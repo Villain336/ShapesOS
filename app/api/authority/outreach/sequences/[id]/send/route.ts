@@ -35,7 +35,7 @@ export async function POST(
   const stores = outreachStores();
   try {
     const result = await sendNextStep(
-      { ...stores, partner: sendingPartner() },
+      { ...stores, partner: await sendingPartner(gate.workspaceId) },
       { workspaceId: gate.workspaceId, sequenceId: id, actor: gate.userId },
     );
     return Response.json({

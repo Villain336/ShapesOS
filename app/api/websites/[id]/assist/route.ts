@@ -12,6 +12,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { getLlmProviderFor, llmStatus } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import {
@@ -80,7 +81,11 @@ export async function POST(
     }));
 
   // Phase D: structured file-change proposals → "bulk" workload.
-  const llm = getLlmProviderFor("bulk");
+  // Phase 15: the workspace's own model key when it has one; metered by tokens.
+  const llmProject = await prisma.project.findUnique({ where: { id: site.projectId }, select: { workspaceId: true } });
+  const llm = llmProject
+    ? await getLlmProviderForWorkspace("bulk", { workspaceId: llmProject.workspaceId, projectId: site.projectId, actorId: user.id })
+    : getLlmProviderFor("bulk");
   let parsed: { proposals: Proposal[]; explanation: string };
 
   if (!llm.isLive) {

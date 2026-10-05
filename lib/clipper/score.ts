@@ -12,6 +12,8 @@ import { ServiceUnavailableError } from "@/lib/api/errors";
 export interface ScoreOptions {
   /** How many candidate segments to ask for. */
   count: number;
+  /** Phase 15: the workspace scoring — its own model key and token metering. */
+  workspaceId?: string;
 }
 
 /** Raw segment as returned by a scorer before normalization. */
@@ -70,15 +72,17 @@ export async function scoreSegments(
   const count = Math.max(1, Math.floor(opts.count));
   const raw: RawSegment[] = scorer
     ? await scorer({ transcriptText: transcript.text, count })
-    : await scoreWithLlm(transcript.text, count);
+    : await scoreWithLlm(transcript.text, count, opts.workspaceId);
   const normalized = normalizeSegments(raw);
   normalized.sort((a, b) => b.viralityScore - a.viralityScore);
   return normalized.slice(0, count);
 }
 
 /** LLM path: background workload, JSON parse, hard failure on garbage. */
-async function scoreWithLlm(text: string, count: number): Promise<RawSegment[]> {
-  const provider = getLlmProviderFor("background");
+async function scoreWithLlm(text: string, count: number, workspaceId?: string): Promise<RawSegment[]> {
+  const provider = workspaceId
+    ? await (await import("@/lib/llm/workspace")).getLlmProviderForWorkspace("background", { workspaceId })
+    : getLlmProviderFor("background");
   if (!provider.isLive) {
     throw new ServiceUnavailableError(
       "Virality scoring needs a live LLM (background workload); the provider resolved to mock. Configure LLM keys to score clips.",

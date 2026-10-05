@@ -133,7 +133,7 @@ export async function scanCommunity(
   const maxDrafts = Math.max(0, input.maxDrafts ?? 5);
   const tasteRejected: TasteRejected[] = [];
   for (const opportunity of opportunities.slice(0, maxDrafts)) {
-    const { draft, taste } = await generateDraftText(opportunity, profile, deps);
+    const { draft, taste } = await generateDraftText(opportunity, profile, { workspaceId: input.workspaceId, ...deps });
     if (!taste.ok) {
       tasteRejected.push({ opportunity, draft, failures: taste.failures });
       if (deps.onTasteReject) deps.onTasteReject({ opportunity, draft, failures: taste.failures });

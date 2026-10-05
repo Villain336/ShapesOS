@@ -27,6 +27,8 @@ import {
   sendDocumensoDocument,
   type DocumensoSigner,
 } from "@/lib/integrations/documenso";
+// Phase 15.1: the workspace's own Documenso (a shared one is refused on hosted).
+import { sidecarEnv } from "@/lib/integrations/sidecar-tenancy";
 import {
   mapDocumensoStatus,
   type EnvelopeStatus,
@@ -141,7 +143,7 @@ export async function addDocumensoFields(
   documentId: string,
   fields: VendorFieldInput[],
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<void> {
   for (const field of fields) {
     await apiFetch(
@@ -164,7 +166,7 @@ export async function addDocumensoFields(
 export async function voidDocumensoDocument(
   documentId: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<void> {
   await apiFetch(
     `/documents/${encodeURIComponent(documentId)}`,
@@ -178,7 +180,7 @@ export async function voidDocumensoDocument(
 export async function downloadDocumensoDocument(
   documentId: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<Uint8Array> {
   const { res } = await apiFetch(
     `/documents/${encodeURIComponent(documentId)}/download`,
@@ -196,7 +198,7 @@ export async function downloadDocumensoDocument(
 /** List templates. Defensive parse — the list shape varies across versions. */
 export async function listDocumensoTemplates(
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<VendorTemplateSummary[]> {
   const { json } = await apiFetch("/templates", { method: "GET" }, fetchImpl, env);
   const raw = Array.isArray(json)
@@ -285,7 +287,7 @@ export function parseDocumensoWebhook(rawBody: string): DocumensoWebhookPayload 
 
 export function createDocumensoVendor(
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): EsignVendor {
   return {
     name: "documenso",

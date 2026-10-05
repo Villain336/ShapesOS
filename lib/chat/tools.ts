@@ -19,12 +19,13 @@ import { roleAtLeast } from "@/lib/authz";
 import { getSeoProvider } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
 import { meter } from "@/lib/metering/service";
+import { creditsFor } from "@/lib/metering/credits";
 import { hourBucket, seedHash } from "@/lib/metering/wiring";
 import { visibilityScore, computeAlerts } from "@/lib/rankings";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { inferIntent } from "@/lib/keywords/intent";
-import { getLlmProviderFor } from "@/lib/llm";
+import { getLlmProviderForWorkspace, valueActionMeterFields } from "@/lib/llm/workspace";
 import { auditProjectSite } from "@/lib/audit/project-audit";
 import { generateReport } from "@/lib/pdf/generate";
 import { approveAutopilotItem } from "@/lib/seo/autopilot-service";
@@ -552,7 +553,15 @@ const create_content_draft: ToolDef = {
       mock: true,
     };
     // Phase D: tool-generated drafts are client-facing → "copy" workload.
-    const llm = getLlmProviderFor("copy");
+    // Phase 15.1: the workspace's own key when it has one; the model work is
+    // part of the value-priced ai_article action (recorded, not charged twice).
+    const llm = await getLlmProviderForWorkspace("copy", {
+      workspaceId: ctx.workspaceId,
+      projectId: ctx.projectId || null,
+      actorId: ctx.userId || null,
+      runId: ctx.runId ?? null,
+      billing: "included",
+    });
     const body = await llm.generate(buildDraftPrompt(brief));
     const words = wordCount(body);
     const keywordId = str(args.keywordId);
@@ -575,6 +584,7 @@ const create_content_draft: ToolDef = {
       workspaceId: ctx.workspaceId,
       projectId: ctx.projectId,
       action: "ai_article",
+      ...valueActionMeterFields(creditsFor("ai_article"), [llm]),
       idempotencyKey: `aichatdraft:${item.id}`,
       evidenceRef: `chat-draft:${item.id}`,
     }).catch(() => {});

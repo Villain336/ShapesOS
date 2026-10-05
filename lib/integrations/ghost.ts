@@ -9,6 +9,7 @@
 // hex-decoded secret, `kid` = id, audience `/admin/`, 5-minute expiry.
 // Implemented with node:crypto — no extra dependency.
 
+import { sidecarEnv } from "./sidecar-tenancy";
 import { createHmac } from "node:crypto";
 
 export const GHOST_URL_ENV = "GHOST_URL";
@@ -19,7 +20,7 @@ export interface GhostStatus {
   name: string;
 }
 
-export function ghostStatus(env: Record<string, string | undefined> = process.env): GhostStatus {
+export function ghostStatus(env: Record<string, string | undefined> = sidecarEnv("ghost")): GhostStatus {
   const configured = !!(env[GHOST_URL_ENV] && env[GHOST_ADMIN_API_KEY_ENV]);
   return { configured, name: "ghost" };
 }
@@ -131,7 +132,7 @@ export interface GhostPost {
 /** POST /posts — creates a post (draft unless status is published). */export async function createGhostPost(
   input: GhostPostInput,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("ghost"),
 ): Promise<GhostPost> {
   const json = (await ghostFetch(
     "/posts/?source=html",
@@ -168,7 +169,7 @@ export interface GhostPost {
 export async function getGhostPost(
   postId: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("ghost"),
 ): Promise<GhostPost> {
   const json = (await ghostFetch(
     `/posts/${encodeURIComponent(postId)}/`,

@@ -631,7 +631,7 @@ export async function ingestReviews(
     });
     if (existing) continue;
 
-    const { sentiment, via } = await classifySentiment(item.text, item.rating);
+    const { sentiment, via } = await classifySentiment(item.text, item.rating, project.workspaceId);
     const created = await prisma.review.create({
       data: {
         projectId,

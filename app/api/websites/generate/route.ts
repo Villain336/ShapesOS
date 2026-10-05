@@ -12,7 +12,8 @@ import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getLlmProviderFor, llmStatus } from "@/lib/llm";
+import { llmStatus } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { recordUsage } from "@/lib/usage";
 
@@ -135,7 +136,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Phase D: generated site HTML is client-facing → "copy" workload.
-  const llm = getLlmProviderFor("copy");
+  // Phase 15: the workspace's own model key when it has one; metered by tokens.
+  const llm = await getLlmProviderForWorkspace("copy", { workspaceId: project.workspaceId, projectId: project.id, actorId: user.id });
   let html: string;
   if (!llm.isLive) {
     html = mockLandingPage(prompt);

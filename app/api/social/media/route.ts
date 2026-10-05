@@ -9,11 +9,12 @@ import { socialMaxUploadBytes } from "@/lib/social/platforms";
 import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { BadRequestError, HttpError } from "@/lib/api/errors";
 import { guardWorkspace, socialError } from "../_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     const rl = await checkRateLimitAsync(`social-media:ws:${workspace.id}`, "write");
@@ -38,3 +39,7 @@ export async function POST(req: Request) {
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

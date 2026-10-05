@@ -35,6 +35,15 @@
 //      Single-key OpenAI-only runs all four on gpt-5.5; failover goes to
 //      gpt-5.5 (or claude-sonnet-5-5 the other way). AGENT_WORKLOADS maps
 //      agent keys (lib/agents/grants.ts) to workloads.
+//   9. Per-workspace model keys (Phase 15.1): resolveWorkload(w, {
+//      workspaceKeys }) uses a workspace's own Anthropic / OpenAI key in place
+//      of the env key for that family (lib/llm/workspace-keys.ts loads them
+//      from the vault). Every safety rule above applies unchanged — the
+//      block-list, the ZDR allow-lists, the retention opt-in — because the
+//      key changes who pays, never which models are routable. A workspace
+//      OpenAI key always goes to api.openai.com (never an operator base URL
+//      or a self-host endpoint) and is ignored under LLM_SELF_HOST=1.
+//      Providers carry keySource ("workspace" → 0 credits, lib/llm/usage.ts).
 //   8. Covered (30-day-retention) models (Phase 7): Anthropic's Fable 5.x
 //      requires 30-day retention — a ZDR org gets HTTP 400 on every request —
 //      so it is NOT on the ZDR allow-list. It routes only when the operator
@@ -51,7 +60,7 @@ import { AnthropicLlmProvider } from "./anthropic";
 import { OpenAiCompatibleLlmProvider } from "./openai";
 import { MockLlmProvider } from "./mock";
 import { FailoverLlmProvider } from "./failover";
-import type { ChatEffort, LlmProvider } from "./types";
+import type { ChatEffort, LlmKeySource, LlmProvider } from "./types";
 import type { AgentKey } from "@/lib/agents/grants";
 
 export type LlmWorkload = "copy" | "bulk" | "background" | "lead" | "subagent" | "code" | "code_max";
@@ -291,10 +300,33 @@ export function openAiBaseUrl(env: EnvLike = process.env): string {
   return firstSet(env.OPENAI_BASE_URL, env.LLM_BASE_URL, "https://api.openai.com/v1").replace(/\/+$/, "");
 }
 
-function readKeys(): Record<LlmFamily, string> {
+/** Phase 15.1: a workspace's own model keys (never logged, never returned). */
+export type WorkspaceModelKeys = Partial<Record<LlmFamily, string>>;
+
+/** The official OpenAI endpoint — where a workspace's own key is sent. */
+export const OPENAI_OFFICIAL_BASE_URL = "https://api.openai.com/v1";
+
+interface KeySet {
+  keys: Record<LlmFamily, string>;
+  source: Record<LlmFamily, LlmKeySource>;
+}
+
+function readKeys(workspaceKeys: WorkspaceModelKeys = {}): KeySet {
+  const ws = {
+    anthropic: firstSet(workspaceKeys.anthropic),
+    // Self-host routes the OpenAI family to a local endpoint: a workspace's
+    // OpenAI key has nowhere safe to go there, so it is not used.
+    openai: isSelfHost() ? "" : firstSet(workspaceKeys.openai),
+  };
   return {
-    openai: openAiApiKey(),
-    anthropic: firstSet(process.env.ANTHROPIC_API_KEY),
+    keys: {
+      openai: ws.openai || openAiApiKey(),
+      anthropic: ws.anthropic || firstSet(process.env.ANTHROPIC_API_KEY),
+    },
+    source: {
+      anthropic: ws.anthropic ? "workspace" : "platform",
+      openai: ws.openai ? "workspace" : isSelfHost() ? "self_host" : "platform",
+    },
   };
 }
 
@@ -334,21 +366,26 @@ function openAiCompatible(
   apiKey: string,
   model: string,
   chat: ChatDefaults,
+  keySource: LlmKeySource,
 ): OpenAiCompatibleLlmProvider {
-  return new OpenAiCompatibleLlmProvider(apiKey, model, openAiBaseUrl(), {
-    selfHost: isSelfHost(),
+  const own = keySource === "workspace";
+  return new OpenAiCompatibleLlmProvider(apiKey, model, own ? OPENAI_OFFICIAL_BASE_URL : openAiBaseUrl(), {
+    selfHost: own ? false : isSelfHost(),
     timeoutMs: openAiTimeoutOverride(),
     workload: chat.workload,
     defaultEffort: chat.defaultEffort,
+    keySource,
   });
 }
 
 /** Build the live provider for an allow-listed hosted model (failover use). */
-function hostedProvider(model: string, keys: Record<LlmFamily, string>, chat: ChatDefaults): LlmProvider | null {
+function hostedProvider(model: string, ks: KeySet, chat: ChatDefaults): LlmProvider | null {
   if (!isRoutableHostedModel(model)) return null;
   const fam = familyOf(model);
-  if (fam === "anthropic" && keys.anthropic) return new AnthropicLlmProvider(keys.anthropic, model, chat);
-  if (fam === "openai" && keys.openai) return openAiCompatible(keys.openai, model, chat);
+  if (fam === "anthropic" && ks.keys.anthropic) {
+    return new AnthropicLlmProvider(ks.keys.anthropic, model, { ...chat, keySource: ks.source.anthropic });
+  }
+  if (fam === "openai" && ks.keys.openai) return openAiCompatible(ks.keys.openai, model, chat, ks.source.openai);
   return null;
 }
 
@@ -372,6 +409,8 @@ export interface ResolvedWorkload {
   /** Covered-model swap: the 30-day-retention default and why it was not
    *  used. Null when not applied. */
   retention: { from: string; reason: string } | null;
+  /** Phase 15.1: whose key serves the primary; null on mock. */
+  keySource: LlmKeySource | null;
 }
 
 function toMock(
@@ -395,11 +434,13 @@ function toMock(
     failoverModel: null,
     effort: WORKLOAD_EFFORT[workload] ?? null,
     retention: null,
+    keySource: null,
   };
 }
 
 /** Resolve the primary (no failover wrapping). */
-function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>): ResolvedWorkload {
+function resolvePrimary(workload: LlmWorkload, ks: KeySet): ResolvedWorkload {
+  const keys = ks.keys;
   const resolved = resolveWorkloadModel(workload);
   const source = resolved.source;
   let model = resolved.model;
@@ -496,12 +537,13 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
       workload,
       requestedModel: model,
       source,
-      provider: new AnthropicLlmProvider(anthropicKey, model, { workload, defaultEffort: effort }),
+      provider: new AnthropicLlmProvider(anthropicKey, model, { workload, defaultEffort: effort, keySource: ks.source.anthropic }),
       fallbackReason: null,
       singleKey,
       failoverModel: null,
       effort,
       retention,
+      keySource: ks.source.anthropic,
     };
   }
 
@@ -532,12 +574,13 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
       workload,
       requestedModel: model,
       source,
-      provider: openAiCompatible(openAiKey, model, { workload, defaultEffort: effort }),
+      provider: openAiCompatible(openAiKey, model, { workload, defaultEffort: effort }, ks.source.openai),
       fallbackReason: null,
       singleKey,
       failoverModel: null,
       effort,
       retention,
+      keySource: ks.source.openai,
     };
   }
 
@@ -555,23 +598,29 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
 export function failoverModelFor(
   workload: LlmWorkload,
   primaryModel: string,
+  workspaceKeys: WorkspaceModelKeys = {},
 ): string | null {
   if (!failoverEnabled() || isSelfHost()) return null;
   const fam = familyOf(primaryModel);
   if (!fam) return null;
   const candidate = FAMILY_WORKLOAD_DEFAULTS[otherFamily(fam)][workload];
   if (!isRoutableHostedModel(candidate)) return null; // blocked/unlisted: never
-  const keys = readKeys();
+  const { keys } = readKeys(workspaceKeys);
   return keys[otherFamily(fam)] ? candidate : null;
 }
 
-export function resolveWorkload(workload: LlmWorkload): ResolvedWorkload {
-  const keys = readKeys();
-  const primary = resolvePrimary(workload, keys);
+export interface ResolveOptions {
+  /** Phase 15.1: the workspace's own model keys (lib/llm/workspace-keys.ts). */
+  workspaceKeys?: WorkspaceModelKeys;
+}
+
+export function resolveWorkload(workload: LlmWorkload, opts: ResolveOptions = {}): ResolvedWorkload {
+  const ks = readKeys(opts.workspaceKeys);
+  const primary = resolvePrimary(workload, ks);
   if (!primary.provider.isLive) return primary;
-  const fbModel = failoverModelFor(workload, primary.requestedModel);
+  const fbModel = failoverModelFor(workload, primary.requestedModel, opts.workspaceKeys);
   const fallback = fbModel
-    ? hostedProvider(fbModel, keys, { workload, defaultEffort: WORKLOAD_EFFORT[workload] ?? null })
+    ? hostedProvider(fbModel, ks, { workload, defaultEffort: WORKLOAD_EFFORT[workload] ?? null })
     : null;
   if (!fbModel || !fallback) return primary;
   return {
@@ -607,14 +656,16 @@ export interface LlmWorkloadStatus {
   effort: ChatEffort | null;
   /** Covered-model swap explanation; null when not applied. */
   retention: string | null;
+  /** Phase 15.1: whose key serves the workload; null on mock. */
+  keySource: LlmKeySource | null;
 }
 
 /** Per-workload status for Settings → Providers and API responses.
  *  Never includes key material — only booleans and model names (T3). */
-export function llmRoutingStatus(): Record<LlmWorkload, LlmWorkloadStatus> {
+export function llmRoutingStatus(opts: ResolveOptions = {}): Record<LlmWorkload, LlmWorkloadStatus> {
   const out = {} as Record<LlmWorkload, LlmWorkloadStatus>;
   for (const w of LLM_WORKLOADS) {
-    const r = resolveWorkload(w);
+    const r = resolveWorkload(w, opts);
     out[w] = {
       name: r.provider.name,
       isLive: r.provider.isLive,
@@ -628,6 +679,7 @@ export function llmRoutingStatus(): Record<LlmWorkload, LlmWorkloadStatus> {
       failover: r.failoverModel,
       effort: r.effort,
       retention: r.retention ? `Default "${r.retention.from}" swapped: ${r.retention.reason}.` : null,
+      keySource: r.keySource,
     };
   }
   return out;

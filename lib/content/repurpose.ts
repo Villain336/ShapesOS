@@ -77,6 +77,18 @@ function defaultDeps(): RepurposeDeps {
   };
 }
 
+/** Phase 15: the default deps for a workspace — its own model key and token
+ *  metering (the route passes this; tests inject their own deps). */
+export async function workspaceRepurposeDeps(workspaceId: string, actorId?: string | null): Promise<RepurposeDeps> {
+  const { getLlmProviderForWorkspace } = await import("@/lib/llm/workspace");
+  const provider = await getLlmProviderForWorkspace("bulk", { workspaceId, actorId: actorId ?? null });
+  return {
+    retrieve: (q, opts) => retrieveExpertContext(q, opts),
+    generate: (prompt, opts) => provider.generate(prompt, opts),
+    live: provider.isLive,
+  };
+}
+
 const FORMAT_INSTRUCTIONS: Record<RepurposeFormatId, string> = {
   brief: `Write a CONTENT BRIEF with these sections:
 ## Audience

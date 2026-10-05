@@ -286,8 +286,9 @@ export async function proposeLayoutWithModel(
   image: { mimeType: string; bytes: Buffer } | null,
 ): Promise<{ layout: DraftLayout | null; notes: string[] }> {
   const notes: string[] = [];
-  const { getLlmProviderFor } = await import("@/lib/llm");
-  const provider = getLlmProviderFor("subagent");
+  // Phase 15.1: the workspace's own model key when it has one.
+  const { resolveWorkloadForWorkspace } = await import("@/lib/llm/workspace");
+  const provider = (await resolveWorkloadForWorkspace("subagent", ctx.workspaceId)).provider;
   if (!provider.isLive) return { layout: null, notes: ["No live language model is configured, so the description was not read."] };
   const content: Array<Record<string, unknown>> = [];
   if (image) {

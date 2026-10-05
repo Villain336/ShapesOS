@@ -280,7 +280,7 @@ async function executeGenerate(job: ClaimedJob) {
 
   // Ask scoring for a wider field, then let selection narrow it down.
   const transcript = source.transcript as unknown as WordTimedTranscript;
-  const candidates = await scoreSegments(transcript, { count: count * 2 });
+  const candidates = await scoreSegments(transcript, { count: count * 2, workspaceId: ws });
   await setJobProgress(ws, job.id, 0.5);
   const picked = selectClips(candidates ?? [], transcript, { count });
   await setJobProgress(ws, job.id, 0.7);

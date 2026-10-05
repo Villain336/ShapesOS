@@ -22,7 +22,11 @@ export type LlmErrorKind =
   // Phase 7: a streamed tool input the SDK could not parse at all. The
   // tool_use block never completed, so there is no id to answer with an
   // error result: the caller re-issues the turn (capped). Never a failover.
-  | "tool_input";
+  | "tool_input"
+  // Phase 15.2: the workspace's credit cap refused a platform-key call
+  // BEFORE it was sent (lib/llm/usage.ts spend gate). Never retried, never a
+  // failover (the other family is platform-paid too).
+  | "cap_exceeded";
 
 const RETRYABLE: ReadonlySet<LlmErrorKind> = new Set(["rate_limit", "server", "timeout", "network"]);
 

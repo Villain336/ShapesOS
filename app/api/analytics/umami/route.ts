@@ -10,12 +10,13 @@ import {
   fetchUmamiPageviews,
   fetchUmamiStats,
 } from "@/lib/integrations/umami";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 
 const DAY_MS = 86_400_000;
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   try {
     await guardWorkspace();
     const url = new URL(req.url);
@@ -39,3 +40,7 @@ export async function GET(req: Request) {
     return httpErrorResponse(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);

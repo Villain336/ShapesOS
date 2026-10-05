@@ -11,7 +11,8 @@
 // approval" — it never fakes a Google API call.
 
 import { prisma } from "@/lib/prisma";
-import { getLlmProviderFor, WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { requestApproval } from "@/lib/messaging/dispatcher";
 import { brandToneFor } from "./engine";
 import type { ApprovalItem, Review } from "@prisma/client";
@@ -103,7 +104,8 @@ export async function draftReviewResponse(
   }
 
   const tone = await brandToneFor(workspaceId);
-  const llm = getLlmProviderFor("copy");
+  // Phase 15: the workspace's own model key when it has one; metered by tokens.
+  const llm = await getLlmProviderForWorkspace("copy", { workspaceId, actorId: opts?.requestedBy ?? null });
   const raw = await llm.generate(
     buildResponsePrompt({
       businessName: review.businessName,

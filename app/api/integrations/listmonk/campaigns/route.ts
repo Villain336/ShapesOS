@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { guardWorkspace, readJson, sidecarError } from "../../_lib";
 import { createListmonkCampaign, listmonkCampaigns } from "@/lib/integrations/listmonk";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ const CreateSchema = z.object({
   contentType: z.enum(["html", "richtext", "markdown", "plain"]).optional(),
 });
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   try {
     await guardWorkspace();
     const sp = new URL(req.url).searchParams;
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     await guardWorkspace({ editor: true });
     const parsed = CreateSchema.safeParse(await readJson(req));
@@ -50,3 +51,8 @@ export async function POST(req: Request) {
     return sidecarError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);
+export const POST = sidecarScoped(handlePOST);

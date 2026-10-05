@@ -5,6 +5,7 @@
 
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import type { SerpVendorId } from "./types";
+import { vendorUsdCredits } from "@/lib/metering/credits";
 
 export type ApiMeterKind = "serp_call" | "volume_lookup" | "ai_prompt" | "backlink_pull";
 
@@ -15,20 +16,55 @@ export interface MeterRecord {
   costUsd: number;
 }
 
-/** Append one metered event. costUsd may be 0 (e.g. cache hits are free). */
+/** Append one metered event. costUsd may be 0 (e.g. cache hits are free).
+ *
+ * Phase 15.2: a call that cost the PLATFORM money is also charged in credits
+ * through meter(): its USD × INTELLIGENCE_VENDOR_MULTIPLIER (4×), rounded up
+ * — action `geo_prompt_run` for AI-visibility prompt runs (`ai_prompt`),
+ * `intelligence_vendor_call` otherwise. A call on the workspace's own vendor
+ * key is free. Idempotent per api_meter row; recorded after the fact (the
+ * call happened); the credit cap is checked before the call
+ * (assertBudgetAvailable). Metering never breaks the data path. */
 export async function recordApiMeter(
   workspaceId: string,
   vendor: string,
   meter: ApiMeterKind,
   quantity: number,
   costUsd: number,
+  opts: { keySource?: "platform" | "workspace" } = {},
 ): Promise<void> {
   const period = currentPeriod();
-  await withWorkspaceScope(workspaceId, (tx) =>
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.apiMeterEntry.create({
       data: { workspaceId, vendor, meter, quantity, costUsd, period },
+      select: { id: true },
     }),
   );
+  if (!(costUsd > 0)) return;
+  try {
+    const keySource = opts.keySource ?? (await vendorKeySource(workspaceId, vendor));
+    if (keySource === "workspace") return;
+    const credits = vendorUsdCredits(costUsd);
+    if (credits <= 0) return;
+    const { meter: chargeCredits } = await import("@/lib/metering/service");
+    await chargeCredits({
+      workspaceId,
+      action: meter === "ai_prompt" ? "geo_prompt_run" : "intelligence_vendor_call",
+      credits,
+      keySource: "platform",
+      afterTheFact: true,
+      idempotencyKey: `apimeter:${row.id}`,
+      evidenceRef: `api_meter:${vendor}:${meter}`,
+    });
+  } catch (err) {
+    console.warn(`[intelligence] could not charge credits for ${vendor}/${meter}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function vendorKeySource(workspaceId: string, vendor: string): Promise<"platform" | "workspace"> {
+  if (vendor !== "serper" && vendor !== "dataforseo" && vendor !== "talordata") return "platform";
+  const { getVendorKeySources } = await import("./credentials");
+  return (await getVendorKeySources(workspaceId))[vendor];
 }
 
 export function currentPeriod(now = new Date()): string {
@@ -79,6 +115,30 @@ export async function assertBudgetAvailable(workspaceId: string, estimatedCostUs
   const estimatedCents = Math.round(estimatedCostUsd * 100);
   if (!budgetAllows(status.spendCents, status.capCents, estimatedCents)) {
     throw new BudgetCapExceeded(workspaceId, status.spendCents, status.capCents ?? 0);
+  }
+  // Phase 15.2: a paid call is also refused when the workspace's CREDIT cap
+  // is reached (platform keys are charged in credits). A workspace whose own
+  // keys serve every vendor is not gated by credits.
+  if (estimatedCostUsd > 0) {
+    const { getVendorKeySources } = await import("./credentials");
+    const sources = await getVendorKeySources(workspaceId).catch(() => null);
+    const allOwn = sources ? Object.values(sources).every((s) => s === "workspace") : false;
+    if (!allOwn) {
+      const { checkCap } = await import("@/lib/metering/service");
+      const cap = await checkCap(workspaceId);
+      if (!cap.allowed) throw new CreditCapExceeded(workspaceId, cap.used, cap.capCredits);
+    }
+  }
+}
+
+/** Phase 15.2: the workspace's credit cap refused a platform-paid data call. */
+export class CreditCapExceeded extends BudgetCapExceeded {
+  constructor(workspaceId: string, usedCredits: number, capCredits: number) {
+    super(workspaceId, 0, 0);
+    this.name = "CreditCapExceeded";
+    this.message =
+      `Credit cap reached (${usedCredits.toLocaleString()} of ${capCredits.toLocaleString()} credits used). ` +
+      `Raise the cap or add credits in Settings → Usage, or connect your own data vendor key.`;
   }
 }
 

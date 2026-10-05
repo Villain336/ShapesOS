@@ -20,6 +20,7 @@ import {
   sendDocumensoDocument,
   type DocumensoSigner,
 } from "@/lib/integrations/documenso";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ function serialize(row: {
   };
 }
 
-export async function GET() {
+async function handleGET() {
   try {
     const { workspace } = await guardWorkspace();
     const rows = await prisma.signingRequest.findMany({
@@ -68,7 +69,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     if (!documensoStatus().configured) {
@@ -149,3 +150,8 @@ export async function POST(req: Request) {
     return httpErrorResponse(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);
+export const POST = sidecarScoped(handlePOST);

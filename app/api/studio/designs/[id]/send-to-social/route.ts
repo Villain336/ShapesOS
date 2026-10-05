@@ -10,6 +10,7 @@ import { sendDesignToSocial } from "@/lib/social/studio";
 import { MAX_RENDER_SCALE } from "@/lib/design/render-server";
 import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { guardWorkspace, readJson, socialError } from "@/app/api/social/_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ const Body = z.object({
   scale: z.number().finite().min(1).max(MAX_RENDER_SCALE).optional(),
 });
 
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     // Rendering is expensive compute: same "ai" tier as the render route.
@@ -38,3 +39,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

@@ -13,6 +13,27 @@ import { createContextDevClient, ContextDevError } from "./client";
 
 export const CONTEXTDEV_CONNECTOR_KEY = "contextdev";
 
+/**
+ * Phase 15.1: Context.dev is "Both" — the workspace's own key (vault) when it
+ * connected one (free), else the PLATFORM key from the host env (charged in
+ * credits at the budget gate, ./budget-store.ts checkAndReserve).
+ */
+export const CONTEXTDEV_PLATFORM_KEY_ENV = "CONTEXTDEV_API_KEY";
+
+function platformKey(env: Record<string, string | undefined> = process.env): string {
+  return (env[CONTEXTDEV_PLATFORM_KEY_ENV] ?? "").trim();
+}
+
+/** Whose Context.dev key a call for this workspace would use. */
+export async function contextDevKeySource(workspaceId: string): Promise<"workspace" | "platform" | "none"> {
+  const own = await prisma.connectorConnection.findFirst({
+    where: { workspaceId, connectorKey: CONTEXTDEV_CONNECTOR_KEY },
+    select: { id: true },
+  });
+  if (own) return "workspace";
+  return platformKey() ? "platform" : "none";
+}
+
 export class ContextDevKeyError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
@@ -78,12 +99,15 @@ export async function storeContextDevKey(
  */
 export async function resolveContextDevKey(
   workspaceId: string,
-): Promise<{ apiKey: string; connectionId: string }> {
+): Promise<{ apiKey: string; connectionId: string | null; keySource: "workspace" | "platform" }> {
   const connection = await prisma.connectorConnection.findFirst({
     where: { workspaceId, connectorKey: CONTEXTDEV_CONNECTOR_KEY },
     select: { id: true, status: true },
   });
   if (!connection) {
+    // Phase 15.1: the platform key (charged in credits) when the host has one.
+    const platform = platformKey();
+    if (platform) return { apiKey: platform, connectionId: null, keySource: "platform" };
     throw new ContextDevKeyError("NOT_CONNECTED", "No Context.dev API key connected for this workspace");
   }
   if (connection.status !== "active") {
@@ -95,5 +119,5 @@ export async function resolveContextDevKey(
   if (!apiKey) {
     throw new ContextDevKeyError("REKEY_REQUIRED", "Vault credential has no API key — reconnect the Context.dev key");
   }
-  return { apiKey, connectionId: connection.id };
+  return { apiKey, connectionId: connection.id, keySource: "workspace" };
 }

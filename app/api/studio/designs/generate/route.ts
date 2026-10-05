@@ -8,7 +8,7 @@
 // configured the route fails loudly (503) — it never returns a fake design.
 
 import { z } from "zod";
-import { getLlmProviderFor } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { validateDesignDocument } from "@/lib/design/validate";
 import { buildDesignPrompt, extractJsonObject } from "@/lib/design/ai";
 import { guardWorkspace, httpErrorResponse, readJson } from "../_lib";
@@ -74,14 +74,15 @@ async function tryGenerate(
 
 export async function POST(req: Request) {
   try {
-    await guardWorkspace({ editor: true });
+    const { user, workspace } = await guardWorkspace({ editor: true });
     const parsed = BodySchema.safeParse(await readJson(req));
     if (!parsed.success) {
       return Response.json({ error: "Invalid request body." }, { status: 400 });
     }
     const { prompt, width, height } = parsed.data;
 
-    const provider = getLlmProviderFor("copy");
+    // Phase 15: the workspace's own model key when it has one; metered by tokens.
+    const provider = await getLlmProviderForWorkspace("copy", { workspaceId: workspace.id, actorId: user.id });
     if (!provider.isLive || !provider.isConfigured()) {
       return Response.json(
         {

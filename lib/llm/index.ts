@@ -19,7 +19,7 @@
 
 import { getLlmProviderFor, llmRoutingStatus, resolveWorkload, LLM_WORKLOADS } from "./router";
 import type { LlmProvider } from "./types";
-import type { LlmWorkload } from "./router";
+import type { LlmWorkload, ResolveOptions } from "./router";
 
 export type { LlmProvider, LlmWorkload };
 export type {
@@ -54,8 +54,9 @@ export function getLlmProvider(): LlmProvider {
   return getLlmProviderFor("bulk");
 }
 
-export function llmStatus() {
-  const routing = llmRoutingStatus();
+/** Phase 15.1: pass a workspace's own keys to see routing as it sees it. */
+export function llmStatus(opts: ResolveOptions = {}) {
+  const routing = llmRoutingStatus(opts);
   const bulk = routing.bulk;
   // Top-level shape is unchanged for existing consumers (mock banners,
   // Settings → Providers, API responses). isLive is true when ANY workload

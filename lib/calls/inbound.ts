@@ -167,10 +167,12 @@ export async function handleCallStatus(input: CallStatusInput): Promise<CallStat
   const durationSec = Math.max(0, Math.floor(input.durationSec ?? 0));
   const recordingUrl = input.recordingUrl ?? null;
   let transcription = input.transcription ?? null;
+  let transcribedHere = false;
   if (!transcription && recordingUrl && status === "completed") {
     try {
       const t = await provider.transcribe({ recordingUrl, callSid: input.callSid });
       transcription = t.transcript;
+      transcribedHere = Boolean(transcription);
     } catch {
       transcription = null; // transcription is best-effort, never fatal
     }
@@ -226,6 +228,19 @@ export async function handleCallStatus(input: CallStatusInput): Promise<CallStat
       touchId: touch?.id ?? null,
     },
   });
+
+  // Phase 15.2: meter the live call's voice minutes (and the transcription
+  // this finalisation ran), once per call. Best-effort, after the fact.
+  {
+    const { meterCallUsage } = await import("./billing");
+    await meterCallUsage({
+      id: call.id,
+      workspaceId: call.workspaceId,
+      provider: call.number.provider,
+      durationSec,
+      transcribed: transcribedHere,
+    });
+  }
 
   // 5. Missed-call text-back (best-effort): only fires when the caller
   // matches a lead with explicit SMS opt-in. A messaging failure must never

@@ -7,6 +7,11 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { providerStatus } from "@/lib/providers";
 import { llmStatus } from "@/lib/llm";
+import { loadWorkspaceModelKeys } from "@/lib/llm/workspace-keys";
+import { sidecarEnv, withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
+import { deploymentMode } from "@/lib/billing/trial";
+import WorkspaceKeysManager from "@/components/settings/WorkspaceKeysManager";
+import KeySourcesTable from "@/components/settings/KeySourcesTable";
 import { prisma } from "@/lib/prisma";
 import { CONTEXTDEV_CONNECTOR_KEY } from "@/lib/knowledge/contextdev/keys";
 import { mockInventory, notLive, type FeatureMode } from "@/lib/providers/mock-inventory";
@@ -82,7 +87,9 @@ export default async function ProvidersSettingsPage() {
   if (!membership) redirect("/dashboard");
 
   const seo = providerStatus();
-  const llm = llmStatus();
+  // Phase 15.1: routing as THIS workspace sees it (its own model keys count).
+  const workspaceKeys = await loadWorkspaceModelKeys(workspace.id).catch(() => ({}));
+  const llm = llmStatus({ workspaceKeys });
   // Context.dev keys live in the workspace vault, not the environment.
   const contextDevConnected = await prisma.connectorConnection
     .findFirst({
@@ -113,14 +120,18 @@ export default async function ProvidersSettingsPage() {
   const cloudinary = cloudinaryStatus();
   /* PROVIDER:pexels */ const pexels = pexelsStatus(); /* END */
   /* PROVIDER:pixabay */ const pixabay = pixabayStatus(); /* END */
-  // Phase 12 (embeds).
-  const umami = umamiStatus();
-  const chatwoot = chatwootStatus();
-  const ghost = ghostStatus();
-  const growthbook = growthBookStatus();
-  const documenso = documensoStatus();
-  /* PROVIDER:listmonk */ const listmonk = listmonkStatus(); /* END */
-  /* PROVIDER:postiz */ const postiz = postizStatus(); /* END */
+  // Phase 12 (embeds). Phase 15.1: read inside this workspace's sidecar
+  // scope — its own instance; on hosted a shared env instance is refused.
+  const { umami, chatwoot, ghost, growthbook, documenso, listmonk, postiz } = await withWorkspaceSidecars(workspace.id, () => ({
+    umami: umamiStatus(),
+    chatwoot: chatwootStatus(),
+    ghost: ghostStatus(),
+    growthbook: growthBookStatus(sidecarEnv("growthbook")),
+    documenso: documensoStatus(),
+    /* PROVIDER:listmonk */ listmonk: listmonkStatus(), /* END */
+    /* PROVIDER:postiz */ postiz: postizStatus(), /* END */
+  }));
+  const hosted = deploymentMode() === "hosted";
   /* INTEGRATION:activepieces */ const activepieces = activepiecesStatus(); /* END */
   // Host-wide resources (the Activepieces engine) are managed by platform
   // operators, not workspace admins — decided here, enforced again by the API.
@@ -131,12 +142,29 @@ export default async function ProvidersSettingsPage() {
       <div>
         <h1 className="aos-heading">Providers</h1>
         <p className="mt-0.5 text-[13px] text-muted">
-          {workspace.name} — which external providers ShapesOS is using. These
-          are configured via environment variables on the host; change them
-          there and restart to apply. Key material is never displayed here.
+          {workspace.name} — which external providers ShapesOS is using, where
+          each key comes from, and the keys this workspace brings itself.
+          Host keys are environment variables (change them on the host and
+          restart); your own keys are added below. Key material is never
+          displayed here.
         </p>
       </div>
       <SettingsNav />
+
+      <section className="rounded-lg bg-paper p-5 shadow-hairline" aria-labelledby="providers-your-keys">
+        <h2 id="providers-your-keys" className="aos-subheading">
+          Your keys
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Keys that belong to this workspace. Model calls on your own key use no AI credits.
+          {hosted ? " On hosted ShapesOS, self-hosted tools work only with your own instance." : ""}
+        </p>
+        <div className="mt-4">
+          <WorkspaceKeysManager kinds={["model", "sidecar", "outreach"]} />
+        </div>
+      </section>
+
+      <KeySourcesTable />
 
       <section
         className="rounded-lg bg-paper p-5 shadow-hairline"
@@ -262,6 +290,11 @@ export default async function ProvidersSettingsPage() {
                     <td className="py-2 text-xs text-muted">
                       {r.isLive ? (
                         <>
+                          {r.keySource === "workspace" ? (
+                            <span className="font-semibold text-ink">Your key — no AI credits used. </span>
+                          ) : r.keySource === "platform" ? (
+                            "Platform key (charged in credits). "
+                          ) : null}
                           {r.source === "env"
                             ? "Set explicitly by environment."
                             : r.source === "legacy"
