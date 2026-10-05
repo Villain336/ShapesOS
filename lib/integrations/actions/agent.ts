@@ -5,8 +5,15 @@
 // conservative gating by construction:
 //
 //   low (reads) + draft-creators  -> execute directly, ALWAYS logged.
+//   medium, under an auto rule    -> Phase 14 (owner decision 2026-10-05):
+//                                    a rule keyed "composio:<toolkit>" set to
+//                                    Auto-run executes a classified medium
+//                                    (non-destructive) write directly, ALWAYS
+//                                    logged with the rule — unless its name is
+//                                    money / irreversible (DoA Tier 3).
 //   everything else               -> proposeApproval, NEVER executed here.
-//                                    The human approves in /dashboard/actions;
+//                                    High (destructive) always asks. The human
+//                                    approves in /dashboard/actions;
 //                                    executeApproved() (gate.ts) is the only
 //                                    execution path for gated tiers.
 //
@@ -25,13 +32,54 @@ import {
   getToolTierOverrides,
   requireConnectedEntity,
 } from "@/lib/integrations/actions/connections";
-import { resolveToolkitForTool } from "@/lib/integrations/actions/toolkits";
+import { resolveToolkitForTool, TOOLKIT_CATEGORY } from "@/lib/integrations/actions/toolkits";
 import {
   logAction,
   proposeAction,
 } from "@/lib/integrations/actions/gate";
 import { containsRedactedPlaceholder, REDACTED_PLACEHOLDER } from "@/lib/integrations/actions/redact";
 import { getComposioBudgetWarning } from "@/lib/integrations/actions/budget";
+import { COMPOSIO_MONEY_TOOLKIT_RE, EXTERNAL_TOOL_MONEY_RE, autoApprovalFor, type AutoApprovalInput } from "@/lib/automation/policy";
+
+/** Phase 14: the automation action a Composio toolkit's rule is keyed on. */
+export function composioAction(toolkitSlug: string): string {
+  return `composio:${toolkitSlug}`;
+}
+
+/**
+ * Phase 14: Composio toolkits that move money (payments, accounting,
+ * payroll, banking, commerce checkout) — no rule ever covers their writes —
+ * and money words in a tool name beyond the DoA Tier-3 verbs (a Stripe
+ * "create charge" or a "send invoice" carries no purchase/refund/transfer
+ * verb). Fail closed: matching either means "always asks".
+ */
+export { COMPOSIO_MONEY_TOOLKIT_RE };
+export const COMPOSIO_MONEY_TOOL_RE = EXTERNAL_TOOL_MONEY_RE;
+
+/**
+ * Phase 14 — PURE. The auto-approve question for a Composio call, or null
+ * when no rule may ever cover it: only a confidently classified MEDIUM
+ * write of a known, non-money toolkit qualifies (high = destructive, always
+ * asks; low / draft-creators already run; a payments / accounting toolkit
+ * or a money word in the tool name always asks). The tool name is also the
+ * description the DoA evaluator scans, so a refund / purchase / delete tool
+ * is Tier 3 and can never auto-run, whatever the rule says.
+ */
+export function composioAutoInput(
+  classified: Pick<ClassifiedAction, "tier" | "classified" | "autoExecutable">,
+  toolkitSlug: string | null | undefined,
+  toolName: string,
+  agentKey: string = "*",
+): AutoApprovalInput | null {
+  if (classified.autoExecutable || classified.tier !== "medium" || !classified.classified || !toolkitSlug) return null;
+  if (TOOLKIT_CATEGORY[toolkitSlug] === "payments" || COMPOSIO_MONEY_TOOLKIT_RE.test(toolkitSlug)) return null;
+  if (COMPOSIO_MONEY_TOOL_RE.test(toolName.toLowerCase().replace(/_/g, " "))) return null;
+  return {
+    agentKey,
+    action: composioAction(toolkitSlug),
+    description: toolName.toLowerCase().replace(/_/g, " "),
+  };
+}
 
 export interface AgentInvokeInput {
   workspaceId: string;
@@ -40,6 +88,8 @@ export interface AgentInvokeInput {
   args: Record<string, unknown>;
   /** Who invoked (agent id / mission id / user id) — lands in the audit log. */
   invokedBy: string;
+  /** Phase 14: the agent asking (its own rule wins over the every-agent rule). */
+  agentKey?: string;
   http?: ComposioHttp;
 }
 
@@ -73,7 +123,12 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
   // Fail-closed: no connection row -> no execution, no proposal.
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, input.appKey);
 
-  if (!classified.autoExecutable) {
+  // Phase 14: a "composio:<toolkit>" rule may let a medium write run.
+  const autoInput = composioAutoInput(classified, toolkitSlug, input.toolName, input.agentKey);
+  const autoDecision = autoInput ? await autoApprovalFor(input.workspaceId, autoInput).catch(() => null) : null;
+  const autoReason = autoDecision?.auto ? autoDecision.reason : null;
+
+  if (!classified.autoExecutable && !autoReason) {
     const { approval } = await proposeAction({
       workspaceId: input.workspaceId,
       appKey: input.appKey,
@@ -133,7 +188,12 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
     toolName: input.toolName,
     riskTier: classified.tier,
     argsSummary: input.args,
-    resultSummary: budgetWarning ? { ...resultSummary, budgetWarning } : resultSummary,
+    resultSummary: {
+      ...resultSummary,
+      ...(budgetWarning ? { budgetWarning } : {}),
+      // Phase 14: the audit names the rule that let a medium write run.
+      ...(autoReason ? { autoApproved: autoReason } : {}),
+    },
     latencyMs: Date.now() - started,
     status,
     executedBy: input.invokedBy,

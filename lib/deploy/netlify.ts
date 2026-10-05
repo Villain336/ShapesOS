@@ -13,6 +13,11 @@
 //      (application/octet-stream)
 // rollback() is POST /api/v1/sites/:site_id/deploys/:deploy_id/restore —
 // that earlier deploy becomes the published one again.
+// Phase 11 (devtools): the m21 "netlify" connector (lib/connectors/m21/
+// native/netlify.ts) reuses this class — listSites() is GET /api/v1/sites,
+// triggerBuild() is POST /api/v1/sites/:site_id/builds (a new build from the
+// site's linked repository). It never retries: a build trigger must not
+// run twice.
 //
 // NOTE: live API is untested from this sandbox (no network egress); shapes
 // follow the documented Netlify REST API (api.netlify.com/api/v1). The
@@ -62,10 +67,15 @@ export class NetlifyDeployTarget implements DeployTarget {
   readonly name = "Netlify";
   readonly isLive = true;
 
-  constructor(private cfg: NetlifyConfig) {}
+  constructor(
+    private cfg: NetlifyConfig,
+    /** Phase 11 (devtools): injectable fetch (tests); defaults to the global fetch at call time. */
+    private readonly opts: { fetchImpl?: typeof fetch } = {},
+  ) {}
 
   private async api(path: string, init?: RequestInit): Promise<Response> {
-    return fetch(`${NETLIFY_API}${path}`, {
+    const fetchImpl = this.opts.fetchImpl ?? fetch;
+    return fetchImpl(`${NETLIFY_API}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${this.cfg.token}`,
@@ -220,6 +230,68 @@ export class NetlifyDeployTarget implements DeployTarget {
       mock: false,
     };
   }
+
+  /** Phase 11 (devtools): the token's sites (GET /sites), for the m21 connector. */
+  async listSites(opts: { limit?: number } = {}): Promise<NetlifySiteSummary[]> {
+    const limit = Math.min(Math.max(Math.floor(opts.limit ?? 50), 1), 100);
+    const list = (await this.check(await this.api(`/sites?filter=all&per_page=${limit}`), "list sites")) as Json[];
+    return (Array.isArray(list) ? list : []).map((s) => {
+      const build = (s.build_settings ?? {}) as Json;
+      const published = (s.published_deploy ?? {}) as Json;
+      return {
+        id: String(s.id ?? ""),
+        name: String(s.name ?? ""),
+        url: siteUrl(s),
+        adminUrl: typeof s.admin_url === "string" ? s.admin_url : null,
+        repo: typeof build.repo_url === "string" && build.repo_url ? build.repo_url : null,
+        branch: typeof build.repo_branch === "string" && build.repo_branch ? build.repo_branch : null,
+        publishedDeployId: typeof published.id === "string" ? published.id : null,
+        updatedAt: typeof s.updated_at === "string" ? s.updated_at : null,
+      };
+    });
+  }
+
+  /**
+   * Phase 11 (devtools): start a new build + deploy from the site's linked
+   * repository (POST /sites/:id/builds). Never retried — a second trigger
+   * would deploy twice.
+   */
+  async triggerBuild(siteId: string, opts: { clearCache?: boolean } = {}): Promise<NetlifyBuildSummary> {
+    const id = siteId.trim() || this.cfg.siteId.trim();
+    if (!id) throw new Error("A Netlify site id is required to trigger a deploy.");
+    const b = (await this.check(
+      await this.api(`/sites/${encodeURIComponent(id)}/builds`, {
+        method: "POST",
+        body: JSON.stringify(opts.clearCache ? { clear_cache: true } : {}),
+      }),
+      "trigger build",
+    )) as Json;
+    if (!b.id) throw new Error("Netlify did not return a build id.");
+    return {
+      buildId: String(b.id),
+      deployId: typeof b.deploy_id === "string" ? b.deploy_id : null,
+      createdAt: typeof b.created_at === "string" ? b.created_at : null,
+      done: b.done === true,
+    };
+  }
+}
+
+export interface NetlifySiteSummary {
+  id: string;
+  name: string;
+  url: string | null;
+  adminUrl: string | null;
+  repo: string | null;
+  branch: string | null;
+  publishedDeployId: string | null;
+  updatedAt: string | null;
+}
+
+export interface NetlifyBuildSummary {
+  buildId: string;
+  deployId: string | null;
+  createdAt: string | null;
+  done: boolean;
 }
 
 /** The deploy's own permalink (https://<id>--<site>.netlify.app). */

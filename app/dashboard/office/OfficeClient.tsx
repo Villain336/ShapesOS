@@ -183,21 +183,41 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
           </button>
           <div className="flex items-center gap-2">
             {openDoc.kind === "sheet" ? (
-              <a
-                href={`/api/office/docs/${openDoc.id}/export?format=csv`}
-                className={btnSecondary}
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </a>
+              <>
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=csv`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </a>
+                {/* Phase 11 (seotools): Excel export, every tab */}
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=xlsx`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export Excel
+                </a>
+              </>
             ) : openDoc.kind === "doc" ? (
-              <a
-                href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
-                className={btnSecondary}
-              >
-                <Download className="h-4 w-4" />
-                Export PDF
-              </a>
+              <>
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </a>
+                {/* Phase 11 (seotools): Word export */}
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=docx`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export Word
+                </a>
+              </>
             ) : null}
             <span className={kindBadge}>
               <meta.icon className="h-3 w-3" /> {meta.label} · v{openDoc.version}

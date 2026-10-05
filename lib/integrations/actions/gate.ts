@@ -68,6 +68,14 @@ export interface ProposeInput {
   proposedBy: string;
   plainSummary?: string;
   ttlMs?: number;
+  /**
+   * Phase 14 (approvals): store the approval already APPROVED by this
+   * automation rule (the reason names it; it lands in the audit trail and
+   * decisionReason). Passed only by lib/ops/gate.ts requestOpsApproval for
+   * its automatable (no-money) slugs. Ignored for a high tier — destructive
+   * actions always wait for a person.
+   */
+  autoApprovedReason?: string;
 }
 
 /**
@@ -123,6 +131,13 @@ export async function proposeAction(input: ProposeInput) {
   const redacted = redactArgs(input.args);
   const summary = input.plainSummary ?? summarizeAction(input.appKey, input.toolName, redacted);
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? APPROVAL_TTL_MS));
+  const autoReason = input.autoApprovedReason?.trim() && classified.tier !== "high" ? input.autoApprovedReason.trim().slice(0, 500) : null;
+  const proposed: AuditEvent = {
+    at: nowIso(),
+    actor: input.proposedBy,
+    event: "proposed",
+    detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
+  };
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.create({
       data: {
@@ -132,21 +147,23 @@ export async function proposeAction(input: ProposeInput) {
         riskTier: classified.tier,
         proposedArgs: toJson(redacted),
         plainSummary: summary,
-        status: "pending",
+        status: autoReason ? "approved" : "pending",
         expiresAt,
-        auditTrail: toJson(trail([], {
-          at: nowIso(),
-          actor: input.proposedBy,
-          event: "proposed",
-          detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
-        })),
+        // Phase 14: an automation rule approved it — no person decided.
+        ...(autoReason ? { decidedBy: "automation", decidedAt: new Date(), decisionReason: autoReason } : {}),
+        auditTrail: toJson(
+          autoReason
+            ? [proposed, { at: nowIso(), actor: "automation", event: "approved", detail: autoReason }]
+            : [proposed],
+        ),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true, expiresAt: true },
     }),
   );
   // Phase 3 (J): gated actions land in the "needs you" inbox — tell the
-  // approvers (best-effort, after the write committed).
-  if (!classified.autoExecutable) {
+  // approvers (best-effort, after the write committed). Phase 14: an
+  // approval a rule already approved needs nobody.
+  if (!classified.autoExecutable && !autoReason) {
     await notifyApprovalNeeded({
       workspaceId: input.workspaceId,
       source: "integration",

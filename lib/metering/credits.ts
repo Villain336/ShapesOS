@@ -130,6 +130,16 @@ export const CREDIT_COSTS = {
    * high quality, larger sizes and Batch (50% off) are priced by
    * imageGenerationCredits() and passed as meter()'s `credits` override. */
   image_generation: { credits: 22, basis: "cost-plus", description: "AI image: 1 image (OpenAI image model)" },
+  // ── MCP free reads (lib/mcp/scopes.ts TOOL_CREDIT_PASSTHROUGH) ──
+  // These passthrough actions were never in the table, so the metering
+  // service refused them as unknown and the MCP tools failed closed
+  // ("Metering is temporarily unavailable") for every caller. Free — reads
+  // of the workspace's own data; the usage row is the audit trail.
+  project_list: { credits: 0, basis: "free", description: "MCP: list projects" },
+  skill_list: { credits: 0, basis: "free", description: "MCP: list scheduled skills" },
+  usage_summary: { credits: 0, basis: "free", description: "MCP: usage summary" },
+  dataset_ask: { credits: 0, basis: "free", description: "MCP: ask the business-data dataset" },
+  dataset_adapter_pull: { credits: 0, basis: "free", description: "MCP: dataset adapter pull" },
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Credits per 1024x1024 image by quality: ~4x OpenAI's GPT Image 2 price

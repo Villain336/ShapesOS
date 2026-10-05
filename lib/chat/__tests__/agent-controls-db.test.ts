@@ -3,7 +3,8 @@
 //   1. Limit a task's tools: the model only sees granted tools, and a tool it
 //      names anyway (directly or through a connector alias) is refused.
 //   2. Auto-approve: a per-agent rule lets a Tier 0/1 action run without the
-//      "yes"; a Tier 2 action still asks even when a rule says auto.
+//      "yes"; Phase 14: a Tier 2 action too, while a Tier 3 (money) action
+//      still asks even when a (forced) rule says auto.
 //   3. Stop: a stop mid-flight aborts the model call, the run ends
 //      `cancelled`, pending proposals are dropped (a later "yes" runs
 //      nothing) and the approvals the run raised are expired.
@@ -244,14 +245,19 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
     assert.ok(events.some((e) => e.type === "gate" && /Refused research_question/.test(e.summary)));
   });
 
-  it("auto-approves a Tier 0/1 action under an agent rule; Tier 2 still asks; Stop drops the proposal", async () => {
+  it("auto-approves under an agent rule (Phase 14: Tier 0-2); Tier 3 still asks with a forced auto row; Stop drops the proposal", async () => {
     await withWorkspaceScope(WS_A, async (tx) => {
       await tx.automationSetting.create({
         data: { workspaceId: WS_A, agentKey: "lead", action: "audit_site", behavior: "auto", updatedBy: USER },
       });
-      // An every-agent "auto" on a Tier-2 kind must not widen it.
+      // Phase 14: an every-agent "auto" on a Tier-2 kind now lets it run.
       await tx.automationSetting.create({
         data: { workspaceId: WS_A, agentKey: "*", action: "run_workflow", behavior: "auto", updatedBy: USER },
+      });
+      // A forced "auto" row on a Tier-3 (money) kind — the PUT guard would
+      // refuse it; the evaluator must still ask.
+      await tx.automationSetting.create({
+        data: { workspaceId: WS_A, agentKey: "*", action: "mark_invoice_paid", behavior: "auto", updatedBy: USER },
       });
     });
     const t = await thread("lead");
@@ -259,31 +265,49 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
       calls: [
         { tool: "run_seo_audit", args: {} },
         { tool: "run_workflow", args: { workflowId: "wf-missing" } },
+        { tool: "ops_mark_invoice_paid", args: { invoiceId: "inv-missing" } },
       ],
     });
-    const out = await turn(t.id, "Audit the site and kick off the weekly workflow");
+    const out = await turn(t.id, "Audit the site, kick off the weekly workflow and mark the invoice paid");
 
     const audit = byTool(out.toolCalls, "run_seo_audit");
     assert.notEqual(audit.status, "pending_confirmation", "the lead's audit_site rule lets it run without asking");
     assert.match(audit.autoApproved ?? "", /auto-approved by the audit_site rule for agent lead/);
 
     const wf = byTool(out.toolCalls, "run_workflow");
-    assert.equal(wf.status, "pending_confirmation", "Tier 2 always asks, whatever the rule says");
-    assert.equal(wf.autoAction, undefined, "the chat must not offer auto for a Tier 2 action");
+    assert.notEqual(wf.status, "pending_confirmation", "Phase 14: Tier 2 runs under an auto rule");
+    assert.match(wf.autoApproved ?? "", /auto-approved by the run_workflow rule for every agent/);
+
+    const pay = byTool(out.toolCalls, "ops_mark_invoice_paid");
+    assert.equal(pay.status, "pending_confirmation", `Tier 3 always asks, whatever the rule says: ${pay.resultSummary}`);
+    assert.equal(pay.autoAction, undefined, "the chat must never offer auto for a Tier 3 action");
+
     assert.equal(out.awaitingConfirmation, true);
 
-    // Stop the waiting task: the proposal is dropped, so "yes" runs nothing.
+    // Stop the waiting task: the proposals are dropped, so "yes" runs nothing.
     await stopThreadRuns({ workspaceId: WS_A, threadId: t.id, userId: USER });
     const last = await prisma.aiChatMessage.findFirst({
       where: { threadId: t.id, role: "assistant" },
       orderBy: { createdAt: "desc" },
     });
     const calls = last!.toolCalls as unknown as ChatToolCall[];
-    assert.equal(calls.find((c) => c.tool === "run_workflow")?.status, "cancelled");
+    assert.equal(calls.find((c) => c.tool === "ops_mark_invoice_paid")?.status, "cancelled");
 
     script = () => ({ text: "Nothing is waiting on you." });
     const yes = await turn(t.id, "yes");
-    assert.ok(!yes.toolCalls.some((c) => c.tool === "run_workflow" && c.status === "executed"));
+    assert.ok(!yes.toolCalls.some((c) => c.tool === "ops_mark_invoice_paid" && c.status === "executed"));
+    // The later tests expect no rules.
+    await withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A } }));
+
+    // Phase 14: a Tier-2 call with no rule asks AND is offered "do this without asking"
+    // (before Phase 14 the offer only ever showed for Tier 0/1).
+    const t2 = await thread("lead");
+    script = () => ({ calls: [{ tool: "trigger_automation_flow", args: { flowId: "flow-missing" } }] });
+    const flowTurn = await turn(t2.id, "Start the onboarding flow");
+    const flow = byTool(flowTurn.toolCalls, "trigger_automation_flow");
+    assert.equal(flow.status, "pending_confirmation", flow.resultSummary);
+    assert.equal(flow.autoAction, "trigger_automation_flow");
+    await stopThreadRuns({ workspaceId: WS_A, threadId: t2.id, userId: USER });
   });
 
   it("stops a run mid-flight: aborts the model call, cancels the run, expires its approvals", async () => {
@@ -412,7 +436,12 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
     const d = byTool(out.toolCalls, "delegate_to_subagent");
     assert.equal(d.status, "executed");
     assert.match(d.resultSummary ?? "", /Analyst was stopped before it finished/);
-    assert.equal(d.delegated?.[0]?.status, "cancelled", "the sub-agent's next tool never ran");
+    // The stop lands either while the sub-agent's model call is in flight (it
+    // is aborted, so no tool is ever proposed) or just after it returns (the
+    // proposed tool is cancelled before it runs) — both are a correct stop.
+    // What must hold: nothing the sub-agent asked for ran.
+    const childCalls = d.delegated ?? [];
+    assert.ok(childCalls.every((c) => c.status === "cancelled"), `the sub-agent's next tool never ran (${JSON.stringify(childCalls.map((c) => [c.tool, c.status]))})`);
     assert.equal((await getAgentRun(WS_A, child!.id))?.status, "cancelled");
     assert.equal((await getAgentRun(WS_A, out.runId))?.status, "succeeded");
   });

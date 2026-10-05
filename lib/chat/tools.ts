@@ -586,28 +586,51 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree.",
+    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
     type: "object",
     properties: {
       siteId: { type: "string", description: "Site id to audit (optional — defaults to the project's first auditable site)." },
+      // Phase 11 (seotools): live-URL crawl (lib/audit/live.ts).
+      live: { type: "boolean", description: "Crawl the live URLs instead of the site files (optional)." },
+      url: { type: "string", description: "Live crawl start URL (optional — defaults to the newest deployment or the project domain)." },
+      maxPages: { type: "number", description: "Live crawl page budget (optional, default 20, max 50)." },
+      renderJs: { type: "boolean", description: "Live crawl: render pages with headless Chromium in the code sandbox when one is available (optional)." },
     },
   },
   async execute(ctx, args) {
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
+    // Phase 11 (seotools): live mode, optionally JS-rendered in the sandbox.
+    const live = args.live === true || args.live === "true" || !!str(args.url);
+    let renderer: import("@/lib/audit/live").PageRenderer | null = null;
+    if (live && (args.renderJs === true || args.renderJs === "true") && ctx.runId) {
+      try {
+        const { sandboxForRun } = await import("@/lib/sandbox");
+        const { sandboxChromiumRenderer } = await import("@/lib/audit/render-sandbox");
+        renderer = sandboxChromiumRenderer(await sandboxForRun(ctx));
+      } catch {
+        renderer = null; // no sandbox: static fetch, labelled in the crawl summary
+      }
+    }
     // Phase 6: shared with the MCP run_seo_audit tool (lib/audit/project-audit).
     const { site, mock: useMock, result } = await auditProjectSite({
       projectId: ctx.projectId,
       siteId: str(args.siteId) || null,
+      live: live ? { url: str(args.url) ?? null, maxPages: Math.min(Math.max(1, num(args.maxPages) ?? 20), 50), renderer } : null,
     });
+    const crawl = (result.audit as { crawl?: { pagesCrawled?: number; rendering?: string; renderingNote?: string } | null }).crawl ?? null;
     return {
-      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
+      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}${crawl ? ` (live crawl of ${crawl.pagesCrawled} page${crawl.pagesCrawled === 1 ? "" : "s"}, ${crawl.rendering} rendering)` : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
       details: {
         auditId: result.audit.id,
         issueCount: result.issues.length,
         mock: useMock,
+        mode: live ? "live" : "files",
+        crawl,
+        // Phase 11: Core Web Vitals (PageSpeed Insights) or { unavailable, reason }.
+        vitals: (result.audit as { vitals?: unknown }).vitals ?? null,
         topIssues: result.issues.slice(0, 10).map((i) => ({
           category: i.category,
           severity: i.severity,
@@ -1075,6 +1098,57 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   ops_mark_invoice_paid: "ops",
   ops_approve_leave: "ops",
   ops_launch_workflow: "ops",
+  // Phase 10 (finance): reports are reads; the rest are ops writes.
+  ops_accounting_report: "workspace",
+  ops_draft_quote: "ops",
+  ops_convert_quote: "ops",
+  ops_record_payment: "ops",
+  ops_draft_vendor_bill: "ops",
+  ops_submit_expense_claim: "ops",
+  ops_post_journal_entry: "ops",
+  // Phase 10 (ops-core): reads are workspace, writes are ops.
+  ops_list_contacts: "workspace",
+  ops_list_companies: "workspace",
+  ops_list_deals: "workspace",
+  ops_list_tickets: "workspace",
+  ops_list_stock_by_location: "workspace",
+  ops_create_contact: "ops",
+  ops_create_company: "ops",
+  ops_create_deal: "ops",
+  ops_move_deal_stage: "ops",
+  ops_convert_lead: "ops",
+  ops_create_task: "ops",
+  ops_log_time: "ops",
+  ops_create_ticket: "ops",
+  ops_reply_ticket: "ops",
+  ops_close_ticket: "ops",
+  ops_create_transfer: "ops",
+  ops_set_reorder_rule: "ops",
+  // Phase 10 (store): the overview is a read; listing products is an ops write.
+  ops_store_overview: "workspace",
+  ops_store_list_product: "ops",
+  // Phase 12 (mfgpos): reads are workspace, writes are ops.
+  ops_list_manufacturing_orders: "workspace",
+  ops_pos_overview: "workspace",
+  ops_create_manufacturing_order: "ops",
+  ops_confirm_manufacturing_order: "ops",
+  ops_log_work_time: "ops",
+  ops_complete_manufacturing_order: "ops",
+  ops_close_pos_session: "ops",
+  // Phase 12 (people): payroll + events (reads are workspace, writes ops).
+  ops_payroll_overview: "workspace",
+  ops_payroll_draft_run: "ops",
+  ops_payroll_request_approval: "ops",
+  ops_payroll_request_posting: "ops",
+  ops_events_overview: "workspace",
+  ops_events_create_event: "ops",
+  ops_events_register: "ops",
+  // Phase 13 (twincore): digital twin — reads are workspace, writes are ops.
+  twin_site_state: "workspace",
+  twin_find: "workspace",
+  twin_book_dock: "ops",
+  twin_assign_equipment: "ops",
+  twin_draft_layout: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1110,6 +1184,20 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   app_create_spec: "ops",
   app_upsert_record: "ops",
   app_delete_record: "ops",
+  // Phase 11 (seotools): structured data for sites (lib/seo/tools.ts) —
+  // drafts only, applying and deploying stay human.
+  add_structured_data: "site",
+  validate_structured_data: "site",
+  submit_sitemap: "site",
+  // Phase 11 (seotools): document output (lib/documents/tools.ts).
+  create_document: "content",
+  create_spreadsheet: "content",
+  // Phase 11 (seotools): data analysis code in the run's sandbox
+  // (lib/sandbox/analyze-tool.ts) — off with the rest of "code" when no sandbox.
+  analyze_data: "code",
+  // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
+  web_scrape: "web",
+  web_crawl: "web",
 };
 
 /**
@@ -1137,6 +1225,52 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_mark_invoice_paid: "mark_invoice_paid",
   ops_approve_leave: "approve_leave",
   ops_launch_workflow: "launch_workflow",
+  // Phase 10 (finance): drafts are Tier 0; converting and submitting are
+  // Tier 2; recording payments and posting journal entries are Tier 3
+  // (lib/orchestrator/authority.ts) — never automated.
+  ops_draft_quote: "draft_quote",
+  ops_convert_quote: "convert_quote",
+  ops_record_payment: "record_payment",
+  ops_draft_vendor_bill: "draft_vendor_bill",
+  ops_submit_expense_claim: "submit_expense_claim",
+  ops_post_journal_entry: "post_journal_entry",
+  // Phase 10 (ops-core): Tier 2 — always ask (lib/automation/actions.ts).
+  ops_create_contact: "write_crm_record",
+  ops_create_company: "write_crm_record",
+  ops_create_deal: "write_crm_record",
+  ops_move_deal_stage: "write_crm_record",
+  ops_convert_lead: "write_crm_record",
+  ops_create_task: "write_project_record",
+  ops_log_time: "write_project_record",
+  ops_create_ticket: "write_ticket",
+  ops_close_ticket: "write_ticket",
+  ops_reply_ticket: "send_ticket_reply",
+  ops_create_transfer: "move_stock",
+  ops_set_reorder_rule: "set_reorder_rule",
+  // Phase 10 (store): Tier 2 — always asks (lib/automation/actions.ts).
+  ops_store_list_product: "write_store_listing",
+  // Phase 12 (mfgpos): a draft MO is Tier 0; confirming and logging time are
+  // Tier 2 (always ask); completing an MO and closing a till session move
+  // stock and the books — Tier 3, never automated (lib/orchestrator/authority.ts).
+  ops_create_manufacturing_order: "draft_manufacturing_order",
+  ops_confirm_manufacturing_order: "confirm_manufacturing_order",
+  ops_log_work_time: "log_work_order_time",
+  ops_complete_manufacturing_order: "complete_manufacturing_order",
+  ops_close_pos_session: "close_pos_session",
+  // Phase 12 (people): drafting a pay run is Tier 0; approving and posting
+  // payroll are Tier 3 (never automated); event writes are Tier 2.
+  ops_payroll_draft_run: "draft_pay_run",
+  ops_payroll_request_approval: "approve_pay_run",
+  ops_payroll_request_posting: "post_pay_run",
+  ops_events_create_event: "write_event",
+  ops_events_register: "write_event",
+  // Phase 13 (twincore): booking a dock and giving a forklift a task are
+  // Tier 1 (internal site operations — an automation rule can let them run;
+  // without one they ask); drafting a layout is Tier 0 (publishing it is a
+  // person's gated step).
+  twin_book_dock: "book_dock",
+  twin_assign_equipment: "assign_equipment",
+  twin_draft_layout: "draft_site_layout",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",
@@ -1155,6 +1289,19 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   app_create_spec: "draft_app_spec",
   app_upsert_record: "write_app_record",
   app_delete_record: "delete_app_record",
+  // Phase 11 (seotools): a site draft revision — Tier 0 (lib/automation/actions.ts).
+  add_structured_data: "draft_structured_data",
+  // Phase 11 (seotools): pinging search engines about your own site — the
+  // existing Tier 1 "refresh owned page" kind (asks unless automation is on).
+  submit_sitemap: "refresh_owned_page",
+  // Phase 11 (seotools): files saved to the workspace — Tier 0 drafts.
+  create_document: "draft_document",
+  create_spreadsheet: "draft_spreadsheet",
+  // Phase 11 (seotools): runs code in the sandbox — same tier as bash (asks).
+  analyze_data: "run_sandbox_command",
+  // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
+  web_scrape: "fetch_web_pages",
+  web_crawl: "fetch_web_pages",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

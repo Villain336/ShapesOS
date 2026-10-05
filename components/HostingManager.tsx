@@ -97,6 +97,10 @@ export default function HostingManager({ projectId }: { projectId: string }) {
   const [nTest, setNTest] = useState<string | null>(null);
   const [nTestBusy, setNTestBusy] = useState(false);
 
+  // Phase 11 (devtools): reuse a Netlify hosting connection for the Netlify agent connector.
+  const [agentBusy, setAgentBusy] = useState<string | null>(null);
+  const [agentMsg, setAgentMsg] = useState<string | null>(null);
+
   // Rollback (Phase 9)
   const [rbBusy, setRbBusy] = useState<string | null>(null);
   const [rbMsg, setRbMsg] = useState<string | null>(null);
@@ -322,6 +326,24 @@ export default function HostingManager({ projectId }: { projectId: string }) {
     await refresh();
   }
 
+  async function connectForAgents(c: HostingConnection) {
+    setAgentBusy(c.id);
+    setAgentMsg(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/connectors/netlify/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostingConnectionId: c.id, label: c.name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.error ?? "Could not connect Netlify for agents.");
+      else setAgentMsg(`Agents can now use "${c.name}" through the Netlify connector. Enable it for a project in its data sources.`);
+    } finally {
+      setAgentBusy(null);
+    }
+  }
+
   async function runDeploy() {
     if (!depSite || !depConn) return;
     setDepBusy(true);
@@ -501,14 +523,26 @@ export default function HostingManager({ projectId }: { projectId: string }) {
               {c.demo && <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-muted">Mock</span>}
               <span className="ml-2 text-xs text-muted">token {c.tokenHint}</span>
             </div>
-            <button
-              onClick={() => void deleteConn(c.id, c.name)}
-              className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
-            >
-              Remove
-            </button>
+            <div className="flex items-center gap-2">
+              {c.target === "netlify" && !c.demo && (
+                <button
+                  onClick={() => void connectForAgents(c)}
+                  disabled={agentBusy === c.id}
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {agentBusy === c.id ? "Connecting…" : "Use for agents"}
+                </button>
+              )}
+              <button
+                onClick={() => void deleteConn(c.id, c.name)}
+                className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
+        {agentMsg && <p className="text-sm text-muted">{agentMsg}</p>}
       </div>
 
       {conns.length > 0 && sites.length > 0 && (

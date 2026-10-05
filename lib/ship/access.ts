@@ -21,6 +21,7 @@ import { githubApp, type GitHubAppAuth } from "@/lib/connectors/github-app";
 import { decryptSiteConfig } from "@/lib/connectors/source";
 import type { GitHubConnector } from "@/lib/connectors/types";
 import { parseRepoFullName } from "./git";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 
 export interface RepoAccess {
   owner: string;
@@ -97,6 +98,8 @@ export async function resolveRepoAccess(
       String(c.repo ?? "").toLowerCase() === repo.toLowerCase(),
   );
   if (match?.demo === true) {
+    // Phase 11 (conncore): demo (mock) repositories are refused in production.
+    assertFakeProviderAllowed("demo GitHub");
     return {
       owner,
       repo,
