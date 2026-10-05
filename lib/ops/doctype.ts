@@ -58,6 +58,8 @@ export class OpsNotFoundError extends OpsError {
 export interface OpsActor {
   workspaceId: string;
   userId: string;
+  /** Phase 14: the agent acting (chat tools), so its own automation rule applies. */
+  agentKey?: string;
 }
 
 export interface OpsListQuery {
@@ -66,7 +68,8 @@ export interface OpsListQuery {
 }
 
 export type OpsWriteResult =
-  | { outcome: "done"; row: Record<string, unknown>; action: string }
+  /** Phase 14: autoApproved = a rule approved the gated write (names the rule). */
+  | { outcome: "done"; row: Record<string, unknown>; action: string; autoApproved?: string }
   | {
       outcome: "approval_required";
       approval: OpsGateProposal;
@@ -224,7 +227,8 @@ export async function opsCreate(
 
   if (classification.mode === "gated") {
     // Fail-closed: no approvalId → propose and ask the human (202-style).
-    const approvalId = typeof rawApprovalId === "string" ? rawApprovalId : undefined;
+    let approvalId = typeof rawApprovalId === "string" ? rawApprovalId : undefined;
+    let autoApproved: string | undefined;
     const mutation = { ...body };
     delete mutation.approvalId;
     if (!approvalId) {
@@ -245,9 +249,17 @@ export async function opsCreate(
         mutation,
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize(summaryRow)}`,
+        agentKey: actor.agentKey,
       });
       await auditOpsEvent(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
-      return { outcome: "approval_required", approval, classification };
+      if (!(approval.autoApproved && approval.status === "approved")) {
+        return { outcome: "approval_required", approval, classification };
+      }
+      // Phase 14: a rule approved it (automatable, no-money slugs only) —
+      // run it now under that approval, through the same verify + claim.
+      autoApproved = approval.autoApproved;
+      approvalId = approval.id;
+      await auditOpsEvent(tx, def, actor, "gate_auto_approved", null, `${classification.label} (approval ${approval.id}): ${autoApproved}`);
     }
     // Verify, then claim approved → executed in THIS transaction before
     // writing: one approval = one execution (replays fail closed).
@@ -265,7 +277,7 @@ export async function opsCreate(
       // Phase 11 (conncore): outbound webhook events, in this transaction.
       await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
     }
-    return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
+    return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
   // Invoice idempotency key: a retry returns the ORIGINAL invoice (200),
@@ -559,7 +571,8 @@ export async function opsPatch(
   assertOpsPatchAllowed(def, existing, patch);
 
   if (classification.mode === "gated") {
-    const approvalId = body.approvalId as string | undefined;
+    let approvalId = body.approvalId as string | undefined;
+    let autoApproved: string | undefined;
     const mutation = { id, ...patch };
     if (!approvalId) {
       const approval = await requestOpsApproval(port, {
@@ -570,9 +583,17 @@ export async function opsPatch(
         mutation,
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize({ ...existing, ...patch })}`,
+        agentKey: actor.agentKey,
       });
       await auditOpsEvent(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
-      return { outcome: "approval_required", approval, classification };
+      if (!(approval.autoApproved && approval.status === "approved")) {
+        return { outcome: "approval_required", approval, classification };
+      }
+      // Phase 14: a rule approved it (automatable, no-money slugs only) —
+      // run it now under that approval, through the same verify + claim.
+      autoApproved = approval.autoApproved;
+      approvalId = approval.id;
+      await auditOpsEvent(tx, def, actor, "gate_auto_approved", id, `${classification.label} (approval ${approval.id}): ${autoApproved}`);
     }
     await verifyAndConsumeOpsApproval(port, tx, {
       workspaceId: actor.workspaceId,
@@ -586,7 +607,7 @@ export async function opsPatch(
     const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
-    return { outcome: "done", row, action: "gate_executed" };
+    return { outcome: "done", row, action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
   const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);

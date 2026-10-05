@@ -22,6 +22,35 @@ import {
   validateBehaviorForAction,
 } from "@/lib/automation/policy";
 import { automationGuard, badRequest, readJson } from "../_lib";
+import { V1_TOOLKIT_SLUGS, listWorkspaceToolkits } from "@/lib/integrations/actions/toolkits";
+import { autoAllowedFor, lockReasonFor } from "@/lib/automation/policy";
+
+/**
+ * Phase 14: the workspace's enabled Composio toolkits, each a switchable
+ * "composio:<toolkit>" rule (medium-risk writes only; money toolkits locked).
+ */
+async function composioToolkitRows(workspaceId: string) {
+  const rows = await listWorkspaceToolkits(workspaceId).catch(() => []);
+  const explicit = new Map(rows.map((r) => [r.toolkitSlug, r.enabled]));
+  const enabled = new Set<string>([
+    ...V1_TOOLKIT_SLUGS.filter((s) => explicit.get(s) !== false),
+    ...rows.filter((r) => r.enabled).map((r) => r.toolkitSlug),
+  ]);
+  return [...enabled].sort().map((slug) => {
+    const action = `composio:${slug}`;
+    const allowed = autoAllowedFor(action);
+    return {
+      action,
+      label: `${slug.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} via Composio`,
+      description: "Medium-risk writes (send, create, update). Destructive ones always ask.",
+      tier: 2 as const,
+      group: "connectors" as const,
+      autoAllowed: allowed,
+      ...(allowed ? {} : { lockReason: lockReasonFor(action) }),
+      defaultBehavior: "ask" as const,
+    };
+  });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +81,8 @@ export async function GET() {
     })),
     defaults: defaultsPayload(),
     thresholdCents,
+    // Phase 14: Composio toolkit rules (shown in the Connectors section).
+    composioToolkits: await composioToolkitRows(access.workspaceId),
   });
 }
 

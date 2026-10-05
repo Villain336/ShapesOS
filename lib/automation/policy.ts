@@ -30,6 +30,7 @@ import {
   TIER1_KINDS,
   amountInDefaultCents,
   evaluateTier,
+  normalizeForTier,
   type TierSettings,
 } from "../orchestrator/authority";
 
@@ -67,6 +68,29 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<string, AutomationBehaviorName>>
 export const NEVER_AUTO_ACTIONS: ReadonlyMap<string, string> = new Map([
   ["browser_act", "acting in a browser can buy or delete things on any site, so it always asks"],
 ]);
+
+/**
+ * Phase 14: money words beyond the DoA Tier-3 verbs, for tools ShapesOS did
+ * not write (custom MCP servers, Composio toolkits): a third-party
+ * "create_charge" or "send_invoice" carries no purchase/refund/transfer
+ * verb. When such a tool's name or description matches, its call is
+ * treated as money (Tier 3) — never auto-approved.
+ */
+export const EXTERNAL_TOOL_MONEY_RE =
+  /\b(charges?|payments?|pay|paid|invoices?|bills?|billing|subscriptions?|prices?|orders?|checkout|payroll|wire|bank|budgets?|bids?|coupons?|discounts?|credits?|debits?|balances?|funds?|money|cash|wallet|tax|taxes)\b/i;
+
+/**
+ * Phase 14: Composio toolkits that move money (payments, accounting,
+ * payroll, banking, commerce, ads) — a "composio:<toolkit>" rule for one can
+ * never be auto (fail closed: a match means always asks).
+ */
+export const COMPOSIO_MONEY_TOOLKIT_RE =
+  /(stripe|paypal|square|braintree|adyen|wise|plaid|brex|ramp|mercury|coinbase|chargebee|recurly|paddle|lemon_?squeezy|quickbooks|xero|freshbooks|zoho_?books|sage|netsuite|bill(_?com)?|gusto|adp|rippling|deel|payroll|bank|invoice|billing|payment|shopify|woocommerce|bigcommerce|ads|adwords)/i;
+
+/** Phase 14: actions that stand for tools ShapesOS did not write (custom MCP, Composio). */
+export function isExternalToolAction(action: string): boolean {
+  return action === "mcp_write" || action === "connector_write" || action.startsWith("composio:");
+}
 
 export interface AutomationRowLike {
   /** Phase 5: "*" (every agent) or one agent's key. Missing = "*". */
@@ -158,6 +182,7 @@ export function defaultBehavior(action: string): AutomationBehaviorName {
  */
 export function autoAllowedFor(action: string): boolean {
   if (action === WORKSPACE_DEFAULT_ACTION) return false;
+  if (action.startsWith("composio:") && COMPOSIO_MONEY_TOOLKIT_RE.test(action.slice("composio:".length))) return false;
   return intrinsicTier(action) !== 3 && !NEVER_AUTO_ACTIONS.has(action);
 }
 
@@ -208,6 +233,7 @@ export function validateBehaviorForAction(
     }
     const never = NEVER_AUTO_ACTIONS.get(action);
     if (never) return `behavior=auto is not allowed for ${action}: ${never}.`;
+    if (!autoAllowedFor(action)) return `behavior=auto is not allowed for ${action}: it moves money, so it always asks.`;
   }
   return null;
 }
@@ -286,7 +312,11 @@ export function decideAutoApproval(
   // The tier the action has by nature (toggle on): what the offer is judged on.
   const intrinsic = evaluateTier(action, { ...toTierSettings(resolved), automationAllows: true });
   const never = NEVER_AUTO_ACTIONS.get(input.action);
-  const offerAuto = !input.destructive && !never && tier !== 3 && intrinsic !== 3;
+  // Third-party tools: money words in the name / description count as Tier 3.
+  const externalMoney =
+    (isExternalToolAction(input.action) && EXTERNAL_TOOL_MONEY_RE.test(normalizeForTier(input.description ?? ""))) ||
+    (input.action.startsWith("composio:") && !autoAllowedFor(input.action));
+  const offerAuto = !input.destructive && !never && !externalMoney && tier !== 3 && intrinsic !== 3;
   const who =
     resolved.source === "default"
       ? "the default"
@@ -295,7 +325,7 @@ export function decideAutoApproval(
         : `agent ${resolved.ruleAgentKey}`;
   const no = (reason: string): AutoApprovalDecision => ({ auto: false, tier, resolved, reason, offerAuto });
   if (input.destructive) return no("destructive actions always ask");
-  if (tier === 3 || intrinsic === 3) {
+  if (tier === 3 || intrinsic === 3 || externalMoney) {
     return { auto: false, tier: 3, resolved, reason: "Tier 3 actions (money and irreversible) can never run automatically", offerAuto: false };
   }
   if (never) return no(`${input.action}: ${never}`);
@@ -307,6 +337,17 @@ export function decideAutoApproval(
   }
   const ruleName = resolved.source === "default" ? `the default for ${input.action}` : `the ${input.action} rule for ${who}`;
   return { auto: true, tier, resolved, reason: `auto-approved by ${ruleName}`, offerAuto };
+}
+
+/**
+ * Phase 14: DB-backed tier settings for the mission executor
+ * (lib/authority/executor.ts deps.resolveTierSettings), agent-aware.
+ */
+export function automationTierSettingsFor(
+  workspaceId: string,
+  agentKey: string = ALL_AGENTS,
+): (action: { kind: string }) => Promise<TierSettings> {
+  return async (action) => toTierSettings(await resolveAutomation(workspaceId, action.kind, agentKey));
 }
 
 /** DB-backed decideAutoApproval. */
@@ -340,8 +381,12 @@ export interface KnownAction {
   group: ActionGroup;
   /** Phase 14: false = Auto-run is locked (Tier 3 or NEVER_AUTO_ACTIONS). */
   autoAllowed: boolean;
+  /** Phase 14: why Auto-run is locked (shown on the row), when it is. */
+  lockReason?: string;
   /** Phase 14: the behavior with no row (DEFAULT_BEHAVIORS, else ask / never). */
   defaultBehavior: AutomationBehaviorName;
+  /** Phase 14: an on/off switch (on = auto, off = never). */
+  control?: "switch";
 }
 
 export const KNOWN_ACTIONS: KnownAction[] = KNOWN_ACTION_DEFS.map((d) => ({
@@ -351,7 +396,16 @@ export const KNOWN_ACTIONS: KnownAction[] = KNOWN_ACTION_DEFS.map((d) => ({
   tier: intrinsicTier(d.action),
   group: actionGroup(d.action),
   autoAllowed: autoAllowedFor(d.action),
+  ...(autoAllowedFor(d.action) ? {} : { lockReason: lockReasonFor(d.action) }),
   defaultBehavior: defaultBehavior(d.action),
+  ...(d.control ? { control: d.control } : {}),
 }));
+
+/** Phase 14: the plain reason Auto-run is locked for an action (UI copy). */
+export function lockReasonFor(action: string): string {
+  const never = NEVER_AUTO_ACTIONS.get(action);
+  if (never) return `${never[0]!.toUpperCase()}${never.slice(1)}.`;
+  return "Money and irreversible actions always ask.";
+}
 
 export { TIER1_KINDS, DEFAULT_SMALL_ACTION_THRESHOLD_CENTS };

@@ -9,6 +9,7 @@
 
 import { evaluateTier } from "../authority";
 import {
+  autoApproveMissionApproval,
   type MissionApprovalStore,
   type StoredMissionApproval,
 } from "../../authority/executor";
@@ -41,6 +42,11 @@ export interface DrafterInput {
 export interface DrafterDeps extends GuardDeps {
   /** Approval store for the Tier-2 request. Default: Prisma twin (production). */
   approvalStore?: MissionApprovalStore;
+  /**
+   * Phase 14 (approvals): may a rule approve the request? Default: the
+   * workspace's automation rules for the drafter (lib/automation/policy.ts).
+   */
+  autoDecision?: (input: { workspaceId: string; action: string; description: string }) => Promise<{ auto: boolean; tier: 0 | 1 | 2 | 3; reason: string } | null>;
 }
 
 export interface DraftArtifact {
@@ -128,7 +134,7 @@ export async function runDrafter(
       `drafter: external action "${external.kind}" evaluated Tier ${tier}, not Tier 2 — refusing to create the approval.`,
     );
   }
-  const approval = await store.create({
+  const created = await store.create({
     workspaceId: input.workspaceId,
     missionId: input.missionId ?? null,
     action: external.kind,
@@ -142,9 +148,27 @@ export async function runDrafter(
     createdBy: "chief-strategy-agent",
   });
 
+  // Phase 14 (approvals): an automation rule for this action (the drafter's
+  // own, else every agent's) approves the request on its authority — audited
+  // as a hash-chained "auto_approved" event naming the rule. Without one it
+  // waits for a person, as before. Sending still happens only through the
+  // approval executor.
+  const autoDecision =
+    deps.autoDecision ??
+    (async (q: { workspaceId: string; action: string; description: string }) => {
+      const { autoApprovalFor } = await import("../../automation/policy");
+      return autoApprovalFor(q.workspaceId, { agentKey: "drafter", action: q.action, description: q.description });
+    });
+  const decision = created.missionId
+    ? await autoDecision({ workspaceId: input.workspaceId, action: external.kind, description: external.description }).catch(() => null)
+    : null;
+  const approval = await autoApproveMissionApproval(store, created, decision);
+
   const summary =
     `Drafted ${draft.kind} for ${draft.audience} via ${draft.channel} (status: draft — NOT sent). ` +
-    `Tier-2 approval ${approval.id} created instead of sending; the approval executor is the only path to act on it.`;
+    (approval.status === "approved"
+      ? `Tier-2 approval ${approval.id} approved by an automation rule (${decision?.reason ?? "rule"}); the approval executor is the only path to act on it.`
+      : `Tier-2 approval ${approval.id} created instead of sending; the approval executor is the only path to act on it.`);
 
   return {
     executor: "drafter",

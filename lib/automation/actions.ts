@@ -22,6 +22,8 @@ export interface KnownActionDef {
   label: string;
   description: string;
   group?: ActionGroup;
+  /** Phase 14: shown as an on/off switch (on = auto, off = never) instead of Ask first / Auto-run / Off. */
+  control?: "switch";
 }
 
 export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
@@ -139,9 +141,25 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // defaults to Auto-run (today's behaviour); slack_placeholder defaults to
   // Off (lib/automation/policy.ts DEFAULT_BEHAVIORS).
   { action: "slack_reply", label: "Reply in Slack", description: "Post the agent's answer (and status messages) back into the Slack thread that asked. Ask first holds each reply for your OK in ShapesOS.", group: "slack" },
-  { action: "slack_placeholder", label: "Say a reply is waiting", description: "While a Slack reply waits for your OK, post a one-line note in the thread. Auto-run turns it on.", group: "slack" },
+  { action: "slack_placeholder", label: "Say a reply is waiting", description: "While a Slack reply waits for your OK, post a one-line note in the thread. Off by default.", group: "slack", control: "switch" },
 ];
 
+
+/**
+ * Phase 14 (approvals): the automation action each autopilot item kind
+ * stands for (lib/seo/autopilot-service.ts). A rule set to Auto-run for it
+ * (Settings → Automation, or "Do this without asking" on the approval card)
+ * approves new items of that kind as they are generated — audited, naming
+ * the rule.
+ *   decay_refresh     → refresh_owned_page (Tier 1: a page you own)
+ *   keyword_brief     → draft_content      (Tier 0: a draft)
+ *   programmatic_page → publish_owned      (Tier 1: a new page on your site)
+ */
+export const AUTOPILOT_KIND_ACTION = {
+  decay_refresh: "refresh_owned_page",
+  keyword_brief: "draft_content",
+  programmatic_page: "publish_owned",
+} as const satisfies Record<"decay_refresh" | "keyword_brief" | "programmatic_page", string>;
 
 const LABELS = new Map(KNOWN_ACTION_DEFS.map((d) => [d.action, d.label]));
 

@@ -298,3 +298,22 @@ describe("Phase 14: explicit code defaults", () => {
     }
   });
 });
+
+describe("Phase 14: third-party tools that name money never auto-run", () => {
+  it("custom MCP and Composio writes with money words count as Tier 3", () => {
+    for (const [action, description] of [
+      ["mcp_write", "create_charge: Charge a customer's card"],
+      ["mcp_write", "send_invoice: Email an invoice"],
+      ["mcp_write", "update_subscription: Change a plan"],
+      ["composio:hubspot", "hubspot create invoice"],
+    ] as const) {
+      const d = decideAutoApproval([auto(action)], { agentKey: "lead", action, description });
+      assert.equal(d.auto, false, description);
+      assert.equal(d.tier, 3);
+      assert.equal(d.offerAuto, false);
+    }
+    // Built-in tools are not word-scanned beyond Tier 3 (drafting an invoice is Tier 0).
+    assert.equal(decideAutoApproval([auto("draft_invoice")], { agentKey: "lead", action: "draft_invoice", description: "ops_draft_invoice: Create a DRAFT invoice" }).auto, true);
+    assert.equal(decideAutoApproval([auto("mcp_write")], { agentKey: "lead", action: "mcp_write", description: "create_issue: Open an issue" }).auto, true);
+  });
+});

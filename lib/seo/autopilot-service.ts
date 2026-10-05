@@ -14,6 +14,7 @@ import {
   dedupeCandidates,
   fallbackTitle,
   isAutoApproveEligible,
+  AUTOPILOT_KIND_ACTION,
   markdownToTiptap,
   scopeKeyFor,
   validateRuleInput,
@@ -392,9 +393,26 @@ export async function runAutopilotRule(
     ruleId: string;
     actor: string;
     draftGenerator?: DraftGenerator;
+    /** Phase 14: may an automation rule approve this kind? Default: the workspace's every-agent rules. */
+    autoDecision?: (action: string) => Promise<{ auto: boolean; reason: string } | null>;
   },
 ): Promise<RunResult> {
   const generate = args.draftGenerator ?? defaultDraftGenerator;
+  // Phase 14: one rule lookup per item kind per run.
+  const ruleDecisions = new Map<string, Promise<{ auto: boolean; reason: string } | null>>();
+  const ruleDecision = (kind: AutopilotItemKind) => {
+    const action = AUTOPILOT_KIND_ACTION[kind];
+    if (!ruleDecisions.has(action)) {
+      const decide =
+        args.autoDecision ??
+        (async (a: string) => {
+          const { autoApprovalFor } = await import("@/lib/automation/policy");
+          return autoApprovalFor(args.workspaceId, { agentKey: "*", action: a, description: `autopilot ${kind.replace(/_/g, " ")}` });
+        });
+      ruleDecisions.set(action, decide(action).catch(() => null));
+    }
+    return ruleDecisions.get(action)!;
+  };
   const rule = await db.autopilotRule.findFirst({
     where: { id: args.ruleId, projectId: args.projectId },
   });
@@ -438,7 +456,9 @@ export async function runAutopilotRule(
         throw new Error("Autopilot killed mid-run — remaining items frozen");
       }
       const draft = await generate(c);
-      const eligible = isAutoApproveEligible(c.kind, rule.autoApprove);
+      const byRuleToggle = isAutoApproveEligible(c.kind, rule.autoApprove);
+      const byAutomation = byRuleToggle ? null : await ruleDecision(c.kind);
+      const eligible = byRuleToggle || byAutomation?.auto === true;
       const item = await db.autopilotItem.create({
         data: {
           runId: run.id,
@@ -472,7 +492,10 @@ export async function runAutopilotRule(
       if (eligible) {
         autoApproved += 1;
         await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_approved",
-          `Autopilot item auto-approved (low-risk decay refresh, rule "${rule.name}" allows it): "${item.title}"`, "system");
+          byRuleToggle
+            ? `Autopilot item auto-approved (low-risk decay refresh, rule "${rule.name}" allows it): "${item.title}"`
+            : `Autopilot item auto-approved (${byAutomation?.reason ?? "automation rule"}): "${item.title}"`,
+          "system");
       }
       generated += 1;
     }
