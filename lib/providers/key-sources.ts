@@ -112,6 +112,10 @@ export const KEY_SOURCES: readonly KeySourceEntry[] = [
   P("brand-media", "Brandfetch, Cloudinary, Pexels, Pixabay, Unsplash", "data",
     ["BRANDFETCH_API_KEY", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "PEXELS_API_KEY", "PIXABAY_API_KEY", "UNSPLASH_ACCESS_KEY"], "Brand assets and stock media."),
   P("composio", "Composio", "apps", ["COMPOSIO_API_KEY"], "Hosted app actions (1 credit per tool call)."),
+  // Phase 15.4 (zernio): LIVE / pre-added. One platform key; each workspace gets
+  // its own Zernio profile and connects its accounts there (Settings → Connectors).
+  P("zernio", "Zernio (ads on 7 networks, social on 16 platforms)", "marketing", ["ZERNIO_API_KEY", "ZERNIO_BASE_URL"],
+    "One profile per workspace; 2 accounts included (plans include 3 / 10 / 25 / 50), then 600 credits per account a month. Creating ads and raising budgets always ask."),
   P("twilio", "Twilio SMS and voice", "messaging", ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
     "SMS (4 credits a segment), voice minutes, tracking numbers and transcription."),
   P("system-mail", "Resend / SMTP system mail", "messaging", ["SMTP_HOST", "SMTP_FROM", "SMTP_USER", "SMTP_PASS", "INVITE_MAIL_FROM"],

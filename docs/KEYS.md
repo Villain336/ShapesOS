@@ -67,6 +67,7 @@ registry, then run `npx tsx scripts/docs/generate-keys-md.mts`.
 | Apollo / Hunter | Platform | `APOLLO_API_KEY`, `HUNTER_API_KEY` | — | Prospect enrichment (2 credits per lookup). |
 | Brandfetch, Cloudinary, Pexels, Pixabay, Unsplash | Platform | `BRANDFETCH_API_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `UNSPLASH_ACCESS_KEY` | — | Brand assets and stock media. |
 | Composio | Platform | `COMPOSIO_API_KEY` | — | Hosted app actions (1 credit per tool call). |
+| Zernio (ads on 7 networks, social on 16 platforms) | Platform | `ZERNIO_API_KEY`, `ZERNIO_BASE_URL` | — | One profile per workspace; 2 accounts included (plans include 3 / 10 / 25 / 50), then 600 credits per account a month. Creating ads and raising budgets always ask. |
 | Twilio SMS and voice | Platform | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | — | SMS (4 credits a segment), voice minutes, tracking numbers and transcription. |
 | Resend / SMTP system mail | Platform | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `INVITE_MAIL_FROM` | — | Invites, magic links and alerts. System mail is free. |
 | E2B sandboxes | Platform | `E2B_API_KEY`, `SANDBOX_PROVIDER` | — | Agent code sandboxes (1 credit per started minute). |
