@@ -30,6 +30,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { agentWorkerConfig } from "@/lib/agents/queue/config";
+import { SUB_AGENTS } from "@/lib/aos/agents";
 import type { ChatToolCall } from "@/lib/chat/tool-exec";
 import {
   delegationProgress,
@@ -214,8 +215,9 @@ export interface TaskUpdate {
 
 const RUN_AFTER_TICK_MS = 5_000;
 
+/** The agent's display name from the registry ("drafter" → "Writer", "actor" → "Operator"), as the rest of the UI shows it. */
 function agentLabel(agent: string): string {
-  return agent.charAt(0).toUpperCase() + agent.slice(1);
+  return (SUB_AGENTS as Record<string, { name: string } | undefined>)[agent]?.name ?? agent.charAt(0).toUpperCase() + agent.slice(1);
 }
 
 function approvalsText(proposals: ChatToolCall[], who: (c: ChatToolCall) => string, describe: (c: ChatToolCall) => string): string {

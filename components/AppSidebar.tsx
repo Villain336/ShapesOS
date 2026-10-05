@@ -13,6 +13,7 @@
 // rail keeps icons, the needs-you dot and the running shapes, with tooltips.
 
 import Link from "next/link";
+import { AGENT_ACTIVITY_CHANGED_EVENT } from "@/lib/aos/events";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
@@ -103,9 +104,12 @@ export function useAgentActivity(initial: { tree: SidebarTree; usage: SidebarUsa
     };
     const timer = window.setInterval(tick, ACTIVITY_POLL_MS);
     document.addEventListener("visibilitychange", tick);
+    // Phase 16: a delegation card saw sub-agents move — refresh now.
+    window.addEventListener(AGENT_ACTIVITY_CHANGED_EVENT, tick);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener(AGENT_ACTIVITY_CHANGED_EVENT, tick);
     };
   }, [refresh]);
   return state;
