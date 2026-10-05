@@ -174,3 +174,5 @@ lib/metering/__tests__/token-billing-db.test.ts
 lib/providers/__tests__/workspace-keys-db.test.ts
 # Phase 15.2 (keys): metered gaps — direct mail at 2× stops at the cap (rest queued, uncharged); sandbox minutes once per lifetime (docker free); Twilio minutes/transcription/number-month idempotent + no number bought at the cap; intelligence vendor calls at 4× (own key free) + GEO runs + cap refusal; Context.dev platform key charged at the gate (cap releases the reservation); studio image route gated + charged once. All vendors FAKE (MOCK).
 lib/metering/__tests__/metered-gaps-db.test.ts
+# Phase 15.2 (keys): delegated sub-agents' model calls are charged through the same llm_tokens path (one row per response, ceil(cost × 1.5)), subagent_spawn stays a separate once-per-child fee — the pool carries exactly tokens + spawn fees. Fake Responses API (MOCK), real loop + queue + worker.
+lib/chat/__tests__/delegation-billing-db.test.ts

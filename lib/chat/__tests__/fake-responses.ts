@@ -90,6 +90,8 @@ export function allText(body: ResponsesBody): string {
   return `${body.instructions ?? ""}\n${JSON.stringify(body.input)}`;
 }
 
+let respSeq = 0;
+
 async function respond(res: ServerResponse, body: ResponsesBody, reply: FakeReply): Promise<void> {
   const output: Array<Record<string, unknown>> = [];
   if (reply.text) output.push({ type: "message", content: [{ type: "output_text", text: reply.text }] });
@@ -97,7 +99,9 @@ async function respond(res: ServerResponse, body: ResponsesBody, reply: FakeRepl
     output.push({ type: "function_call", call_id: `call_${++callSeq}`, name: c.tool, arguments: JSON.stringify(c.args ?? {}) });
   }
   const response = {
-    id: `resp_${callSeq}_${Date.now()}`,
+    // Phase 15.2: unique per reply (as the real API's ids are) — the token
+    // ledger is idempotent per response id.
+    id: `resp_${++respSeq}_${callSeq}_${Date.now()}`,
     status: "completed",
     output,
     usage: reply.usage ?? { input_tokens: 10, output_tokens: 5 },
