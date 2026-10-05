@@ -158,3 +158,5 @@ lib/chat/__tests__/delegation-bugs-db.test.ts
 lib/chat/__tests__/delegation-db.test.ts
 # Phase 16 (deleg): a scheduled skill's live subtasks hang under one AgentRun (parentRunId) and Stop on it interrupts every subtask's in-flight call. Fake Responses API (MOCK).
 lib/scheduler/__tests__/skill-tree-db.test.ts
+# Phase 16 (deleg): Settings → Automation → Automatic delegation API (viewer reads, editor writes, bounded, RLS) and the run plan view route (404 across workspaces).
+lib/agents/delegation/__tests__/delegation-routes-db.test.ts

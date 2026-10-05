@@ -29,7 +29,8 @@ import { getAgentRun, requestAgentRunCancel } from "@/lib/agents/runs/service";
 import { AgentWorker } from "@/lib/agents/queue/worker";
 import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
 import { isLoopState } from "@/lib/agents/loop";
-import { getDelegation, settleDelegation } from "@/lib/agents/delegation/store";
+import { getDelegation, loadDelegationView, settleDelegation } from "@/lib/agents/delegation/store";
+import { loadAgentActivity } from "@/lib/aos/activity.server";
 import { runTrackedAgentTurn, stopThreadRuns, type ChatToolCall } from "../agent";
 import { allText, deferred, offered, startFakeModel, toolOutputs, waitFor, type FakeModel, type ResponsesBody } from "./fake-responses";
 
@@ -166,6 +167,18 @@ describe("Phase 16 automatic delegation (fake Responses API, real loop + queue +
     assert.ok(kids[4]!.createdAt.getTime() >= firstFourEnded, "the 5th started only after a slot freed");
     assert.equal((await lastAssistant(t.id))?.content, "Merged all five.");
     assert.equal((await getAgentRun(WS, out.runId))?.status, "succeeded");
+
+    // The UI's data, from these real rows: the plan view and the agent tree.
+    const view = await loadDelegationView(WS, out.runId);
+    assert.equal(view?.live, false);
+    assert.equal(view?.plans[0]?.line, "5 of 5 sub-agents done");
+    assert.ok(view?.plans[0]?.tasks.every((x) => x.aos === "done" && x.href && x.summary));
+    const activity = await loadAgentActivity(WS);
+    const node = activity.tree?.branches.find((b) => b.key === `run:${out.runId}`);
+    assert.ok(node, "the lead's run is in the tree");
+    assert.match(node!.line, /5 of 5 sub-agents done/);
+    assert.equal(node!.children?.length, 5, "its sub-agents hang under it");
+    assert.ok(node!.children!.every((c) => c.name === "Researcher" && c.status === "done"));
   });
 
   it("the workspace cap holds across runs (a workspace setting: 2 live sub-agents)", async () => {

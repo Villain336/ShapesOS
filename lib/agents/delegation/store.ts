@@ -559,3 +559,11 @@ export async function isWaitingOnChildren(workspaceId: string, runId: string): P
   const d = await getDelegation(workspaceId, runId).catch(() => null);
   return hasOpenPlan(d?.state ?? null);
 }
+
+/** Phase 16: a run's delegation as the UI draws it (null when the run isn't in this workspace). */
+export async function loadDelegationView(workspaceId: string, runId: string): Promise<import("@/lib/aos/delegation").DelegationView | null> {
+  const d = await getDelegation(workspaceId, runId);
+  if (!d) return null;
+  const { buildDelegationView } = await import("@/lib/aos/delegation");
+  return buildDelegationView(runId, d.status, d.state);
+}

@@ -143,7 +143,8 @@ function liveRunFor(tree: AgentTree): { run: LiveRun | null; chips: LiveChip[] }
     ? {
         title: `${running.name}: ${running.line}`,
         subtitle: running.missionName ?? undefined,
-        progress: mission?.progress ?? null,
+        // Phase 16: a run working with sub-agents shows "3 of 5" on the strip.
+        progress: mission?.progress ?? running.progress ?? null,
         href: running.href ?? undefined,
       }
     : mission

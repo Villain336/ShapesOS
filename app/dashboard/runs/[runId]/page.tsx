@@ -36,6 +36,11 @@ import { LiveWatch } from "./LiveWatch";
 import { ChangesReview } from "./ChangesReview";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 import { RestoreCheckpointButton } from "./RestoreCheckpointButton";
+import { DelegationPlanLive } from "./DelegationPlanLive";
+import { loadDelegationView } from "@/lib/agents/delegation/store";
+import { StatusShape } from "@/components/aos/StatusShape";
+import { runStatus } from "@/lib/aos/runs";
+import { statusLabel } from "@/lib/aos/status";
 import { sandboxRowForRun } from "@/lib/sandbox/store";
 import { isSandboxOutputEvent, previewLinks, sandboxRunView } from "@/lib/sandbox/run-view";
 
@@ -199,6 +204,9 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   ]);
   const tools = run.allowedTools.filter(isToolGroup).filter((g) => g !== "workspace" && g !== "delegate");
 
+  // Phase 16: the delegation plan this run handed to sub-agents (live via the watch SSE).
+  const delegation = await loadDelegationView(workspace.id, run.id).catch(() => null);
+
   // Phase 8 (ship): the run's diff, branch / PR and any push or PR waiting on a person.
   const review = await loadRunReview(workspace.id, run.id);
   const threadOwner = review?.threadId
@@ -253,6 +261,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
             control={control}
             stopRunId={stopRunId}
           />
+
+          {delegation && delegation.plans.length > 0 ? <DelegationPlanLive initial={delegation} /> : null}
 
           {/* Slice 7: live watch — mounted ONLY while the run is running.
               Finished runs show the recorded video instead. */}
@@ -369,14 +379,21 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
                     </Link>
                   </li>
                 ) : null}
-                {childRuns.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-2.5 text-md">
-                    <Link href={`/dashboard/runs/${c.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
-                      {runAgentName(c.kind, c.agentKey)}
-                    </Link>
-                    <span className="text-sm text-muted capitalize">{c.status}</span>
-                  </li>
-                ))}
+                {childRuns.map((c) => {
+                  // Phase 16: a sub-agent's state is an agent state — shape + word.
+                  const s = runStatus(String(c.status));
+                  return (
+                    <li key={c.id} className="flex items-center justify-between gap-3 py-2.5 text-md">
+                      <Link href={`/dashboard/runs/${c.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
+                        {runAgentName(c.kind, c.agentKey)}
+                      </Link>
+                      <span className="inline-flex items-center gap-1.5 text-sm text-muted">
+                        {s ? <StatusShape status={s} size={9} live={false} /> : null}
+                        {s ? statusLabel(s) : "Stopped"}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </Section>
           ) : null}

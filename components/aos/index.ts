@@ -20,3 +20,4 @@ export { ApprovalCard, type ApprovalItem, type ApprovalCardMode } from "./Approv
 export { PermissionSegmented, PERMISSION_OPTIONS, Switch, SwitchRow, Field, FieldMessage, type Permission } from "./Controls";
 export { MenuSurface, MenuLabel, MenuRow, MenuSeparator } from "./Menu";
 export { FilterPill } from "./FilterPill";
+export { DelegationPlan } from "./DelegationPlan";
