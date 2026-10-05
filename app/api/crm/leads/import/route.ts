@@ -14,6 +14,8 @@ import { dedupKeyFor, recomputeScore, logActivity } from "@/lib/crm/dedup";
 import { parseStages, CLOSED_STAGES } from "@/lib/crm/stages";
 import { recordCaptureTouch } from "@/lib/attribution/touches";
 import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
+import { parseCsvWithLines, parseLeadValueCents } from "@/lib/crm/csv-import";
+import { emitLeadCreated } from "@/lib/webhooks/emit";
 
 const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
 
@@ -24,26 +26,7 @@ const ImportSchema = z.object({
 
 /** Minimal RFC-4180-ish CSV parse (quotes, commas, newlines in quotes). */
 export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
-      } else field += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-    else if (c === "\r") { /* skip */ }
-    else field += c;
-  }
-  row.push(field);
-  if (row.length > 1 || row[0] !== "") rows.push(row);
-  return rows.filter((r) => r.some((f) => f.trim() !== ""));
+  return parseCsvWithLines(text).rows;
 }
 
 export interface ImportRowResult {
@@ -62,6 +45,8 @@ export async function processImportRows(
   actor: string,
   pipeline: { id: string; stages: unknown },
   rows: string[][],
+  /** Source line of each row (parseCsvWithLines) — errors name the real line. */
+  lines?: number[],
 ): Promise<ImportRowResult> {
   const stages = parseStages(pipeline.stages);
   const stageIds = new Set(stages.map((s) => s.id));
@@ -82,24 +67,27 @@ export async function processImportRows(
 
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
+    const rowNo = lines?.[r] ?? r + 1;
     const get = (i: number) => (i >= 0 && i < row.length ? row[i].trim() : "");
     const name = get(nameIdx);
-    if (!name) { errors.push({ row: r + 1, error: "name required" }); continue; }
+    if (!name) { errors.push({ row: rowNo, error: "name required" }); continue; }
 
     const email = get(idx("email")) || null;
     const phone = get(idx("phone")) || null;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.push({ row: r + 1, error: "invalid email" }); continue;
+      errors.push({ row: rowNo, error: "invalid email" }); continue;
     }
     const sourceRaw = get(idx("source")).toLowerCase().replace(/[-\s]/g, "_");
     const source = (SOURCES as readonly string[]).includes(sourceRaw) ? sourceRaw : "import";
     const stageRaw = get(idx("stage")).toLowerCase().replace(/\s+/g, "_");
     const stage = stageRaw && stageIds.has(stageRaw) ? stageRaw : stages[0].id;
-    const valueRaw = get(idx("value")).replace(/[$,]/g, "");
-    const valueCents = valueRaw ? Math.round(Number(valueRaw) * 100) : null;
-    if (valueCents !== null && (!Number.isFinite(valueCents) || valueCents < 0)) {
-      errors.push({ row: r + 1, error: "invalid value" }); continue;
+    // Bounded to the int4 column with a clear message (was a generic
+    // "insert failed" once the value overflowed).
+    const value = parseLeadValueCents(get(idx("value")));
+    if ("error" in value) {
+      errors.push({ row: rowNo, error: value.error }); continue;
     }
+    const valueCents = value.cents;
     // C2: UTM columns → the creation attribution touch.
     const utm = {
       utm_source: get(idx("utm_source")) || undefined,
@@ -117,7 +105,7 @@ export async function processImportRows(
           select: { id: true },
         });
         if (existing) {
-          duplicates.push({ row: r + 1, name, existingId: existing.id });
+          duplicates.push({ row: rowNo, name, existingId: existing.id });
           continue;
         }
       }
@@ -140,7 +128,7 @@ export async function processImportRows(
       });
       await logActivity({
         workspaceId, leadId: lead.id, type: "import",
-        body: `Imported from CSV (row ${r + 1})`, actor,
+        body: `Imported from CSV (row ${rowNo})`, actor,
       });
       // C2: creation touch + won-revenue event (imported rows may be won).
       await recordCaptureTouch({
@@ -154,6 +142,8 @@ export async function processImportRows(
         actor,
       });
       await recomputeScore(lead.id, workspaceId);
+      // Phase 4a: lead.created webhook (best-effort, never throws).
+      await emitLeadCreated(lead);
       created++;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && dedupKey) {
@@ -161,9 +151,9 @@ export async function processImportRows(
           where: { workspaceId, dedupKey },
           select: { id: true },
         });
-        duplicates.push({ row: r + 1, name, existingId: existing?.id ?? "unknown" });
+        duplicates.push({ row: rowNo, name, existingId: existing?.id ?? "unknown" });
       } else {
-        errors.push({ row: r + 1, error: "insert failed" });
+        errors.push({ row: rowNo, error: "insert failed" });
       }
     }
   }
@@ -191,11 +181,11 @@ export async function POST(req: Request) {
   });
   if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
 
-  const rows = parseCsv(parsed.data.csv);
+  const { rows, lines } = parseCsvWithLines(parsed.data.csv);
   if (rows.length > 5001) {
     return Response.json({ error: "Import capped at 5000 rows" }, { status: 400 });
   }
   const actor = user.name ?? user.email ?? "Import";
-  const result = await processImportRows(workspace.id, actor, pipeline, rows);
+  const result = await processImportRows(workspace.id, actor, pipeline, rows, lines);
   return Response.json(result);
 }

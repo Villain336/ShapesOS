@@ -19,6 +19,7 @@ import {
   BarChart3,
   ScrollText,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type Tab = "proposals" | "sras" | "breakers" | "curves" | "audit" | "run";
 
@@ -236,7 +237,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
   };
 
   const revokeSra = async (id: string) => {
-    if (!confirm("Revoke this SRA instantly? Mode (b) ceases to exist the moment this lands.")) return;
+    if (!await confirmAction("Revoke this SRA instantly? Mode (b) ceases to exist the moment this lands.")) return;
     setBusy(true);
     try {
       await api(`/api/flywheel/reallocation/sras/${id}/revoke`, { method: "POST", body: JSON.stringify({ reason: "manual revoke from UI" }) });
@@ -280,7 +281,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
         return;
       }
     }
-    if (!confirm(`Execute this ${money(p.amountCents)} shift from ${p.sourceChannel} to ${p.destChannel}?`)) return;
+    if (!await confirmAction(`Execute this ${money(p.amountCents)} shift from ${p.sourceChannel} to ${p.destChannel}?`)) return;
     setBusy(true);
     try {
       await api(`/api/flywheel/reallocation/proposals/${p.id}/execute`, { method: "POST", body: JSON.stringify(body) });
@@ -293,7 +294,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
   };
 
   const acknowledgeBreaker = async (id: string) => {
-    if (!confirm("Acknowledge this breaker? This STARTS the mandatory 72h cool-down — it does not end it.")) return;
+    if (!await confirmAction("Acknowledge this breaker? This STARTS the mandatory 72h cool-down — it does not end it.")) return;
     setBusy(true);
     try {
       await api(`/api/flywheel/reallocation/breakers/${id}/acknowledge`, { method: "POST" });

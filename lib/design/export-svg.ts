@@ -542,7 +542,7 @@ export function exportPageToSvg(
   const body = page.elements.map((el) => elementToSvg(el, opts)).filter(Boolean).join("\n");
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<!-- Exported from Marketr Canvas (schema v${validated.doc.schemaVersion}) — page "${escapeXml(page.name)}" -->\n` +
+    `<!-- Exported from ShapesOS Canvas (schema v${validated.doc.schemaVersion}) — page "${escapeXml(page.name)}" -->\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="${formatNumber(page.width)}" height="${formatNumber(page.height)}" viewBox="0 0 ${formatNumber(page.width)} ${formatNumber(page.height)}">\n` +
     `<rect x="0" y="0" width="${formatNumber(page.width)}" height="${formatNumber(page.height)}" fill="${escapeXml(page.background)}"/>\n` +
     (body ? body + "\n" : "") +

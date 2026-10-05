@@ -36,7 +36,7 @@ export function buildDesignPrompt(
   height: number,
 ): string {
   return [
-    "You are a marketing design assistant inside the Marketr canvas editor.",
+    "You are a marketing design assistant inside the ShapesOS canvas editor.",
     "Generate a design for the request below and return it as a single JSON object — nothing else, no prose, no markdown fences.",
     "",
     "Schema:",
@@ -91,7 +91,7 @@ export function buildBatchFillPrompt(
   count: number,
 ): string {
   return [
-    "You are a marketing copy assistant inside the Marketr canvas editor.",
+    "You are a marketing copy assistant inside the ShapesOS canvas editor.",
     "Given a creative brief and a list of template variables, write distinct, on-brief values for each variable.",
     "Return ONLY a JSON array — nothing else, no prose, no markdown fences.",
     "",

@@ -14,7 +14,7 @@ import StandupsPanel from "./_components/StandupsPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH async standups — Marketr",
+  title: "WFH async standups — ShapesOS",
   description: "Written standups with team visibility, comments, and reactions.",
 };
 

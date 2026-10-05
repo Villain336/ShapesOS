@@ -84,13 +84,28 @@ function signedVolume(
   return (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
 }
 
+/**
+ * Float32 STL coordinates can be NaN/±Infinity. A triangle with any
+ * non-finite vertex is dropped (never fed into bbox/volume/checks), so stats
+ * and manufacturability results are computed only from real geometry.
+ */
+function finiteTriangle(buf: Buffer, offset: number): boolean {
+  for (let k = 0; k < 9; k++) {
+    if (!Number.isFinite(buf.readFloatLE(offset + 12 + k * 4))) return false;
+  }
+  return true;
+}
+
 /** Parse binary STL (bytes already validated by the size equation). */
 function parseBinaryStl(buf: Buffer): MeshStats | null {
   const count = buf.readUInt32LE(80);
   const bbox = new Bbox();
   let volume = 0;
+  let kept = 0;
   let offset = 84;
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count; i++, offset += 50) {
+    if (!finiteTriangle(buf, offset)) continue;
+    kept++;
     // 12 floats normal (ignored) + 9 vertex floats + 2 attribute bytes.
     const ax = buf.readFloatLE(offset + 12);
     const ay = buf.readFloatLE(offset + 16);
@@ -105,10 +120,9 @@ function parseBinaryStl(buf: Buffer): MeshStats | null {
     bbox.add(bx, by, bz);
     bbox.add(cx, cy, cz);
     volume += signedVolume(ax, ay, az, bx, by, bz, cx, cy, cz);
-    offset += 50;
   }
-  if (!Number.isFinite(bbox.min[0])) return null;
-  return { triangleCount: count, bboxMin: bbox.min, bboxMax: bbox.max, volumeEstimate: volume };
+  if (kept === 0 || !Number.isFinite(bbox.min[0]) || !Number.isFinite(volume)) return null;
+  return { triangleCount: kept, bboxMin: bbox.min, bboxMax: bbox.max, volumeEstimate: volume };
 }
 
 /** Parse ASCII STL: vertices grouped by consecutive "vertex" lines. */
@@ -229,15 +243,19 @@ export interface MeshTriangles {
 function extractBinaryStlTriangles(buf: Buffer): MeshTriangles | null {
   const count = buf.readUInt32LE(80);
   const positions = new Float32Array(count * 9);
+  let kept = 0;
   let offset = 84;
-  for (let i = 0; i < count; i++) {
-    // Same layout as parseBinaryStl: 12 normal floats (ignored) + 9 vertex floats.
+  for (let i = 0; i < count; i++, offset += 50) {
+    // Same layout as parseBinaryStl: 12 normal floats (ignored) + 9 vertex
+    // floats; non-finite triangles dropped exactly as parseBinaryStl does.
+    if (!finiteTriangle(buf, offset)) continue;
     for (let k = 0; k < 9; k++) {
-      positions[i * 9 + k] = buf.readFloatLE(offset + 12 + k * 4);
+      positions[kept * 9 + k] = buf.readFloatLE(offset + 12 + k * 4);
     }
-    offset += 50;
+    kept++;
   }
-  return { positions, triangleCount: count };
+  if (kept === 0) return null;
+  return { positions: kept === count ? positions : positions.slice(0, kept * 9), triangleCount: kept };
 }
 
 function extractAsciiStlTriangles(text: string): MeshTriangles | null {

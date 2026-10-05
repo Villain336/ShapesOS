@@ -1,6 +1,8 @@
 // Marketr — security settings page (milestone 21, part D1).
 // Admin+ only (server-gated), read-only display: SSO auto-provisioning status,
 // secrets provider, and session/auth notes. No secret material is shown.
+// Phase 4a: the require-2FA policy (owners toggle, admins see it) and SCIM
+// provisioning tokens (owners only), via WorkspaceSecurityControls.
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
@@ -8,6 +10,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { ssoAutoProvisioningConfigured } from "@/lib/sso";
 import { getSecretsProvider } from "@/lib/secrets";
 import SettingsNav from "@/components/settings/SettingsNav";
+import { WorkspaceSecurityControls } from "@/components/security/WorkspaceSecurityControls";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +53,9 @@ export default async function SecuritySettingsPage() {
         </p>
       </div>
       <SettingsNav />
+
+      {/* Phase 4a: require-2FA policy (owners change it) + SCIM tokens (owners). */}
+      <WorkspaceSecurityControls isOwner={membership.role === "owner"} />
 
       <div className="rounded-xl border border-line bg-paper p-5">
         <div className="flex items-center justify-between gap-2">
@@ -98,7 +104,10 @@ export default async function SecuritySettingsPage() {
           </div>
           <div>
             <dt className="text-xs text-muted">Sign-in methods</dt>
-            <dd>Google, credentials, and SAML/OIDC where configured.</dd>
+            <dd>
+              Google, credentials, and SAML/OIDC where configured; passkeys. Members manage their own authenticator app and
+              passkeys under Your security.
+            </dd>
           </div>
         </dl>
         <p className="mt-3 text-xs text-muted">

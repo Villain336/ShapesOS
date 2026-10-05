@@ -7,7 +7,8 @@
 // tenants (defense in depth, T8).
 
 import type { PrismaClient, ScheduledSkill } from "@prisma/client";
-import { parseCron, nextRunAfter, CronParseError } from "./cron";
+import { parseCron, nextRunAfterInZone, CronParseError } from "./cron";
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@/lib/time/zoned";
 import {
   isEventSource,
   validateEventPayload,
@@ -25,6 +26,7 @@ import {
 } from "./guard";
 import { executeSkillRun } from "./runner";
 import { schedulerAudit } from "./audit";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export { CronParseError };
 
@@ -36,6 +38,8 @@ export interface CreateScheduleInput {
   skillId: string;
   triggerType: "cron" | "event";
   cronExpr?: string | null;
+  /** IANA zone the cron is read in (default UTC). Validated. */
+  timezone?: string | null;
   eventSource?: string | null;
   eventConfig?: Record<string, unknown> | null;
   createdBy: string;
@@ -49,6 +53,18 @@ export class ScheduleServiceError extends Error {
     super(message);
     this.name = "ScheduleServiceError";
   }
+}
+
+/** Validate a schedule's IANA timezone; blank/absent → UTC. */
+export function normalizeScheduleTimezone(tz: unknown): string {
+  if (tz == null || (typeof tz === "string" && tz.trim() === "")) return DEFAULT_TIME_ZONE;
+  const trimmed = typeof tz === "string" ? tz.trim() : tz;
+  if (!isValidTimeZone(trimmed)) {
+    throw new ScheduleServiceError(
+      `unknown timezone "${String(tz).slice(0, 64)}" (use an IANA name like America/New_York)`,
+    );
+  }
+  return trimmed;
 }
 
 async function loadScheduleForWorkspace(db: Db, id: string, workspaceId: string) {
@@ -85,11 +101,12 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
   let eventSource: string | null = null;
   let eventConfigJson: Record<string, unknown> | null = null;
   let nextRunAt: Date | null = null;
+  const timezone = normalizeScheduleTimezone(input.timezone); // throws → 400
 
   if (input.triggerType === "cron") {
     const parsed = parseCron(input.cronExpr ?? ""); // throws CronParseError → 400
     cronExpr = parsed.expr;
-    nextRunAt = nextRunAfter(parsed, now);
+    nextRunAt = nextRunAfterInZone(parsed, now, timezone);
   } else if (input.triggerType === "event") {
     if (!isEventSource(input.eventSource)) {
       throw new ScheduleServiceError(`unknown event source: ${String(input.eventSource)}`);
@@ -115,6 +132,7 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
       skillId: skill.id,
       triggerType: input.triggerType,
       cronExpr,
+      timezone,
       eventSource,
       eventConfigJson: eventConfigJson ? (JSON.parse(JSON.stringify(eventConfigJson)) as never) : undefined,
       createdBy: input.createdBy,
@@ -129,7 +147,7 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
     projectId,
     workspaceId: input.workspaceId,
     action: "schedule_created",
-    summary: `Schedule created: "${skill.name}" (${input.triggerType}${cronExpr ? ` ${cronExpr}` : ""}${eventSource ? ` ${eventSource}` : ""}, ${approvalMode})`,
+    summary: `Schedule created: "${skill.name}" (${input.triggerType}${cronExpr ? ` ${cronExpr} ${timezone}` : ""}${eventSource ? ` ${eventSource}` : ""}, ${approvalMode})`,
     actorUserId: input.createdBy,
   });
   return schedule;
@@ -137,6 +155,8 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
 
 export interface UpdateScheduleInput {
   cronExpr?: string | null;
+  /** IANA zone (cron schedules); null/blank resets to UTC. */
+  timezone?: string | null;
   eventSource?: string | null;
   eventConfig?: Record<string, unknown> | null;
   approvalMode?: "supervised" | "scheduled" | "autopilot";
@@ -157,13 +177,20 @@ export async function updateSchedule(
   const data: Record<string, unknown> = {};
   let statusChanged = false;
 
-  if (patch.cronExpr !== undefined) {
+  if (patch.cronExpr !== undefined || patch.timezone !== undefined) {
     if (schedule.triggerType !== "cron") {
-      throw new ScheduleServiceError("cannot set cronExpr on an event schedule");
+      throw new ScheduleServiceError(
+        patch.cronExpr !== undefined
+          ? "cannot set cronExpr on an event schedule"
+          : "cannot set timezone on an event schedule",
+      );
     }
-    const parsed = parseCron(patch.cronExpr ?? "");
+    const timezone =
+      patch.timezone !== undefined ? normalizeScheduleTimezone(patch.timezone) : schedule.timezone;
+    const parsed = parseCron(patch.cronExpr !== undefined ? (patch.cronExpr ?? "") : (schedule.cronExpr ?? ""));
     data.cronExpr = parsed.expr;
-    data.nextRunAt = nextRunAfter(parsed, now);
+    data.timezone = timezone;
+    data.nextRunAt = nextRunAfterInZone(parsed, now, timezone);
   }
   if (patch.eventSource !== undefined || patch.eventConfig !== undefined) {
     if (schedule.triggerType !== "event") {
@@ -304,6 +331,19 @@ export async function fireSchedule(db: Db, schedule: ScheduledSkill, opts: FireO
       summary: `Supervised run proposed: schedule ${schedule.id.slice(0, 8)} (trigger ${opts.trigger}) — waiting for approval`,
       actorUserId: opts.actorId ?? null,
     });
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    // Deciding needs skills.install (admin+ always holds it).
+    await notifyApprovalNeeded({
+      workspaceId: schedule.workspaceId,
+      source: "scheduler",
+      sourceId: run.id,
+      title: `Supervised run (${opts.trigger}) is waiting for approval`,
+      href: schedule.projectId
+        ? `/dashboard/projects/${encodeURIComponent(schedule.projectId)}/automations/schedules/runs/${encodeURIComponent(run.id)}`
+        : undefined,
+      requestedBy: opts.actorId ?? null,
+      decideRole: "admin",
+    });
     return { fired: true, runId: run.id, awaitingApproval: true };
   }
 
@@ -315,16 +355,18 @@ export async function fireSchedule(db: Db, schedule: ScheduledSkill, opts: FireO
 export async function approveRun(db: Db, runId: string, workspaceId: string, approverId: string) {
   const run = await db.skillRun.findFirst({
     where: { id: runId, workspaceId },
-    include: { skill: true },
+    include: { skill: true, schedule: { select: { createdBy: true } } },
   });
   if (!run) throw new ScheduleServiceError(`run not found: ${runId}`);
   if (run.status !== "awaiting_approval") {
     throw new ScheduleServiceError(`run is not awaiting approval (status ${run.status})`);
   }
-  await db.skillRun.update({
-    where: { id: run.id },
+  // Guarded transition: two concurrent decisions can't both land.
+  const claimed = await db.skillRun.updateMany({
+    where: { id: run.id, workspaceId, status: "awaiting_approval" },
     data: { status: "approved", approvedBy: approverId, approvedAt: new Date() },
   });
+  if (claimed.count !== 1) throw new ScheduleServiceError("run is not awaiting approval (already decided)");
   await schedulerAudit(db, {
     projectId: run.projectId,
     workspaceId,
@@ -332,24 +374,55 @@ export async function approveRun(db: Db, runId: string, workspaceId: string, app
     summary: `Supervised run approved: "${run.skill.name}" (run ${run.id.slice(0, 8)})`,
     actorUserId: approverId,
   });
+  // Phase 4a: best-effort "decided" notification to the schedule's owner
+  // (never throws — the decision already landed).
+  await notifyScheduledRunDecided(run, "approved", approverId);
   await executeSkillRun(db, run.id);
   return run.id;
 }
 
 /** Reject a supervised run → it never executes. */
 export async function rejectRun(db: Db, runId: string, workspaceId: string, approverId: string) {
-  const run = await db.skillRun.findFirst({ where: { id: runId, workspaceId } });
+  const run = await db.skillRun.findFirst({
+    where: { id: runId, workspaceId },
+    include: { skill: true, schedule: { select: { createdBy: true } } },
+  });
   if (!run) throw new ScheduleServiceError(`run not found: ${runId}`);
   if (run.status !== "awaiting_approval") {
     throw new ScheduleServiceError(`run is not awaiting approval (status ${run.status})`);
   }
-  await db.skillRun.update({ where: { id: run.id }, data: { status: "rejected", finishedAt: new Date(), approvedBy: approverId, approvedAt: new Date() } });
+  const claimed = await db.skillRun.updateMany({
+    where: { id: run.id, workspaceId, status: "awaiting_approval" },
+    data: { status: "rejected", finishedAt: new Date(), approvedBy: approverId, approvedAt: new Date() },
+  });
+  if (claimed.count !== 1) throw new ScheduleServiceError("run is not awaiting approval (already decided)");
   await schedulerAudit(db, {
     projectId: run.projectId,
     workspaceId,
     action: "scheduler_run_rejected",
     summary: `Supervised run rejected: run ${run.id.slice(0, 8)}`,
     actorUserId: approverId,
+  });
+  await notifyScheduledRunDecided(run, "denied", approverId);
+}
+
+/** "Your supervised run was approved/rejected" → the schedule's creator. Never throws. */
+async function notifyScheduledRunDecided(
+  run: { id: string; workspaceId: string; projectId: string | null; skill: { name: string }; schedule: { createdBy: string } | null },
+  decision: "approved" | "denied",
+  decidedBy: string,
+): Promise<void> {
+  await notifyApprovalDecided({
+    workspaceId: run.workspaceId,
+    source: "scheduler",
+    sourceId: run.id,
+    title: `Supervised run of "${run.skill.name}"`,
+    decision,
+    decidedBy,
+    requestedBy: run.schedule?.createdBy ?? null,
+    href: run.projectId
+      ? `/dashboard/projects/${encodeURIComponent(run.projectId)}/automations/schedules/runs/${encodeURIComponent(run.id)}`
+      : undefined,
   });
 }
 

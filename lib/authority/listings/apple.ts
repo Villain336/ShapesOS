@@ -28,7 +28,7 @@ export const APPLE_CLAIM_STEPS: AppleClaimStep[] = [
   {
     order: 3,
     title: "Complete verification",
-    detail: "Apple verifies ownership — typically via a phone call or document upload to the business listing. This is owner-performed; Marketr cannot do it for you.",
+    detail: "Apple verifies ownership — typically via a phone call or document upload to the business listing. This is owner-performed; ShapesOS cannot do it for you.",
     ownerAction: "Complete Apple's verification",
   },
   {
@@ -45,9 +45,9 @@ export const APPLE_CLAIM_STEPS: AppleClaimStep[] = [
   },
   {
     order: 6,
-    title: "Mark claimed in Marketr",
-    detail: "Once Apple confirms the listing, mark it claimed in Marketr so the channel status flips to connected and sync monitoring begins.",
-    ownerAction: "Confirm the claim in Marketr",
+    title: "Mark claimed in ShapesOS",
+    detail: "Once Apple confirms the listing, mark it claimed in ShapesOS so the channel status flips to connected and sync monitoring begins.",
+    ownerAction: "Confirm the claim in ShapesOS",
   },
 ];
 

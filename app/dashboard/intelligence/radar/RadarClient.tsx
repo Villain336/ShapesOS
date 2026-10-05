@@ -21,6 +21,7 @@ import {
   Search,
   Zap,
 } from "lucide-react";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Small atoms (same recipe as StudioApp) ───────────────────────────────────
 
@@ -227,6 +228,8 @@ function EventsTab() {
               <tr
                 key={e.id}
                 onClick={() => loadDetail(e.id)}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => loadDetail(e.id))}
                 className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${selectedId === e.id ? "bg-hover-paper" : ""}`}
               >
                 <td className="whitespace-nowrap px-3 py-2 text-muted">{fmtDate(e.startedAt)}</td>

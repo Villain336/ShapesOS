@@ -35,7 +35,7 @@ const CURATED: CuratedSpec[] = [
     packageName: "@activepieces/piece-webhook",
     load: () => import("@activepieces/piece-webhook"),
     exportKey: "webhook",
-    marketingUse: "Entry point: let Marketr missions, playbooks, or external apps fire a flow with a JSON payload.",
+    marketingUse: "Entry point: let ShapesOS missions, playbooks, or external apps fire a flow with a JSON payload.",
   },
   {
     packageName: "@activepieces/piece-schedule",
@@ -47,7 +47,7 @@ const CURATED: CuratedSpec[] = [
     packageName: "@activepieces/piece-http",
     load: () => import("@activepieces/piece-http"),
     exportKey: "http",
-    marketingUse: "Call any Marketr API route or third-party endpoint from inside a flow.",
+    marketingUse: "Call any ShapesOS API route or third-party endpoint from inside a flow.",
   },
   {
     packageName: "@activepieces/piece-smtp",
@@ -205,7 +205,7 @@ export const AUTOMATION_RECIPES: AutomationRecipe[] = [
   {
     id: "lead-capture-fanout",
     title: "New lead → Sheets + Slack",
-    description: "Marketr (or a landing page) POSTs a lead payload to a webhook flow; the flow appends it to Google Sheets and pings #sales in Slack.",
+    description: "ShapesOS (or a landing page) POSTs a lead payload to a webhook flow; the flow appends it to Google Sheets and pings #sales in Slack.",
     pieces: ["@activepieces/piece-webhook", "@activepieces/piece-google-sheets", "@activepieces/piece-slack"],
     triggerPiece: "@activepieces/piece-webhook",
   },
@@ -219,7 +219,7 @@ export const AUTOMATION_RECIPES: AutomationRecipe[] = [
   {
     id: "weekly-rank-digest",
     title: "Weekly rank digest",
-    description: "Schedule trigger → HTTP call into Marketr's rank API → OpenAI summarizes movers → Mailchimp campaign to the client.",
+    description: "Schedule trigger → HTTP call into ShapesOS's rank API → OpenAI summarizes movers → Mailchimp campaign to the client.",
     pieces: ["@activepieces/piece-schedule", "@activepieces/piece-http", "@activepieces/piece-openai", "@activepieces/piece-mailchimp"],
     triggerPiece: "@activepieces/piece-schedule",
   },

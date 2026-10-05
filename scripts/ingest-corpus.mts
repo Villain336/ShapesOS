@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 // Marketr — Phase 10 M9: corpus ingest runner.
 //
-// Ingests the full 24-source registry (M9-CORPUS-SOURCES.md #1–24) in
+// Ingests the full 24-source registry (docs/research/M9-CORPUS-SOURCES.md #1–24) in
 // priority order: verbatim-ingestible sources (Tier 1 CC-BY-4.0 + Tier 2)
 // via ingestSeedSource(), learn-only sources (#2–8, #21–24) via their
 // Tier 1S original-synthesis playbooks (ingestSynthesisPlaybook()).

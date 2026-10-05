@@ -6,6 +6,7 @@
 // in a bad body can't leak back in the response).
 
 import { z } from "zod";
+import { errorResponse } from "./errors";
 
 export { z };
 
@@ -58,6 +59,37 @@ export function validateBody<T>(schema: z.ZodType<T>, body: unknown): Validated<
   }
   return { ok: true, data: parsed.data };
 }
+
+/**
+ * Validate URL query parameters against a zod object schema. Empty values
+ * count as absent; only the first value of a repeated key is used. Invalid
+ * input → { ok: false, error } with a 400 from the shared error mapper
+ * (lib/api/errors.ts), so `?take=abc`, `?limit=1.5` or an unknown enum
+ * filter never reaches Prisma as a 500.
+ */
+export function parseQuery<T>(schema: z.ZodType<T>, searchParams: URLSearchParams): Validated<T> {
+  const raw: Record<string, string> = {};
+  for (const [k, v] of searchParams) {
+    if (!(k in raw) && v !== "") raw[k] = v;
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: errorResponse(parsed.error) };
+  return { ok: true, data: parsed.data };
+}
+
+/**
+ * Integer query parameter for paging: absent → `def`; anything that isn't a
+ * whole number ("abc", "1.5", "1e3") is a 400; in-range values pass and
+ * out-of-range ones are clamped to [min, max] (the routes' long-standing
+ * clamp behavior).
+ */
+export const intQuery = (def: number, min: number, max: number) =>
+  z
+    .string()
+    .trim()
+    .regex(/^-?\d{1,9}$/, "must be a whole number")
+    .optional()
+    .transform((v) => (v === undefined ? def : Math.min(max, Math.max(min, Number(v)))));
 
 // --- reusable field schemas -------------------------------------------------
 

@@ -358,7 +358,7 @@ const ParticleShapeMorph = ({
       const reduced = matchMedia("(prefers-reduced-motion: reduce)");
       let width = 0;
       let height = 0;
-      let color = "#000";
+      let color = "#000000"; // canvas fill needs a literal; matches --aos-ink
       let frame = 0;
       let previous = 0;
       let spin = 0.6;
@@ -499,7 +499,7 @@ const ParticleShapeMorph = ({
       };
 
       const readColor = () => {
-        color = getComputedStyle(host).color || "#000";
+        color = getComputedStyle(host).color || "#000000";
         if (!frame) draw();
       };
 
@@ -546,14 +546,14 @@ const ParticleShapeMorph = ({
       ref={hostRef}
       type="button"
       aria-label={`Particle field showing ${LABELS[list[active]] ?? list[active]}. Activate for the next shape.`}
-      className={`relative isolate block size-72 cursor-pointer text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/40 ${className}`}
+      className={`relative isolate block size-72 cursor-pointer text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${className}`}
     >
       <canvas
         ref={canvasRef}
         aria-hidden="true"
         className="absolute inset-0 h-full w-full"
       />
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] text-foreground/45 uppercase">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 text-xs font-semibold text-muted">
         <span className="tabular-nums">
           {String(active + 1).padStart(2, "0")} /{" "}
           {String(list.length).padStart(2, "0")}

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface FsFile {
   id: string;
@@ -153,7 +154,7 @@ export function FileManager({
   }
 
   async function remove(fileId: string, purge: boolean) {
-    if (purge && !window.confirm("Permanently delete this file? This cannot be undone.")) return;
+    if (purge && !await confirmAction("Permanently delete this file? This cannot be undone.")) return;
     setBusy(true);
     setError(null);
     try {

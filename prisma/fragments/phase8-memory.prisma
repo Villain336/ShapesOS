@@ -1,5 +1,5 @@
 // ============================================================
-// Phase 8 G3 — Growth Memory substrate (SPEC-PHASE8.md §2 G3, §4).
+// Phase 8 G3 — Growth Memory substrate (docs/specs/SPEC-PHASE8.md §2 G3, §4).
 // ============================================================
 // Marketr — Growth Memory: three stores (episodic / semantic / procedural)
 // + one retrieval contract. The Test Lab's F3 archive sink schema is adopted

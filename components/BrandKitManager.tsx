@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { previewBrandTheme, sanitizeBrandHex } from "@/lib/brand-theme";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface BrandKit {
   id: string;
@@ -32,6 +33,7 @@ const FONT_FIELDS = [
 
 const emptyForm = {
   name: "",
+  // Stored brand-kit data (PDF/report colors the user edits), not UI styling.
   colors: { primary: "#18181b", accent: "#f97316", text: "#18181b", muted: "#71717a" },
   fonts: { heading: "Helvetica-Bold", body: "Helvetica" },
   tone: "",
@@ -116,7 +118,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this brand kit? Templates using it will fall back to the default kit.")) return;
+    if (!await confirmAction("Delete this brand kit? Templates using it will fall back to the default kit.")) return;
     const res = await fetch(`/api/brand-kits/${id}`, { method: "DELETE" });
     if (res.ok) setKits((prev) => prev.filter((k) => k.id !== id));
   }
@@ -141,40 +143,40 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           Brand kits power white-label PDF reports. The default kit is used when a template has none.
         </p>
         <button
           onClick={startCreate}
-          className="rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700"
+          className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover"
         >
           New brand kit
         </button>
       </div>
 
-      {error && <p className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-md border border-failed bg-failed-tint px-4 py-2 text-sm text-failed-text">{error}</p>}
 
       {editingId && (
-        <div className="rounded-lg border border-zinc-300 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold">{editingId === "new" ? "New brand kit" : "Edit brand kit"}</h2>
+        <div className="rounded-lg bg-paper shadow-hairline p-6">
+          <h2 className="mb-4 text-lg font-heading tracking-heading stretch-heading">{editingId === "new" ? "New brand kit" : "Edit brand kit"}</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-zinc-500">Name</span>
+              <span className="text-muted">Name</span>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="e.g. Launchabl"
-                className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
               />
             </label>
             {FONT_FIELDS.map((f) => (
               <label key={f.key} className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">{f.label}</span>
+                <span className="text-muted">{f.label}</span>
                 <input
                   value={(form.fonts as Record<string, string>)[f.key] ?? ""}
                   onChange={(e) => setForm({ ...form, fonts: { ...form.fonts, [f.key]: e.target.value } })}
                   placeholder="Helvetica"
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 />
               </label>
             ))}
@@ -182,44 +184,48 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             {COLOR_FIELDS.map((c) => (
               <label key={c.key} className="flex items-center gap-2 text-sm">
+                {/* Color picker value is the user's stored brand color (data). */}
                 <input
                   type="color"
                   value={(form.colors as Record<string, string>)[c.key] ?? "#000000"}
                   onChange={(e) => setForm({ ...form, colors: { ...form.colors, [c.key]: e.target.value } })}
-                  className="h-8 w-10 cursor-pointer rounded border border-zinc-200 bg-zinc-50"
+                  className="h-8 w-10 cursor-pointer rounded-key border border-line bg-canvas"
                 />
-                <span className="text-zinc-500">{c.label}</span>
+                <span className="text-muted">{c.label}</span>
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[12px] text-zinc-500">
+          <p className="mt-2 text-[12px] text-muted">
             Primary drives this workspace&apos;s UI accent too — the whole app re-tints live
             as you pick. Save to apply.
           </p>
-          {/* Live preview strip — these brand utilities follow the preview broadcast. */}
-          <div className="mt-3 flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-            <span className="text-[12px] font-medium text-zinc-500">Live preview</span>
-            <span className="inline-flex items-center rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white">
+          {/* Live preview strip — deliberately tenant-brand vars (--brand-*): this
+              previews the kit's color via the preview broadcast. Brand-kit
+              machinery stays (Tico 2026-10-01); everything else is Agentic OS. */}
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-line bg-canvas p-3">
+            <span className="text-[12px] font-medium text-muted">Live preview</span>
+            <span className="inline-flex items-center rounded-full bg-[var(--brand-600)] px-2.5 py-1.5 text-[13px] font-semibold text-white">
               Primary button
             </span>
-            <span className="inline-flex items-center rounded-full border border-brand-600/30 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+            <span className="inline-flex items-center rounded-full border border-[var(--brand-600)]/30 bg-[var(--brand-50)] px-2 py-0.5 text-[11px] font-semibold text-[var(--brand-700)]">
               Soft tint chip
             </span>
-            <span className="font-mono text-[12px] text-zinc-400">
-              {primaryPreview ?? "#7c3aed"}
+            <span className="font-mono text-[12px] text-muted">
+              {/* Shown value only: with no tenant brand the base primary is ink. */}
+              {primaryPreview ?? "#000000"}
             </span>
           </div>
           <label className="mt-4 flex flex-col gap-1 text-sm">
-            <span className="text-zinc-500">Tone / voice notes (guides AI copy in reports)</span>
+            <span className="text-muted">Tone / voice notes (guides AI copy in reports)</span>
             <textarea
               value={form.tone}
               onChange={(e) => setForm({ ...form, tone: e.target.value })}
               rows={2}
               placeholder="Confident, plain-spoken, no jargon…"
-              className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+              className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
             />
           </label>
-          <label className="mt-3 flex items-center gap-2 text-sm text-zinc-500">
+          <label className="mt-3 flex items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
               checked={form.isDefault}
@@ -231,13 +237,13 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
             <button
               onClick={save}
               disabled={saving}
-              className="rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>
             <button
               onClick={() => setEditingId(null)}
-              className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 hover:bg-zinc-100"
+              className="rounded-full bg-paper px-4 py-1.5 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
             >
               Cancel
             </button>
@@ -247,30 +253,31 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         {kits.map((kit) => (
-          <div key={kit.id} className="rounded-lg border border-zinc-300 bg-white p-5">
+          <div key={kit.id} className="rounded-lg bg-paper shadow-hairline p-5">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-zinc-900">
+                <h3 className="font-semibold text-ink">
                   {kit.name}
                   {kit.isDefault && (
-                    <span className="ml-2 rounded bg-accent-tint px-2 py-0.5 text-xs text-accent-ink">default</span>
+                    <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-ink">default</span>
                   )}
                 </h3>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-muted">
                   {kit._count?.templates ?? 0} templates · {kit._count?.reports ?? 0} reports
                 </p>
               </div>
               <div
-                className="h-10 w-10 rounded border border-zinc-200"
+                className="h-10 w-10 rounded-sm border border-line"
+                // Swatch of the kit's stored primary (data); fallback matches the form default.
                 style={{ backgroundColor: kit.colors?.primary ?? "#18181b" }}
                 title="Primary color"
               />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {COLOR_FIELDS.map((c) => (
-                <span key={c.key} className="flex items-center gap-1 text-xs text-zinc-500">
+                <span key={c.key} className="flex items-center gap-1 text-xs text-muted">
                   <span
-                    className="inline-block h-3 w-3 rounded-full border border-zinc-200"
+                    className="inline-block h-3 w-3 rounded-full border border-line"
                     style={{ backgroundColor: (kit.colors as Record<string, string>)?.[c.key] ?? "transparent" }}
                   />
                   {c.label}
@@ -278,7 +285,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <label className="cursor-pointer rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100">
+              <label className="cursor-pointer rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper">
                 {uploadingId === kit.id ? "Uploading…" : kit.logoPath ? "Replace logo" : "Upload logo"}
                 <input
                   type="file"
@@ -293,13 +300,13 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
               </label>
               <button
                 onClick={() => startEdit(kit)}
-                className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100"
+                className="rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
               >
                 Edit
               </button>
               <button
                 onClick={() => remove(kit.id)}
-                className="rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100"
+                className="rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint"
               >
                 Delete
               </button>
@@ -308,7 +315,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
         ))}
       </div>
       {kits.length === 0 && !editingId && (
-        <p className="text-sm text-zinc-500">No brand kits yet. Create one to start white-labeling reports.</p>
+        <p className="text-sm text-muted">No brand kits yet. Create one to start white-labeling reports.</p>
       )}
     </div>
   );

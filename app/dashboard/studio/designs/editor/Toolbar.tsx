@@ -363,12 +363,12 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               type="color"
               value={page.background}
               onChange={(e) => setPageBackground(page.id, e.target.value)}
-              className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
+              className="h-7 w-8 cursor-pointer rounded-key bg-paper p-0.5 shadow-control"
               title="Page background"
             />
             Background
           </label>
-          <span className="rounded bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-muted">
+          <span className="rounded-key bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-muted">
             {page.width} × {page.height}
           </span>
           <div ref={resizeRef} className="relative">
@@ -455,7 +455,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
             onChange={(e) => {
               for (const t of textEls) updateElement(t.id, { fill: e.target.value });
             }}
-            className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
+            className="h-7 w-8 cursor-pointer rounded-key bg-paper p-0.5 shadow-control"
             title="Text color"
           />
           {(["left", "center", "right"] as const).map((a) => (
@@ -520,6 +520,8 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
             value={(() => {
               const el = selected[0]!;
               if (el.type === "line") return el.stroke;
+              // <input type="color"> only accepts a literal #rrggbb, and these
+              // are the design document's own colors (user data), not UI chrome.
               if (el.type === "image") return "#ffffff";
               if (el.type === "chart") return el.colors[0] ?? "#7c3aed";
               if (el.type === "qr") return el.foreground;
@@ -531,7 +533,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                 if (Object.keys(patch).length > 0) updateElement(el.id, patch);
               }
             }}
-            className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
+            className="h-7 w-8 cursor-pointer rounded-key bg-paper p-0.5 shadow-control"
             title="Fill color"
           />
           <button
@@ -652,7 +654,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               undo();
               setNotice(null);
             }}
-            className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-ink aos-press hover:bg-hover-paper"
+            className="rounded-full bg-paper px-3 py-1 text-[12px] font-semibold text-ink aos-press hover:bg-hover-paper"
           >
             Undo
           </button>

@@ -362,7 +362,7 @@ export function BrainCanvas2D({
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink" /> Tier 1 · official
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-muted">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dashed border-ink" /> Tier 1S · Marketr synthesis
+          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dashed border-ink" /> Tier 1S · ShapesOS synthesis
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-subtle" /> Proposed

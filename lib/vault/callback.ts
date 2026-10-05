@@ -12,7 +12,7 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { ConnectorConnection } from "@prisma/client";
-import { parseOAuthState, getOAuthConfig, type OAuthProviderConfig } from "./oauth";
+import { parseOAuthState, getOAuthConfig, buildTokenRequest, shopUrl, type OAuthProviderConfig } from "./oauth";
 
 export interface CallbackDeps {
   fetchImpl?: typeof fetch;
@@ -37,6 +37,8 @@ export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string,
   fetchImpl: typeof fetch = fetch,
+  /** Phase 11 (devtools): PKCE code verifier from the signed state. */
+  codeVerifier?: string,
 ): Promise<OAuthTokenResponse> {
   const clientId = (process.env[config.clientIdEnv] ?? "").trim();
   const clientSecret = (process.env[config.clientSecretEnv] ?? "").trim();
@@ -45,18 +47,20 @@ export async function exchangeCodeForTokens(
       `OAuth is not configured for "${connectorKey}": ${config.clientIdEnv}/${config.clientSecretEnv}`,
     );
   }
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret,
-  });
-  const res = await fetchImpl(config.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body,
-  });
+  const res = await fetchImpl(
+    config.tokenUrl,
+    buildTokenRequest(
+      config,
+      {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      },
+      clientId,
+      clientSecret,
+    ),
+  );
   if (!res.ok) {
     throw new Error(`Token exchange failed for "${connectorKey}" (HTTP ${res.status})`);
   }
@@ -78,15 +82,21 @@ export async function storeOAuthTokens(input: {
   connectorKey: string;
   token: OAuthTokenResponse;
   scopes: string[];
+  /** Phase 11 (bizsync): non-secret routing ids (shop, realmId) for meta + payload. */
+  routing?: Record<string, string>;
 }): Promise<ConnectorConnection> {
   const { userId, workspaceId, connectorKey, token, scopes } = input;
+  const routing = input.routing ?? {};
   const config = getOAuthConfig(connectorKey);
   const clientId = (process.env[config?.clientIdEnv ?? ""] ?? "").trim();
   const clientSecret = (process.env[config?.clientSecretEnv ?? ""] ?? "").trim();
 
   // Non-sensitive metadata the UI may display.
-  const meta: { grantedScopes?: string } = {};
+  const meta: Record<string, string> = {};
   if (typeof token.scope === "string") meta.grantedScopes = token.scope;
+  // Phase 11 (conncore): provider routing metadata (e.g. Slack team id).
+  Object.assign(meta, config?.tokenMeta?.(token as unknown as Record<string, unknown>) ?? {});
+  Object.assign(meta, routing);
 
   const credentialPayload: Record<string, unknown> = {
     access_token: token.access_token,
@@ -94,6 +104,8 @@ export async function storeOAuthTokens(input: {
     ...(token.token_type ? { token_type: token.token_type } : {}),
     client_id: clientId,
     client_secret: clientSecret,
+    // Phase 11 (bizsync): adapters address the store / company with these.
+    ...routing,
   };
   const encryptedBlob = secrets().encrypt(JSON.stringify(credentialPayload));
   const expiresAt =
@@ -146,11 +158,27 @@ export async function handleOAuthCallback(
   code: string,
   redirectUri: string,
   deps: CallbackDeps = {},
+  /** Phase 11 (bizsync): the full callback query (Shopify hmac/shop, QuickBooks realmId). */
+  query: Record<string, string> = {},
 ): Promise<ConnectorConnection> {
   const parsed = parseOAuthState(state);
-  const config = getOAuthConfig(parsed.connectorKey);
+  let config = getOAuthConfig(parsed.connectorKey);
   if (!config) {
     throw new Error(`Connector "${parsed.connectorKey}" does not support OAuth2`);
+  }
+  // Phase 11 (devtools): a PKCE provider needs the verifier minted at start.
+  if (config.pkce && !parsed.cv) {
+    throw new Error(`Invalid OAuth state: missing PKCE verifier for "${parsed.connectorKey}"`);
+  }
+  // Phase 11 (bizsync): a per-shop provider (Shopify) — the callback must be
+  // for the store the signed state names, signed by Shopify with our app
+  // secret; the token exchange goes to that store's host.
+  if (config.perShop) {
+    const { verifyShopifyOAuthHmac, normalizeShopDomain } = await import("@/lib/bizsync/shopify/shop");
+    const secret = (process.env[config.clientSecretEnv] ?? "").trim();
+    if (!parsed.shop || normalizeShopDomain(query.shop) !== parsed.shop) throw new Error("OAuth callback shop does not match the flow");
+    if (!verifyShopifyOAuthHmac(query, secret)) throw new Error("OAuth callback signature is invalid");
+    config = { ...config, tokenUrl: shopUrl(config.tokenUrl, parsed.shop) };
   }
   const token = await exchangeCodeForTokens(
     config,
@@ -158,12 +186,26 @@ export async function handleOAuthCallback(
     code,
     redirectUri,
     deps.fetchImpl ?? fetch,
+    config.pkce ? parsed.cv : undefined,
   );
-  return storeOAuthTokens({
+  const connection = await storeOAuthTokens({
     userId: parsed.userId,
     workspaceId: parsed.workspaceId,
     connectorKey: parsed.connectorKey,
     token,
     scopes: config.scopes,
+    routing: { ...(config.callbackMeta?.(query, parsed) ?? {}), ...(config.refreshWithRedirectUri ? { redirect_uri: redirectUri } : {}) },
   });
+  // Phase 11 (bizsync): Shopify webhook route / Xero tenant discovery.
+  if (parsed.connectorKey === "shopify" || parsed.connectorKey === "xero" || parsed.connectorKey === "gusto") {
+    const { onBizsyncConnected } = await import("@/lib/bizsync/install");
+    await onBizsyncConnected({ connectorKey: parsed.connectorKey, connection, fetchImpl: deps.fetchImpl });
+  }
+  // Phase 11 (conncore): a Slack install also records the team → workspace
+  // route the Events API receiver needs (lib/slack/install.ts).
+  if (parsed.connectorKey === "slack") {
+    const { recordSlackInstall } = await import("@/lib/slack/install");
+    await recordSlackInstall({ workspaceId: parsed.workspaceId, userId: parsed.userId, connectionId: connection.id, meta: connection.meta });
+  }
+  return connection;
 }

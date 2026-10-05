@@ -26,7 +26,7 @@ import AdsTabs from "../_components/AdsTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Spend proposals — Marketr",
+  title: "Spend proposals — ShapesOS",
   description: "Approve or reject every ad-spend action before it executes.",
 };
 

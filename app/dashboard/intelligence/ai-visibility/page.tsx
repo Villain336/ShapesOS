@@ -13,7 +13,7 @@ import { AiVisibilityClient } from "./AiVisibilityClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "AI visibility — Marketr",
+  title: "AI visibility — ShapesOS",
   description:
     "Honest AI-visibility intelligence: per-engine estimated ranges with confidence intervals, N-rep stability, citation gaps, and first-party correlation.",
 };

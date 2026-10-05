@@ -1,6 +1,6 @@
 // Marketr — R1 pre-draft guardrails (HARD BLOCKS).
 //
-// SPEC-PHASE6.md §2/R1, §9 invariant 6.
+// docs/specs/SPEC-PHASE6.md §2/R1, §9 invariant 6.
 // These run BEFORE any draft is generated. A hit blocks the AI draft
 // (draftBlocked = true); the queue item keeps the flags so a human can
 // write the reply manually. Structural, not configurable.

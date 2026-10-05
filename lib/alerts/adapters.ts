@@ -175,7 +175,7 @@ export function renderAlertEmail(payload: AlertPayload): { subject: string; html
 <p style="font-size:14px;line-height:1.6;white-space:pre-wrap">${esc(payload.body)}</p>
 ${links ? `<p style="font-size:14px;margin-top:16px">${links}</p>` : ""}
 <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 12px">
-<p style="font-size:12px;color:#6b7280">Sent by Marketr alert hub. Manage rules in your workspace settings.</p>
+<p style="font-size:12px;color:#6b7280">Sent by ShapesOS alert hub. Manage rules in your workspace settings.</p>
 </body></html>`;
   const text = `${payload.title}\n\n${payload.body}${payload.links?.length ? `\n\n${payload.links.map((l) => `${l.label}: ${l.url}`).join("\n")}` : ""}`;
   return { subject: payload.title.slice(0, 120), html, text };

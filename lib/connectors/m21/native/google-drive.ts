@@ -1,20 +1,21 @@
-// Marketr — M21 Google Drive adapter.
+// ShapesOS — M21 Google Drive adapter.
 //
-// LIVE WIRING (not yet implemented): this adapter is MOCK-ONLY today. The
-// live pass must call the Google Drive API v3:
-//   GET  https://www.googleapis.com/drive/v3/files?q=...&fields=files(id,name,mimeType,size,modifiedTime)
-//     → list_files() / search_files()
-//   GET  https://www.googleapis.com/drive/v3/files/{fileId}/export?mimeType=text/plain
-//     (Google Docs/Sheets/Slides → text) → get_file_text()
-//   GET  https://www.googleapis.com/drive/v3/files/{fileId}?alt=media
-//     (binary/CSV/PDF) → get_file_text()
-// Auth: OAuth2 Bearer access_token (scopes drive.readonly + drive.file);
-// refresh via lib/vault/refresh.ts. Docs:
-// https://developers.google.com/workspace/drive/api/reference/rest/v3
+// LIVE WIRING (Phase 4b): with a vault credential this adapter calls the
+// Google Drive API v3, read-only (lib/connectors/m21/live/google-drive.ts):
+//   GET https://www.googleapis.com/drive/v3/files?q='<folder>' in parents …
+//     → list_files() (pageToken pagination)
+//   GET https://www.googleapis.com/drive/v3/files?q=name contains … or fullText contains …
+//     → search_files()
+//   GET https://www.googleapis.com/drive/v3/files/{fileId}/export?mimeType=text/plain|text/csv
+//     (Docs/Sheets/Slides) or files/{fileId}?alt=media (text-like files)
+//     → get_file_text() (capped at 200k chars; binaries return metadata only)
+//   GET https://www.googleapis.com/drive/v3/about?fields=user → health check
+// Auth: OAuth2 Bearer (scope drive.readonly only — the adapter never
+// writes), refresh-on-401 through the vault; 429/5xx/rate-limit 403 back off.
+// Docs: https://developers.google.com/workspace/drive/api/reference/rest/v3
 //
-// MOCK MODE: deterministic demo file listing + document text for attaching
-// briefs to chat sessions; every row flagged mock: true, titles carry
-// "(MOCK)". No network calls.
+// MOCK MODE (no credential): deterministic demo file listing + document
+// text; every row flagged mock: true, titles carry "(MOCK)". No network calls.
 
 import type {
   ConnectorAdapter,
@@ -23,7 +24,16 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { strProp, mockOk, fail } from "../types";
+import { strProp, mockOk, liveOk, fail } from "../types";
+import { clampInt, liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
+import {
+  driveGetFileText,
+  driveListFiles,
+  drivePing,
+  folderQuery,
+  normalizeDriveId,
+  searchQuery,
+} from "../live/google-drive";
 
 const MOCK_FILES = [
   { id: "mock-doc-1", name: "Q3 Content Brief (MOCK)", mimeType: "application/vnd.google-apps.document", modifiedTime: "2026-09-18T09:00:00Z" },
@@ -52,6 +62,8 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
     },
   };
 
+  constructor(private readonly deps: LiveDeps = {}) {}
+
   listTools(): ConnectorToolDef[] {
     return [
       {
@@ -72,7 +84,10 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
         mutating: false,
         argsSchema: {
           type: "object",
-          properties: { query: strProp("Search text, e.g. \"content brief\".") },
+          properties: {
+            query: strProp("Search text, e.g. \"content brief\"."),
+            limit: strProp("Max files (default 25)."),
+          },
           required: ["query"],
         },
       },
@@ -92,9 +107,46 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
   async invoke(
     tool: string,
     args: Record<string, unknown>,
-    _credential: DecryptedCredential | null,
-    _ctx: InvokeContext,
+    credential: DecryptedCredential | null,
+    ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return this.mockInvoke(tool, args);
+    try {
+      switch (tool) {
+        case "list_files": {
+          const folderRaw = args.folderId ?? ctx.projectConfig?.folderId;
+          const folderId = folderRaw ? normalizeDriveId(folderRaw, "folderId") : undefined;
+          return liveOk(await driveListFiles(auth, folderQuery(folderId), clampInt(args.limit, 25, 1, 200), this.deps));
+        }
+        case "search_files": {
+          const text = String(args.query ?? "").trim();
+          if (!text || text.length > 200) {
+            throw new ConnectorApiError(this.displayName, "bad_request", `${this.displayName}: query must be 1–200 characters.`);
+          }
+          return liveOk(await driveListFiles(auth, searchQuery(text), clampInt(args.limit, 25, 1, 100), this.deps));
+        }
+        case "get_file_text":
+          return liveOk(await driveGetFileText(auth, normalizeDriveId(args.fileId, "fileId"), this.deps));
+        default:
+          return fail(`Unknown tool "${tool}" for connector ${this.key}`);
+      }
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return { ok: false, error: "No access token stored.", errorCode: "not_connected" };
+    try {
+      return liveOk(await drivePing(auth, this.deps));
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  private mockInvoke(tool: string, args: Record<string, unknown>): InvokeResult {
     switch (tool) {
       case "list_files": {
         const limit = Math.min(Number(args.limit) || 25, 100);

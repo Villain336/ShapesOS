@@ -1,11 +1,19 @@
-// Marketr — automation settings form (Phase 9 M6, SPEC-PHASE9.md §P9E).
+// Marketr — automation settings form (Phase 9 M6, docs/specs/SPEC-PHASE9.md §P9E).
 // Client component: per-action Auto/Ask/Never policy table, workspace
 // small-action threshold, and user-editable escalation rules.
 // House style: dense tables, Agentic OS tokens, Lucide only, light mode.
+//
+// Phase 14 (approvals): Auto-run works for every Tier 0–2 action; Tier 3
+// rows (money and irreversible) are locked with the reason. Rows are grouped
+// (Agents and content, Operations, Connectors incl. Composio toolkits,
+// Slack); Slack's "say a reply is waiting" is an on/off switch.
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Field, PermissionSegmented, Switch, type Permission } from "@/components/aos/Controls";
+import { AGENT_KEYS, agentDisplayName } from "@/lib/agents/grants";
+import { ACTION_GROUP_LABELS, type ActionGroup } from "@/lib/automation/actions";
 import {
   BellRing,
   Bot,
@@ -22,6 +30,8 @@ type Behavior = "auto" | "ask" | "never";
 type Tier = 0 | 1 | 2 | 3;
 
 interface SettingRow {
+  /** Phase 5: "*" = every agent, else one agent's key. */
+  agentKey?: string;
   action: string;
   behavior: Behavior;
   thresholdCents: number | null;
@@ -32,6 +42,12 @@ interface KnownAction {
   label: string;
   description: string;
   tier: Tier;
+  /** Phase 14 (absent from an older server = "agents"). */
+  group?: ActionGroup;
+  autoAllowed?: boolean;
+  lockReason?: string;
+  defaultBehavior?: Behavior;
+  control?: "switch";
 }
 
 interface SettingsPayload {
@@ -43,6 +59,8 @@ interface SettingsPayload {
     knownActions: KnownAction[];
   };
   thresholdCents: number;
+  /** Phase 14: "composio:<toolkit>" rules for the workspace's enabled toolkits. */
+  composioToolkits?: KnownAction[];
 }
 
 type ConditionKind = "amount_above" | "unseen_treatment" | "no_source_record" | "external_audience";
@@ -88,8 +106,8 @@ function TierBadge({ tier }: { tier: Tier }) {
   const labels: Record<Tier, string> = {
     0: "Tier 0 · Observe",
     1: "Tier 1 · Small",
-    2: "Tier 2 · Ask",
-    3: "Tier 3 · Never",
+    2: "Tier 2 · Significant",
+    3: "Tier 3 · Always asks",
   };
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
@@ -116,89 +134,57 @@ function EffectBadge({ effect }: { effect: "require_approval" | "notify" }) {
   );
 }
 
-// Permission segmented control: pill group on a neutral track.
-// Ask = needs + black text, Auto = running, Never = ink.
+// Permission segmented control (kit PermissionSegmented): Ask first / Auto-run
+// / Off map 1:1 onto the stored behaviors ask / auto / never. Tier 3 can never
+// auto-run, so Auto-run is shown locked there (the safety core enforces it).
+const TO_PERMISSION: Record<Behavior, Permission> = { ask: "ask", auto: "auto", never: "off" };
+const TO_BEHAVIOR: Record<Permission, Behavior> = { ask: "ask", auto: "auto", off: "never" };
+/** Phase 14: Tier 3 is locked with this copy; other locks carry their own reason. */
+export const MONEY_LOCK_COPY = "Money and irreversible actions always ask.";
+
+function lockFor(a: KnownAction): string | null {
+  if (a.tier === 3) return a.lockReason ?? MONEY_LOCK_COPY;
+  if (a.autoAllowed === false) return a.lockReason ?? MONEY_LOCK_COPY;
+  return null;
+}
+
 function BehaviorControl({
   value,
-  tier,
+  action,
   onChange,
   disabled,
 }: {
   value: Behavior;
-  tier: Tier;
+  action: KnownAction;
   onChange: (b: Behavior) => void;
   disabled?: boolean;
 }) {
-  const options: Behavior[] = ["auto", "ask", "never"];
+  const lock = lockFor(action);
+  if (action.control === "switch") {
+    return (
+      <Switch
+        checked={value === "auto"}
+        disabled={disabled}
+        onChange={(on) => onChange(on ? "auto" : "never")}
+        label={action.label}
+      />
+    );
+  }
   return (
-    <div
-      className="inline-flex rounded-full border border-line bg-canvas p-0.5"
-      role="radiogroup"
-      aria-label="Automation behavior"
-    >
-      {options.map((opt) => {
-        const locked = tier === 3 && opt === "auto";
-        const active = value === opt;
-        const activeCls =
-          opt === "ask"
-            ? "bg-needs text-ink"
-            : opt === "auto"
-              ? "bg-running text-white"
-              : "bg-ink text-white";
-        return (
-          <button
-            key={opt}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled || locked}
-            title={locked ? "Tier 3 actions can never run automatically — this is un-overridable." : undefined}
-            onClick={() => onChange(opt)}
-            className={`h-7 min-w-[52px] rounded-full px-2 text-xs font-medium capitalize transition disabled:opacity-40 ${
-              active
-                ? activeCls
-                : locked
-                  ? "cursor-not-allowed text-subtle"
-                  : "text-muted hover:text-ink"
-            }`}
-          >
-            {opt}
-          </button>
-        );
-      })}
+    <div className="flex flex-col gap-1">
+      <PermissionSegmented
+        label={`${action.label} permission`}
+        value={TO_PERMISSION[value]}
+        onChange={(p) => onChange(TO_BEHAVIOR[p])}
+        locked={lock ? { auto: lock } : undefined}
+        disabled={disabled}
+      />
+      {lock ? <span className="text-[11px] text-muted">{lock}</span> : null}
     </div>
   );
 }
 
-function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
-        checked ? "bg-ink" : "bg-disabled-fg"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[21px]" : "left-[3px]"
-        }`}
-      />
-    </button>
-  );
-}
+const GROUP_ORDER: readonly ActionGroup[] = ["agents", "ops", "connectors", "slack"];
 
 function fmtDollars(cents: number): string {
   return `$${(cents / 100).toFixed(0)}`;
@@ -211,9 +197,12 @@ export default function AutomationSettingsForm() {
   const [rules, setRules] = useState<EscalationRule[] | null>(null);
   const [tab, setTab] = useState<"policy" | "rules">("policy");
   const [thresholdInput, setThresholdInput] = useState("");
+  const [thresholdError, setThresholdError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Phase 5: whose rules the table shows ("*" = every agent).
+  const [agentScope, setAgentScope] = useState<string>("*");
 
   // New-rule form
   const [newName, setNewName] = useState("");
@@ -242,13 +231,20 @@ export default function AutomationSettingsForm() {
     load();
   }, [load]);
 
+  // Every-agent rules, and the rules of the agent being viewed.
   const byAction = useMemo(() => {
     const m = new Map<string, SettingRow>();
-    for (const s of data?.settings ?? []) m.set(s.action, s);
+    for (const s of data?.settings ?? []) if ((s.agentKey ?? "*") === "*") m.set(s.action, s);
     return m;
   }, [data]);
+  const agentRows = useMemo(() => {
+    const m = new Map<string, SettingRow>();
+    if (agentScope === "*") return m;
+    for (const s of data?.settings ?? []) if (s.agentKey === agentScope) m.set(s.action, s);
+    return m;
+  }, [data, agentScope]);
 
-  async function putSetting(action: string, behavior: Behavior, thresholdCents: number | null) {
+  async function putSetting(action: string, behavior: Behavior, thresholdCents: number | null, agentKey = "*") {
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -256,17 +252,19 @@ export default function AutomationSettingsForm() {
       const res = await fetch("/api/automation/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, behavior, thresholdCents }),
+        body: JSON.stringify({ action, behavior, thresholdCents, agentKey }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Save failed.");
       setData((prev) => {
         if (!prev) return prev;
-        const settings = prev.settings.filter((s) => s.action !== action);
-        settings.push({ action, behavior: body.setting.behavior, thresholdCents: body.setting.thresholdCents });
+        const settings = prev.settings.filter((s) => !(s.action === action && (s.agentKey ?? "*") === agentKey));
+        settings.push({ agentKey, action, behavior: body.setting.behavior, thresholdCents: body.setting.thresholdCents });
         return { ...prev, settings };
       });
-      setNotice(`Saved: ${action} → ${behavior}.`);
+      setNotice(
+        `Saved: ${action} → ${behavior}${agentKey === "*" ? "" : ` for ${agentDisplayName(agentKey as (typeof AGENT_KEYS)[number])}`}.`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
     } finally {
@@ -276,10 +274,11 @@ export default function AutomationSettingsForm() {
 
   async function saveThreshold() {
     const dollars = Number(thresholdInput);
-    if (!Number.isFinite(dollars) || dollars < 0 || dollars > 100000) {
-      setError("Threshold must be a non-negative dollar amount.");
+    if (!thresholdInput.trim() || !Number.isFinite(dollars) || dollars < 0 || dollars > 100000) {
+      setThresholdError("Enter $0 to $100,000.");
       return;
     }
+    setThresholdError(null);
     await putSetting("*", "ask", Math.round(dollars * 100));
   }
 
@@ -355,14 +354,15 @@ export default function AutomationSettingsForm() {
       <div className="flex gap-2.5 rounded-lg border border-line bg-canvas p-3">
         <Info size={16} className="mt-0.5 shrink-0 text-subtle" />
         <p className="text-[13px] leading-relaxed text-muted">
-          <span className="font-semibold text-ink">How automation works:</span>{" "}
-          <span className="font-medium">Tier 0</span> actions (reads, drafts, analysis) always run.{" "}
-          <span className="font-medium">Tier 1</span> small actions run on their own only where you
-          set <span className="font-medium">Auto</span> — everything else asks you first.{" "}
-          <span className="font-medium">Tier 2</span> always asks, every time.{" "}
-          <span className="font-medium">Tier 3</span> (moving money, signing contracts, deleting
-          data) can never run automatically — no toggle, no prompt, no exception. The agent cannot
-          widen this list.
+          <span className="font-semibold text-ink">How automation works:</span> every action asks you
+          first until you set it to <span className="font-medium">Auto-run</span>. You can do that for
+          any <span className="font-medium">Tier 0</span> (reads, drafts),{" "}
+          <span className="font-medium">Tier 1</span> (small, your own channels) or{" "}
+          <span className="font-medium">Tier 2</span> (significant) action, for every agent or for one.
+          An amount over the threshold still asks.{" "}
+          <span className="font-medium">Tier 3</span> — money and irreversible actions (paying,
+          refunding, signing, deleting) — always asks: no toggle, no prompt, no exception, and the
+          agent cannot change this list.
         </p>
       </div>
 
@@ -415,25 +415,59 @@ export default function AutomationSettingsForm() {
             <div className="min-w-[220px] flex-1">
               <div className="text-[13px] font-semibold text-ink">Small-action threshold</div>
               <div className="text-[12px] text-muted">
-                Tier 1 actions at or under this amount may run automatically when set to Auto.
+                An action carrying an amount runs on Auto-run only at or under this amount; above it, it asks.
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-md border border-line bg-canvas px-2">
-                <span className="text-[13px] text-subtle">$</span>
-                <input
-                  value={thresholdInput}
-                  onChange={(e) => setThresholdInput(e.target.value)}
-                  inputMode="decimal"
-                  aria-label="Small-action threshold in dollars"
-                  className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none"
-                />
-              </div>
-              <button onClick={saveThreshold} disabled={saving} className={btnPrimary}>
+            <div className="flex items-start gap-2">
+              <Field
+                label="Small-action threshold in dollars"
+                hideLabel
+                value={thresholdInput}
+                onChange={(e) => {
+                  setThresholdInput(e.target.value);
+                  if (thresholdError) setThresholdError(null);
+                }}
+                inputMode="decimal"
+                leading={<span className="text-base">$</span>}
+                trailing="USD"
+                inputClassName="aos-mono"
+                error={thresholdError}
+                className="w-60"
+              />
+              <button onClick={saveThreshold} disabled={saving} className={`${btnPrimary} mt-1`}>
                 <Save size={14} />
                 Save
               </button>
             </div>
+          </div>
+
+          {/* Phase 5: per-agent rules. "Every agent" is the workspace rule;
+              an agent's own rule wins over it. */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper p-3">
+            <div className="min-w-[220px] flex-1">
+              <div className="text-[13px] font-semibold text-ink">Rules for</div>
+              <div className="text-[12px] text-muted">
+                Set a rule for one agent (e.g. let Writer draft content without asking). An agent&apos;s own
+                rule wins over the every-agent rule. Tier 3 always asks.
+              </div>
+            </div>
+            <label className="sr-only" htmlFor="automation-agent-scope">
+              Agent
+            </label>
+            <select
+              id="automation-agent-scope"
+              value={agentScope}
+              onChange={(e) => setAgentScope(e.target.value)}
+              className={`${inputCls} min-w-44`}
+            >
+              <option value="*">Every agent</option>
+              {AGENT_KEYS.map((k) => (
+                <option key={k} value={k}>
+                  {agentDisplayName(k)}
+                  {k === "lead" ? " (lead)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Per-action table */}
@@ -448,13 +482,33 @@ export default function AutomationSettingsForm() {
                 </tr>
               </thead>
               <tbody>
-                {data.defaults.knownActions.map((a) => {
-                  const row = byAction.get(a.action);
+                {GROUP_ORDER.map((group) => {
+                  const rows = [
+                    ...data.defaults.knownActions.filter((a) => (a.group ?? "agents") === group),
+                    ...(group === "connectors" ? (data.composioToolkits ?? []) : []),
+                  ];
+                  if (rows.length === 0) return null;
+                  return [
+                    <tr key={`group:${group}`} className="border-b border-line bg-canvas">
+                      <th colSpan={4} scope="colgroup" className="px-3 py-2 text-left text-xs font-semibold text-ink">
+                        {ACTION_GROUP_LABELS[group]}
+                      </th>
+                    </tr>,
+                    ...rows.map((a) => {
+                  const everyRow = byAction.get(a.action);
+                  const ownRow = agentRows.get(a.action);
+                  const row = agentScope === "*" ? everyRow : ownRow;
                   const behavior: Behavior =
-                    row?.behavior ?? data.defaults.behaviors[a.action] ?? "ask";
+                    ownRow?.behavior ??
+                    everyRow?.behavior ??
+                    data.defaults.behaviors[a.action] ??
+                    a.defaultBehavior ??
+                    "ask";
+                  const inherited = agentScope !== "*" && !ownRow;
                   return (
                     <tr
-                      key={a.action}
+                      key={`${agentScope}:${a.action}`}
+                      data-action={a.action}
                       className="border-b border-line last:border-0 hover:bg-hover-paper"
                     >
                       <td className="px-3 py-2.5">
@@ -468,16 +522,19 @@ export default function AutomationSettingsForm() {
                       <td className="px-3 py-2.5 align-top">
                         <BehaviorControl
                           value={behavior}
-                          tier={a.tier}
+                          action={a}
                           disabled={saving}
                           onChange={(b) =>
-                            putSetting(a.action, b, row?.thresholdCents ?? null)
+                            putSetting(a.action, b, row?.thresholdCents ?? null, agentScope)
                           }
                         />
+                        {inherited ? (
+                          <div className="mt-1 text-[11px] text-subtle">From every agent</div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         {a.tier === 1 ? (
-                          <div className="flex items-center rounded-md border border-line bg-canvas px-2">
+                          <div className="flex items-center rounded-md border border-line bg-canvas px-2 focus-within:border-focus focus-within:ring-[3px] focus-within:ring-[var(--aos-focus-halo)]">
                             <span className="text-[13px] text-subtle">$</span>
                             <input
                               defaultValue={row?.thresholdCents != null ? String(row.thresholdCents / 100) : ""}
@@ -490,9 +547,10 @@ export default function AutomationSettingsForm() {
                                   v === "" ? null : Math.round(Number(v) * 100);
                                 if (v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) return;
                                 if (next !== (row?.thresholdCents ?? null)) {
-                                  putSetting(a.action, behavior, next);
+                                  putSetting(a.action, behavior, next, agentScope);
                                 }
                               }}
+                              data-focus-ring="container"
                               className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none placeholder:text-subtle"
                             />
                           </div>
@@ -502,13 +560,16 @@ export default function AutomationSettingsForm() {
                       </td>
                     </tr>
                   );
+                    }),
+                  ];
                 })}
               </tbody>
             </table>
           </div>
           <p className="text-[12px] text-muted">
             Leave a threshold blank to use the workspace default ({fmtDollars(data.thresholdCents)}).
-            Tier 3 rows always show Never — that setting is locked by the safety core, not by this page.
+            Tier 3 rows can never be set to Auto-run. That lock lives in the safety core, not on this page.
+            Destructive tools always ask too, whatever a row says.
           </p>
         </div>
       )}
@@ -516,9 +577,10 @@ export default function AutomationSettingsForm() {
       {tab === "rules" && (
         <div className="flex flex-col gap-4">
           <p className="text-[13px] text-muted">
-            Escalation rules stop the system on defined conditions instead of asking you about
-            everything. Any rule with effect <span className="font-medium">Require approval</span>{" "}
-            forces the action to Tier 2, even if its toggle is set to Auto.
+            Escalation rules describe the conditions that should stop the system instead of asking
+            you about everything. They are saved here for review; the approval gates don&apos;t read
+            them yet, so to make an action ask, set it to{" "}
+            <span className="font-medium">Ask first</span> on the per-action tab.
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
@@ -546,6 +608,7 @@ export default function AutomationSettingsForm() {
                     <td className="px-3 py-2.5">
                       <Switch
                         checked={rule.enabled}
+                        disabled={saving}
                         onChange={(v) =>
                           putRules(rules.map((r) => (r.id === rule.id ? { ...r, enabled: v } : r)))
                         }

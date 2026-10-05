@@ -5,9 +5,9 @@
 // surfaces, black primary actions, Lucide icons only, tokens only.
 // Reference customer: the drone program's airframe revisions.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Plus, Loader2, FolderKanban, TableProperties, LayoutDashboard } from "lucide-react";
-import { ModelDetail } from "./ModelDetail";
+import { ModelDetail, isModelTab, type TabKey } from "./ModelDetail";
 import { ProjectHubTab } from "./ProjectHubTab";
 
 interface Project {
@@ -32,7 +32,13 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function CadApp() {
+export interface CadDeepLink {
+  project: string | null;
+  model: string | null;
+  tab: string | null;
+}
+
+export function CadApp({ deepLink }: { deepLink?: CadDeepLink } = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +51,10 @@ export function CadApp() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+  // Deep link (record search): /dashboard/cad?project=…&model=…&tab=…
+  // Applied once, when the linked project's models load.
+  const pendingLink = useRef<CadDeepLink | null>(deepLink ?? null);
+  const [initialTab, setInitialTab] = useState<TabKey | undefined>(undefined);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -53,7 +63,9 @@ export function CadApp() {
       const body = await api<{ projects: Project[] }>("/api/cad/projects");
       setProjects(body.projects);
       if (!selectedProjectId && body.projects.length > 0) {
-        setSelectedProjectId(body.projects[0]!.id);
+        const wanted = pendingLink.current?.project;
+        const match = wanted ? body.projects.find((p) => p.id === wanted) : undefined;
+        setSelectedProjectId((match ?? body.projects[0]!).id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load projects.");
@@ -73,6 +85,12 @@ export function CadApp() {
         `/api/cad/projects/${projectId}/models`,
       );
       setModels(body.models);
+      const link = pendingLink.current;
+      if (link?.model && link.project === projectId && body.models.some((m) => m.id === link.model)) {
+        setInitialTab(isModelTab(link.tab) ? link.tab : undefined);
+        setSelectedModelId(link.model);
+        pendingLink.current = null;
+      }
     } catch {
       setModels([]);
     } finally {
@@ -209,8 +227,10 @@ export function CadApp() {
         ) : selectedModelId ? (
           <ModelDetail
             modelId={selectedModelId}
+            initialTab={initialTab}
             onBack={() => {
               setSelectedModelId(null);
+              setInitialTab(undefined);
               if (selectedProjectId) loadModels(selectedProjectId);
             }}
             onChanged={() => selectedProjectId && loadModels(selectedProjectId)}

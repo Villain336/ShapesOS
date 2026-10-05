@@ -36,10 +36,12 @@ function brandTheme(defaultTheme: Theme): Theme {
     const v = css.getPropertyValue(name).trim();
     return v || fallback;
   };
-  // Defaults mirror app/globals.css (violet) so SSR/first paint matches.
-  const b50 = read("--brand-50", "#f5f3ff");
-  const b600 = read("--brand-600", "#7c3aed");
-  const b700 = read("--brand-700", "#6d28d9");
+  // Univer's canvas renderer needs literal color strings, so the vars are
+  // resolved here. --brand-* still carries a tenant brand kit when one is set;
+  // the fallbacks are the Agentic OS base values (--aos-canvas / --aos-ink).
+  const b50 = read("--brand-50", "#F3F3F1");
+  const b600 = read("--brand-600", "#000000");
+  const b700 = read("--brand-700", "#000000");
   return {
     ...defaultTheme,
     primary: { ...defaultTheme.primary, 50: b50, 500: b600, 600: b600, 700: b700 },
@@ -193,15 +195,15 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
             className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {saving ? "Saving…" : "Save to Marketr"}
+            {saving ? "Saving…" : "Save to ShapesOS"}
           </button>
         )}
       </div>
       <div className="relative" style={{ height }}>
         <div ref={containerRef} className="h-full w-full" />
         {phase === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-paper/80">
-            <Loader2 className="h-6 w-6 animate-spin text-subtle" />
+          <div className="absolute inset-0 flex items-center justify-center bg-paper">
+            <Loader2 className="h-6 w-6 animate-spin text-muted" />
           </div>
         )}
         {phase === "error" && (

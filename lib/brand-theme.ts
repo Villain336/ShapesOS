@@ -3,20 +3,21 @@
 // The locked static violet primary is now a dynamic brand color: each
 // workspace's DEFAULT brand kit (Settings → Brand kits) drives the CSS
 // variables --brand-600 / --brand-700 / --brand-50 at runtime, scoped to the
-// dashboard theme root (components/BrandTheme.tsx). No-brand → the violet
-// defaults in app/globals.css, so nothing visually changes by default.
+// dashboard theme root (components/BrandTheme.tsx). No-brand → the Agentic OS
+// defaults in app/globals.css (--brand-600 = --aos-ink, black).
 //
 // This module is the ONLY writer of the brand vars. Law: docs/audit/THEMING.md
 
-/** Today's violet-600 — the default primary when no brand color is set. */
-export const DEFAULT_BRAND_PRIMARY = "#7c3aed";
+/** The default primary when no brand color is set: Agentic OS ink (black
+ *  primary actions, docs/design/DESIGN.md; mirrors --aos-ink in tokens.css). */
+export const DEFAULT_BRAND_PRIMARY = "#000000";
 
 /** Window event the brand-kits editor dispatches for live preview. */
 export const BRAND_PREVIEW_EVENT = "marketr:brand-preview";
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
-/** Accept only #rgb / #rrggbb hex — anything else falls back to default violet. */
+/** Accept only #rgb / #rrggbb hex — anything else falls back to the default. */
 export function sanitizeBrandHex(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();

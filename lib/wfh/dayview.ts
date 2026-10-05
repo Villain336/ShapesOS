@@ -10,6 +10,8 @@
 // 13B loop consumes them to learn preferences (e.g. "this user always
 // overrides Friday focus blocks" → suggest shorter Friday blocks).
 
+import { resolveTimeZone, zonedParts, zonedTimeToUtc, type ZonedParts } from "@/lib/time/zoned";
+
 export interface DayFocusOccurrence {
   blockId: string;
   title: string;
@@ -35,6 +37,8 @@ export interface DayViewInput {
   ritualsDue: { ritualId: string; type: string; title: string; prompt: string | null; nextOccurrence: Date }[];
   digestWindows: { time: string; label: string; queued: number }[];
   mode: string;
+  /** The user's IANA timezone: "today" and local times are read in it (default UTC). */
+  timeZone?: string | null;
 }
 
 export interface DayTimelineItem {
@@ -47,7 +51,7 @@ export interface DayTimelineItem {
 }
 
 export interface DayView {
-  date: string; // YYYY-MM-DD (UTC)
+  date: string; // YYYY-MM-DD (the user's local date)
   mode: string;
   timeline: DayTimelineItem[];
   standup: DayViewInput["standup"];
@@ -58,15 +62,19 @@ export interface DayView {
 // Expand recurring blocks into today's occurrences and build the timeline.
 export function buildDayView(input: DayViewInput): DayView {
   const now = input.now;
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-  const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+  const tz = resolveTimeZone(input.timeZone);
+  const today = zonedParts(now, tz);
+  // Local wall time today → instant, each converted on its own (DST-safe).
+  const localToday = (minutes: number) => zonedTimeToUtc(today.year, today.month, today.day, minutes, tz).date;
+  const dayStart = localToday(0);
+  const dayEnd = zonedTimeToUtc(today.year, today.month, today.day + 1, 0, tz).date;
 
   const items: DayTimelineItem[] = [];
   let protectedMinutes = 0;
 
   for (const b of input.focusBlocks) {
     if (b.status === "cancelled") continue;
-    for (const occ of occurrencesOnDay(b, dayStart, dayEnd)) {
+    for (const occ of occurrencesOnDay(b, today, dayStart, dayEnd, tz)) {
       items.push({
         kind: "focus",
         startAt: occ.startAt,
@@ -82,7 +90,7 @@ export function buildDayView(input: DayViewInput): DayView {
   if (input.standup.due || input.standup.submitted) {
     items.push({
       kind: "standup",
-      startAt: new Date(dayStart.getTime() + 9 * 3600 * 1000),
+      startAt: localToday(9 * 60),
       endAt: null,
       title: "Async standup",
       detail: input.standup.submitted ? "Submitted" : (input.standup.copy ?? "Due today"),
@@ -105,7 +113,7 @@ export function buildDayView(input: DayViewInput): DayView {
     const [h, m] = d.time.split(":").map(Number);
     items.push({
       kind: "digest",
-      startAt: new Date(dayStart.getTime() + (h * 60 + m) * 60000),
+      startAt: localToday(h * 60 + m),
       endAt: null,
       title: `Notification digest — ${d.label}`,
       detail: d.queued > 0 ? `${d.queued} item(s) queued` : "Nothing queued",
@@ -116,7 +124,7 @@ export function buildDayView(input: DayViewInput): DayView {
   items.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   return {
-    date: dayStart.toISOString().slice(0, 10),
+    date: today.ymd,
     mode: input.mode,
     timeline: items,
     standup: input.standup,
@@ -127,8 +135,10 @@ export function buildDayView(input: DayViewInput): DayView {
 
 function occurrencesOnDay(
   b: DayViewInput["focusBlocks"][number],
+  today: ZonedParts,
   dayStart: Date,
   dayEnd: Date,
+  tz: string,
 ): { startAt: Date; endAt: Date }[] {
   const durMs = b.endAt.getTime() - b.startAt.getTime();
   const out: { startAt: Date; endAt: Date }[] = [];
@@ -140,21 +150,18 @@ function occurrencesOnDay(
     return out;
   }
 
-  // Walk the recurrence from the block's start date to today.
-  const stepDays = b.recurrence === "weekly" ? 7 : 1;
-  const cursor = new Date(b.startAt);
-  let guard = 0;
-  while (cursor < dayEnd && guard < 400) {
-    guard++;
-    const isWeekday = cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6;
-    const matches =
-      b.recurrence === "daily" ||
-      (b.recurrence === "weekdays" && isWeekday) ||
-      (b.recurrence === "weekly" && cursor.getUTCDay() === b.startAt.getUTCDay());
-    if (matches && cursor >= dayStart && cursor < dayEnd && cursor >= b.startAt) {
-      out.push({ startAt: new Date(cursor), endAt: new Date(cursor.getTime() + durMs) });
-    }
-    cursor.setUTCDate(cursor.getUTCDate() + stepDays);
+  // Recurring: today's occurrence starts at the block's LOCAL start time
+  // (calendar stepping — 09:00 stays 09:00 across DST).
+  const start = zonedParts(b.startAt, tz);
+  const isWeekday = today.weekday !== 0 && today.weekday !== 6;
+  const matches =
+    b.recurrence === "daily" ||
+    (b.recurrence === "weekdays" && isWeekday) ||
+    (b.recurrence === "weekly" && today.weekday === start.weekday);
+  if (!matches) return out;
+  const occ = zonedTimeToUtc(today.year, today.month, today.day, start.minutes, tz).date;
+  if (occ >= dayStart && occ < dayEnd && occ >= b.startAt) {
+    out.push({ startAt: occ, endAt: new Date(occ.getTime() + durMs) });
   }
   return out;
 }

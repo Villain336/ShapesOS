@@ -1,9 +1,19 @@
-// Marketr — Growth Missions list + template picker (Phase 9, M4).
+// Marketr — Growth Missions list + template picker (Phase 9, M4; Agentic OS 4d).
+//
+// Each mission is a kit agent card (agent-blocks.png) titled by the
+// mission: the status band shows its CURRENT agent state (running, needs
+// you, failed, done, queued, paused — never identity), the line says what
+// the lead and its sub-agents are doing, and the one action goes where the
+// state points (Review / Open run / Open mission). States come from GET
+// /api/missions → lib/aos/agents deriveMission, the same derivation the
+// Overview and sidebar use. Archived missions have no agent state and sit
+// in a neutral list.
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Briefcase,
   Building2,
@@ -25,6 +35,11 @@ import {
   type BusinessType,
   type MissionTemplate,
 } from "@/lib/missions/templates";
+import { closeOnEscape } from "@/lib/ui/keyboard";
+import { AgentCard, FilterPill, aosButton } from "@/components/aos";
+import { SUB_AGENTS, type MissionView } from "@/lib/aos/agents";
+import { stepCounter } from "@/lib/aos/run-steps";
+import { byStatusThenRecent, type AosStatus } from "@/lib/aos/status";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
@@ -38,11 +53,9 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 // ── Atoms (Agentic OS) ───────────────────────────────────────────────────────
 
-// All mission-list metadata (type, goal counts) is category information,
-// not agent state — always a neutral chip. The tone prop stays for
-// call-site compatibility.
-function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: string }) {
-  void tone;
+// Template metadata (type, goal counts) is category information, not agent
+// state — always a neutral chip.
+function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
@@ -50,59 +63,11 @@ function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: 
   );
 }
 
-// Mission statuses ARE genuine agent states: active work runs, paused holds,
-// complete finishes, planned waits its turn. Archived is just a shelf.
-function MissionStatusBadge({ status }: { status: string }) {
-  const base =
-    "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
-  const shape = (extra: string) => (
-    <span className={`aos-shape ${extra}`} style={{ color: "inherit" }} aria-hidden />
-  );
-  switch (status) {
-    case "active":
-      return (
-        <span className={`${base} bg-running text-white`}>
-          {shape("aos-shape--running aos-is-live")} Active
-        </span>
-      );
-    case "paused":
-      return (
-        <span className={`${base} bg-line text-ink`}>
-          {shape("aos-shape--paused")} Paused
-        </span>
-      );
-    case "complete":
-      return (
-        <span className={`${base} bg-done text-white`}>
-          {shape("aos-shape--done")} Complete
-        </span>
-      );
-    case "planned":
-      return (
-        <span className={`${base} bg-paper text-ink shadow-outline`}>
-          {shape("aos-shape--queued")} Planned
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
-          Archived
-        </span>
-      );
-  }
-}
-
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
-const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
-
-const btnGhost =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- style token for future ghost buttons
-const btnRun =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+// Launch = Run (running fill, per the action table).
+const btnRun = aosButton({ variant: "run", size: "sm" });
 
 const BT_ICONS: Record<BusinessType, typeof Home> = {
   "home-services": Home,
@@ -125,17 +90,8 @@ interface MissionListItem {
   progress: number;
   nextCheckpoint: string | null;
   createdAt: string | null;
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
-        <div className="h-full rounded-full bg-ink" style={{ width: `${Math.round(value * 100)}%` }} />
-      </div>
-      <span className="text-[11px] tabular-nums text-muted">{Math.round(value * 100)}%</span>
-    </div>
-  );
+  /** Agent state (null = archived: no agent state). */
+  agent: MissionView | null;
 }
 
 // ── Template picker (modal) ──────────────────────────────────────────────────
@@ -208,7 +164,7 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
@@ -249,10 +205,22 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
                 className={`cursor-pointer rounded-lg border px-3.5 py-3 ${
                   selectedId === t.id ? "border-ink bg-canvas" : "border-line bg-paper hover:border-control"
                 }`}
+                role="presentation"
                 onClick={() => setSelectedId(t.id === selectedId ? null : t.id)}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-ink">{t.name}</div>
+                  {/* Keyboard path: the card is a mouse target; the name is the button. */}
+                  <button
+                    type="button"
+                    aria-expanded={selectedId === t.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(t.id === selectedId ? null : t.id);
+                    }}
+                    className="rounded-sm text-left text-sm font-semibold text-ink"
+                  >
+                    {t.name}
+                  </button>
                   <Chip>{t.goals.length} goals</Chip>
                 </div>
                 <p className="mt-0.5 text-xs text-muted">{t.description}</p>
@@ -320,11 +288,45 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
 
 // ── Missions list ────────────────────────────────────────────────────────────
 
+type StatusFilter = AosStatus | "archived" | "all";
+
+const STATUS_FILTERS: Array<{ value: StatusFilter; label: string; shape?: AosStatus }> = [
+  { value: "all", label: "All" },
+  { value: "needs", label: "Needs you", shape: "needs" },
+  { value: "running", label: "Running", shape: "running" },
+  { value: "failed", label: "Failed", shape: "failed" },
+  { value: "queued", label: "Queued", shape: "queued" },
+  { value: "paused", label: "Paused", shape: "paused" },
+  { value: "done", label: "Done", shape: "done" },
+  { value: "archived", label: "Archived" },
+];
+
+/** The tools of the sub-agents the lead delegated to (card chips). */
+function missionTools(v: MissionView): string[] {
+  const seen = new Set<string>();
+  for (const b of v.branches) {
+    const key = b.key as keyof typeof SUB_AGENTS;
+    for (const t of SUB_AGENTS[key]?.tools ?? []) seen.add(t);
+  }
+  return [...seen].slice(0, 3);
+}
+
+function cardAction(m: MissionListItem, v: MissionView) {
+  if (v.status === "needs") return { label: "Review", href: `/dashboard/missions/${m.id}#approvals` };
+  if (v.status === "failed" && v.runId) return { label: "Open run", href: `/dashboard/runs/${v.runId}` };
+  return { label: "Open mission", href: `/dashboard/missions/${m.id}` };
+}
+
+function cardMeta(m: MissionListItem, v: MissionView): string {
+  if (v.status === "done") return "Finished";
+  if (v.progress) return stepCounter(v.progress.done, v.progress.total);
+  return m.nextCheckpoint ? `Next: ${m.nextCheckpoint}` : `${Math.round(m.progress * 100)}% of goal`;
+}
+
 export function MissionsApp() {
-  const router = useRouter();
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [fType, setFType] = useState("");
-  const [fStatus, setFStatus] = useState("");
+  const [fStatus, setFStatus] = useState<StatusFilter>("all");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -345,102 +347,142 @@ export function MissionsApp() {
     void load();
   }, [load]);
 
+  const counts = useMemo(() => {
+    const out: Record<string, number> = { all: missions.length };
+    for (const m of missions) {
+      const k = m.agent?.status ?? "archived";
+      out[k] = (out[k] ?? 0) + 1;
+    }
+    return out;
+  }, [missions]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return missions.filter((m) => {
       if (fType && m.businessType !== fType) return false;
-      if (fStatus && m.status !== fStatus) return false;
+      if (fStatus !== "all" && (m.agent?.status ?? "archived") !== fStatus) return false;
       if (needle && !(m.name.toLowerCase().includes(needle) || m.goalSummary.toLowerCase().includes(needle))) return false;
       return true;
     });
   }, [missions, fType, fStatus, q]);
 
+  const live = useMemo(
+    () =>
+      filtered
+        .filter((m): m is MissionListItem & { agent: MissionView } => !!m.agent)
+        .sort((a, b) => byStatusThenRecent(a.agent, b.agent)),
+    [filtered],
+  );
+  const archived = useMemo(() => filtered.filter((m) => !m.agent), [filtered]);
+
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls} aria-label="Filter by business type">
-          <option value="">All business types</option>
-          {BUSINESS_TYPES.map((id) => (
-            <option key={id} value={id}>{BUSINESS_TYPE_LABELS[id]}</option>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter by state">
+          {STATUS_FILTERS.filter((f) => f.value === "all" || (counts[f.value] ?? 0) > 0 || f.value === fStatus).map((f) => (
+            <FilterPill key={f.value} selected={fStatus === f.value} status={f.shape} count={counts[f.value] ?? 0} onClick={() => setFStatus(f.value)}>
+              {f.label}
+            </FilterPill>
           ))}
-        </select>
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className={inputCls} aria-label="Filter by status">
-          <option value="">All statuses</option>
-          <option value="planned">Planned</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="complete">Complete</option>
-          <option value="archived">Archived</option>
-        </select>
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search missions…" className={`${inputCls} w-44 pl-9`} />
         </div>
-        <div className="ml-auto">
-          <button onClick={() => setPickerOpen(true)} className={btnPrimary}>
-            <Plus size={14} /> New mission
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls} aria-label="Filter by business type">
+            <option value="">All business types</option>
+            {BUSINESS_TYPES.map((id) => (
+              <option key={id} value={id}>{BUSINESS_TYPE_LABELS[id]}</option>
+            ))}
+          </select>
+          <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-subtle" aria-hidden />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search missions" aria-label="Search missions" className={`${inputCls} w-full pl-9`} />
+          </div>
+          <button onClick={() => setPickerOpen(true)} className={aosButton({ variant: "primary", size: "sm", className: "ml-auto" })}>
+            <Plus size={15} aria-hidden /> New mission
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-xs font-semibold text-muted">
-              <th className="px-3 py-2 font-semibold">Name</th>
-              <th className="px-3 py-2 font-semibold">Type</th>
-              <th className="px-3 py-2 font-semibold">Goal</th>
-              <th className="px-3 py-2 font-semibold">Progress</th>
-              <th className="px-3 py-2 font-semibold">Status</th>
-              <th className="px-3 py-2 font-semibold">Next checkpoint</th>
-              <th className="px-3 py-2 font-semibold"><span className="sr-only">Open</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((m) => {
-              const Icon = BT_ICONS[m.businessType] ?? Target;
-              return (
-                <tr
-                  key={m.id}
-                  onClick={() => router.push(`/dashboard/missions/${m.id}`)}
-                  className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
-                >
-                  <td className="px-3 py-2 font-medium text-ink">{m.name}</td>
-                  <td className="px-3 py-2">
-                    <Chip><Icon size={10} /> {m.businessTypeLabel}</Chip>
-                  </td>
-                  <td className="px-3 py-2 text-muted">{m.goalSummary}</td>
-                  <td className="px-3 py-2"><ProgressBar value={m.progress} /></td>
-                  <td className="px-3 py-2">
-                    <MissionStatusBadge status={m.status} />
-                  </td>
-                  <td className="max-w-[220px] truncate px-3 py-2 text-muted" title={m.nextCheckpoint ?? ""}>
-                    {m.nextCheckpoint ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <ChevronRight size={14} className="ml-auto text-subtle" />
-                  </td>
-                </tr>
-              );
-            })}
-            {filtered.length === 0 && !loading && (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-sm text-subtle">
-                  {missions.length === 0
-                    ? "No missions yet — launch the first one with “New mission”."
-                    : "No missions match these filters."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {loading && missions.length === 0 ? (
+        <p className="flex items-center gap-2 text-md text-muted">
+          <Loader2 size={16} className="aos-spin" aria-hidden /> Loading missions…
+        </p>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
+          <Target size={28} className="text-subtle" aria-hidden />
+          <h2 className="aos-subheading">{missions.length === 0 ? "Hand the lead agent a goal" : "No missions match these filters"}</h2>
+          <p className="max-w-[46ch] text-md text-muted">
+            {missions.length === 0
+              ? "Pick a template, set the target and launch. Strategist plans it and hands each step to a sub-agent; nothing goes out without your approval."
+              : "Clear the search or pick another state to see the rest."}
+          </p>
+          {missions.length === 0 ? (
+            <button onClick={() => setPickerOpen(true)} className={aosButton({ variant: "primary", size: "sm" })}>
+              <Plus size={15} aria-hidden /> New mission
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">
-        <span className="font-medium text-ink">Kill switches always on. </span>
-        Every mission can be paused instantly; the workspace freeze halts everything. Resume re-verifies
-        budgets, data freshness, and goal assumptions before anything continues.
-      </div>
+      {live.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {live.map((m) => {
+            const v = m.agent;
+            const team = v.branches.map((b) => b.name);
+            return (
+              <AgentCard
+                key={m.id}
+                status={v.status}
+                title={m.name}
+                eyebrow={team.length ? `Strategist → ${team.join(", ")}` : "Strategist · Lead"}
+                description={v.line}
+                tools={missionTools(v)}
+                meta={cardMeta(m, v)}
+                action={cardAction(m, v)}
+              >
+                <p className="mt-3 flex min-w-0 items-center gap-1.5 text-sm text-muted">
+                  <Target size={13} className="shrink-0" aria-hidden />
+                  <span className="truncate">
+                    {m.businessTypeLabel} · {m.goalSummary}
+                  </span>
+                </p>
+              </AgentCard>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {archived.length > 0 ? (
+        <section aria-labelledby="archived-h" className="flex flex-col gap-2">
+          <h2 id="archived-h" className="aos-subheading">
+            Archived
+          </h2>
+          <ul className="divide-y divide-line overflow-hidden rounded-lg bg-paper shadow-hairline">
+            {archived.map((m) => (
+              <li key={m.id}>
+                <Link
+                  href={`/dashboard/missions/${m.id}`}
+                  className="flex min-h-12 items-center gap-3 px-4 py-2.5 transition-[background-color] duration-150 hover:bg-hover-paper"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-base font-semibold text-ink">{m.name}</span>
+                    <span className="block truncate text-sm text-muted">
+                      {m.businessTypeLabel} · {m.goalSummary}
+                    </span>
+                  </span>
+                  <span className="inline-flex h-6 items-center rounded-full bg-paper px-2.5 text-xs font-semibold text-muted shadow-control">Archived</span>
+                  <ChevronRight size={16} className="text-subtle" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <p className="text-sm text-muted">
+        <span className="font-semibold text-ink">Kill switches are always on. </span>
+        Every mission can be paused instantly; the workspace freeze halts everything. Resume re-verifies budgets, data
+        freshness and goal assumptions before anything continues.
+      </p>
 
       {pickerOpen && <TemplatePicker onClose={() => { setPickerOpen(false); void load(); }} />}
     </div>

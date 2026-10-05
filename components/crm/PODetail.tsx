@@ -140,7 +140,7 @@ export function PODetail({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
+      <div className={backdropCls} onClick={onClose} aria-hidden />
       <div className={slideoverCls}>
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between border-b border-line px-5 py-4">

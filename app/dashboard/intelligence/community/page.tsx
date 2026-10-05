@@ -12,7 +12,7 @@ import CommunityClient from "./CommunityClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Community engagement — Marketr",
+  title: "Community engagement — ShapesOS",
   description:
     "Find live conversations where your expertise matters, draft replies, and track posted outcomes.",
 };
@@ -30,7 +30,7 @@ export default async function CommunityPage() {
         <h1 className="aos-heading">Community engagement</h1>
         <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — draft-first outreach on HN, Reddit, and niche forums. You post
-          natively; Marketr only drafts.
+          natively; ShapesOS only drafts.
         </p>
       </div>
       <CommunityClient />

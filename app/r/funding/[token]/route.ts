@@ -25,6 +25,7 @@ import {
 } from "@/lib/funding/dataroom";
 import { readFile } from "@/lib/filesystem/service";
 import { buildDownloadHeaders } from "@/lib/filesystem/download";
+import { USER_FILE_VIEW_CSP } from "@/lib/security/headers";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
 import nodemailer from "nodemailer";
 import { smtpSettings } from "@/lib/alerts/adapters";
@@ -318,12 +319,15 @@ async function serveVersion(
     }`;
     const beaconUrl = `/r/funding/${encodeURIComponent(opts.token)}/views/${encodeURIComponent(view.id)}`;
     const openedAt = Math.round(opts.now.getTime());
+    // The page CSP (proxy.ts) only runs scripts carrying this request's nonce.
+    const nonce = req.headers.get("x-nonce") ?? "";
+    const nonceAttr = /^[A-Za-z0-9+/]+={0,2}$/.test(nonce) ? ` nonce="${nonce}"` : "";
     return page(
       opts.docTitle,
       `<h1>${esc(opts.docTitle)}</h1>` +
         `<div class="meta">Version ${opts.version.versionNumber} · ${esc(opts.version.fileName)} · this view was logged for the sender</div>` +
         `<iframe class="viewer" src="${iframeSrc}" title="${esc(opts.docTitle)}"></iframe>` +
-        `<script>(function(){var t0=${openedAt};function send(){var ms=Date.now()-t0;try{navigator.sendBeacon(${JSON.stringify(beaconUrl)},JSON.stringify({durationMs:ms}))}catch(e){}}window.addEventListener("pagehide",send);})();</script>`,
+        `<script${nonceAttr}>(function(){var t0=${openedAt};function send(){var ms=Date.now()-t0;try{navigator.sendBeacon(${JSON.stringify(beaconUrl)},JSON.stringify({durationMs:ms}))}catch(e){}}window.addEventListener("pagehide",send);})();</script>`,
     );
   }
 
@@ -332,9 +336,13 @@ async function serveVersion(
     fileId: opts.version.workspaceFileId,
   });
   if (!file) return gonePage();
-  const headers = buildDownloadHeaders(
-    opts.version.mimeType ?? "application/octet-stream",
-    opts.version.fileName,
-  );
+  // nosniff + inline-only-for-safe-types from the download helper, with the
+  // sandboxed file-view CSP — the same policy proxy.ts sends for this request
+  // (the proxy's header is the one that reaches the browser).
+  const headers = {
+    ...buildDownloadHeaders(opts.version.mimeType ?? "application/octet-stream", opts.version.fileName),
+    "content-security-policy": USER_FILE_VIEW_CSP,
+    "cache-control": "private, no-store",
+  };
   return new Response(new Uint8Array(file.bytes), { headers });
 }

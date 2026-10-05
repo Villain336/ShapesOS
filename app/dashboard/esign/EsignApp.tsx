@@ -34,6 +34,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Agentic OS atoms ─────────────────────────────────────────────────────────
 
@@ -607,8 +609,8 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
     );
   }
 
-  const canSend = detail.status === "draft";
-  const canVoid = ["draft", "sent", "partially-signed"].includes(detail.status);
+  const canSend = detail.status === "draft" || detail.status === "error";
+  const canVoid = ["draft", "error", "sent", "partially-signed", "expired"].includes(detail.status);
   const canRefresh = ["sent", "partially-signed", "completed"].includes(detail.status);
   const canClone = ["expired", "declined"].includes(detail.status);
   const [cloning, setCloning] = useState(false);
@@ -830,7 +832,7 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
       if (!res.ok) throw new Error(data.error ?? "Action failed.");
       onChanged();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Action failed.");
+      toastError(e instanceof Error ? e.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -849,7 +851,7 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not build the evidence pack.");
+      toastError(e instanceof Error ? e.message : "Could not build the evidence pack.");
     } finally {
       setBusy(false);
     }
@@ -1276,6 +1278,8 @@ function EnvelopesTab() {
                     <tr
                       key={e.id}
                       onClick={() => setSelectedId(e.id)}
+                      tabIndex={0}
+                      onKeyDown={activateOnKey(() => setSelectedId(e.id))}
                       className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     >
                       <td className="px-3 py-2.5 font-medium text-ink">{e.title}</td>
@@ -1295,7 +1299,7 @@ function EnvelopesTab() {
       </div>
 
       <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
-        Signing itself happens with the connected vendor (Documenso). Marketr prepares the
+        Signing itself happens with the connected vendor (Documenso). ShapesOS prepares the
         envelope, gates the send on your explicit review, and mirrors the sealed document
         plus a tamper-evident audit trail — it never invents a signature.
       </div>
@@ -1656,7 +1660,7 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
   }, [load]);
 
   async function remove(id: string) {
-    if (!window.confirm("Delete this template? Existing envelopes keep their copy.")) return;
+    if (!await confirmAction("Delete this template? Existing envelopes keep their copy.")) return;
     setDeleting(id);
     try {
       await fetch(`/api/esign/templates/${id}`, { method: "DELETE" });

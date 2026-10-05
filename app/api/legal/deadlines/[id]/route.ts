@@ -50,7 +50,7 @@ export async function PATCH(
     return Response.json({ disclaimer: LEGAL_DISCLAIMER, deadline });
   } catch (e) {
     if (e instanceof LegalError) {
-      const status = e.code === "UNKNOWN_DEADLINE" ? 404 : 400;
+      const status = e.code === "UNKNOWN_DEADLINE" ? 404 : e.code === "DEADLINE_NOT_OPEN" ? 409 : 400;
       return Response.json(
         { disclaimer: LEGAL_DISCLAIMER, error: e.message },
         { status },
@@ -72,7 +72,7 @@ export async function DELETE(
     return Response.json({ disclaimer: LEGAL_DISCLAIMER, deleted: true });
   } catch (e) {
     if (e instanceof LegalError) {
-      const status = e.code === "UNKNOWN_DEADLINE" ? 404 : 400;
+      const status = e.code === "UNKNOWN_DEADLINE" ? 404 : e.code === "DEADLINE_NOT_OPEN" ? 409 : 400;
       return Response.json(
         { disclaimer: LEGAL_DISCLAIMER, error: e.message },
         { status },

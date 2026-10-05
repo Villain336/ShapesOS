@@ -21,11 +21,20 @@
 // (b) Authorization: Bearer <webhook secret>. The exact production scheme is
 // UNVERIFIED against a live firing — confirm before trusting production
 // traffic (same honesty pattern as the PostGrid JWT note in lib/mail).
+//
+// Tenant binding (Phase 2): the real webhook URL carries ?w=<workspaceId>,
+// which is unsigned — so each workspace signs with its OWN secret, derived
+// from the host secret: HMAC-SHA256(CALLRAIL_WEBHOOK_SECRET,
+// "callrail-webhook:v1:<workspaceId>") (see callRailWorkspaceWebhookSecret and
+// scripts/callrail-webhook-secret.mts). A secret that verifies for workspace
+// A can't be replayed into workspace B by editing ?w=. The old single
+// host-wide secret is accepted only while CALLRAIL_WEBHOOK_ACCEPT_SHARED_SECRET=1
+// (migration window — see DEPLOY.md §1b).
 
 import { createHmac, createHash } from "node:crypto";
 import type { MediaStore, CallNumber } from "./store";
 import { safeEqual } from "../mail/provider";
-import { requireSecret } from "@/lib/env/secrets";
+import { assertFakeProviderAllowed, requireSecret } from "@/lib/env/secrets";
 
 export type CallRailProviderName = "fake" | "callrail";
 
@@ -57,7 +66,9 @@ export interface CallRailProvider {
   readonly name: CallRailProviderName;
   provisionNumber(input: CallNumberInput): Promise<{ numberE164: string }>;
   releaseNumber(numberE164: string): Promise<void>;
-  validateWebhookSignature(opts: { rawBody: string; signature: string | null }): boolean;
+  /** `workspaceId` is the (unsigned) workspace the route resolved; real
+   *  providers verify against that workspace's own secret. */
+  validateWebhookSignature(opts: { rawBody: string; signature: string | null; workspaceId?: string }): boolean;
   parseWebhook(payload: unknown): Promise<CallEvent[]>;
 }
 
@@ -78,6 +89,8 @@ export class FakeCallRailProvider implements CallRailProvider {
   private counter = 0;
 
   async provisionNumber(input: CallNumberInput): Promise<{ numberE164: string }> {
+    // Phase 11 (conncore): a fake tracking number is refused in production.
+    assertFakeProviderAllowed("CallRail");
     this.counter += 1;
     const area = (input.areaCode ?? "336").replace(/\D/g, "").slice(0, 3).padStart(3, "3");
     const hash = createHash("sha256")
@@ -115,6 +128,21 @@ export class FakeCallRailProvider implements CallRailProvider {
   }
 }
 
+/**
+ * The per-workspace CallRail webhook secret: HMAC-SHA256(host secret,
+ * "callrail-webhook:v1:<workspaceId>") as hex. Configure it in that
+ * workspace's CallRail webhook (Bearer or HMAC of the body).
+ */
+export function callRailWorkspaceWebhookSecret(hostSecret: string, workspaceId: string): string {
+  return createHmac("sha256", hostSecret).update(`callrail-webhook:v1:${workspaceId}`, "utf8").digest("hex");
+}
+
+function signatureMatches(secret: string, rawBody: string, signature: string): boolean {
+  if (safeEqual(signature, `Bearer ${secret}`)) return true;
+  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  return safeEqual(signature, expected);
+}
+
 export class ProviderNotConfiguredError extends Error {
   constructor(provider: string, missing: string) {
     super(`${provider} provider is not configured (missing ${missing})`);
@@ -132,12 +160,20 @@ export class RealCallRailProvider implements CallRailProvider {
   readonly name = "callrail" as const;
   private apiKey: string;
   private webhookSecret: string | null;
+  private acceptSharedSecret: boolean;
   readonly live: boolean;
 
-  constructor(opts: { apiKey?: string; webhookSecret?: string; live?: boolean }) {
+  constructor(opts: {
+    apiKey?: string;
+    webhookSecret?: string;
+    live?: boolean;
+    /** Migration window only: also accept the host-wide secret itself. */
+    acceptSharedSecret?: boolean;
+  }) {
     if (!opts.apiKey) throw new ProviderNotConfiguredError("callrail", "CALLRAIL_API_KEY");
     this.apiKey = opts.apiKey;
     this.webhookSecret = opts.webhookSecret ?? null;
+    this.acceptSharedSecret = opts.acceptSharedSecret ?? false;
     this.live = opts.live ?? false;
   }
 
@@ -154,12 +190,18 @@ export class RealCallRailProvider implements CallRailProvider {
     throw new Error("CallRail live release is not wired in v1");
   }
 
-  validateWebhookSignature(opts: { rawBody: string; signature: string | null }): boolean {
-    if (!opts.signature || !this.webhookSecret) return false;
-    const bearer = `Bearer ${this.webhookSecret}`;
-    if (safeEqual(opts.signature, bearer)) return true;
-    const expected = createHmac("sha256", this.webhookSecret).update(opts.rawBody, "utf8").digest("hex");
-    return safeEqual(opts.signature, expected);
+  validateWebhookSignature(opts: { rawBody: string; signature: string | null; workspaceId?: string }): boolean {
+    if (!opts.signature || !this.webhookSecret || !opts.workspaceId) return false;
+    const perWorkspace = callRailWorkspaceWebhookSecret(this.webhookSecret, opts.workspaceId);
+    if (signatureMatches(perWorkspace, opts.rawBody, opts.signature)) return true;
+    if (this.acceptSharedSecret && signatureMatches(this.webhookSecret, opts.rawBody, opts.signature)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[callrail:webhook] workspace ${opts.workspaceId} still signs with the host-wide secret — switch it to its per-workspace secret, then unset CALLRAIL_WEBHOOK_ACCEPT_SHARED_SECRET`,
+      );
+      return true;
+    }
+    return false;
   }
 
   async parseWebhook(_payload: unknown): Promise<CallEvent[]> {
@@ -223,7 +265,7 @@ export function createCallRailService(store: MediaStore, provider: CallRailProvi
 
     async ingestWebhook(opts) {
       const { rawBody, signature, workspaceId } = opts;
-      if (!provider.validateWebhookSignature({ rawBody, signature })) {
+      if (!provider.validateWebhookSignature({ rawBody, signature, workspaceId })) {
         return { accepted: false, reason: "invalid signature", eventsApplied: 0, duplicate: false };
       }
       let payload: unknown;

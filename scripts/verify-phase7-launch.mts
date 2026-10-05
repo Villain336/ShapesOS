@@ -4,7 +4,7 @@
 // Run 3x green before calling F6 done.
 //
 // No DB, no network: static checks + pure-logic imports only.
-// Covers SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §9, §10
+// Covers docs/specs/SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §9, §10
 // (exit gate 9), §12.5 (open-core split deferred — readiness only).
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";

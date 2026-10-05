@@ -124,15 +124,15 @@ export default function TeamChatPanel({
   );
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-page">
+    <div className="relative flex h-full min-h-0 flex-col bg-canvas">
       {/* Slim channel strip — chat chrome, not a page header */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-paper px-4">
         <span className="text-[13px] font-medium text-ink">Project channel</span>
         <ValuePill tone="neutral">
           <Users className="mr-1 size-3" />
           {memberCount} member{memberCount === 1 ? "" : "s"}
         </ValuePill>
-        <span className="ml-auto text-[12px] text-ink-3">Refreshes every 5 seconds</span>
+        <span className="ml-auto text-[12px] text-muted">Refreshes every 5 seconds</span>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -142,13 +142,13 @@ export default function TeamChatPanel({
               <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-5 px-4 pb-48 pt-6">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center pt-16 text-center">
-                    <span className="flex size-12 items-center justify-center rounded-full bg-violet-600 text-white">
+                    <span className="flex size-12 items-center justify-center rounded-full bg-ink text-white">
                       <Users className="size-6" />
                     </span>
-                    <h2 className="mt-4 text-[24px] font-bold tracking-tight text-stone-900">
+                    <h2 className="aos-heading mt-4 text-ink">
                       No messages yet
                     </h2>
-                    <p className="mt-2 max-w-[46ch] text-[13.5px] leading-relaxed text-ink-2">
+                    <p className="mt-2 max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
                       Kick off the conversation — the whole project team sees it here.
                     </p>
                   </div>
@@ -166,7 +166,7 @@ export default function TeamChatPanel({
                           <MessageAvatar>
                             <Avatar size="sm">
                               <AvatarFallback
-                                className={cn(mine && "bg-ink text-page")}
+                                className={cn(mine && "bg-ink text-white")}
                               >
                                 {initials(m.authorName)}
                               </AvatarFallback>
@@ -176,11 +176,11 @@ export default function TeamChatPanel({
                             <MessageHeader>
                               <span className="font-medium text-ink">{m.authorName}</span>
                               {mine && <ValuePill tone="accent">you</ValuePill>}
-                              <span className="font-normal text-ink-3">{formatTime(m.createdAt)}</span>
+                              <span className="font-normal text-muted">{formatTime(m.createdAt)}</span>
                             </MessageHeader>
                             <Bubble variant="ghost" align="start">
                               <BubbleContent>
-                                <p className="whitespace-pre-wrap text-ink-2">{m.body}</p>
+                                <p className="whitespace-pre-wrap text-ink">{m.body}</p>
                               </BubbleContent>
                             </Bubble>
                           </MessageContent>
@@ -198,7 +198,7 @@ export default function TeamChatPanel({
         {/* Floating composer */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0">
           <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-            <div className="material-float pointer-events-auto rounded-[14px] p-2 shadow-float-lg ring-1 ring-line">
+            <div className="pointer-events-auto rounded-xl bg-paper p-2 shadow-overlay">
               <PromptBar
                 demo={false}
                 placeholder="Message the team…"

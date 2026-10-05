@@ -7,7 +7,7 @@ import { ReconcileApp } from "./ReconcileApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Cost Reconciliation — Marketr",
+  title: "Cost Reconciliation — ShapesOS",
   description:
     "Ledger estimates vs provider actuals for direct mail: campaigns or month, variance flags, manual invoice import.",
 };

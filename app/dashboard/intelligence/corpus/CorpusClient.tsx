@@ -167,7 +167,7 @@ export function CorpusClient({ manifest }: { manifest: CorpusManifest | null }) 
               <div className="text-xs font-semibold text-ink">Synthesized 1S</div>
               <div className="mt-1 text-2xl font-bold text-ink">{stats.synthesized}</div>
               <p className="mt-1 text-xs text-muted">
-                Learn-only sources shipped as Marketr-original playbooks — ideas learned, expression ours, factual
+                Learn-only sources shipped as ShapesOS-original playbooks — ideas learned, expression ours, factual
                 attribution kept. Never verbatim academy text.
               </p>
             </div>
@@ -183,7 +183,7 @@ export function CorpusClient({ manifest }: { manifest: CorpusManifest | null }) 
           <div className="rounded-lg bg-paper p-3 text-xs leading-relaxed text-muted shadow-hairline">
             <span className="font-semibold text-ink">Tier &amp; license doctrine.</span> Tier 1 =
             official platform material (Google Search Central, CC-BY-4.0). Tier 2 = openly-licensed works.
-            Tier 1S = learn-only sources (academies, blogs) expressed in Marketr&apos;s own words. Wikipedia
+            Tier 1S = learn-only sources (academies, blogs) expressed in ShapesOS&apos;s own words. Wikipedia
             CC-BY-SA material is segregated in a separate asset. Tier 3 purchased material never enters this
             corpus. Last eval: {manifest.evalRunAt ? manifest.evalRunAt.slice(0, 10) : "not run"}.
           </div>

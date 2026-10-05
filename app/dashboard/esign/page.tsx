@@ -9,7 +9,7 @@ import { EsignApp } from "./EsignApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "E-sign — Marketr",
+  title: "E-sign — ShapesOS",
   description: "Prepare, send, and track signature envelopes — governed, evidence-first.",
 };
 
@@ -26,7 +26,7 @@ export default async function EsignPage() {
         <h1 className="aos-heading">E-sign</h1>
         <p className="mt-0.5 text-sm text-muted">
           Prepare signature envelopes, review them, and send — the vendor seals the
-          document, Marketr keeps the evidence.
+          document, ShapesOS keeps the evidence.
         </p>
       </div>
       <EsignApp />

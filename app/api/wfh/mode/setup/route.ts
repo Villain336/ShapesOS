@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       focusBlockMinutes: setup.focusBlockMinutes,
       standupCadence: setup.standupCadence,
       notificationProfile: setup.notificationProfile,
+      ...(setup.timezone ? { timezone: setup.timezone } : {}),
       setupCompletedAt: new Date(),
     },
     update: {
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       focusBlockMinutes: setup.focusBlockMinutes,
       standupCadence: setup.standupCadence,
       notificationProfile: setup.notificationProfile,
+      ...(setup.timezone ? { timezone: setup.timezone } : {}),
       setupCompletedAt: new Date(),
       email: user.email ?? null,
     },

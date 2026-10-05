@@ -235,7 +235,7 @@ export default function AttachmentMenu() {
             <DialogTitle>Attach from Drive or Notion</DialogTitle>
             <DialogDescription>
               Reference a file from a bound Drive/Notion data source — nothing
-              is copied, Marketr reads it on reference.
+              is copied, ShapesOS reads it on reference.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-1">

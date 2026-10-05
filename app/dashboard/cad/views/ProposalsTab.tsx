@@ -16,6 +16,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface VersionLite {
   id: string;
@@ -143,7 +144,7 @@ export function ProposalsTab({
       action === "approve"
         ? " This marks the model as “change requested”. The geometry is NOT rewritten — the edit happens in your CAD tool."
         : "";
-    if (!window.confirm(`${verb} this proposal?${consequence}`)) return;
+    if (!await confirmAction(`${verb} this proposal?${consequence}`)) return;
     setBusyId(id);
     setError(null);
     try {

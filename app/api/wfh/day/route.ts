@@ -12,13 +12,11 @@ import {
   isStandupDue,
   isStandupLate,
   nudgeCopy,
+  standupDateFor,
   type StandupCadence,
 } from "@/lib/wfh/standups";
 import { nextOccurrence, RITUAL_TYPE_META, type RitualCadence, type RitualType } from "@/lib/wfh/rituals";
-
-function todayNoonUTC(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
-}
+import { resolveTimeZone, zonedParts, zonedTimeToUtc } from "@/lib/time/zoned";
 
 export async function GET() {
   const user = await requireUser();
@@ -28,13 +26,16 @@ export async function GET() {
   if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const now = new Date();
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-  const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+  const mode = await prisma.wfhWorkMode.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+  });
+  // "Today" is the user's local day in their IANA timezone (default UTC).
+  const tz = resolveTimeZone(mode?.timezone);
+  const local = zonedParts(now, tz);
+  const dayStart = zonedTimeToUtc(local.year, local.month, local.day, 0, tz).date;
+  const dayEnd = zonedTimeToUtc(local.year, local.month, local.day + 1, 0, tz).date;
 
-  const [mode, focusBlocks, todayStandup, subs, digestItems] = await Promise.all([
-    prisma.wfhWorkMode.findUnique({
-      where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
-    }),
+  const [focusBlocks, todayStandup, subs, digestItems] = await Promise.all([
     prisma.wfhFocusBlock.findMany({
       where: {
         workspaceId: workspace.id,
@@ -49,7 +50,7 @@ export async function GET() {
       take: 100,
     }),
     prisma.wfhStandup.findFirst({
-      where: { workspaceId: workspace.id, userId: user.id, date: todayNoonUTC(now) },
+      where: { workspaceId: workspace.id, userId: user.id, date: standupDateFor(now, tz) },
       select: { id: true },
     }),
     prisma.wfhRitualSubscription.findMany({
@@ -63,8 +64,8 @@ export async function GET() {
   ]);
 
   const cadence = (mode?.standupCadence ?? "daily") as StandupCadence;
-  const due = isStandupDue(cadence, now, !!todayStandup);
-  const late = due && isStandupLate(now);
+  const due = isStandupDue(cadence, now, !!todayStandup, tz);
+  const late = due && isStandupLate(now, 10, tz);
 
   const horizon = new Date(now.getTime() + 48 * 3600 * 1000);
   const ritualsDue = subs
@@ -73,7 +74,7 @@ export async function GET() {
       type: s.ritual.type,
       title: s.ritual.title,
       prompt: RITUAL_TYPE_META[s.ritual.type as RitualType]?.prompt ?? null,
-      nextOccurrence: nextOccurrence(s.ritual.anchorDate, s.ritual.cadence as RitualCadence, now),
+      nextOccurrence: nextOccurrence(s.ritual.anchorDate, s.ritual.cadence as RitualCadence, now, s.ritual.timezone),
     }))
     .filter((r) => r.nextOccurrence.getTime() <= horizon.getTime())
     .sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
@@ -104,6 +105,7 @@ export async function GET() {
     ritualsDue,
     digestWindows,
     mode: mode?.mode ?? "office",
+    timeZone: tz,
   });
 
   return NextResponse.json({

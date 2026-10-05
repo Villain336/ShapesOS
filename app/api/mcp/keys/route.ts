@@ -5,6 +5,7 @@
 //        expiresAt defaults to 90 days and may be at most one year away.
 //        The raw key is returned ONCE — it is never stored and never retrievable.
 
+import { mcpEffectiveState } from "@/lib/mcp/enabled";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,7 @@ import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { mintApiKey } from "@/lib/mcp/auth";
 import { readUsageSummary } from "@/lib/mcp/metering";
 import { MCP_TOOL_NAMES, scopeForTool } from "@/lib/mcp/scopes";
+import { EntitlementError, entitlementDenied, featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +72,13 @@ export async function GET() {
     byKey = {};
   }
   const withUsage = keys.map((k) => ({ ...publicKey(k), usageCredits: byKey[k.id] ?? 0 }));
-  return Response.json({ enabled: ctx.workspace.mcpEnabled, keys: withUsage });
+  return Response.json({
+    // Phase 11 (conncore): the effective switch (explicit, else plan default).
+    enabled: mcpEffectiveState(ctx.workspace).on,
+    // Phase 4a: whether the plan includes API/MCP access.
+    entitled: planHasFeature(ctx.workspace.plan, "api_access"),
+    keys: withUsage,
+  });
 }
 
 const CreateKeySchema = z
@@ -84,8 +92,12 @@ const CreateKeySchema = z
 export async function POST(req: NextRequest) {
   const ctx = await adminCtx();
   if ("error" in ctx) return ctx.error;
-  if (!ctx.workspace.mcpEnabled) {
+  if (!mcpEffectiveState(ctx.workspace).on) {
     return Response.json({ error: "MCP is not enabled for this workspace" }, { status: 403 });
+  }
+  // Phase 4a: API keys need the api_access entitlement.
+  if (!planHasFeature(ctx.workspace.plan, "api_access")) {
+    return entitlementDenied(new EntitlementError(featureUpgradeMessage("api_access"), "api_access"));
   }
   let body: unknown;
   try {

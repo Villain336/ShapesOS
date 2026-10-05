@@ -50,7 +50,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "AEO — Marketr",
+  title: "AEO — ShapesOS",
   description: "Per-engine AI answer visibility tracking, source-impact analysis, and supervised fix actions.",
 };
 
@@ -540,7 +540,7 @@ export default async function AeoPage({
           <div className="rounded-lg border border-line bg-paper p-4">
             <h3 className="mb-1 text-sm font-semibold text-ink">Third-party user action plans</h3>
             <p className="mb-3 text-[11px] text-muted">
-              Marketr cannot edit third-party pages — these are concrete plans for you to execute. Approving
+              ShapesOS cannot edit third-party pages — these are concrete plans for you to execute. Approving
               marks a commitment; it never publishes on your behalf.
             </p>
             {thirdParty.length === 0 ? (

@@ -412,20 +412,38 @@ export async function dispatchDueNurtureMail(
     if (!aud.mailDate || new Date(aud.mailDate).getTime() > now.getTime()) continue;
     if (campaign.approvals.length === 0) continue; // belt-and-braces; execute would refuse
 
-    // Workspace daily cap (shared across channels).
+    // Workspace daily cap (shared across channels), enforced atomically: the
+    // count and the send run while holding a (workspace, UTC day) advisory
+    // lock, so concurrent mail sweeps can't both see headroom and overshoot.
+    // Its own key (not the SMS/email claim's), so a slow print-provider call
+    // never stalls message claims. try-lock (not wait): a busy workspace-day
+    // leaves this campaign approved for the next sweep instead of parking
+    // pooled connections behind a provider call.
     const cap = await workspaceDailyCap(workspaceId);
-    if ((await mailSendsToday(workspaceId)) >= cap) {
-      out.skippedCap += 1;
-      continue;
-    }
-
-    out.attempted += 1;
     try {
-      const res = await executeCampaign(workspaceId, campaign.id);
-      out.sent += res.sent;
-      out.suppressed += res.suppressed + res.quarantinedSkipped;
-      out.failed += res.failed;
+      const outcome = await prisma.$transaction(
+        async (tx) => {
+          const lockKey = `mail-daily-cap:${workspaceId}:${now.toISOString().slice(0, 10)}`;
+          const [row] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext(${lockKey})) AS locked`;
+          if (!row?.locked) return "busy" as const;
+          if ((await mailSendsToday(workspaceId, startOfUtcDay(now))) >= cap) return "cap" as const;
+          // Sends commit on their own connections before the lock is released,
+          // so the next holder's count sees them.
+          return executeCampaign(workspaceId, campaign.id);
+        },
+        { maxWait: 15_000, timeout: 120_000 },
+      );
+      if (outcome === "busy") continue;
+      if (outcome === "cap") {
+        out.skippedCap += 1;
+        continue;
+      }
+      out.attempted += 1;
+      out.sent += outcome.sent;
+      out.suppressed += outcome.suppressed + outcome.quarantinedSkipped;
+      out.failed += outcome.failed;
     } catch (e) {
+      out.attempted += 1;
       out.failed += 1;
       out.errors.push({
         campaignId: campaign.id,

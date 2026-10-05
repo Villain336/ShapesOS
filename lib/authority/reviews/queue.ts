@@ -1,6 +1,6 @@
 // Marketr — R1 approval queue logic (DRAFTS-ONLY v1).
 //
-// SPEC-PHASE6.md §2/R1, §3/F2, §7, §9 invariants 1 & 6.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2, §7, §9 invariants 1 & 6.
 // v1 is an approval queue for EVERYTHING: no auto-post code path exists.
 // Every post requires an approved review_reply_post approval (two-person)
 // whose binding re-verifies before execution (see lib/authority/db.ts).

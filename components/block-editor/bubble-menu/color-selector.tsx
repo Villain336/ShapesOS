@@ -62,6 +62,8 @@ const storage = {
   },
 };
 
+// Legit data values: these are the user's text/highlight palette, written as
+// literal colors into the document's marks (and its HTML export), not UI chrome.
 const TEXT_COLORS = [
   { color: "#0f172a", label: "Foreground" },
   { color: "#ef4444", label: "Red" },

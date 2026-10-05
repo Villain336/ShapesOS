@@ -8,7 +8,7 @@ import { useState, type FormEvent } from "react";
 import type { KeywordResearchReport } from "@/lib/keywords/research";
 
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 const CLUSTER_LABELS: Record<string, string> = {
   informational: "Informational",
@@ -59,14 +59,14 @@ export default function KeywordResearchTask({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white/60 p-5">
+    <div className="flex flex-col gap-4 rounded-lg bg-paper p-5 shadow-hairline">
       <div>
-        <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+        <h2 className="text-sm font-semibold text-muted">
           Full research task
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-muted">
           Seed metrics plus a clustered ideas report (volumes, difficulty, CPC,
-          intent). <span className="font-medium text-zinc-700">Costs 40 credits</span>{" "}
+          intent). <span className="font-medium text-ink">Costs 40 credits</span>{" "}
           per task (same seed, same day is not charged twice).
         </p>
       </div>
@@ -74,7 +74,7 @@ export default function KeywordResearchTask({
         <div className="flex-1">
           <label
             htmlFor="research-seed"
-            className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
+            className="mb-1 block text-xs font-semibold text-muted"
           >
             Seed keyword
           </label>
@@ -90,53 +90,53 @@ export default function KeywordResearchTask({
         <button
           type="submit"
           disabled={loading || !seed.trim()}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
         >
           {loading ? "Researching…" : "Run research task"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-failed-text">{error}</p>}
       {report && (
         <div className="flex flex-col gap-4">
           {report.mock && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-muted">
               Mock keyword data — connect a live data source for real volumes.
             </p>
           )}
-          <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm">
-            <div className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+          <div className="rounded-md border border-line bg-paper p-4 text-sm">
+            <div className="text-xs font-semibold text-muted">
               Seed: {report.seed}
             </div>
             {report.seedMetrics ? (
               <div className="mt-2 flex flex-wrap gap-4">
-                <span><span className="text-zinc-500">Volume:</span> <span className="font-medium">{fmt(report.seedMetrics.volume)}</span></span>
-                <span><span className="text-zinc-500">Difficulty:</span> <span className="font-medium">{report.seedMetrics.difficulty ?? "—"}</span></span>
-                <span><span className="text-zinc-500">CPC:</span> <span className="font-medium">{report.seedMetrics.cpc != null ? `$${report.seedMetrics.cpc.toFixed(2)}` : "—"}</span></span>
-                <span><span className="text-zinc-500">Intent:</span> <span className="font-medium">{report.seedMetrics.intent}</span></span>
+                <span><span className="text-muted">Volume:</span> <span className="font-medium">{fmt(report.seedMetrics.volume)}</span></span>
+                <span><span className="text-muted">Difficulty:</span> <span className="font-medium">{report.seedMetrics.difficulty ?? "—"}</span></span>
+                <span><span className="text-muted">CPC:</span> <span className="font-medium">{report.seedMetrics.cpc != null ? `$${report.seedMetrics.cpc.toFixed(2)}` : "—"}</span></span>
+                <span><span className="text-muted">Intent:</span> <span className="font-medium">{report.seedMetrics.intent}</span></span>
               </div>
             ) : (
-              <p className="mt-2 text-zinc-500">{report.seedMetricsNote}</p>
+              <p className="mt-2 text-muted">{report.seedMetricsNote}</p>
             )}
           </div>
           {Object.entries(report.clusters).map(([intent, ideas]) =>
             ideas.length > 0 ? (
               <div key={intent}>
-                <h3 className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+                <h3 className="text-xs font-semibold text-muted">
                   {CLUSTER_LABELS[intent] ?? intent} ({ideas.length})
                 </h3>
                 <table className="mt-1 w-full text-sm">
                   <tbody>
                     {ideas.slice(0, 10).map((idea) => (
-                      <tr key={idea.phrase} className="border-t border-zinc-200">
+                      <tr key={idea.phrase} className="border-t border-line">
                         <td className="py-2 pr-4">{idea.phrase}</td>
-                        <td className="py-2 pr-4 text-zinc-500">vol {fmt(idea.volume)}</td>
-                        <td className="py-2 text-zinc-500">diff {idea.difficulty ?? "—"}</td>
+                        <td className="py-2 pr-4 text-muted">vol {fmt(idea.volume)}</td>
+                        <td className="py-2 text-muted">diff {idea.difficulty ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {ideas.length > 10 && (
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted">
                     +{ideas.length - 10} more in this cluster
                   </p>
                 )}

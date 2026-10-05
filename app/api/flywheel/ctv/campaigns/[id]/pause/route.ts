@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     // --- Vibe API path: real pause ---
     if (campaign.mode === "api" && campaign.platform === "vibe") {
       if (!campaign.vibeCampaignId) {
-        return badRequest("No Vibe campaign is linked to this Marketr campaign yet.");
+        return badRequest("No Vibe campaign is linked to this ShapesOS campaign yet.");
       }
       if (!campaign.approvalObjectId) {
         return badRequest("An approval object id is required to pause a Vibe buy.");

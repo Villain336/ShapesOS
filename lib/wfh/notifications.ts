@@ -9,6 +9,7 @@
 
 import type { WorkModeState } from "./mode";
 import { isWfhEffectiveOn } from "./mode";
+import { DEFAULT_TIME_ZONE, resolveTimeZone, zonedParts, zonedTimeToUtc } from "@/lib/time/zoned";
 
 export type NotificationUrgency = "urgent" | "routine";
 
@@ -102,13 +103,16 @@ export function routeNotification(
     return { deliver: "now", reason: "wfh_not_effective" };
   }
   const windows = resolveDigestWindows(ctx.digestTimesMin);
-  const windowMin = nextWindowMin(windows.timesMin, ctx.at);
+  const windowMin = nextWindowMin(windows.timesMin, ctx.at, ctx.mode?.timezone ?? DEFAULT_TIME_ZONE);
   return { deliver: "digest", reason: "batched_digest", windowMin };
 }
 
-/** Next digest window at or after `at` (minutes since midnight local). */
-export function nextWindowMin(timesMin: number[], at: Date): number {
-  const nowMin = at.getHours() * 60 + at.getMinutes();
+/**
+ * Next digest window at or after `at` (minutes since midnight in the user's
+ * IANA timezone — never the server's).
+ */
+export function nextWindowMin(timesMin: number[], at: Date, timeZone: string = DEFAULT_TIME_ZONE): number {
+  const nowMin = zonedParts(at, resolveTimeZone(timeZone)).minutes;
   for (const t of timesMin) {
     if (t >= nowMin) return t;
   }
@@ -118,22 +122,24 @@ export function nextWindowMin(timesMin: number[], at: Date): number {
 /**
  * Which digest windows are due at `at`, given the last flush per window?
  * `lastFlushedAt` maps windowMin -> ISO timestamp of the last flush. A window
- * is due when its time today has passed and it hasn't been flushed since.
+ * is due when its local time today has passed and it hasn't been flushed
+ * since that moment. Local day and times are read in `timeZone`.
  */
 export function dueWindowsFor(
   timesMin: number[],
   at: Date,
   lastFlushedAt: Record<number, string | null>,
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): number[] {
-  const nowMin = at.getHours() * 60 + at.getMinutes();
-  const dayStart = new Date(at);
-  dayStart.setHours(0, 0, 0, 0);
+  const tz = resolveTimeZone(timeZone);
+  const today = zonedParts(at, tz);
   return timesMin.filter((t) => {
-    if (t > nowMin) return false;
+    if (t > today.minutes) return false;
     const last = lastFlushedAt[t];
     if (!last) return true;
-    const lastDate = new Date(last);
-    return lastDate < dayStart || (lastDate.getHours() * 60 + lastDate.getMinutes()) < t;
+    // The instant this window opened today (DST-safe: converted on its own).
+    const windowOpened = zonedTimeToUtc(today.year, today.month, today.day, t, tz).date;
+    return new Date(last).getTime() < windowOpened.getTime();
   });
 }
 

@@ -14,8 +14,9 @@
 import Stripe from "stripe";
 import { Prisma, type BillingOverageInvoice, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { applyTopUp, setSpendCap } from "./service";
+import { applyPlanChange, applyTopUp, setSpendCap } from "./service";
 import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
+import { deploymentMode, lapsedPlanFor } from "@/lib/billing/trial";
 import {
   PLANS,
   planById,
@@ -340,7 +341,7 @@ export class StripeBillingSink implements BillingSink {
           price_data: {
             currency: "usd",
             unit_amount: pack.priceCents,
-            product_data: { name: `Marketr credit top-up — ${pack.credits.toLocaleString()} credits` },
+            product_data: { name: `ShapesOS credit top-up — ${pack.credits.toLocaleString()} credits` },
           },
           quantity: 1,
         },
@@ -633,7 +634,7 @@ export class StripeBillingSink implements BillingSink {
     if (!customerId) {
       const customer = await this.client().customers.create({
         metadata: { workspaceId },
-        description: `Marketr workspace ${workspaceId}`,
+        description: `ShapesOS workspace ${workspaceId}`,
       });
       customerId = customer.id;
       await prisma.billingWorkspace.update({
@@ -965,7 +966,7 @@ export class StripeBillingSink implements BillingSink {
       // Card gate above guarantees a bound customer — never create one here.
       const customerId = bw.stripeCustomerId as string;
       const description =
-        `Marketr overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
+        `ShapesOS overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
         `(usage past cap, through ${label})`;
       await this.client().invoiceItems.create(
         { customer: customerId, amount: amountCents, currency: "usd", description },
@@ -1392,7 +1393,9 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
  * signed Stripe webhook paths in this module — never from UI input.
  */
 async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: string): Promise<void> {
-  await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: planId } });
+  // Plan + included pool + cap move together (one locked transaction) —
+  // an upgraded workspace is never left capped at the old tier's pool.
+  await applyPlanChange(workspaceId, planId);
   await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
 }
 
@@ -1460,7 +1463,9 @@ export async function syncSubscriptionFromStripe(
   });
 
   if (ended) {
-    await setWorkspacePlan(workspaceId, "self_hosted" as Plan, `subscription ${sub.id} ended (${sub.status})`);
+    // Phase 3: on a hosted deployment a lapsed subscription becomes an ended
+    // trial (read-only for metered actions), never unbilled self_hosted.
+    await setWorkspacePlan(workspaceId, lapsedPlanFor(deploymentMode()), `subscription ${sub.id} ended (${sub.status})`);
   } else if (planId) {
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (ws && ws.plan !== planId) {

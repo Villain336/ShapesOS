@@ -1,7 +1,7 @@
 // Marketr — Phase 10 M9: the BINDING ingest allowlist.
 //
 // This module is the code-level enforcement of the clean-sourcing tiers
-// (SPEC-PHASE10.md §M9). Ingestion MUST call assertIngestAllowed() before
+// (docs/specs/SPEC-PHASE10.md §M9). Ingestion MUST call assertIngestAllowed() before
 // writing a single chunk; the test suite asserts that the registry contains
 // ONLY Tier 1-shippable + Tier 2 sources and that forbidden sources throw.
 
@@ -77,7 +77,7 @@ export function assertIngestAllowed(def: {
 }
 
 /**
- * Full 24-source registry (M9-CORPUS-SOURCES.md #1–24). Sources with a fetch
+ * Full 24-source registry (docs/research/M9-CORPUS-SOURCES.md #1–24). Sources with a fetch
  * URL are ingested by scripts/ingest-corpus.mts; sources whose fetch is
  * blocked or whose license is uncertain are recorded PENDING with a reason
  * — never ingested. Learn-only sources (#2–8, #21–24) are registry entries
@@ -737,7 +737,7 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     pendingReason:
       "REFUSED — license incompatible. The Yelp Open Dataset agreement limits use to " +
       "academic/non-commercial purposes and prohibits commercial use and third-party " +
-      "redistribution (https://www.yelp.com/dataset). Incompatible with Marketr's commercial " +
+      "redistribution (https://www.yelp.com/dataset). Incompatible with ShapesOS's commercial " +
       "shipped corpus. Do not ingest without a commercial license; Hugging Face mirrors inherit " +
       "the restriction.",
   },

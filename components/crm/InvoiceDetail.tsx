@@ -11,10 +11,12 @@ import {
 import { formatMoney } from "./types";
 import {
   INVOICE_STATUS_META,
-  shortInvoiceId,
   type OpsInvoice,
   type CustomerRef,
 } from "./InvoicesTab";
+// Phase 10 (finance): number, PDF, delivery, partial payments, credit notes,
+// payment link and recurring schedules.
+import { InvoiceFinancePanel, invoiceLabel } from "@/components/ops-finance/InvoiceFinancePanel";
 import { backdropCls, btnApprove, btnDeny, btnExecute, btnGhost, btnPrimary, btnReview, chipCls, errorBoxCls, inputCls, needsBoxCls, noteBoxCls, sectionTitleCls, slideoverCls, tableCls } from "./ui";
 
 interface PendingGate {
@@ -59,7 +61,7 @@ export function InvoiceDetail({
     ? `${customer.name}${customer.company ? ` (${customer.company})` : ""}`
     : "customer";
   const summaryFor = (label: string) =>
-    `${label} — invoice INV-${shortInvoiceId(invoice.id)} for ${formatMoney(invoice.totalCents)} to ${who} (due ${fmtDate(invoice.dueAt)})`;
+    `${label} — invoice ${invoiceLabel(invoice)} for ${formatMoney(invoice.totalCents)} to ${who} (due ${fmtDate(invoice.dueAt)})`;
 
   async function requestTransition(to: "sent" | "paid" | "cancelled") {
     setBusy(true);
@@ -116,7 +118,7 @@ export function InvoiceDetail({
           approvalId: d.approval.id as string,
           tier: (d.approval.riskTier as string) ?? "medium",
           actionLabel: "Send payment reminder",
-          summary: `Send payment reminder to ${who} for invoice INV-${shortInvoiceId(invoice.id)} — ${formatMoney(invoice.totalCents)} due ${fmtDate(invoice.dueAt)}.`,
+          summary: `Send payment reminder to ${who} for invoice ${invoiceLabel(invoice)} — ${formatMoney(invoice.totalCents)} due ${fmtDate(invoice.dueAt)}.`,
           kind: "reminder",
           reminderText: text,
           approved: false,
@@ -182,7 +184,7 @@ export function InvoiceDetail({
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? "Execution failed.");
         setPending(null);
-        setNote("Reminder recorded as sent.");
+        setNote("Reminder approved and emailed.");
         onChanged();
       }
     } catch (e) {
@@ -196,14 +198,14 @@ export function InvoiceDetail({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
+      <div className={backdropCls} onClick={onClose} aria-hidden />
       <div className={slideoverCls}>
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold tracking-tight text-ink">
-                  INV-{shortInvoiceId(invoice.id)}
+                  {invoiceLabel(invoice)}
                 </h3>
                 <span className={chipCls}>
                   {meta.label}
@@ -343,6 +345,8 @@ export function InvoiceDetail({
               </div>
             </dl>
 
+            <InvoiceFinancePanel invoice={invoice} onChanged={onChanged} />
+
             {/* Reminder composer */}
             {showRemind && (
               <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-3">
@@ -354,7 +358,7 @@ export function InvoiceDetail({
                   className={`${inputCls} mt-2 min-h-[90px] w-full`}
                   value={reminderText}
                   onChange={(e) => setReminderText(e.target.value)}
-                  placeholder={`Hi ${customer?.name ?? "there"} — just a friendly reminder that invoice INV-${shortInvoiceId(invoice.id)} for ${formatMoney(invoice.totalCents)} was due ${fmtDate(invoice.dueAt)}. Let us know if you need anything!`}
+                  placeholder={`Hi ${customer?.name ?? "there"} — just a friendly reminder that invoice ${invoiceLabel(invoice)} for ${formatMoney(invoice.totalCents)} was due ${fmtDate(invoice.dueAt)}. Let us know if you need anything!`}
                 />
                 <div className="mt-2 flex gap-2">
                   <button
@@ -399,14 +403,14 @@ export function InvoiceDetail({
                     onClick={() => requestTransition("paid")}
                     className={btnPrimary}
                   >
-                    <BadgeDollarSign size={14} /> Record payment
+                    <BadgeDollarSign size={14} /> Mark paid in full
                   </button>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => {
                       setReminderText(
-                        `Hi ${customer?.name ?? "there"} — just a friendly reminder that invoice INV-${shortInvoiceId(invoice.id)} for ${formatMoney(invoice.totalCents)} was due ${fmtDate(invoice.dueAt)}. Let us know if you need anything!`,
+                        `Hi ${customer?.name ?? "there"} — just a friendly reminder that invoice ${invoiceLabel(invoice)} for ${formatMoney(invoice.totalCents)} was due ${fmtDate(invoice.dueAt)}. Let us know if you need anything!`,
                       );
                       setShowRemind(true);
                     }}
@@ -436,7 +440,7 @@ export function InvoiceDetail({
               )}
             </div>
             <p className="mt-2 text-[12px] text-subtle">
-              Sending, recording payment, voiding, and reminders all need your approval first.
+              Sending (emailed with the PDF), payments, credit notes, voiding and reminders all need your approval first.
             </p>
           </div>
         </div>

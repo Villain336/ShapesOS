@@ -12,10 +12,11 @@
 //      which connected account) — it NEVER places an order or transmits
 //      anything externally. v1 does not place orders.
 //   2. BOMs pin to model versions. Every line item carries a source
-//      ("manual" | "derived:<method>"). v1 ships NO derived methods —
-//      DERIVED_METHODS is empty on purpose: the OS does not honestly know
-//      fastener counts or part breakdowns from a bare mesh, so it does not
-//      invent them. Tenant-entered lines are the whole v1 BOM.
+//      ("manual" | "derived:<method>"). Phase 4b adds ONE derived method,
+//      "mesh_bodies" (lib/cad/bom-derive.ts): bodies, quantities, volume and
+//      material mass measured from the version's real mesh. Fastener counts
+//      and bought-in parts are not in a mesh, so they stay manual lines.
+//      Derived lines are written only by the derive path, never by hand.
 //   3. Cost estimates are ESTIMATES: BOM total × quantity + rate-card
 //      process cost, every number labeled, the rate card cited by id/name,
 //      warnings recorded for anything uncomputable. Vendor quotes are never
@@ -130,18 +131,18 @@ export function validateContact(input: unknown): ContactDetails {
 // BOM
 // ---------------------------------------------------------------------------
 
-/** BOM line-item source. v1: only "manual". */
+/** BOM line-item source. */
 export type BomLineSource = "manual" | `derived:${string}`;
 
 /**
- * v1 ships NO derived BOM methods. A mesh carries no part breakdown, no
- * fastener list, no material density — deriving them would be invention.
- * This list stays empty until a method exists that is honest about its
- * inputs (e.g. "volume_material" once a tenant picks a material with a
- * declared density). addBomLine rejects any derived:* source with
- * DERIVED_METHOD_UNSUPPORTED.
+ * Derived BOM methods that exist. "mesh_bodies" measures the bodies in a
+ * version's mesh (lib/cad/bom-derive.ts) and needs a tenant-picked material
+ * for mass. Anything else (e.g. "fastener_count") is rejected with
+ * DERIVED_METHOD_UNSUPPORTED — a mesh doesn't know it. Even a supported
+ * method can't be typed in by hand (DERIVED_LINE_NOT_MANUAL): derived lines
+ * come only from a derivation, so their measurements are real.
  */
-export const DERIVED_METHODS: readonly string[] = [];
+export const DERIVED_METHODS: readonly string[] = ["mesh_bodies"];
 
 export function isBomLineSource(v: string): v is BomLineSource {
   if (v === "manual") return true;
@@ -179,9 +180,13 @@ export function validateBomLineInput(input: BomLineInput): Required<
     if (!(DERIVED_METHODS as readonly string[]).includes(method)) {
       throw new CadError(
         "DERIVED_METHOD_UNSUPPORTED",
-        `Derived BOM method "${method}" is not implemented in v1 — derived line items cannot be created yet. Add the line manually.`,
+        `Derived BOM method "${method}" is not implemented — a mesh can't tell us that. Add the line manually.`,
       );
     }
+    throw new CadError(
+      "DERIVED_LINE_NOT_MANUAL",
+      `"${source}" lines are created by deriving a BOM from the model's geometry, not entered by hand. Add the line as manual.`,
+    );
   }
   let unitCostUsd: number | null = null;
   if (input.unitCostUsd != null) {
@@ -214,6 +219,11 @@ export interface BomRollupLine {
   lineTotalUsd: number;
   missingCost: boolean;
   source: string;
+  /** Per-unit volume (mm³) and mass (g) — derived lines only; null = unknown. */
+  volumeMm3: number | null;
+  massG: number | null;
+  /** qty × massG; null when the mass is unknown. */
+  lineMassG: number | null;
 }
 
 export interface BomRollup {
@@ -221,24 +231,35 @@ export interface BomRollup {
   /** Sum of line totals. Lines with unknown unit cost contribute $0. */
   totalUsd: number;
   linesMissingCost: number;
+  /** Sum of known line masses (g); null when no line has a mass. */
+  totalMassG: number | null;
+  linesMissingMass: number;
   lines: BomRollupLine[];
 }
 
-export function computeBomRollup(
-  lines: {
-    id: string;
-    partName: string;
-    qty: number;
-    unitName: string;
-    materialSpec?: string | null;
-    supplier?: string | null;
-    unitCostUsd: number | null;
-    source: string;
-  }[],
-): BomRollup {
+export interface BomRollupInputLine {
+  id: string;
+  partName: string;
+  qty: number;
+  unitName: string;
+  materialSpec?: string | null;
+  supplier?: string | null;
+  unitCostUsd: number | null;
+  source: string;
+  volumeMm3?: number | null;
+  massG?: number | null;
+}
+
+function finiteOrNull(n: number | null | undefined): number | null {
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+export function computeBomRollup(lines: BomRollupInputLine[]): BomRollup {
   const rolled: BomRollupLine[] = lines.map((l) => {
-    const missingCost = l.unitCostUsd == null;
-    const lineTotalUsd = missingCost ? 0 : round2(l.qty * (l.unitCostUsd as number));
+    const unitCostUsd = finiteOrNull(l.unitCostUsd);
+    const missingCost = unitCostUsd == null;
+    const lineTotalUsd = missingCost ? 0 : round2(l.qty * unitCostUsd);
+    const massG = finiteOrNull(l.massG);
     return {
       lineId: l.id,
       partName: l.partName,
@@ -246,19 +267,216 @@ export function computeBomRollup(
       unitName: l.unitName,
       materialSpec: l.materialSpec ?? undefined,
       supplier: l.supplier ?? undefined,
-      unitCostUsd: l.unitCostUsd,
+      unitCostUsd,
       lineTotalUsd,
       missingCost,
       source: l.source,
+      volumeMm3: finiteOrNull(l.volumeMm3),
+      massG,
+      lineMassG: massG == null ? null : round2(l.qty * massG),
     };
   });
   const totalUsd = round2(rolled.reduce((s, l) => s + l.lineTotalUsd, 0));
+  const massLines = rolled.filter((l) => l.lineMassG != null);
   return {
     lineCount: rolled.length,
     totalUsd,
     linesMissingCost: rolled.filter((l) => l.missingCost).length,
+    totalMassG: massLines.length ? round2(massLines.reduce((s, l) => s + (l.lineMassG as number), 0)) : null,
+    linesMissingMass: rolled.length - massLines.length,
     lines: rolled,
   };
+}
+
+// ---------------------------------------------------------------------------
+// BOM comparison across revisions
+// ---------------------------------------------------------------------------
+
+export type BomDiffStatus = "added" | "removed" | "changed" | "unchanged";
+
+export interface BomDiffLine {
+  key: string;
+  partName: string;
+  materialSpec: string | null;
+  status: BomDiffStatus;
+  qtyFrom: number | null;
+  qtyTo: number | null;
+  qtyDelta: number;
+  /** Per-unit mass on each side (null = unknown). */
+  massFromG: number | null;
+  massToG: number | null;
+  lineTotalFromUsd: number;
+  lineTotalToUsd: number;
+  lineTotalDeltaUsd: number;
+}
+
+export interface BomComparison {
+  lines: BomDiffLine[];
+  totals: {
+    lineCountFrom: number;
+    lineCountTo: number;
+    totalFromUsd: number;
+    totalToUsd: number;
+    totalDeltaUsd: number;
+    /** Known masses only; null when a side has no mass at all. */
+    massFromG: number | null;
+    massToG: number | null;
+    massDeltaG: number | null;
+    added: number;
+    removed: number;
+    changed: number;
+  };
+}
+
+function bomKey(l: BomRollupLine): string {
+  return `${l.partName.trim().toLowerCase()}|${(l.materialSpec ?? "").trim().toLowerCase()}`;
+}
+
+interface BomAgg {
+  partName: string;
+  materialSpec: string | null;
+  qty: number;
+  mass: number | null;
+  total: number;
+}
+
+function aggregateBom(rollup: BomRollup): Map<string, BomAgg> {
+  const out = new Map<string, BomAgg>();
+  for (const l of rollup.lines) {
+    const k = bomKey(l);
+    const a = out.get(k);
+    if (a) {
+      a.qty += l.qty;
+      a.total = round2(a.total + l.lineTotalUsd);
+      a.mass = a.mass ?? l.massG;
+    } else {
+      out.set(k, { partName: l.partName, materialSpec: l.materialSpec ?? null, qty: l.qty, mass: l.massG, total: l.lineTotalUsd });
+    }
+  }
+  return out;
+}
+
+function sameNumber(a: number | null, b: number | null): boolean {
+  if (a == null || b == null) return a === b;
+  return Math.abs(a - b) <= Math.max(1e-6, Math.abs(a) * 1e-4);
+}
+
+/**
+ * Part-level diff between two BOM rollups (e.g. airframe v6 → v7). Lines are
+ * matched on part name + material; duplicates within one BOM are summed.
+ */
+export function compareBomRollups(from: BomRollup, to: BomRollup): BomComparison {
+  const a = aggregateBom(from);
+  const b = aggregateBom(to);
+  const keys = [...new Set([...a.keys(), ...b.keys()])];
+  const lines: BomDiffLine[] = keys.map((key) => {
+    const x = a.get(key);
+    const y = b.get(key);
+    const status: BomDiffStatus = !x
+      ? "added"
+      : !y
+        ? "removed"
+        : x.qty === y.qty && sameNumber(x.mass, y.mass) && sameNumber(x.total, y.total)
+          ? "unchanged"
+          : "changed";
+    const lineTotalFromUsd = x?.total ?? 0;
+    const lineTotalToUsd = y?.total ?? 0;
+    const either = (y ?? x)!;
+    return {
+      key,
+      partName: either.partName,
+      materialSpec: either.materialSpec,
+      status,
+      qtyFrom: x?.qty ?? null,
+      qtyTo: y?.qty ?? null,
+      qtyDelta: (y?.qty ?? 0) - (x?.qty ?? 0),
+      massFromG: x?.mass ?? null,
+      massToG: y?.mass ?? null,
+      lineTotalFromUsd,
+      lineTotalToUsd,
+      lineTotalDeltaUsd: round2(lineTotalToUsd - lineTotalFromUsd),
+    };
+  });
+  const order: Record<BomDiffStatus, number> = { added: 0, changed: 1, removed: 2, unchanged: 3 };
+  lines.sort((p, q) => order[p.status] - order[q.status] || p.partName.localeCompare(q.partName));
+  return {
+    lines,
+    totals: {
+      lineCountFrom: from.lineCount,
+      lineCountTo: to.lineCount,
+      totalFromUsd: from.totalUsd,
+      totalToUsd: to.totalUsd,
+      totalDeltaUsd: round2(to.totalUsd - from.totalUsd),
+      massFromG: from.totalMassG,
+      massToG: to.totalMassG,
+      massDeltaG:
+        from.totalMassG == null || to.totalMassG == null ? null : round2(to.totalMassG - from.totalMassG),
+      added: lines.filter((l) => l.status === "added").length,
+      removed: lines.filter((l) => l.status === "removed").length,
+      changed: lines.filter((l) => l.status === "changed").length,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CSV export
+// ---------------------------------------------------------------------------
+
+export const BOM_CSV_HEADER = [
+  "part",
+  "qty",
+  "unit",
+  "material",
+  "supplier",
+  "volume_cm3_per_unit",
+  "mass_g_per_unit",
+  "line_mass_g",
+  "unit_cost_usd",
+  "line_total_usd",
+  "cost_known",
+  "source",
+] as const;
+
+/**
+ * BOM rollup → CSV rows (header, one row per line, blank, total). Every
+ * cell goes through lib/csv.ts (RFC 4180 quoting + formula-injection
+ * neutralization: part names and suppliers are tenant/collaborator text).
+ * Unknown numbers are empty cells, never 0.
+ */
+export function bomCsvRows(rollup: BomRollup): unknown[][] {
+  const rows: unknown[][] = [[...BOM_CSV_HEADER]];
+  for (const l of rollup.lines) {
+    rows.push([
+      l.partName,
+      l.qty,
+      l.unitName,
+      l.materialSpec ?? "",
+      l.supplier ?? "",
+      l.volumeMm3 == null ? null : round2(l.volumeMm3 / 1000),
+      l.massG,
+      l.lineMassG,
+      l.unitCostUsd,
+      l.missingCost ? null : l.lineTotalUsd,
+      l.missingCost ? "no" : "yes",
+      l.source,
+    ]);
+  }
+  rows.push([]);
+  rows.push([
+    "TOTAL",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    rollup.totalMassG,
+    null,
+    rollup.totalUsd,
+    rollup.linesMissingCost > 0 ? `lower bound (${rollup.linesMissingCost} line(s) without cost)` : "yes",
+    null,
+  ]);
+  return rows;
 }
 
 // ---------------------------------------------------------------------------

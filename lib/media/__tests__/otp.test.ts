@@ -11,6 +11,27 @@ import { deliverApprovalOtp } from "../otp";
 
 const BIND = { approvalId: "appr_1", approverId: "user_owner" };
 
+// Route stubs are registered at top level, before any import of the route:
+// mock.module hooks register asynchronously, and registering them inside a
+// describe raced with the lazy route import on slower CI runners.
+mock.module("@/app/api/media/_lib", {
+  namedExports: {
+    mediaGuard: async () => ({ userId: "user_owner", email: "o@x.test", workspaceId: "ws", mediaRole: "owner" }),
+    requireMediaOwner: () => null,
+    safetyError: (e: unknown) => Response.json({ error: String(e) }, { status: 422 }),
+  },
+});
+mock.module("@/lib/media/db", {
+  namedExports: {
+    safetyTablesReady: async () => true,
+    mediaStores: () => ({
+      approvals: {
+        get: async (id: string, ws: string) => (id === "appr_1" && ws === "ws" ? { id, status: "pending" } : null),
+      },
+    }),
+  },
+});
+
 describe("OtpChallengeStore", () => {
   it("6-digit codes from crypto, never Math.random", () => {
     const orig = Math.random;
@@ -90,24 +111,6 @@ describe("POST /api/media/approvals/:id/otp never returns the code", () => {
   };
   after(() => {
     console.info = origInfo;
-  });
-
-  mock.module("@/app/api/media/_lib", {
-    namedExports: {
-      mediaGuard: async () => ({ userId: "user_owner", email: "o@x.test", workspaceId: "ws", mediaRole: "owner" }),
-      requireMediaOwner: () => null,
-      safetyError: (e: unknown) => Response.json({ error: String(e) }, { status: 422 }),
-    },
-  });
-  mock.module("@/lib/media/db", {
-    namedExports: {
-      safetyTablesReady: async () => true,
-      mediaStores: () => ({
-        approvals: {
-          get: async (id: string, ws: string) => (id === "appr_1" && ws === "ws" ? { id, status: "pending" } : null),
-        },
-      }),
-    },
   });
 
   it("response has no code; the delivered code verifies only for this approval + approver", async () => {

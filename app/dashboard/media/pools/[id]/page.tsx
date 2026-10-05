@@ -13,7 +13,7 @@ const chip =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-canvas text-muted border-line";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Pool — Media — Marketr" };
+export const metadata = { title: "Pool — Media — ShapesOS" };
 
 function money(cents: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
@@ -38,10 +38,10 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
   const util = poolUtilization(pool) * 100;
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+          <p className="text-xs font-semibold text-subtle">
             Budget pool · {pool.period} · {pool.status}
           </p>
           <h1 className="aos-heading mt-1 text-ink">{pool.name}</h1>
@@ -76,7 +76,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
             <div className="flex justify-between"><dt className="text-muted">Limit</dt><dd className="text-ink">= pool cap ({money(pool.capCents, pool.currency)})</dd></div>
           </dl>
           <p className="mt-2 text-xs text-muted">
-            Issued on the client&apos;s own account. Card declines survive Marketr software bugs —
+            Issued on the client&apos;s own account. Card declines survive ShapesOS software bugs —
             the layer that kills the €7,937/day class. Only the ref is stored; never a PAN.
           </p>
         </section>
@@ -100,7 +100,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Time</th>
                   <th className="px-3 py-2 font-medium">Kind</th>
                   <th className="px-3 py-2 font-medium">Amount</th>

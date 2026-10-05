@@ -23,6 +23,24 @@ const WEBHOOK_ENV = { DOCUMENSO_WEBHOOK_SECRET: "wh-secret" };
 
 // ------------------------------------------------------------- fakes ---
 
+
+// Minimal Prisma `where` matcher for the fake updateMany (equality, Date
+// equality, null, { in }, { notIn }) — the guarded writes the module uses.
+function matchesWhere(row: any, where: any): boolean {
+  for (const [k, v] of Object.entries(where ?? {})) {
+    if (v instanceof Date) {
+      if (!(row[k] instanceof Date) || row[k].getTime() !== v.getTime()) return false;
+    } else if (v && typeof v === "object") {
+      const c = v as { in?: unknown[]; notIn?: unknown[] };
+      if (c.in && !c.in.includes(row[k])) return false;
+      if (c.notIn && c.notIn.includes(row[k])) return false;
+    } else if (v === null ? row[k] != null : row[k] !== v) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function makeFakeDb() {
   const envelopes = new Map<string, any>();
   const auditRows: any[] = [];
@@ -90,6 +108,15 @@ function makeFakeDb() {
         if (!env) throw new Error("envelope not found");
         Object.assign(env, data, { updatedAt: new Date() });
         return env;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const env of envelopes.values()) {
+          if (!matchesWhere(env, where)) continue;
+          Object.assign(env, data, { updatedAt: new Date() });
+          count++;
+        }
+        return { count };
       },
     },
     esignSigner: {

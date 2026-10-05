@@ -6,6 +6,7 @@ import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { workspaceIdFrom, requireWorkspaceAccess } from "@/lib/route-utils";
 import { listFacts } from "@/lib/substrate/graph/facts";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,13 @@ export async function GET(req: NextRequest) {
   const access = await requireWorkspaceAccess(user.id, workspaceIdFrom(req), "viewer");
   if ("error" in access) return access.error;
 
+  const limitQuery = parseQuery(z.object({ limit: intQuery(200, 1, 1000) }), req.nextUrl.searchParams);
+  if (!limitQuery.ok) return limitQuery.error;
   const facts = await listFacts(access.workspaceId, {
     entityRef: req.nextUrl.searchParams.get("entity_ref") ?? undefined,
     factType: req.nextUrl.searchParams.get("fact_type") ?? undefined,
     source: req.nextUrl.searchParams.get("source") ?? undefined,
-    limit: Math.min(Number(req.nextUrl.searchParams.get("limit") ?? 200) || 200, 1000),
+    limit: limitQuery.data.limit,
   });
 
   return Response.json({

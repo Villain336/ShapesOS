@@ -1,6 +1,6 @@
 // Marketr — /api/orchestrator shared guard (not a route: no HTTP exports).
 //
-// Phase 9 orchestrator namespace (SPEC-PHASE9.md §P9B). Replicates the
+// Phase 9 orchestrator namespace (docs/specs/SPEC-PHASE9.md §P9B). Replicates the
 // substrateGuard("viewer") semantics from app/api/substrate/_lib.ts for
 // this namespace: session -> workspace; reads need viewer, mutations need
 // editor.

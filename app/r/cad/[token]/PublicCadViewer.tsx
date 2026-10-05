@@ -70,7 +70,7 @@ export function PublicCadViewer({
         )}
 
         <p className="mt-4 text-center text-xs text-muted">
-          Shared from Marketr · this link expires automatically and can be revoked
+          Shared from ShapesOS · this link expires automatically and can be revoked
           by its owner at any time.
         </p>
       </div>

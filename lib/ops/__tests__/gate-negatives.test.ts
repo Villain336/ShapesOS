@@ -11,6 +11,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITY_MAP } from "../entities";
 import { OpsError, opsPatch, type OpsActor } from "../doctype";
@@ -20,6 +21,7 @@ import {
   verifyOpsApproval,
   type OpsGatePort,
 } from "../gate";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_neg", userId: "user_neg" };
 const MUTATION: Record<string, unknown> = { id: "inv_1", status: "sent" };
@@ -45,7 +47,7 @@ function portWith(approval: {
   return {
     propose: async () => ({ id: "ap_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,
@@ -64,10 +66,12 @@ function approvedPortFor(args: typeof BINDING_ARGS): OpsGatePort {
 function makeSpyTx(existing: Record<string, unknown>) {
   let updated = 0;
   const audits: Array<Record<string, unknown>> = [];
+  const claims = approvalClaimDelegate();
   const tx = new Proxy(
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return { create: async (a: { data: Record<string, unknown> }) => { audits.push(a.data); return a.data; } };
         }
@@ -75,6 +79,10 @@ function makeSpyTx(existing: Record<string, unknown>) {
           findFirst: async () => ({ ...existing }),
           findMany: async () => [{ ...existing }],
           create: async (a: { data: Record<string, unknown> }) => ({ ...a.data }),
+          updateMany: async () => {
+            updated += 1;
+            return { count: 1 };
+          },
           update: async (args: { data: Record<string, unknown> }) => {
             updated += 1;
             return { ...existing, ...args.data };

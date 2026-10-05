@@ -6,6 +6,7 @@
 
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/design/store";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export function PagesStrip() {
   const document = useCanvasStore((s) => s.document);
@@ -66,8 +67,8 @@ export function PagesStrip() {
               </button>
               {document.pages.length > 1 && (
                 <button
-                  onClick={() => {
-                    if (window.confirm(`Delete "${page.name}"?`)) removePage(page.id);
+                  onClick={async () => {
+                    if (await confirmAction(`Delete "${page.name}"?`)) removePage(page.id);
                   }}
                   title="Delete page"
                   className="rounded bg-paper p-0.5 text-muted shadow-outline hover:text-failed-text"

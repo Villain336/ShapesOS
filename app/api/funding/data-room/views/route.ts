@@ -6,6 +6,7 @@
 import { guardWorkspace, httpErrorResponse } from "@/lib/enrichment/guard";
 import { prisma } from "@/lib/prisma";
 import { PrismaFundingStore } from "@/lib/funding/prisma-store";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +14,13 @@ export async function GET(req: Request) {
   try {
     const { workspace } = await guardWorkspace();
     const url = new URL(req.url);
+    const limitQuery = parseQuery(z.object({ limit: intQuery(100, 1, 500) }), url.searchParams);
+    if (!limitQuery.ok) return limitQuery.error;
     const store = new PrismaFundingStore(prisma);
     const views = await store.listViews(workspace.id, {
       docId: url.searchParams.get("docId") ?? undefined,
       linkId: url.searchParams.get("linkId") ?? undefined,
-      limit: Number(url.searchParams.get("limit") ?? "100") || 100,
+      limit: limitQuery.data.limit,
     });
     return Response.json({ workspaceId: workspace.id, views });
   } catch (e) {

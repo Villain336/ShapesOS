@@ -270,7 +270,9 @@ export interface IntroAskWindow {
 /**
  * Honor the relationship's free-text boundaries when sizing the ask
  * window. Keyword parse (case-insensitive):
- *   "never ask" / "no intros" / "don't ask" → blocked
+ *   "never ask/request" / "no (more) intros" / "don't ask" / "do not ask"
+ *   (straight or curly apostrophe) → blocked — checked before cadence,
+ *   unless the ban is phrased as a limit ("… more than monthly")
  *   "weekly" → 1 ask / 7d · "monthly" → 1 ask / 31d
  *   "quarterly" → 1 ask / 91d · "yearly"/"annual" → 1 ask / 365d
  *   anything else / null → the default (1 ask / 91d).
@@ -279,20 +281,27 @@ export interface IntroAskWindow {
 export function introAskWindow(
   boundaries: string | null,
 ): IntroAskWindow | { blocked: true } {
-  const text = (boundaries ?? "").toLowerCase();
-  // Specific cadence keywords win over the never-ask patterns: "don't ask
-  // for intros more than monthly" is a monthly limit, not a ban.
-  if (/weekly/.test(text)) return { windowDays: 7, maxAsks: 1 };
-  if (/monthly/.test(text)) return { windowDays: 31, maxAsks: 1 };
-  if (/quarter/.test(text)) return { windowDays: 91, maxAsks: 1 };
-  if (/yearly|annual/.test(text)) return { windowDays: 365, maxAsks: 1 };
-  if (
-    /never\s+(ask|introduce|introduction)|no\s+intro|do\s*n't\s+ask|don't\s+ask/.test(
+  // Curly/modifier apostrophes (iOS/macOS default "don’t") read as "'".
+  const text = (boundaries ?? "").toLowerCase().replace(/[‘’ʼ′`]/g, "'");
+  const cadence: IntroAskWindow | null = /weekly/.test(text)
+    ? { windowDays: 7, maxAsks: 1 }
+    : /monthly/.test(text)
+      ? { windowDays: 31, maxAsks: 1 }
+      : /quarter/.test(text)
+        ? { windowDays: 91, maxAsks: 1 }
+        : /yearly|annual/.test(text)
+          ? { windowDays: 365, maxAsks: 1 }
+          : null;
+  // Bans are checked BEFORE cadence: "Never ask — I only see him annually"
+  // is a ban, not a yearly limit. The one exception is a ban phrased as a
+  // limit ("don't ask for intros more than monthly", "at most yearly").
+  const banned =
+    /never\s+(ever\s+)?(ask|request|introduc)|never\s+(\w+\s+)?intro|do\s*n'?t\s+(ever\s+)?(ask|request|introduc)|do\s+not\s+(ever\s+)?(ask|request|introduc)|no\s+(more\s+)?intro/.test(
       text,
-    )
-  ) {
-    return { blocked: true };
-  }
+    );
+  const phrasedAsLimit = /more\s+(often\s+)?than|at\s+most|\bonce\s+(a|per|every)\b/.test(text);
+  if (banned && !(cadence && phrasedAsLimit)) return { blocked: true };
+  if (cadence) return cadence;
   return {
     windowDays: DEFAULT_INTRO_ASK_WINDOW_DAYS,
     maxAsks: DEFAULT_INTRO_MAX_ASKS_PER_WINDOW,

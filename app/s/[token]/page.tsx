@@ -15,6 +15,7 @@ import { exportPageToSvg } from "@/lib/design/export-svg";
 import { RrwebRecorder } from "@/components/replay/RrwebRecorder";
 import { UmamiTracker } from "@/components/analytics/UmamiTracker";
 import { umamiSnippetConfig } from "@/lib/integrations/umami";
+import { effectiveWhiteLabel } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,13 @@ function svgDataUrl(svg: string): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
 }
 
+// Review status is a human decision, not an agent state: neutral chips, told
+// apart by label and weight (DESIGN.md reserves the status hues for agents).
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  draft: { label: "Draft", cls: "bg-stone-100 text-stone-600" },
-  in_review: { label: "In review", cls: "bg-amber-100 text-amber-800" },
-  approved: { label: "Approved", cls: "bg-emerald-100 text-emerald-800" },
-  changes_requested: { label: "Changes requested", cls: "bg-red-100 text-red-800" },
+  draft: { label: "Draft", cls: "bg-canvas text-muted" },
+  in_review: { label: "In review", cls: "bg-paper text-ink shadow-control" },
+  approved: { label: "Approved", cls: "bg-ink text-paper" },
+  changes_requested: { label: "Changes requested", cls: "bg-paper text-ink shadow-outline" },
 };
 
 async function loadShare(token: string) {
@@ -51,6 +54,7 @@ async function loadShare(token: string) {
           workspace: {
             select: {
               id: true,
+              plan: true,
               whiteLabelBrandColor: true,
               whiteLabelLogoUrl: true,
               whiteLabelCustomDomain: true,
@@ -96,15 +100,18 @@ export default async function PublicSharePage({
 
   // White-label read path: logo + brand color + custom domain for this
   // design's workspace. Missing/empty fields fall back to the defaults.
-  const wl = share.design.workspace;
-  const brandAccent = wl.whiteLabelBrandColor?.trim() || "#7c3aed";
-  const wlLogoUrl = wl.whiteLabelLogoUrl
-    ? `/api/public/workspaces/${wl.id}/logo`
+  // Phase 4a: only on plans that include white-label (effectiveWhiteLabel).
+  const wl = effectiveWhiteLabel(share.design.workspace);
+  // The tenant's saved brand color is user data (white-label preview), so it
+  // stays literal; with none set we fall back to the system ink.
+  const brandAccent = wl.brandColor?.trim() || "var(--aos-ink)";
+  const wlLogoUrl = wl.logoUrl
+    ? `/api/public/workspaces/${share.design.workspace.id}/logo`
     : null;
-  const wlDomain = wl.whiteLabelCustomDomain?.trim() || null;
+  const wlDomain = wl.customDomain?.trim() || null;
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] px-4 py-8 md:px-8">
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8">
       {umami && <UmamiTracker websiteId={umami.websiteId} scriptUrl={umami.scriptUrl} />}
       {share.replayOptIn && <RrwebRecorder token={token} />}
       <div className="mx-auto max-w-4xl">
@@ -115,21 +122,21 @@ export default async function PublicSharePage({
             <img
               src={wlLogoUrl}
               alt="Workspace logo"
-              className="h-10 w-10 rounded-lg border border-stone-200 bg-white object-contain"
+              className="h-10 w-10 rounded-sm bg-paper object-contain shadow-hairline"
             />
           ) : (
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-sm text-paper"
               style={{ backgroundColor: brandAccent }}
             >
               <FileText className="h-5 w-5" />
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-bold tracking-tight text-stone-900">
+            <h1 className="truncate text-xl font-heading stretch-heading tracking-heading text-ink">
               {share.design.name}
             </h1>
-            <p className="text-[13px] text-stone-500">
+            <p className="text-[13px] text-muted">
               Shared design preview — {pages.length} page{pages.length === 1 ? "" : "s"}
               {wlDomain ? ` · ${wlDomain}` : ""}
             </p>
@@ -146,8 +153,8 @@ export default async function PublicSharePage({
             const res = exportPageToSvg(doc, p.id);
             return (
               <section key={p.id}>
-                <h2 className="mb-2 text-[13px] font-semibold text-stone-700">{p.name}</h2>
-                <div className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+                <h2 className="mb-2 text-[13px] font-semibold text-ink">{p.name}</h2>
+                <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
                   {res.ok ? (
                     // H1: rendered as an IMAGE, never inline HTML. SVG loaded
                     // through <img> can't run script or fetch subresources,
@@ -159,7 +166,7 @@ export default async function PublicSharePage({
                       className="block h-auto w-full"
                     />
                   ) : (
-                    <p className="p-6 text-[13px] text-stone-500">
+                    <p className="p-6 text-[13px] text-muted">
                       This page could not be rendered.
                     </p>
                   )}
@@ -170,12 +177,12 @@ export default async function PublicSharePage({
         </div>
 
         <section className="mt-10">
-          <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-stone-900">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-heading stretch-heading tracking-heading text-ink">
             <MessageSquare className="h-4 w-4" style={{ color: brandAccent }} />
             Comments ({comments.length})
           </h2>
           {comments.length === 0 ? (
-            <p className="rounded-lg border border-stone-200 bg-white p-4 text-[13px] text-stone-500">
+            <p className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
               No comments yet.
             </p>
           ) : (
@@ -183,29 +190,29 @@ export default async function PublicSharePage({
               {comments.map((c) => (
                 <li
                   key={c.id}
-                  className="rounded-lg border border-stone-200 bg-white p-4"
+                  className="rounded-lg bg-paper p-4 shadow-hairline"
                 >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-stone-900">
+                    <span className="text-[13px] font-semibold text-ink">
                       {c.authorName}
                     </span>
                     {c.resolvedAt && (
-                      <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                      <span className="flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold text-ink">
                         <CheckCircle2 className="h-3 w-3" />
                         Resolved
                       </span>
                     )}
-                    <span className="ml-auto flex items-center gap-1 text-[11px] text-stone-400">
+                    <span className="ml-auto flex items-center gap-1 text-[11px] text-muted">
                       <Clock3 className="h-3 w-3" />
                       {new Date(c.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="whitespace-pre-wrap text-[13px] text-stone-700">{c.body}</p>
+                  <p className="whitespace-pre-wrap text-[13px] text-ink">{c.body}</p>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-3 text-[12px] text-stone-400">
+          <p className="mt-3 text-[12px] text-muted">
             Commenting is disabled on public previews — sign in to the workspace to join the
             discussion.
           </p>

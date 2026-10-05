@@ -64,8 +64,12 @@ function formatCount(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-export function DatasetsApp() {
-  const [tab, setTab] = useState<DatasetsTab>("sources");
+export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {}) {
+  const [tab, setTab] = useState<DatasetsTab>(
+    initialTab === "types" || initialTab === "reviews" || initialTab === "build" || initialTab === "activate"
+      ? initialTab
+      : "sources",
+  );
   const [sources, setSources] = useState<RegisterSource[]>([]);
   const [totals, setTotals] = useState({ sources: 0, documents: 0, chunks: 0, chars: 0 });
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null);

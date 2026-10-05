@@ -14,6 +14,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITIES, OPS_ENTITY_MAP } from "../entities";
 import {
@@ -28,6 +29,7 @@ import {
   opsBindingFor,
   type OpsGatePort,
 } from "../gate";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_conform", userId: "user_conform" };
 
@@ -44,6 +46,7 @@ interface StubCalls {
 function makeStubTx() {
   const store: Record<string, Array<Record<string, unknown>>> = {};
   const calls: StubCalls = { audits: [], creates: [], updates: [] };
+  const claims = approvalClaimDelegate();
 
   const delegate = (name: string) => ({
     findMany: async (args: { where?: Record<string, unknown> }) => {
@@ -66,6 +69,15 @@ function makeStubTx() {
       (store[name] ??= []).push(row);
       calls.creates.push({ delegate: name, data: args.data });
       return row;
+    },
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      // Status-guarded writes (transition table): every where key must match.
+      const rows = (store[name] ?? []).filter((r) =>
+        Object.entries(args.where).every(([k, v]) => r[k] === v),
+      );
+      for (const row of rows) Object.assign(row, args.data);
+      if (rows.length) calls.updates.push({ delegate: name, where: args.where, data: args.data });
+      return { count: rows.length };
     },
     update: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
       const rows = store[name] ?? [];
@@ -94,6 +106,7 @@ function makeStubTx() {
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (args: { data: Record<string, unknown> }) => {
@@ -118,7 +131,7 @@ function stubGatePort(approval?: {
   return {
     propose: async () => ({ id: "ap_stub_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,
@@ -161,10 +174,13 @@ function validCreateBody(slug: string): Record<string, unknown> {
 
 describe("DocType convention conformance (stub tx)", () => {
   it("registers exactly the 11 ops entities (8 slice-1 + purchase-orders + projects + 2 slice-5)", () => {
-    assert.deepEqual(
-      OPS_ENTITIES.map((d) => d.slug).sort(),
-      ["inventory-txns", "invoices", "leave-requests", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "team-members", "workflow-runs"],
-    );
+    // Phase 10 extends the registry; the 11 Phase 17 entities must stay and
+    // slugs must stay unique.
+    const slugs = OPS_ENTITIES.map((d) => d.slug);
+    for (const base of ["inventory-txns", "invoices", "leave-requests", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "team-members", "workflow-runs"]) {
+      assert.ok(slugs.includes(base), `${base} still registered`);
+    }
+    assert.equal(new Set(slugs).size, slugs.length, "unique slugs");
     for (const d of OPS_ENTITIES) {
       assert.ok(OPS_ENTITY_MAP[d.slug] === d, `${d.slug} in map`);
       assert.ok(d.delegate.startsWith("ops"), `${d.slug} delegate`);

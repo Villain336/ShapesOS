@@ -42,6 +42,7 @@ import {
   type HullcheckLayer,
   type SelfAssessmentAnswer,
 } from "@/lib/legal/digital";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface DigitalPropertyView {
   id: string;
@@ -185,7 +186,7 @@ export function DigitalView({
   }
 
   async function removeProperty(id: string) {
-    if (!window.confirm("Remove this property and all its findings?")) return;
+    if (!await confirmAction("Remove this property and all its findings?")) return;
     try {
       await api(`/api/legal/digital-properties/${id}`, "DELETE");
       setSelectedId(null);

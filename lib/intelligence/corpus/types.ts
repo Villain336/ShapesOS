@@ -4,7 +4,7 @@
 // Agent, missions, and playbooks retrieve from — so Marketr reasons with
 // expert patterns, not just data. Retrieval is always source-attributed.
 //
-// Clean-sourcing tiers are BINDING (SPEC-PHASE10.md §M9, enforced in tests):
+// Clean-sourcing tiers are BINDING (docs/specs/SPEC-PHASE10.md §M9, enforced in tests):
 //   Tier 1 — official platform materials. Only CC-BY-4.0 (Google Search
 //     Central) may be ingested verbatim. Every other academy is learn-only.
 //   Tier 2 — openly-licensed / public-domain. Shippable with attribution.
@@ -40,7 +40,7 @@ export type CorpusLicenseKind =
  *  by test). BY/BY-SA licenses require the license URL.
  *
  *  Tier "1S" chunks are Marketr-ORIGINAL synthesis playbooks distilled from
- *  learn-only sources (SPEC-PHASE10.md §M9, Tico 2026-09-26): genuinely
+ *  learn-only sources (docs/specs/SPEC-PHASE10.md §M9, Tico 2026-09-26): genuinely
  *  original words, sources cited, no copying, no close paraphrase. A 1S
  *  chunk MUST carry synthesizedFrom (source titles), synthesisDate, and
  *  original: true — enforced by the chunker. 1S text is authored by

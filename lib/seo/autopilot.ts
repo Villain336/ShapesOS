@@ -170,6 +170,9 @@ export function isAutoApproveEligible(kind: AutopilotItemKind, ruleAutoApprove: 
   return ruleAutoApprove === true && kind === "decay_refresh";
 }
 
+/** Phase 14 (approvals): the automation action each item kind stands for (lib/automation/actions.ts). */
+export { AUTOPILOT_KIND_ACTION } from "@/lib/automation/actions";
+
 // Kill-switch scope semantics
 // ---------------------------------------------------------------------------
 

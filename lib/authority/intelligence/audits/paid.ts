@@ -64,7 +64,7 @@ export async function runPaidAudit(ctx: AuditContext): Promise<AuditResult> {
     if (c.status === "disconnected") {
       findings.push({
         severity: "warn", title: `${c.label} not connected`,
-        detail: `Connect ${c.label} so the audit sees platform-side delivery, not just Marketr-side spend records.`,
+        detail: `Connect ${c.label} so the audit sees platform-side delivery, not just ShapesOS-side spend records.`,
         dataSource: "ConnectorConnection",
       });
     }

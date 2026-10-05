@@ -36,6 +36,9 @@ export interface SendSmsInput {
   /** Required by Twilio; ignored by the fake provider. */
   from?: string;
   body: string;
+  /** Stable per-message key (the OutboundMessage id). Providers that support
+   * idempotent sends (Resend, fake) dedupe on it; Twilio has no such key. */
+  idempotencyKey?: string;
 }
 
 export interface SendEmailInput {
@@ -47,6 +50,10 @@ export interface SendEmailInput {
   html: string;
   text?: string;
   headers?: Record<string, string>;
+  /** Phase 4b: where replies go (the workspace's inbound reply address). */
+  replyTo?: string;
+  /** See SendSmsInput.idempotencyKey — sent as Resend's Idempotency-Key. */
+  idempotencyKey?: string;
 }
 
 export interface SendResult {
@@ -59,6 +66,9 @@ export interface SendResult {
 
 export interface MessagingProvider {
   readonly name: string;
+  /** True when a repeated send with the same idempotencyKey is a no-op at the
+   * provider — the dispatcher only auto-retries a stale "sending" claim then. */
+  readonly dedupesByIdempotencyKey: boolean;
   sendSms(input: SendSmsInput): Promise<SendResult>;
   sendEmail(input: SendEmailInput): Promise<SendResult>;
   validateWebhookSignature(opts: {
@@ -90,6 +100,8 @@ export function smsSegments(body: string): number {
 
 export class TwilioMessagingProvider implements MessagingProvider {
   readonly name: SmsProviderName = "twilio";
+  // Twilio's Messages API has no idempotency key: a retried POST is a second SMS.
+  readonly dedupesByIdempotencyKey = false;
   private accountSid: string;
   private authToken: string;
   private apiKey?: string;
@@ -175,6 +187,7 @@ export class TwilioMessagingProvider implements MessagingProvider {
 
 export class ResendEmailProvider implements MessagingProvider {
   readonly name: EmailProviderName = "resend";
+  readonly dedupesByIdempotencyKey = true;
   private resend: Resend;
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
@@ -193,14 +206,18 @@ export class ResendEmailProvider implements MessagingProvider {
     if (!input.to) throw new Error("Resend sendEmail: missing recipient");
     if (!input.from) throw new Error("Resend sendEmail: missing sender");
     const from = input.fromName ? `${input.fromName} <${input.from}>` : input.from;
-    const res = await this.resend.emails.send({
-      from,
-      to: input.to,
-      subject: input.subject,
-      html: input.html,
-      text: input.text,
-      headers: input.headers,
-    });
+    const res = await this.resend.emails.send(
+      {
+        from,
+        to: input.to,
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+        headers: input.headers,
+        ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
+    );
     if (res.error) {
       const e = res.error as { message?: string; name?: string };
       throw new Error(`Resend send failed: ${e.message ?? e.name ?? "unknown error"}`);
@@ -238,13 +255,22 @@ export function fakeMessagingSecret(env: NodeJS.ProcessEnv = process.env): strin
 
 export class FakeMessagingProvider implements MessagingProvider {
   readonly name = "fake" as const;
+  readonly dedupesByIdempotencyKey = true;
   private static counter = 0;
+  /** idempotencyKey → first result (models Resend's Idempotency-Key). */
+  private static byKey = new Map<string, SendResult>();
+  /** Sends that actually "went out" (deduped replays excluded) — for tests. */
+  static deliveries: Array<{ channel: "sms" | "email"; to: string; idempotencyKey?: string }> = [];
 
   static resetCounter(): void {
     FakeMessagingProvider.counter = 0;
+    FakeMessagingProvider.byKey.clear();
+    FakeMessagingProvider.deliveries = [];
   }
 
   async sendSms(input: SendSmsInput): Promise<SendResult> {
+    const prior = input.idempotencyKey ? FakeMessagingProvider.byKey.get(input.idempotencyKey) : undefined;
+    if (prior) return prior;
     FakeMessagingProvider.counter += 1;
     const sid = fakeMessageSid("FAKESM", `${Date.now()}:${FakeMessagingProvider.counter}`);
     // eslint-disable-next-line no-console
@@ -252,17 +278,25 @@ export class FakeMessagingProvider implements MessagingProvider {
       `[messaging:fake:sms] to=${input.to} segments=${smsSegments(input.body)} sid=${sid} body=${input.body.slice(0, 120)}`,
     );
     // Simulated delivery: the fake provider "delivers" instantly.
-    return { providerSid: sid, segments: smsSegments(input.body), delivered: true };
+    const res = { providerSid: sid, segments: smsSegments(input.body), delivered: true };
+    if (input.idempotencyKey) FakeMessagingProvider.byKey.set(input.idempotencyKey, res);
+    FakeMessagingProvider.deliveries.push({ channel: "sms", to: input.to, idempotencyKey: input.idempotencyKey });
+    return res;
   }
 
   async sendEmail(input: SendEmailInput): Promise<SendResult> {
+    const prior = input.idempotencyKey ? FakeMessagingProvider.byKey.get(input.idempotencyKey) : undefined;
+    if (prior) return prior;
     FakeMessagingProvider.counter += 1;
     const sid = fakeMessageSid("FAKEEM", `${Date.now()}:${FakeMessagingProvider.counter}`);
     // eslint-disable-next-line no-console
     console.log(
       `[messaging:fake:email] to=${input.to} subject=${input.subject} sid=${sid} headers=${JSON.stringify(input.headers ?? {})}`,
     );
-    return { providerSid: sid, delivered: true };
+    const res = { providerSid: sid, delivered: true };
+    if (input.idempotencyKey) FakeMessagingProvider.byKey.set(input.idempotencyKey, res);
+    FakeMessagingProvider.deliveries.push({ channel: "email", to: input.to, idempotencyKey: input.idempotencyKey });
+    return res;
   }
 
   validateWebhookSignature(opts: {

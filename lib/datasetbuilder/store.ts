@@ -586,7 +586,28 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
         r.target === input.target &&
         r.version === input.version,
     );
-    if (existing) return existing;
+    // A go-live is strictly later than any other record on this target, so
+    // it reads as live even within the same millisecond.
+    const liveAt = () =>
+      new Date(
+        Math.max(
+          Date.now(),
+          1 +
+            Math.max(
+              0,
+              ...[...this.publishRecords.values()]
+                .filter((r) => r.datasetId === input.datasetId && r.target === input.target)
+                .map((r) => r.publishedAt.getTime()),
+            ),
+        ),
+      );
+    if (existing) {
+      if (input.makeLive) {
+        existing.publishedAt = liveAt();
+        existing.artifactRef = input.artifactRef;
+      }
+      return existing;
+    }
     const record: DatasetPublishRecord = {
       id: newId("dspub"),
       workspaceId: input.workspaceId,
@@ -596,7 +617,7 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
       versionId: input.versionId,
       chunkCount: input.chunkCount,
       artifactRef: input.artifactRef,
-      publishedAt: new Date(),
+      publishedAt: input.makeLive ? liveAt() : new Date(),
     };
     this.publishRecords.set(record.id, record);
     return record;
@@ -610,7 +631,11 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
       (r) => r.datasetId === datasetId && r.target === target,
     );
     if (rows.length === 0) return null;
-    return rows.reduce((a, b) => (b.version > a.version ? b : a));
+    // Live = most recently published; ties → higher version (mirrors Postgres).
+    return rows.reduce((a, b) => {
+      const d = b.publishedAt.getTime() - a.publishedAt.getTime();
+      return d > 0 || (d === 0 && b.version > a.version) ? b : a;
+    });
   }
 
   async listPublishRecords(

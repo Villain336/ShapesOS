@@ -9,7 +9,8 @@
 //   RLS: FORCE on, no-GUC reads zero, workspace A cannot read B's catalog
 //   V1_ACTION_CATALOG intact: 37 tools, classifier agrees on every expected tier
 //   confirmConnection finalize hooks the catalog refresh (fixture-backed)
-//   live path behind COMPOSIO_API_KEY throws PENDING-KEY (clearly marked)
+//   COMPOSIO_API_KEY selects the live router (Phase 6 live discovery,
+//   exercised against a stubbed fetch — no network); no key → fixtures
 //
 // Run: npx tsx scripts/verify-phase15-discovery.mts
 // Requires: DATABASE_URL (local durable Postgres).
@@ -21,6 +22,7 @@ import {
   countWithoutScope,
 } from "../lib/substrate/memory/rls";
 import {
+  LiveComposioToolRouter,
   fixtureToolRouter,
   getToolRouter,
   refreshCatalogForConnection,
@@ -197,16 +199,27 @@ async function main() {
     `got ${after}, want ${v1GmailCount}`,
   );
 
-  // ── 7. live path is clearly stubbed behind COMPOSIO_API_KEY ──
+  // ── 7. COMPOSIO_API_KEY selects live discovery (stubbed fetch, no network) ──
   const savedKey = process.env.COMPOSIO_API_KEY;
-  process.env.COMPOSIO_API_KEY = "test-key-pending";
-  let pendingThrew = false;
+  const savedFetch = globalThis.fetch;
+  process.env.COMPOSIO_API_KEY = "test-key-live-discovery";
+  let liveUrl = "";
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    liveUrl = String(input);
+    return new Response(JSON.stringify({ items: [{ slug: "gmail", name: "Gmail" }], next_cursor: null }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  let liveSlugs: string[] = [];
   try {
-    await getToolRouter().listToolkits();
-  } catch (e) {
-    pendingThrew = /PENDING-KEY/.test((e as Error).message);
+    const liveRouter = getToolRouter();
+    check("live path: key selects LiveComposioToolRouter", liveRouter instanceof LiveComposioToolRouter);
+    liveSlugs = (await liveRouter.listToolkits()).map((t) => t.toolkitSlug);
+  } finally {
+    globalThis.fetch = savedFetch;
   }
-  check("live path: stubbed with PENDING-KEY marker", pendingThrew);
+  check("live path: lists toolkits from GET /toolkits", /\/toolkits\?limit=1000$/.test(liveUrl) && liveSlugs.join() === "gmail", liveUrl);
   if (savedKey === undefined) delete process.env.COMPOSIO_API_KEY;
   else process.env.COMPOSIO_API_KEY = savedKey;
   check("fixture router active without key", getToolRouter() === fixtureToolRouter);

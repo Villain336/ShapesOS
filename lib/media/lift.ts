@@ -21,6 +21,7 @@
 // honest "not configured" errors.
 
 import { createHash } from "node:crypto";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 
 export type LiftSource = "gsc" | "gtrends" | "ga4" | "gbp";
 
@@ -138,6 +139,12 @@ function inFlight(date: string, q: LiftQuery): boolean {
 
 export class FakeLiftProvider implements LiftProvider {
   readonly name = "fake" as const;
+
+  // Phase 11 (conncore): fabricated lift data is refused in production
+  // ("lift data is not connected"); dev/test/demo keep the fixture.
+  constructor() {
+    assertFakeProviderAllowed("lift data");
+  }
 
   async getBrandedSearch(query: LiftQuery): Promise<LiftDay[]> {
     this.assertQuery(query);

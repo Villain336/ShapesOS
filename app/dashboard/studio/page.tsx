@@ -12,8 +12,8 @@ import { StudioHero } from "@/components/studio/StudioHero";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Creative Studio — Marketr",
-  description: "The central home for all creative and design work across Marketr: mail/print creatives and the asset library.",
+  title: "Creative Studio — ShapesOS",
+  description: "The central home for all creative and design work across ShapesOS: mail/print creatives and the asset library.",
 };
 
 export default async function StudioPage() {
@@ -21,7 +21,7 @@ export default async function StudioPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <StudioHero />
       <StudioApp />
     </div>

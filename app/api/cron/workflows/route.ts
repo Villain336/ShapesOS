@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
     select: { id: true, workspaceId: true, domain: true },
   });
 
-  const minuteStart = startOfCurrentMinute();
+  const now = new Date();
+  const minuteStart = startOfCurrentMinute(now);
   const fired: FireResult[] = [];
   let waitingRuns = 0;
 
@@ -50,18 +51,22 @@ export async function POST(req: NextRequest) {
       // schedule nodes with their own cron. Dedupe via the engine's 5-min
       // window + the lastRunAt guard below.
       const dueSources: Array<{ kind: string; triggerNodeId?: string }> = [];
+      // Schedules are read in the workflow's IANA timezone (node config may
+      // override it); never the server's local zone.
       if (w.schedule) {
         try {
-          if (cronDue(w.schedule)) dueSources.push({ kind: "schedule" });
+          if (cronDue(w.schedule, now, w.timezone)) dueSources.push({ kind: "schedule" });
         } catch {
           // Invalid cron is a save-time error; ignore defensively here.
         }
       }
       for (const n of w.nodes) {
         if (n.kind === "trigger" && n.type === "schedule") {
-          const cron = ((n.config ?? {}) as Record<string, unknown>).cron;
+          const cfg = (n.config ?? {}) as Record<string, unknown>;
+          const cron = cfg.cron;
+          const tz = typeof cfg.timezone === "string" && cfg.timezone ? cfg.timezone : w.timezone;
           try {
-            if (typeof cron === "string" && cronDue(cron)) {
+            if (typeof cron === "string" && cronDue(cron, now, tz)) {
               dueSources.push({ kind: "schedule", triggerNodeId: n.id });
             }
           } catch {

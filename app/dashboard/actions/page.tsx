@@ -15,7 +15,7 @@ import { ActionsClient } from "./ActionsClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Actions — Marketr",
+  title: "Actions — ShapesOS",
   description: "Connect apps and review agent-proposed actions. Nothing executes without your approval.",
 };
 

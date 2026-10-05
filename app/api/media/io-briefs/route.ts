@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
     },
     terms,
     signatureStatus: "draft" as IoSignatureStatus,
-    workspaceName: workspace?.name ?? "Marketr",
+    workspaceName: workspace?.name ?? "ShapesOS",
     generatedBy: gate.userId,
   });
   await store.setBriefPdf(brief.id, gate.workspaceId, pdf.pdfUrl);

@@ -37,7 +37,13 @@ export async function GET() {
 
   const enriched = rituals.map((r) => {
     const cadence = r.cadence as RitualCadence;
-    const recent = occurrencesSince(r.anchorDate, cadence, new Date(now.getTime() - 90 * 24 * 3600 * 1000), now);
+    const recent = occurrencesSince(
+      r.anchorDate,
+      cadence,
+      new Date(now.getTime() - 90 * 24 * 3600 * 1000),
+      now,
+      r.timezone,
+    );
     const cutoff = recent.length > 4 ? recent[recent.length - 4].getTime() : 0;
     const participationCount = r.participations.filter(
       (p) => p.occurredAt.getTime() >= cutoff,
@@ -59,10 +65,11 @@ export async function GET() {
       description: r.description,
       cadence: r.cadence,
       anchorDate: r.anchorDate.toISOString(),
+      timezone: r.timezone,
       active: r.active,
       subscriberCount: r.subscriptions.length,
       subscribed: r.subscriptions.some((s) => s.userId === user.id),
-      nextOccurrence: nextOccurrence(r.anchorDate, cadence, now).toISOString(),
+      nextOccurrence: nextOccurrence(r.anchorDate, cadence, now, r.timezone).toISOString(),
       participations: r.participations.map((p) => ({
         userId: p.userId,
         note: p.note,
@@ -96,6 +103,7 @@ export async function POST(req: NextRequest) {
       description: body.description != null ? String(body.description) : null,
       cadence: body.cadence as RitualCadence | undefined,
       anchorDate: body.anchorDate ? new Date(String(body.anchorDate)) : null,
+      timezone: body.timezone != null ? String(body.timezone) : null,
     });
     if (!v.ok || !v.normalized) {
       throw new WfhRitualError("VALIDATION_FAILED", "Ritual is invalid.", v.errors);
@@ -110,6 +118,7 @@ export async function POST(req: NextRequest) {
         description: n.description,
         cadence: n.cadence,
         anchorDate: n.anchorDate,
+        timezone: n.timezone,
         active: true,
       },
     });

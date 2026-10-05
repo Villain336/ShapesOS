@@ -14,7 +14,7 @@ function page(email: string | null, listName: string | null, ok: boolean): Respo
     ? `<p>${email ? `<strong>${email}</strong> has` : "You have"} been removed from <strong>${listName ?? "the list"}</strong>. No more emails will be sent to this address.</p>`
     : `<p>This unsubscribe link is invalid or has already been used.</p>`;
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — Marketr</title></head>` +
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — ShapesOS</title></head>` +
       `<body style="font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:48px 16px">` +
       `<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;text-align:center">` +
       `<h1 style="font-size:20px;color:#111827">${title}</h1>${body}</div></body></html>`,

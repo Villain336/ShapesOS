@@ -3,8 +3,9 @@
 // data from the ops API. Presentational only — orders are records-only in
 // Phase 17 (no commerce writes; Medusa deferred to Phase 18).
 //
-// House pattern: --brand-600/700/50 vars, never hardcoded primaries; Lucide
-// icons only; dense table styling like the orders UI.
+// Agentic OS: token classes only; order statuses are workflow records, not
+// agent states, so they render as neutral chips. Lucide icons only; dense
+// table styling like the orders UI.
 
 "use client";
 
@@ -35,10 +36,10 @@ interface OrderRow {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  new: "bg-sky-50 text-sky-800 border-sky-200",
-  paid: "bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20",
-  fulfilled: "bg-stone-100 text-stone-700 border-stone-200",
-  cancelled: "bg-stone-100 text-stone-500 border-stone-200",
+  new: "bg-paper text-ink shadow-control",
+  paid: "bg-ink text-white",
+  fulfilled: "bg-canvas text-ink",
+  cancelled: "bg-canvas text-muted line-through",
 };
 
 function fmtCents(cents: number): string {
@@ -69,7 +70,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
 
   if (error && !order) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white p-4 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[13px] text-muted">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4" />
           <span>{error}</span>
@@ -80,7 +81,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
 
   if (!order) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white p-4 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[13px] text-muted">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading order…</span>
@@ -90,14 +91,14 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-2.5">
+    <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+      <div className="flex items-center justify-between border-b border-line bg-canvas px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-[var(--brand-600)]" />
-          <span className="text-sm font-semibold text-stone-900">Order {order.id.slice(0, 8)}…</span>
+          <Package className="h-4 w-4 text-ink" />
+          <span className="text-sm font-semibold text-ink">Order {order.id.slice(0, 8)}…</span>
         </div>
         <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
             STATUS_BADGE[order.status] ?? STATUS_BADGE.new
           }`}
         >
@@ -106,7 +107,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
       </div>
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="text-left text-stone-500">
+          <tr className="text-left text-muted">
             <th className="px-4 py-2 font-medium">Item</th>
             <th className="px-2 py-2 text-right font-medium">Qty</th>
             <th className="px-4 py-2 text-right font-medium">Line total</th>
@@ -114,22 +115,22 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
         </thead>
         <tbody>
           {order.items.map((it, i) => (
-            <tr key={i} className="border-t border-stone-100 hover:bg-[var(--brand-50)]/40">
-              <td className="px-4 py-2 text-stone-900">
+            <tr key={i} className="border-t border-line hover:bg-hover-paper">
+              <td className="px-4 py-2 text-ink">
                 {it.name ?? it.description ?? "Item"}
-                {it.sku && <span className="ml-2 text-[12px] text-stone-500">{it.sku}</span>}
+                {it.sku && <span className="ml-2 text-[12px] text-muted">{it.sku}</span>}
               </td>
-              <td className="px-2 py-2 text-right tabular-nums text-stone-600">{it.qty}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-stone-900">
+              <td className="px-2 py-2 text-right tabular-nums text-muted">{it.qty}</td>
+              <td className="px-4 py-2 text-right tabular-nums text-ink">
                 {fmtCents(it.qty * it.priceCents)}
               </td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t border-stone-200">
-            <td colSpan={2} className="px-4 py-2 text-right font-semibold text-stone-900">Total</td>
-            <td className="px-4 py-2 text-right font-semibold tabular-nums text-stone-900">
+          <tr className="border-t border-line">
+            <td colSpan={2} className="px-4 py-2 text-right font-semibold text-ink">Total</td>
+            <td className="px-4 py-2 text-right font-semibold tabular-nums text-ink">
               {fmtCents(order.totalCents)}
             </td>
           </tr>

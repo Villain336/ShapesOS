@@ -13,7 +13,7 @@
 //   T6 rollover — period rollover happens inside the same locked transaction
 //        before the charge lands, so a charge can never count twice.
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import {
@@ -23,6 +23,7 @@ import {
   isMeteredAction,
 } from "./credits";
 import { BadRequestError } from "@/lib/api/errors";
+import { isTrialExpired, trialExpiredMessage } from "@/lib/billing/trial";
 
 // ── Public contract (consumed by the sibling MCP track — keep stable) ────────
 // Phase C gaps (G1) additions — all back-compatible:
@@ -62,11 +63,44 @@ export interface MeterOptions {
    * meaning.
    */
   credits?: number;
+  /**
+   * Phase 7: token usage of one model call (action "llm_tokens", written by
+   * lib/llm/usage.ts). Stored on the same append-only event row. costMicroUsd
+   * is the estimated vendor cost; null when a price is unknown.
+   */
+  llm?: LlmUsageFields | null;
+}
+
+export interface LlmUsageFields {
+  provider: string;
+  model: string;
+  workload: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  costMicroUsd: number | null;
+}
+
+function nonNegInt(n: number, field: string): number {
+  if (!Number.isInteger(n) || n < 0) throw new Error(`metering: llm.${field} must be a non-negative integer`);
+  return n;
 }
 
 export type MeterResult =
   | { ok: true; charged: number; eventId: string }
-  | { ok: false; reason: "cap_exceeded" | "unknown_action"; charged: 0; message: string };
+  | {
+      ok: false;
+      reason: "cap_exceeded" | "unknown_action";
+      charged: 0;
+      message: string;
+      /**
+       * Phase 3: set when the refusal is an ended hosted trial (still
+       * reason "cap_exceeded", so every existing caller blocks the action
+       * the same way). The message carries the upgrade prompt.
+       */
+      trialExpired?: true;
+    };
 
 export interface UsageSummary {
   used: number;
@@ -93,6 +127,8 @@ export interface CapStatus {
   used: number;
   /** True when the workspace opted into automatic overage (never the default). */
   autoOverage: boolean;
+  /** Phase 3: the workspace's hosted trial is over — metered actions are refused. */
+  trialExpired?: boolean;
 }
 
 // ── Internals ────────────────────────────────────────────────────────────────
@@ -145,20 +181,14 @@ async function lockBalance(tx: Tx, workspaceId: string): Promise<LockedBalance> 
     if (rows.length > 0) return rows[0];
     const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (!ws) throw new Error(`metering: unknown workspace ${workspaceId}`);
-    try {
-      await tx.creditBalance.create({
-        data: {
-          workspaceId,
-          includedCredits: includedCreditsForPlan(ws.plan),
-          purchasedCredits: 0,
-          usedCredits: 0,
-          periodStart: monthStart(new Date()),
-        },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue; // lost the create race — re-lock
-      throw err;
-    }
+    // ON CONFLICT DO NOTHING, not create + catch: in Postgres a unique
+    // violation aborts the whole transaction, so a caught P2002 could never be
+    // retried (every later statement fails "current transaction is aborted").
+    // Losing the create race is now a no-op and the loop re-locks the winner's row.
+    await tx.$executeRaw`
+      INSERT INTO credit_balances (workspace_id, included_credits, purchased_credits, used_credits, period_start)
+      VALUES (${workspaceId}, ${includedCreditsForPlan(ws.plan)}, 0, 0, ${monthStart(new Date())})
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock credit balance");
 }
@@ -171,14 +201,14 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
              auto_overage AS "autoOverage"
       FROM spend_caps WHERE workspace_id = ${workspaceId} FOR UPDATE`;
     if (rows.length > 0) return rows[0];
-    try {
-      await tx.spendCap.create({
-        data: { workspaceId, capCredits: pool, blockAtCap: true, alertAtPct: 80 },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue;
-      throw err;
-    }
+    // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
+    // blocked. Every other plan starts with the hard cap at its pool.
+    // ON CONFLICT DO NOTHING for the same reason as lockBalance.
+    const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+    await tx.$executeRaw`
+      INSERT INTO spend_caps (workspace_id, cap_credits, block_at_cap, alert_at_pct, auto_overage)
+      VALUES (${workspaceId}, ${pool}, ${ws?.plan !== "self_hosted"}, 80, false)
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock spend cap");
 }
@@ -201,9 +231,22 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     action,
     idempotencyKey,
     evidenceRef = null,
+    llm = null,
   } = opts;
   if (!workspaceId) throw new Error("metering: workspaceId is required");
   if (!idempotencyKey) throw new Error("metering: idempotencyKey is required");
+  const llmData = llm
+    ? {
+        llmProvider: llm.provider,
+        llmModel: llm.model,
+        llmWorkload: llm.workload,
+        llmInputTokens: nonNegInt(llm.inputTokens, "inputTokens"),
+        llmOutputTokens: nonNegInt(llm.outputTokens, "outputTokens"),
+        llmCacheReadTokens: nonNegInt(llm.cacheReadTokens, "cacheReadTokens"),
+        llmCacheWriteTokens: nonNegInt(llm.cacheWriteTokens, "cacheWriteTokens"),
+        llmCostMicroUsd: llm.costMicroUsd === null ? null : BigInt(nonNegInt(llm.costMicroUsd, "costMicroUsd")),
+      }
+    : {};
 
   if (!isMeteredAction(action)) {
     return {
@@ -259,6 +302,28 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // T2: lock balance + cap — concurrent meter() calls serialize here.
         const bal = await lockBalance(tx, workspaceId);
         const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
+        // Read the plan after the locks: applyPlanChange takes the same locks,
+        // so an upgrade that committed before us is always seen here.
+        const ws = await tx.workspace.findUnique({
+          where: { id: workspaceId },
+          select: { plan: true, trialEndsAt: true },
+        });
+        const onTrial = ws?.plan === "trial";
+
+        // Phase 3: an ended hosted trial is read-only for metered actions.
+        // Zero-cost actions still pass — never punish the outcome.
+        if (charge > 0 && ws && isTrialExpired(ws)) {
+          return {
+            result: {
+              ok: false,
+              reason: "cap_exceeded",
+              charged: 0,
+              message: trialExpiredMessage(ws.trialEndsAt),
+              trialExpired: true,
+            },
+            alert: null,
+          };
+        }
 
         // T6: lazy period rollover inside the locked transaction, before charging.
         const now = new Date();
@@ -269,8 +334,20 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
           rolled = true;
         }
         if (rolled) {
-          usedCredits = 0;
+          // The trial pool is one-time: a month boundary inside the 14 days
+          // must not refill it.
+          if (!onTrial) usedCredits = 0;
           if (purchasedExpiresAt && now > purchasedExpiresAt) {
+            // applyTopUp raised the cap by every purchased credit; expiring
+            // them must take that headroom back too, or the expired credits
+            // stay spendable (unpaid, and unbilled without auto-overage).
+            // Lowered by exactly the expired amount, so an admin's own
+            // headroom above or below the pool is kept; never below 0.
+            if (purchasedCredits > 0) {
+              const capCredits = Math.max(0, cap.capCredits - purchasedCredits);
+              await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
+              cap.capCredits = capCredits;
+            }
             purchasedCredits = 0;
             purchasedExpiresAt = null;
           }
@@ -283,16 +360,19 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // Cap check FIRST. Zero-cost actions always pass — never punish the outcome.
         // Auto-overage (explicit opt-in) also passes: the billing track bills
         // the overage; the ledger records it honestly.
-        const overageAllowed = cap.autoOverage || !cap.blockAtCap;
+        // A trial is always hard-capped: no overage opt-in, no uncapped legacy row.
+        const overageAllowed = !onTrial && (cap.autoOverage || !cap.blockAtCap);
         if (charge > 0 && !overageAllowed && usedCredits + charge > cap.capCredits) {
           return {
             result: {
               ok: false,
               reason: "cap_exceeded",
               charged: 0,
-              message:
-                `Credit cap reached (${usedCredits.toLocaleString()} of ${cap.capCredits.toLocaleString()} ` +
-                `credits used). Raise the cap or add credits in Settings → Usage.`,
+              message: onTrial
+                ? `Trial credits used up (${usedCredits.toLocaleString()} of ${cap.capCredits.toLocaleString()}). ` +
+                  `Choose a plan in Billing (/dashboard/billing) to keep going.`
+                : `Credit cap reached (${usedCredits.toLocaleString()} of ${cap.capCredits.toLocaleString()} ` +
+                  `credits used). Raise the cap or add credits in Settings → Usage.`,
             },
             alert: null,
           };
@@ -311,7 +391,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // event fully beyond the pool marks exactly its own credits.
         const paidPool = includedCredits + purchasedCredits;
         const overageCredits =
-          cap.autoOverage && charge > 0
+          cap.autoOverage && !onTrial && charge > 0
             ? Math.max(0, Math.min(charge, usedCredits + charge - paidPool))
             : 0;
         const event = await tx.usageEvent.create({
@@ -325,6 +405,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             overageCredits,
             idempotencyKey,
             evidenceRef,
+            ...llmData,
           },
           select: { id: true },
         });
@@ -395,27 +476,30 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
  * uses this; the TOCTOU between gate and charge is closed by meter() (T9).
  */
 export async function checkCap(workspaceId: string): Promise<CapStatus> {
-  const [bal, cap] = await Promise.all([
+  const [bal, cap, ws] = await Promise.all([
     prisma.creditBalance.findUnique({ where: { workspaceId } }),
     prisma.spendCap.findUnique({ where: { workspaceId } }),
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true, trialEndsAt: true } }),
   ]);
-  let included = bal?.includedCredits ?? 0;
-  if (!bal) {
-    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
-    included = includedCreditsForPlan(ws?.plan ?? "self_hosted");
-  }
+  const plan = ws?.plan ?? "self_hosted";
+  const included = bal?.includedCredits ?? includedCreditsForPlan(plan);
   const purchased = bal?.purchasedCredits ?? 0;
   const used = bal?.usedCredits ?? 0;
   const capCredits = cap?.capCredits ?? included + purchased;
-  const blockAtCap = cap?.blockAtCap ?? true;
-  const autoOverage = cap?.autoOverage ?? false;
+  // Mirrors meter(): a trial is always hard-capped, with no overage; with no
+  // cap row yet, blocking follows what lockSpendCap will create.
+  const onTrial = plan === "trial";
+  const blockAtCap = onTrial || (cap?.blockAtCap ?? plan !== "self_hosted");
+  const autoOverage = !onTrial && (cap?.autoOverage ?? false);
   const remaining = Math.max(0, capCredits - used);
+  const trialExpired = ws ? isTrialExpired(ws) : false;
   return {
-    allowed: !blockAtCap || autoOverage || remaining > 0,
+    allowed: !trialExpired && (!blockAtCap || autoOverage || remaining > 0),
     remaining,
     capCredits,
     used,
     autoOverage,
+    trialExpired,
   };
 }
 
@@ -515,6 +599,57 @@ export async function applyTopUp(
     const capCredits = cap.capCredits + topUp.creditsAdded;
     await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
     return { purchasedCredits, capCredits };
+  });
+}
+
+/**
+ * Plan change: set the workspace's plan tier AND re-sync its credit pool in
+ * ONE locked transaction (balance + cap rows FOR UPDATE, so concurrent
+ * meter() calls serialize behind it). includedCredits follows the plan; the
+ * cap moves by the same delta — an upgrade raises it, a downgrade lowers it
+ * — so any headroom an admin set relative to the pool is preserved. Floor 0.
+ */
+export async function applyPlanChange(
+  workspaceId: string,
+  plan: Plan,
+  opts: { trialEndsAt?: Date | null; now?: Date } = {},
+): Promise<{ includedCredits: number; capCredits: number }> {
+  return prisma.$transaction(async (tx) => {
+    const bal = await lockBalance(tx, workspaceId);
+    const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
+    const prev = await tx.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { plan: true, trialEndsAt: true },
+    });
+    // Phase 3: moving onto the trial plan never starts a fresh trial unless
+    // the caller passes trialEndsAt. A lapsed subscription lands on an
+    // already-ended trial: the earlier of the old trial end and now.
+    let trialEndsAt: Date | null | undefined;
+    if (plan === "trial") {
+      const now = opts.now ?? new Date();
+      trialEndsAt =
+        opts.trialEndsAt !== undefined
+          ? opts.trialEndsAt
+          : prev?.trialEndsAt && prev.trialEndsAt < now
+            ? prev.trialEndsAt
+            : now;
+    }
+    await tx.workspace.update({
+      where: { id: workspaceId },
+      data: { plan, ...(trialEndsAt !== undefined ? { trialEndsAt } : {}) },
+    });
+    const includedCredits = includedCreditsForPlan(plan);
+    const capCredits = Math.max(0, cap.capCredits + (includedCredits - bal.includedCredits));
+    await tx.creditBalance.update({ where: { workspaceId }, data: { includedCredits } });
+    // Crossing the self-hosted boundary flips blocking (BYO keys record but
+    // never block; billed plans hard-cap). Otherwise keep the admin's choice.
+    const wasSelfHosted = prev?.plan === "self_hosted";
+    const isSelfHosted = plan === "self_hosted";
+    await tx.spendCap.update({
+      where: { workspaceId },
+      data: { capCredits, ...(wasSelfHosted !== isSelfHosted ? { blockAtCap: !isSelfHosted } : {}) },
+    });
+    return { includedCredits, capCredits };
   });
 }
 

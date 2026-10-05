@@ -6,10 +6,12 @@
 // Mirrors app/api/webhooks/mail/*: invalid signatures → 401; internal
 // failures → 200 (avoid retry storms).
 //
-// Workspace resolution: the fake provider is test-scoped — the caller passes
-// ?w=<workspaceId> (or the route falls back to the CallRail-configured row
-// once live provider rows exist). Real CallRail rows resolve via webhook
-// secret match, mirroring ingestMailWebhook.
+// Workspace resolution: the webhook URL carries ?w=<workspaceId>. It is not
+// trusted on its own — the real provider verifies the signature with that
+// workspace's own derived secret (lib/media/callrail.ts
+// callRailWorkspaceWebhookSecret), so editing ?w= can't move an event into
+// another tenant. The fake provider is dev/test-scoped (refused in
+// production unless ALLOW_FAKE_PROVIDERS=1).
 
 import type { NextRequest } from "next/server";
 import { getMediaStore } from "@/lib/media/store";
@@ -39,8 +41,12 @@ export async function POST(req: NextRequest) {
           apiKey: process.env.CALLRAIL_API_KEY,
           webhookSecret: process.env.CALLRAIL_WEBHOOK_SECRET,
           live: false, // test-mode-first: live enabling is explicit, never by env accident
+          acceptSharedSecret: process.env.CALLRAIL_WEBHOOK_ACCEPT_SHARED_SECRET === "1",
         })
       : new FakeCallRailProvider();
+  if (provider.name === "callrail" && !workspaceId) {
+    return Response.json({ error: "missing workspace (?w=)" }, { status: 400 });
+  }
   const service = createCallRailService(getMediaStore(), provider);
 
   try {

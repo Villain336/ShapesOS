@@ -9,7 +9,7 @@ import { getOrCreateWorkspace } from "@/lib/session";
 import { getMediaStore } from "@/lib/media/store";
 import { FakePlatformSpendFeed, reconcileBuy } from "@/lib/media/reconciliation";
 
-export const metadata = { title: "Receipt Reconciliation — Marketr" };
+export const metadata = { title: "Receipt Reconciliation — ShapesOS" };
 export const dynamic = "force-dynamic";
 
 export default async function MediaReconciliationPage({
@@ -34,7 +34,7 @@ export default async function MediaReconciliationPage({
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <h1 className="aos-heading text-ink">Receipt reconciliation</h1>
       <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
         Ledger vs platform actuals/invoices. Variance is surfaced here — never silent.
@@ -62,7 +62,7 @@ export default async function MediaReconciliationPage({
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="rounded-lg border border-line bg-paper p-3">
-                <div className="text-[11px] uppercase tracking-wide text-muted">{label}</div>
+                <div className="text-[11px] font-semibold text-muted">{label}</div>
                 <div className="text-lg font-semibold text-ink">{value}</div>
               </div>
             ))}
@@ -87,7 +87,7 @@ export default async function MediaReconciliationPage({
           <h2 className="mt-6 text-sm font-semibold text-ink">Line items</h2>
           <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-paper"><table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+              <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-muted">
                 <th className={thCls}>Line</th>
                 <th className={thCls}>Ledger</th>
                 <th className={thCls}>Actual</th>

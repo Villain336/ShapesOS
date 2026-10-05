@@ -16,7 +16,7 @@ import WfhTabs from "./_components/WfhTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH mode — Marketr",
+  title: "WFH mode — ShapesOS",
   description: "One switch that reconfigures the OS for remote work: async-first notifications, protected focus time, and rituals.",
 };
 

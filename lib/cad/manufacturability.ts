@@ -474,6 +474,21 @@ export function runManufacturabilityChecks(
       flags: [],
     };
   }
+  // Never report computed results from NaN/Infinity geometry (the extractor
+  // drops such triangles; this guards any other caller).
+  for (let i = 0; i < triangleCount * 9; i++) {
+    if (!Number.isFinite(positions[i])) {
+      const detail = "The mesh has non-finite (NaN/Infinity) coordinates — analysis cannot run.";
+      return {
+        checks: [
+          { check: "wall_thickness", status: "unavailable", detail },
+          { check: "overhang", status: "unavailable", detail },
+          { check: "tolerance", status: "unavailable", detail },
+        ],
+        flags: [],
+      };
+    }
+  }
   const wall = checkWallThickness(positions, triangleCount);
   const over = checkOverhang(positions, triangleCount);
   const tol = checkTolerance(positions, triangleCount);

@@ -6,7 +6,7 @@ import { SessionsApp } from "./SessionsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Call Sessions — Marketr",
+  title: "Call Sessions — ShapesOS",
   description: "Live, rehearsal, and blocked call sessions with transcripts and audit trails.",
 };
 

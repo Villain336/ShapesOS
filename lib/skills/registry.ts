@@ -8,7 +8,7 @@ import type { RegistryPack } from "./types";
 
 const SEO_AUDIT_MD = `---
 name: SEO Audit
-description: Run a structured technical and content SEO audit using Marketr data: crawl health, index coverage, page experience, content quality, and internal linking — delivered as a prioritized issue list with impact and effort.
+description: Run a structured technical and content SEO audit using ShapesOS data: crawl health, index coverage, page experience, content quality, and internal linking — delivered as a prioritized issue list with impact and effort.
 version: 1.2.0
 tools:
   - google-search-console.query
@@ -17,7 +17,7 @@ tools:
 
 # SEO Audit
 
-A repeatable audit workflow for technical and content SEO. Use Marketr's
+A repeatable audit workflow for technical and content SEO. Use ShapesOS's
 Search Console connector for the ground truth (impressions, clicks,
 position, index coverage) and DataForSEO's on-page data for crawl-level
 detail. The audit answers one question: what should we fix first, and why.
@@ -154,7 +154,7 @@ writing is a separate step with its own review.
 
 ### 5. Internal links and metadata
 - Recommend 3-5 internal link targets from the project's existing pages
-  (use the site's sitemap or Marketr's content index), with suggested anchor
+  (use the site's sitemap or ShapesOS's content index), with suggested anchor
   text.
 - Draft the title tag (under 60 characters, keyword near the front) and meta
   description (under 155 characters, with the SERP angle).
@@ -185,7 +185,7 @@ Deliver the brief as markdown:
 
 const RANK_REPORT_MD = `---
 name: Rank Report
-description: Compile a client-ready ranking report from Marketr rank tracking: visibility trends, biggest movers, SERP feature wins, and plain-English commentary on what changed and why.
+description: Compile a client-ready ranking report from ShapesOS rank tracking: visibility trends, biggest movers, SERP feature wins, and plain-English commentary on what changed and why.
 version: 1.0.0
 tools:
   - dataforseo.rank_tracking
@@ -291,7 +291,7 @@ opportunities is a plan.
 ## Workflow
 
 ### 1. Confirm the competitor set
-- Default: the project's tracked competitors in Marketr (2-4 domains).
+- Default: the project's tracked competitors in ShapesOS (2-4 domains).
 - Confirm the domains are true SERP competitors, not just business
   competitors. A business rival that never ranks for the project's keywords
   is not a gap source.
@@ -455,7 +455,7 @@ export const REGISTRY_PACKS: RegistryPack[] = [
     key: "seo-audit",
     name: "SEO Audit",
     description:
-      "Run a structured technical and content SEO audit using Marketr data: crawl health, index coverage, page experience, content quality, and internal linking — delivered as a prioritized issue list with impact and effort.",
+      "Run a structured technical and content SEO audit using ShapesOS data: crawl health, index coverage, page experience, content quality, and internal linking — delivered as a prioritized issue list with impact and effort.",
     version: "1.2.0",
     declaredTools: ["google-search-console.query", "dataforseo.on_page"],
     skillMd: SEO_AUDIT_MD,
@@ -473,7 +473,7 @@ export const REGISTRY_PACKS: RegistryPack[] = [
     key: "rank-report",
     name: "Rank Report",
     description:
-      "Compile a client-ready ranking report from Marketr rank tracking: visibility trends, biggest movers, SERP feature wins, and plain-English commentary on what changed and why.",
+      "Compile a client-ready ranking report from ShapesOS rank tracking: visibility trends, biggest movers, SERP feature wins, and plain-English commentary on what changed and why.",
     version: "1.0.0",
     declaredTools: ["dataforseo.rank_tracking", "google-search-console.query"],
     skillMd: RANK_REPORT_MD,

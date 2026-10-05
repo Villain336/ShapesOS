@@ -280,7 +280,7 @@ export function buildEddmBriefDocument(input: EddmBriefInput): ReactElement {
               style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}
             >
               <SpanText style={{ fontSize: 9, color: "#71717a" }}>
-                Generated {input.generatedAt} · {input.workspaceName} · Marketr EDDM concierge
+                Generated {input.generatedAt} · {input.workspaceName} · ShapesOS EDDM concierge
               </SpanText>
               <PageNumber format="Page {page} of {total}" align="right" />
             </View>

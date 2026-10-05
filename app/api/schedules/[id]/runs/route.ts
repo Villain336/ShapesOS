@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { requirePermission, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, notFound, requireWorkspaceAccess, requireProjectAccess } from "@/lib/route-utils";
-import { validateBody, z } from "@/lib/api/validate";
+import { validateBody, z, intQuery, parseQuery } from "@/lib/api/validate";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { triggerManual, ScheduleServiceError } from "@/lib/scheduler/service";
 
@@ -46,7 +46,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   if ("error" in auth) return auth.error;
 
   const q = req.nextUrl.searchParams;
-  const take = Math.min(Math.max(Number(q.get("take") ?? 50) || 50, 1), 200);
+  const takeQuery = parseQuery(z.object({ take: intQuery(50, 1, 200) }), q);
+  if (!takeQuery.ok) return takeQuery.error;
+  const take = takeQuery.data.take;
   const runs = await prisma.skillRun.findMany({
     where: { scheduleId: id, workspaceId: access.workspaceId },
     orderBy: { startedAt: "desc" },

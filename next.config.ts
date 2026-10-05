@@ -2,10 +2,11 @@ import type { NextConfig } from "next";
 import { withPayload } from "@payloadcms/next/withPayload";
 import { buildSecurityHeaders, shouldSendHsts } from "./lib/security/headers";
 
-// Security headers (Milestone 11 baseline, Phase 1 CSP/HSTS): see
+// Security headers (Milestone 11 baseline, Phase 1 HSTS): see
 // lib/security/headers.ts for the policy and its compatibility notes.
-// - Content-Security-Policy on every response (script-src-attr 'none' blocks
-//   injected event-handler XSS; object/base/frame-ancestors locked down).
+// - Content-Security-Policy is NOT sent from here: it carries a per-request
+//   nonce, so proxy.ts sets it (a static copy here would be a second CSP
+//   header that browsers intersect with the nonce one).
 // - HSTS in production unless NEXTAUTH_URL is explicitly http://.
 // - X-Frame-Options: SAMEORIGIN — the landing-page preview uses a sandboxed
 //   srcDoc iframe, which is unaffected by frame-ancestor policy.
@@ -21,6 +22,13 @@ const nextConfig: NextConfig = {
   // peak memory and got the runner killed. Only CI sets SKIP_BUILD_TYPECHECK —
   // local and Docker builds still type-check. (Next's memory-usage guide.)
   typescript: { ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1" },
+  // Next 16.3 writes Turbopack's build cache to .next/cache by default. CI
+  // never restores that directory, so the multi-GB write is pure waste — and
+  // it runs alongside page-data collection, which (with Phase 10's routes)
+  // pushed the GitHub runner out of memory ("runner has received a shutdown
+  // signal" during "Collecting page data"). Per Next's turbopackFileSystemCache
+  // guide: off where the cache is never kept (CI); local builds keep it warm.
+  experimental: { turbopackFileSystemCacheForBuild: !process.env.CI },
   // No X-Powered-By (also suppresses the "Next.js, Payload" header that
   // withPayload adds when this is left unset).
   poweredByHeader: false,

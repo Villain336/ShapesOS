@@ -1,14 +1,15 @@
 // Marketr — GBP posts API (milestone 16, flagged scaffold).
-// GET  /api/gbp/posts?accountId=…[&locationId=…] → posts (viewer+; mock provider for live reads).
+// GET  /api/gbp/posts?accountId=…[&locationId=…] → posts (viewer+; provider read-through: live with a GBP connection, mock otherwise).
 // POST /api/gbp/posts { accountId, locationId, title, summary, callToAction?, actionUrl?, scheduledAt? }
-//      → create a draft/scheduled post (editor+).
+//      → create a draft/scheduled post (editor+). Phase 4b: with a live GBP
+//      connection, { publish: true } publishes on Google; otherwise a local draft.
 
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { gbpGate } from "../_gate";
-import { getGbpProvider } from "@/lib/local/gbp";
+import { gbpProviderForWorkspace } from "@/lib/local/gbp-live";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +38,19 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
     take: 50,
   });
-  // Mock provider read-through for demo locations.
-  const providerPosts =
-    locationId && getGbpProvider().isConfigured()
-      ? await getGbpProvider().listPosts(locationId)
-      : [];
-  return Response.json({ posts: stored, providerPosts, provider: getGbpProvider().name });
+  // Provider read-through: live when the workspace connected GBP (Phase 4b),
+  // the mock provider otherwise.
+  const provider = await gbpProviderForWorkspace(workspace.id);
+  let providerPosts: unknown[] = [];
+  let providerError: string | null = null;
+  if (locationId && provider.isConfigured()) {
+    try {
+      providerPosts = await provider.listPosts(locationId);
+    } catch (err) {
+      providerError = err instanceof Error ? err.message : "Provider read failed.";
+    }
+  }
+  return Response.json({ posts: stored, providerPosts, providerError, provider: provider.name, live: provider.isLive });
 }
 
 export async function POST(req: NextRequest) {
@@ -77,8 +85,19 @@ export async function POST(req: NextRequest) {
     scheduledAt = d;
   }
 
-  // Route through the (mock) provider so the shape matches the future live one.
-  const created = await getGbpProvider().createPost({
+  // Phase 4b: with a live GBP connection, posting publishes on Google, so it
+  // needs an explicit publish: true from the editor; otherwise the post is
+  // kept as a local draft and nothing is sent. Scheduled posts stay local.
+  const provider = await gbpProviderForWorkspace(workspace.id);
+  if (provider.isLive && (body.publish !== true || scheduledAt)) {
+    const draft = await prisma.gbpPost.create({
+      data: { gbpAccountId: account.id, locationId, title, summary, status: scheduledAt ? "scheduled" : "draft", scheduledAt, externalId: null },
+    });
+    return Response.json({ post: draft, published: false }, { status: 201 });
+  }
+  let created;
+  try {
+    created = await provider.createPost({
     locationId,
     title,
     summary,
@@ -86,6 +105,9 @@ export async function POST(req: NextRequest) {
     actionUrl: typeof body.actionUrl === "string" ? body.actionUrl : null,
     scheduledAt,
   });
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : "Publishing to Google failed." }, { status: 502 });
+  }
 
   const post = await prisma.gbpPost.create({
     data: {

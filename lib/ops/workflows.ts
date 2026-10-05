@@ -38,8 +38,9 @@
 // mid-rollback — a rollback that waits on a human is not a rollback.
 // `runKey` is an idempotency key (unique per workspace): the same approved
 // plan can never execute twice, so a replayed approval cannot double-charge.
-// The Phase 14 approval itself is left "approved" (the ops convention from
-// slices 1–5); the runKey uniqueness is the replay lock for workflow runs.
+// The runKey uniqueness is the replay lock for workflow runs, and the
+// Phase 14 approval is additionally consumed (approved → executed) in the
+// run's transaction, like every other gated ops write.
 
 import type { Prisma } from "@prisma/client";
 import {
@@ -54,6 +55,7 @@ import {
   OpsGateError,
   phase14GatePort,
   requestOpsApproval,
+  consumeOpsApproval,
   verifyOpsApproval,
   type OpsGatePort,
 } from "./gate";
@@ -216,12 +218,16 @@ export const orderPaymentFulfillment: WorkflowDef = {
     },
     {
       name: "record-charge",
-      describe: (r) => `Record ${money(r.amountCents ?? 0)} charge via Stripe for order ${r.orderId}`,
-      rollback: (r) => `Record ${money(r.amountCents ?? 0)} refund via Stripe for order ${r.orderId}`,
+      describe: (r) => `Record a ${money(r.amountCents ?? 0)} manual charge for order ${r.orderId} (no card is charged)`,
+      rollback: (r) => `Record a ${money(r.amountCents ?? 0)} manual refund for order ${r.orderId}`,
       money: true,
       // RECORDS ONLY (the ops invariant): the row is the system of record.
-      // A live Stripe PaymentIntent call would go here in production; the
-      // compensation below would then issue the real refund.
+      // Phase 10 (store): this step no longer pretends to be Stripe (it used
+      // to write a made-up providerRef "ch_<runId>"). It records a MANUAL
+      // charge — money taken offline — with no provider reference. Real card
+      // payments arrive only through the tenant's signed Stripe webhook
+      // (storefront checkout / invoice payment links, lib/ops/finance/stripe.ts),
+      // which records the real payment intent id.
       async execute(ctx) {
         const { tx, actor, resolved } = ctx;
         const charge = await (tx as unknown as {
@@ -232,9 +238,10 @@ export const orderPaymentFulfillment: WorkflowDef = {
             orderId: resolved.orderId,
             kind: "charge",
             amountCents: resolved.amountCents,
-            provider: "stripe",
-            providerRef: `ch_${ctx.runId.slice(-8)}`,
+            provider: "manual",
+            providerRef: null,
             status: "succeeded",
+            note: `Recorded by workflow run ${ctx.runId} (manual charge, no provider)`,
           },
         });
         return { detail: { paymentId: charge.id, amountCents: resolved.amountCents } };
@@ -250,9 +257,10 @@ export const orderPaymentFulfillment: WorkflowDef = {
             orderId: resolved.orderId,
             kind: "refund",
             amountCents: resolved.amountCents,
-            provider: "stripe",
-            providerRef: chargeId ? `re_${String(chargeId).slice(-8)}` : undefined,
+            provider: "manual",
+            providerRef: null,
             status: "succeeded",
+            note: `Compensation for workflow run ${ctx.runId}${chargeId ? ` (reverses payment ${String(chargeId)})` : ""} — manual refund, no provider`,
           },
         });
         return { detail: { refundId: refund.id, amountCents: resolved.amountCents } };
@@ -354,7 +362,7 @@ export async function runWorkflow(
 
   // The single gate check for the whole run: step executions and
   // compensations below run UNDER this approval (pre-authorized rollback).
-  await verifyOpsApproval(port, {
+  const approval = await verifyOpsApproval(port, {
     workspaceId: actor.workspaceId,
     slug: "OPS_WORKFLOW_RUN",
     entity: "workflow-runs",
@@ -371,6 +379,12 @@ export async function runWorkflow(
   if (existing) {
     throw new OpsError(409, `Workflow run "${args.runKey}" already executed — replay blocked`);
   }
+  await consumeOpsApproval(tx, {
+    workspaceId: actor.workspaceId,
+    approval,
+    actor: actor.userId,
+    slug: "OPS_WORKFLOW_RUN",
+  });
 
   // Create the run record (draft-creator → free, logged).
   const created = await opsCreate(tx, WF_DEF, actor, {

@@ -14,7 +14,9 @@ const NOT_FOUND = new Set([
 export function introErrorResponse(e: ConnectorError) {
   let status = 400;
   if (NOT_FOUND.has(e.code)) status = 404;
-  else if (e.code === "intro_already_active") status = 409;
+  // intro_conflict: a concurrent request moved the row on first (guarded
+  // transition); intro_expired: the proposal's window closed before the act.
+  else if (e.code === "intro_already_active" || e.code === "intro_conflict" || e.code === "intro_expired") status = 409;
   else if (e.code === "agent_cannot_act") status = 403;
   return Response.json({ error: e.message, code: e.code }, { status });
 }

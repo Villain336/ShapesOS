@@ -11,6 +11,7 @@ import { appendAuditEvent, type AuditDb } from "./audit";
 import { createEnvelopeDraft, EsignGateError, type DraftSignerInput } from "./envelopes";
 import { instantiateTemplate } from "./templates";
 import type { SignerRole } from "./vendor";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 /** Envelope-level signer roles are a closed set (template roles are freeform). */
 const ENVELOPE_ROLES: SignerRole[] = ["signer", "approver", "cc"];
@@ -94,6 +95,15 @@ export async function prepareEnvelopeDraft(db: AgentDb, input: PrepareDraftInput
     bodyHash: createHash("sha256")
       .update(JSON.stringify(["agent_draft_prepared", envelopeId, input.actor]))
       .digest("hex"),
+  });
+  // Phase 3 (J): the draft waits at the human send gate — say so (best-effort).
+  await notifyApprovalNeeded({
+    workspaceId: input.workspaceId,
+    source: "esign",
+    sourceId: envelopeId,
+    title: `Review and send "${input.title}"`,
+    href: "/dashboard/esign",
+    requestedBy: input.actor,
   });
 
   const envelope = await db.esignEnvelope.findFirst({
@@ -212,6 +222,14 @@ export async function draftNudge(
     bodyHash: createHash("sha256").update(JSON.stringify(["nudge_drafted", nudgeId])).digest("hex"),
   });
   if (!res.ok) throw new EsignGateError("duplicate_nudge", "This nudge was already drafted.");
+  await notifyApprovalNeeded({
+    workspaceId: input.workspaceId,
+    source: "esign",
+    sourceId: res.id,
+    title: `Remind ${signer.email} to sign "${envelope.title}"`,
+    href: "/dashboard/esign",
+    requestedBy: input.actor,
+  });
   return { nudgeEventId: res.id, nudgeId, message };
 }
 
@@ -298,7 +316,12 @@ export async function sweepExpirations(
   });
   const ids: string[] = [];
   for (const env of stale) {
-    await db.esignEnvelope.update({ where: { id: env.id }, data: { status: "expired" } });
+    // Guarded: an envelope completed/voided since the read is never expired.
+    const res = await db.esignEnvelope.updateMany({
+      where: { id: env.id, status: { in: ["sent", "partially-signed"] } },
+      data: { status: "expired" },
+    });
+    if (res.count !== 1) continue;
     await appendAuditEvent(db, {
       envelopeId: env.id,
       event: "expired",

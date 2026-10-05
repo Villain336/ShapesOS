@@ -40,9 +40,11 @@ import {
   type MailProviderName,
 } from "./provider";
 import { FakeMailProvider } from "./fake";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 import { LobProvider } from "./lob";
 import { PostGridProvider } from "./postgrid";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export const MAIL_CONSENT_CHANNEL = "mail";
 export const SENDABLE_VERIFICATION = ["valid", "corrected"] as const;
@@ -73,6 +75,15 @@ function constructProvider(
 }
 
 /**
+ * Phase 11 (conncore): no Lob/PostGrid row → the render-only fake, which
+ * production refuses ("direct mail is not connected").
+ */
+export function fallbackMailProvider(): ResolvedMailProvider {
+  assertFakeProviderAllowed("direct mail");
+  return { provider: new FakeMailProvider(), mode: "test", providerRowId: null, providerName: "fake" };
+}
+
+/**
  * Resolve the workspace's mail provider. No row → fake (render-only).
  * Mode "test" → real provider built with the TEST key (render-only at the
  * provider). Mode "live" → real provider with the LIVE key (real postage —
@@ -83,9 +94,7 @@ export async function resolveMailProvider(workspaceId: string): Promise<Resolved
     where: { workspaceId },
     orderBy: { updatedAt: "desc" },
   });
-  if (!row) {
-    return { provider: new FakeMailProvider(), mode: "test", providerRowId: null, providerName: "fake" };
-  }
+  if (!row) return fallbackMailProvider();
   const mode: MailProviderMode = row.mode === "live" ? "live" : "test";
   const enc = mode === "live" ? row.liveKeyEnc : row.testKeyEnc;
   if (!enc) {
@@ -500,6 +509,15 @@ export async function requestApproval(
     where: { id: campaign.id },
     data: { status: "pending_approval" },
   });
+  // Phase 3 (J): best-effort "needs you" notification (never throws).
+  await notifyApprovalNeeded({
+    workspaceId,
+    source: "mail",
+    sourceId: approval.id,
+    title: `${campaign.name ?? "Direct mail campaign"} · ${estimate.sendablePieces} pieces`,
+    href: "/dashboard/mail",
+    requestedBy: opts?.requestedBy ?? null,
+  });
   return { approval, estimate };
 }
 
@@ -512,7 +530,7 @@ export async function decideApproval(
 ) {
   const approval = await prisma.mailApproval.findFirst({
     where: { id: approvalId },
-    include: { campaign: { select: { id: true, workspaceId: true, status: true } } },
+    include: { campaign: { select: { id: true, workspaceId: true, status: true, name: true, createdBy: true } } },
   });
   if (!approval || approval.campaign.workspaceId !== workspaceId) {
     throw new NotFoundError("Approval not found");
@@ -533,6 +551,18 @@ export async function decideApproval(
   await prisma.mailCampaign.update({
     where: { id: approval.campaignId },
     data: { status: decision === "approve" ? "approved" : "cancelled" },
+  });
+  // Phase 4a: best-effort "decided" notification (never throws). Until it
+  // is decided, approverId holds the requester (set by requestApproval).
+  await notifyApprovalDecided({
+    workspaceId,
+    source: "mail",
+    sourceId: approval.id,
+    title: `${approval.campaign.name ?? "Direct mail campaign"} · ${approval.pieceCount} pieces`,
+    decision: decision === "approve" ? "approved" : "denied",
+    decidedBy: approverId,
+    requestedBy: approval.approverId ?? approval.campaign.createdBy ?? null,
+    href: "/dashboard/mail",
   });
   return updated;
 }

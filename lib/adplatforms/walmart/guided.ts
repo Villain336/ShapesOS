@@ -87,7 +87,7 @@ export const WALMART_GUIDED_STEPS: WalmartGuidedStep[] = [
     id: "launch-in-ad-center",
     title: "Launch campaigns in Walmart Ad Center (for now)",
     detail:
-      "Until the API slice lands, campaigns are created in Walmart Ad Center: Sponsored Products, Sponsored Brands, Sponsored Video, and Vibe CTV. Register each campaign below with its Walmart campaign ID, then import spend via CSV — Marketr tracks everything you import.",
+      "Until the API slice lands, campaigns are created in Walmart Ad Center: Sponsored Products, Sponsored Brands, Sponsored Video, and Vibe CTV. Register each campaign below with its Walmart campaign ID, then import spend via CSV — ShapesOS tracks everything you import.",
   },
 ];
 

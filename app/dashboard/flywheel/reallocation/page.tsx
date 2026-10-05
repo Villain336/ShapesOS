@@ -11,7 +11,7 @@ import ReallocationApp from "./ReallocationApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Reallocation — Marketr",
+  title: "Reallocation — ShapesOS",
   description: "Budget reallocation agent: marginal-ROAS optimizer, SRA guardrails, breakers, audit.",
 };
 

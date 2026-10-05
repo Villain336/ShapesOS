@@ -1,7 +1,8 @@
 // ShapesOS — who may sign up (Phase 1: SIGNUP_MODE).
 //
-//   SIGNUP_MODE=open (default)  any Google/OIDC/SAML sign-in without a
-//                               workspace gets a personal one provisioned.
+//   SIGNUP_MODE=open (default)  any Google/OIDC/SAML sign-in (or Phase 6
+//                               email account) without a workspace gets a
+//                               personal one provisioned.
 //   SIGNUP_MODE=invite          brand-new users are NOT auto-provisioned.
 //                               Sign-in is allowed only for:
 //                                 - the ADMIN_EMAIL credentials login (the
@@ -13,6 +14,9 @@
 //                                   addressed to their email (they then claim
 //                                   it via the /invite?token=… link).
 //                               Everyone else lands on /invite-required.
+//
+// Phase 6 email signup (lib/auth/email/store.ts) runs signInAllowed before
+// creating an account, so in invite mode only invitees can sign up.
 //
 // Enforced twice: the Auth.js signIn callback refuses the session, and
 // getOrCreateWorkspace refuses to create a workspace (InviteRequiredError)
@@ -48,6 +52,18 @@ export function isOperatorUserId(userId: string): boolean {
 /** May this user get a freshly created personal workspace? */
 export function mayProvisionWorkspace(userId: string, env: NodeJS.ProcessEnv = process.env): boolean {
   return signupMode(env) === "open" || isOperatorUserId(userId);
+}
+
+/**
+ * May this user create an ADDITIONAL workspace (POST /api/workspaces)?
+ * Open mode: anyone signed in. Invite mode: only people who already belong to
+ * a workspace (or the operator) — a signed-in user with no membership must not
+ * be able to provision their own workspace and sidestep invite-only.
+ */
+export async function mayCreateWorkspace(userId: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (mayProvisionWorkspace(userId, env)) return true;
+  const member = await prisma.workspaceMember.findFirst({ where: { userId }, select: { id: true } });
+  return member !== null;
 }
 
 /** May this user sign in at all? (Only restricts anything in invite mode.) */
