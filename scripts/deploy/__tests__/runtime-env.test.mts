@@ -98,7 +98,8 @@ describe("runtimeExports", () => {
 describe("with-runtime-env.sh", () => {
   const SCRIPT = join(process.cwd(), "scripts/deploy/with-runtime-env.sh");
   const run = (env: Record<string, string>, args: string[]) =>
-    spawnSync("sh", [SCRIPT, ...args], { encoding: "utf8", env: { PATH: process.env.PATH ?? "", ...env } });
+    // A deliberately minimal environment (cast: the repo's ProcessEnv type requires NODE_ENV).
+    spawnSync("sh", [SCRIPT, ...args], { encoding: "utf8", env: { PATH: process.env.PATH ?? "", ...env } as unknown as NodeJS.ProcessEnv });
 
   it("exports the composed URL and blob values, then exec's the command", () => {
     const r = run(

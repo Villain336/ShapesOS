@@ -40,7 +40,8 @@ function listen(server: Server): Promise<string> {
 function run(env: Record<string, string>): Promise<{ code: number; out: string }> {
   return new Promise((resolve) => {
     const child = spawn("sh", [SCRIPT], {
-      env: { PATH: process.env.PATH ?? "", NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", ...env },
+      // A deliberately minimal environment (cast: the repo's ProcessEnv type requires NODE_ENV).
+      env: { PATH: process.env.PATH ?? "", NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", ...env } as unknown as NodeJS.ProcessEnv,
     });
     let out = "";
     child.stdout.on("data", (d) => (out += d));
