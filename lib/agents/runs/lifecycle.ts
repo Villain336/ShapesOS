@@ -147,6 +147,8 @@ export async function executeBrowserRun(
     launcher: deps.launcher,
     headless: request.headless,
     watch: request.watch ?? false,
+    // Deploy PR: relay the live watch so any web replica can serve it.
+    workspaceId,
     guardRequest: request.guardRequest,
     onTimelineEvent: (event) => {
       void appendAgentRunEvent(workspaceId, runId, event);

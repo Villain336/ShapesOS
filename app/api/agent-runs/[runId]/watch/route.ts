@@ -118,7 +118,7 @@ export async function GET(
     return Response.json({ error: "No live stream for this run" }, { status: 404 });
   }
 
-  const sub = subscribeWatchStream(runId);
+  const sub = subscribeWatchStream(runId, { workspaceId: workspace.id });
   const encoder = new TextEncoder();
   let closed = false;
 

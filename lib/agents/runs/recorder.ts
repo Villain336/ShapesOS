@@ -284,6 +284,11 @@ export interface RecorderOptions {
    * permanent record.
    */
   watch?: boolean;
+  /**
+   * Deploy PR: the run's workspace. With it the live watch is also relayed
+   * through Postgres so a web replica (not just this process) can serve it.
+   */
+  workspaceId?: string;
   /** Timeline sink — lifecycle.ts persists these as AgentRunEvent rows. */
   onTimelineEvent?: (event: AgentRunEventInput) => void | Promise<void>;
   /** Phase 8: per-request URL guard (SSRF) handed to the browser context. */
@@ -312,8 +317,8 @@ export interface StoppedRecording {
  * idempotent-ish: it always releases the slot and closes the browser.
  */
 export class AgentRunRecorder {
-  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest">> &
-    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest"> & { artifactDir: string };
+  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest" | "workspaceId">> &
+    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest" | "workspaceId"> & { artifactDir: string };
   private browser: RecorderBrowser | null = null;
   private context: RecorderContext | null = null;
   private slotHeld = false;
@@ -355,7 +360,7 @@ export class AgentRunRecorder {
       // is a no-op (null) when the page cannot screencast — the run
       // proceeds unwatched rather than failing.
       if (this.opts.watch) {
-        this.watchDetach = await attachWatch(page, this.opts.runId);
+        this.watchDetach = await attachWatch(page, this.opts.runId, this.opts.workspaceId);
       }
       await this.emitTimeline({
         type: "browser",

@@ -10,6 +10,7 @@ lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/agents/runs/__tests__/watch-relay-db.test.ts
 lib/api/__tests__/shared-state-db.test.ts
 lib/approvals/__tests__/inbox-db.test.ts
 lib/auth/__tests__/member-roles.test.ts
