@@ -631,6 +631,9 @@ model Workspace {
   zernioAccounts              ZernioAccount[]
   zernioAdValidations         ZernioAdValidation[]
   zernioAccountUsage          ZernioAccountUsage[]
+  // Deploy PR (WS=state): state shared by every app instance.
+  singleUseTokens             SingleUseToken[]
+  agentRunWatchFrames         AgentRunWatchFrame[]
   agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
@@ -9405,6 +9408,8 @@ model AgentRun {
   jobs       AgentJob[]
   // Phase 8: the code sandbox this run works in (lib/sandbox).
   sandbox   AgentRunSandbox?
+  // Deploy PR: the live-watch frame relay row while the run is watched.
+  watchFrame AgentRunWatchFrame?
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
@@ -16922,4 +16927,64 @@ model ZernioAccountUsage {
 
   @@unique([workspaceId, month])
   @@map("zernio_account_usage")
+}
+
+// ---------------------------------------------------------------------------
+// Deploy PR (WS=state): state that must be shared by every app instance
+// (2+ web replicas and the worker, no shared memory).
+// ---------------------------------------------------------------------------
+
+// Single-use confirmation tokens (lib/api/single-use-tokens.ts), e.g. the
+// domain-purchase confirmation (lib/studio/service.ts) that used to live in
+// a per-process Map: a token issued by one replica is accepted exactly once
+// by any replica. Only the SHA-256 of the token is stored; consuming it is
+// one DELETE … RETURNING, so a replay (or a concurrent double confirm)
+// finds nothing. FORCE RLS on workspace_id; expired rows are swept on issue.
+model SingleUseToken {
+  tokenHash   String    @id @map("token_hash")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  purpose     String
+  payload     Json
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, expiresAt])
+  @@map("single_use_tokens")
+}
+
+// Live-watch frame relay (lib/agents/runs/watch-relay.ts). The recording runs
+// on the worker; the dashboard's SSE may be served by any web replica. One
+// row per watched run holding only the LATEST JPEG (latest-wins, like the
+// in-process bus), uploaded only while a viewer polls (watched_until), and
+// deleted when the stream ends — frames stay transient, the WebM is the
+// permanent record. The table is UNLOGGED (see the migration): no WAL, not
+// replicated, emptied by a crash — by design. FORCE RLS on workspace_id.
+model AgentRunWatchFrame {
+  runId        String    @id @map("run_id")
+  run          AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seq          Int       @default(0)
+  jpeg         Bytes?
+  ended        Boolean   @default(false)
+  updatedAt    DateTime  @default(now()) @map("updated_at")
+  watchedUntil DateTime? @map("watched_until")
+
+  @@index([workspaceId, updatedAt])
+  @@map("agent_run_watch_frames")
+}
+
+// Knowledge-corpus retrieval counters (lib/intelligence/corpus/activity.ts).
+// The corpus is a platform asset shared by every tenant, not tenant data, so
+// this is a GLOBAL table (no workspace_id, no RLS — like rate_limit_buckets):
+// keys are corpus source ids, values are counts and a timestamp. It replaces
+// data/corpus/retrieval-usage.json, which each replica would have counted on
+// its own (and overwritten).
+model CorpusRetrievalUsage {
+  sourceId  String   @id @map("source_id")
+  hits      Int      @default(0)
+  lastHitAt DateTime @map("last_hit_at")
+
+  @@map("corpus_retrieval_usage")
 }
