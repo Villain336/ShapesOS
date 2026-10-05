@@ -17,6 +17,7 @@
 // Rule failures are OpsError (the generic route maps them to HTTP).
 
 import type { Prisma } from "@prisma/client";
+import { requireWithinLimitTx } from "@/lib/billing/entitlements-server";
 import { OpsError, OpsNotFoundError, auditOpsEvent, type OpsActor } from "../doctype";
 import {
   DEFAULT_DOCK_SLOT_MINUTES,
@@ -58,6 +59,12 @@ async function mustSite(tx: Tx, actor: OpsActor, siteId: string) {
 // ---------------------------------------------------------------------------
 
 export async function createSiteRow(tx: Tx, actor: OpsActor, body: Row): Promise<Row> {
+  // Phase 15.3 (pricing): twin sites per plan (Pro 3; Business, Agency,
+  // trial and self-hosted unlimited). Serialized per workspace so two racing
+  // creates can't both take the last slot; opsCreate already checked the
+  // digital_twin feature itself.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`twin-sites:${actor.workspaceId}`}))`;
+  await requireWithinLimitTx(tx, actor.workspaceId, "twin_sites", await tx.opsSite.count({ where: { workspaceId: actor.workspaceId } }));
   const warehouseId = String(body.warehouseId);
   const wh = await tx.opsWarehouse.findFirst({ where: { id: warehouseId, workspaceId: actor.workspaceId } });
   if (!wh) throw new OpsNotFoundError("warehouses", warehouseId);

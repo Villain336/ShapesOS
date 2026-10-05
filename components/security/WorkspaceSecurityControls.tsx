@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Copy, Loader2, Plus, Users } from "lucide-react";
 import { confirmAction, toast, toastError } from "@/lib/ui/feedback";
+import { UpgradeNotice } from "@/components/billing/UpgradeNotice";
 import { btnDelete, btnPrimary, btnSecondary, cardCls, chipCls, chipMutedCls, helpCls, inputCls, labelCls } from "./ui";
 
 interface Policy {
@@ -135,13 +136,19 @@ function ScimTokens() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ name: string; raw: string } | null>(null);
+  // Phase 15.3 (pricing): SCIM is a plan feature; the server refuses new
+  // tokens without it, so the form is replaced by the upgrade notice.
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
   const load = useCallback(
     () =>
-      api<{ tokens: ScimToken[]; endpoint: string }>("/api/settings/security/scim-tokens").then(
+      api<{ tokens: ScimToken[]; endpoint: string; entitled?: boolean; upgradeMessage?: string | null }>(
+        "/api/settings/security/scim-tokens",
+      ).then(
         (data) => {
           setTokens(data.tokens);
           setEndpoint(data.endpoint);
+          setUpgradeMessage(data.entitled === false ? (data.upgradeMessage ?? "SCIM provisioning isn't included in your plan.") : null);
         },
         (e: unknown) => toastError(e instanceof Error ? e.message : "Couldn't load SCIM tokens."),
       ),
@@ -266,6 +273,11 @@ function ScimTokens() {
         </table>
       )}
 
+      {upgradeMessage ? (
+        <div className="mt-4">
+          <UpgradeNotice message={upgradeMessage} />
+        </div>
+      ) : (
       <form onSubmit={create} className="mt-4 flex flex-wrap items-end gap-2">
         <div className="min-w-0 flex-1">
           <label htmlFor="scim-name" className={labelCls}>
@@ -285,6 +297,7 @@ function ScimTokens() {
           {busy ? "Creating" : "Create token"}
         </button>
       </form>
+      )}
     </section>
   );
 }

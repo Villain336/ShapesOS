@@ -21,6 +21,7 @@
 // (RLS fail-closed). Reads filter by workspaceId; cross-workspace ids 404.
 
 import { emitOpsWriteEvents } from "@/lib/webhooks/ops-events";
+import { requireEntitlementTx } from "@/lib/billing/entitlements-server";
 import type { Prisma } from "@prisma/client";
 import {
   OPS_ENTITY_MAP,
@@ -214,6 +215,9 @@ export async function opsCreate(
   rawBody: unknown,
   opts: OpsServiceOpts = {},
 ): Promise<OpsWriteResult> {
+  // Phase 15.3 (pricing): a plan feature gates creating this entity (POS,
+  // payroll, digital twin) — 403 with an upgrade message, before anything else.
+  if (def.createEntitlement) await requireEntitlementTx(tx, actor.workspaceId, def.createEntitlement);
   const parsed = def.createSchema.safeParse(rawBody);
   if (!parsed.success) {
     throw new OpsError(400, `Invalid ${def.label}: ${parsed.error.issues[0]?.message ?? "validation failed"}`);

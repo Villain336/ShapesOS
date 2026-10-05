@@ -38,6 +38,9 @@ const svc = () => import("./service");
 
 export const twinSiteDef: OpsEntityDef = {
   slug: "twin-sites",
+  // Phase 15.3 (pricing): the digital twin is a Pro-and-up feature; the
+  // per-plan site count (twin_sites) is checked in createSiteRow.
+  createEntitlement: "digital_twin",
   // Phase 14 (approvals): drafts are editor-only — the generic route must not
   // hand them (or their objects / bookings) to viewers. Viewers read a
   // PUBLISHED site through /api/twin/sites/[id]/state and /live.

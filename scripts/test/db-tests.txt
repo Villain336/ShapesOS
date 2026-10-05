@@ -152,3 +152,5 @@ lib/twin/__tests__/twin-viewer-db.test.ts
 lib/automation/__tests__/p14-approvals-db.test.ts
 # Phase 14: the connector refresh sweep never marks an API key or a non-expiring token needs_reauth; renewable credentials still refresh, expiring ones without a refresh token still ask.
 lib/vault/__tests__/refresh-due-db.test.ts
+# Phase 15.3 (pricing): plan gates — digital twin refused on Starter and past Pro's site limit, allowed on Business/trial/self-hosted; POS + payroll creation refused on Starter, allowed on Pro/trial/self-hosted; compute refused after a downgrade (cancel still works); SCIM token route refuses a plan without SCIM and a valid token stops authenticating after a downgrade.
+lib/billing/__tests__/plan-gates-db.test.ts

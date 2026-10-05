@@ -23,6 +23,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { OpsError, opsCreate, opsEntityDef, opsPatch, type OpsActor } from "@/lib/ops/doctype";
+import { requireEntitlementTx } from "@/lib/billing/entitlements-server";
 import type { TwinSiteKind } from "./types";
 
 type Tx = Prisma.TransactionClient;
@@ -48,6 +49,10 @@ export async function createSampleSite(tx: Tx, actor: OpsActor, kind: TwinSiteKi
   const code = SAMPLE_SITE_CODES[kind];
   const existing = await tx.opsSite.findFirst({ where: { workspaceId: actor.workspaceId, code }, include: { _count: { select: { objects: true } } } });
   if (existing) return { siteId: existing.id, kind, created: false, objectCount: existing._count.objects };
+  // Phase 15.3 (pricing): refuse up front (before any sample record is
+  // written) when the plan has no digital twin. The twin_sites count is
+  // checked again when the site row itself is created (createSiteRow).
+  await requireEntitlementTx(tx, actor.workspaceId, "digital_twin");
 
   const create = async (slug: string, body: Row): Promise<Row> => {
     const r = await opsCreate(tx, opsEntityDef(slug), actor, body);
