@@ -114,6 +114,19 @@ Headings get **wider**, not just bolder; that width is the brand's signature. Se
 - **No agent has a color of its own.** Identity is the name plus a black monogram tile (white letter, `radius-key`). Color appears only as the agent's *current state* (running / needs you / done / failed, with its shape), and changes when the state changes. Never key a chart, avatar, border or card to "the researcher's color".
 - Sidebar "Running now", the Overview, runs and missions follow the same tree: lead → sub-agents.
 
+## Twin scene (Phase 13 digital twin)
+
+The digital twin (`/dashboard/ops/twin`) draws a warehouse, factory or store as an isometric 3D scene with Agentic OS chrome around it.
+
+- **Clay only.** The scene and its top-down SVG use the neutral clay greys `clay-0` (lightest: ground, lit tops) to `clay-4` (darkest: tyres, frames) plus `clay-grid` for ground lines (`--aos-clay-*` in `tokens.css`, with a `.dark` variant). No hue, no textures, no external art: every object is a code-generated low-poly primitive from `lib/twin/scene-kit.ts`.
+- **Entity states are neutral text pills** ("Occupied", "Running", "Open", "Low stock"): white pill, muted text, no shape. A dock, machine or register never takes a status colour.
+- **Status colour + shape only for agents.** When an agent is working on an object, its `StatusShape` floats above it in a white pill (running circle, needs-you triangle, done quarter-disc, failed square). These are the only status colours in the scene.
+- **Selection and hover are ink edges** around the object (black when selected, muted when hovered). No glow, no gradients, no coloured shadows, no glass panels; overlays are white `paper` cards with `shadow-hairline`.
+- **Alerts** (dock overdue, bin low, machine stopped and late, register left open) show a black pill with a bell over the object and a line in the inspector. Not red.
+- **Honest positions.** Equipment without telemetry is drawn at its last task location and labelled "estimated".
+- **Motion.** The scene renders on demand (no idle animation). Camera fly-to uses a short ease; with `prefers-reduced-motion` the camera jumps instead.
+- **Fallbacks.** The server renders a top-down SVG of the same layout while WebGL loads; it is also the 2D view and the no-WebGL view. A table-only view lists every object as a focusable button for screen readers.
+
 ## Writing
 
 - Name things the way the user thinks of them: "Tools", "Schedules", "Memory", not internal system names.

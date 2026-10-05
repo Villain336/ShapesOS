@@ -4,6 +4,7 @@
 
 import { secrets } from "@/lib/secrets";
 import { MockSiteFileProvider } from "./mock";
+import { fakeOrRefuse } from "@/lib/env/secrets";
 import { SftpSiteFileProvider } from "./sftp";
 import type { SiteConnectionConfig, SiteFileProvider } from "./types";
 
@@ -20,7 +21,8 @@ export function getSiteFileProvider(conn: {
   secretEnc: string;
   demo: boolean;
 }): SiteFileProvider {
-  if (conn.demo) return new MockSiteFileProvider();
+  // Phase 11 (conncore): demo (mock) file connections are refused in production.
+  if (conn.demo) return fakeOrRefuse("demo SFTP", () => new MockSiteFileProvider());
   const secret = secrets().decrypt(conn.secretEnc);
   const config: SiteConnectionConfig = {
     id: conn.id,

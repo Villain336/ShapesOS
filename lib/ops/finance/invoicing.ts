@@ -16,6 +16,7 @@
 // credit notes are gated (OPS_CREDIT_NOTE_ISSUE). The Stripe webhook is the
 // one exception: a provider-signed payment event is the authority.
 
+import { emitOpsEvent, invoicePaidEvent } from "@/lib/webhooks/ops-events";
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { OpsError, type OpsActor } from "../doctype";
@@ -117,6 +118,11 @@ export async function applyInvoicePayment(tx: Tx, actor: OpsActor, input: ApplyP
       summary: `payment ${payment.id} of ${fmtMoney(input.amountCents)} applied (${input.provider ?? "manual"}); balance ${fmtMoney(balance - input.amountCents)}${status === "paid" ? " — paid in full" : ""}`,
     },
   });
+  // Phase 11 (conncore): paid in full by a payment → invoice.paid (same
+  // dedup key as a status patch, so it is delivered once), in this transaction.
+  if (status === "paid") {
+    await emitOpsEvent(tx, actor.workspaceId, invoicePaidEvent({ ...inv, paidCents, status, paidAt: new Date() } as unknown as Record<string, unknown>));
+  }
   return { payment, invoice: { ...inv, paidCents, status }, balanceDueCents: balance - input.amountCents };
 }
 
@@ -224,7 +230,8 @@ export async function invoiceAccount(tx: Tx, workspaceId: string, invoiceId: str
 // PDF + delivery
 // ---------------------------------------------------------------------------
 
-async function financeSettings(tx: Tx, workspaceId: string) {
+// Phase 12 (people): exported for payslip PDFs (employer name, currency).
+export async function financeSettings(tx: Tx, workspaceId: string) {
   const [s, ws] = await Promise.all([
     tx.opsFinanceSettings.findUnique({ where: { workspaceId } }),
     tx.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),

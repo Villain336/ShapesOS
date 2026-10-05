@@ -26,6 +26,7 @@
 // not a draft) is NOT applied automatically: an audit row flags it for a
 // person, mirroring the invoice path.
 
+import { emitOpsEvent, orderPaidEvent } from "@/lib/webhooks/ops-events";
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { OPS_ENTITY_MAP } from "../entities";
@@ -180,6 +181,12 @@ export async function markWebOrderPaid(
       order.id,
       `web order ${orderLabel(order.id)} paid via Stripe (${amount}c, ${providerRef}) → confirmed; ${stock.moves} stock move(s)${stock.oversold.length ? `, OVERSOLD ${stock.oversold.join(", ")}` : ""}${promoNote}`,
     );
+    // Phase 11 (conncore): order.paid, in this transaction (once per order).
+    await emitOpsEvent(
+      tx,
+      workspaceId,
+      orderPaidEvent({ ...order, status: "confirmed", paidAt, customerEmail: email } as unknown as Record<string, unknown>, "stripe"),
+    );
     return { duplicate: false, orderId, paymentId: payment.id, status: "confirmed", stockMoves: stock.moves, oversold: stock.oversold, journalEntryId: posted?.entry.id ?? null };
   });
 }
@@ -196,7 +203,12 @@ export async function bookSale(
   orderId: string,
   lines: WebOrderLine[],
   storeId: string | null,
+  // Phase 12 (mfgpos): the till books its sales here too — its register's
+  // location is taken from first, and the ledger notes name the till sale.
+  opts: { preferLocationId?: string | null; label?: string; actorName?: string } = {},
 ): Promise<{ moves: number; oversold: string[] }> {
+  const what = opts.label ?? `web order ${orderLabel(orderId)}`;
+  const actorName = opts.actorName ?? "storefront";
   let moves = 0;
   const oversold: string[] = [];
   const store = storeId ? await tx.opsStore.findFirst({ where: { id: storeId, workspaceId: actor.workspaceId }, select: { warehouseId: true } }) : null;
@@ -229,24 +241,31 @@ export async function bookSale(
     const wh = new Map(locs.map((l) => [l.id, l.warehouseId]));
     const quants = groups
       .filter((g) => g.locationId && wh.has(g.locationId) && vOf(g) === variantId)
-      .map((g) => ({ locationId: g.locationId!, qty: g._sum.delta ?? 0, preferred: Boolean(store?.warehouseId) && wh.get(g.locationId!) === store!.warehouseId }))
+      .map((g) => ({
+        locationId: g.locationId!,
+        qty: g._sum.delta ?? 0,
+        exact: Boolean(opts.preferLocationId) && g.locationId === opts.preferLocationId,
+        preferred: Boolean(store?.warehouseId) && wh.get(g.locationId!) === store!.warehouseId,
+      }))
       .filter((q) => q.qty > 0)
-      .sort((a, b) => Number(b.preferred) - Number(a.preferred) || b.qty - a.qty);
+      .sort((a, b) => Number(b.exact) - Number(a.exact) || Number(b.preferred) - Number(a.preferred) || b.qty - a.qty);
     let left = line.qty;
     for (const q of quants) {
       if (left <= 0) break;
       const take = Math.min(left, q.qty);
-      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -take, reason: "sale", variantId: bookVariant, locationId: q.locationId, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
+      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -take, reason: "sale", variantId: bookVariant, locationId: q.locationId, note: what, actorName });
       left -= take;
       moves += 1;
     }
     if (left > 0) {
-      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -left, reason: "sale", variantId: bookVariant, locationId: null, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
+      // Phase 12 (mfgpos): a till with a location sells what isn't located
+      // elsewhere from its own shelf (the goods were physically there).
+      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -left, reason: "sale", variantId: bookVariant, locationId: opts.preferLocationId ?? null, note: what, actorName });
       moves += 1;
     }
   }
   if (oversold.length) {
-    await auditOpsEvent(tx, OPS_ENTITY_MAP["inventory-txns"]!, actor, "oversold", orderId, `web order ${orderLabel(orderId)} sold more than on hand: ${oversold.join(", ")} — restock or contact the buyer`);
+    await auditOpsEvent(tx, OPS_ENTITY_MAP["inventory-txns"]!, actor, "oversold", orderId, `${what} sold more than on hand: ${oversold.join(", ")} — restock or contact the buyer`);
   }
   return { moves, oversold };
 }

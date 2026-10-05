@@ -35,8 +35,8 @@
 //     an in-flight model call, cancels the turn's pending proposals and
 //     expires the approvals it raised.
 //   * Auto-approve: a per-agent rule (lib/automation/policy.ts) may let a
-//     Tier 0/1 action run without the "yes" — Tier 2/3 and destructive tools
-//     always ask, whatever the rule says.
+//     Tier 0–2 action (Phase 14) run without the "yes" — Tier 3 (money and
+//     irreversible) and destructive tools always ask, whatever the rule says.
 //
 // PHASE 8 — durable runs: a turn still working after AGENT_INLINE_BUDGET_SECONDS
 // hands off to the agent worker at its next step boundary (the transcript is
@@ -52,7 +52,7 @@ import { getTool, registerExtraTool, type ToolContext, type ToolDef } from "./to
 import {
   DELEGATE_TOOL,
   executeTool,
-  proposalText,
+  proposalText as proposalTextFor,
   runEvent,
   stopRequested,
   type ChatToolCall,
@@ -115,6 +115,14 @@ import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
 // Phase 9 (apps): the mini-app tools register themselves on import.
 import "@/lib/apps/tools";
+// Phase 11 (seotools): structured data + sitemap tools (group "site").
+import "@/lib/seo/tools";
+// Phase 11 (seotools): create_document / create_spreadsheet (group "content").
+import "@/lib/documents/tools";
+// Phase 11 (seotools): analyze_data (group "code", runs in the sandbox).
+import "@/lib/sandbox/analyze-tool";
+// Phase 11 (seotools): web_scrape / web_crawl (group "web", Context.dev).
+import "@/lib/knowledge/contextdev/web-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
@@ -382,6 +390,11 @@ async function mockTurn(
     await executeTool(ctx, toolName, args, call);
     return call;
   };
+  // Phase 14: a call an automation rule let run is reported as done, not proposed.
+  const proposalText = (call: ChatToolCall): string =>
+    call.autoApproved
+      ? `${call.status === "executed" ? "Done" : "Tried"} without asking (${call.autoApproved}): ${call.resultSummary ?? call.tool}`
+      : proposalTextFor(call);
 
   const first = lower.split(/\s+/)[0];
   switch (first) {

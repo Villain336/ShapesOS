@@ -8,6 +8,11 @@ import { TOOLS, TOOL_ACTION, TOOL_GROUP, allTools, getTool, toolCatalogForPrompt
 // Phase 8: the ship and browser tools register themselves on import.
 import "@/lib/ship/tools";
 import "@/lib/agents/runs/browser-tools";
+// Phase 11 (seotools): SEO, document, analysis and web tools register on import.
+import "@/lib/seo/tools";
+import "@/lib/documents/tools";
+import "@/lib/sandbox/analyze-tool";
+import "@/lib/knowledge/contextdev/web-tools";
 import { isToolGroup } from "@/lib/agents/grants";
 import { evaluateTier } from "@/lib/orchestrator/authority";
 import { KNOWN_ACTIONS } from "@/lib/automation/policy";
@@ -72,6 +77,36 @@ describe("tool groups", () => {
     assert.equal(toolGranted("git_commit", ["workspace", "code"]), true);
     assert.equal(toolGranted("git_push_branch", ["workspace", "code"]), false);
     assert.equal(toolGranted("git_push_branch", ["workspace", "ship"]), true);
+  });
+
+  it("Phase 11 (seotools) tools: groups, actions and tiers", () => {
+    const on = { smallActionThresholdCents: 10_000, automationAllows: true };
+    const off = { smallActionThresholdCents: 10_000, automationAllows: false };
+    const expect: Array<[string, string, string | null, number | null]> = [
+      // name, group, action, tier (null = safe tool, no action)
+      ["add_structured_data", "site", "draft_structured_data", 0],
+      ["validate_structured_data", "site", null, null],
+      ["create_document", "content", "draft_document", 0],
+      ["create_spreadsheet", "content", "draft_spreadsheet", 0],
+      ["web_scrape", "web", "fetch_web_pages", 0],
+      ["web_crawl", "web", "fetch_web_pages", 0],
+      ["analyze_data", "code", "run_sandbox_command", 2],
+    ];
+    for (const [name, group, action, tier] of expect) {
+      assert.ok(getTool(name), `${name} is registered`);
+      assert.equal(TOOL_GROUP[name], group, name);
+      if (action) {
+        assert.equal(TOOL_ACTION[name], action, name);
+        assert.equal(evaluateTier({ kind: action }, on), tier, name);
+        assert.ok(KNOWN_ACTIONS.some((a) => a.action === action), `${action} is in the automation catalog`);
+      }
+    }
+    // Submitting a sitemap is the existing Tier-1 "refresh owned page": asks unless automation is on.
+    assert.equal(TOOL_GROUP.submit_sitemap, "site");
+    assert.equal(TOOL_ACTION.submit_sitemap, "refresh_owned_page");
+    assert.equal(evaluateTier({ kind: "refresh_owned_page" }, off), 2);
+    assert.equal(evaluateTier({ kind: "refresh_owned_page" }, on), 1);
+    assert.equal(TOOL_ACTION.analyze_data, TOOL_ACTION.bash, "analyze_data has bash's tier");
   });
 
   it("the prompt catalog lists only granted tools", () => {

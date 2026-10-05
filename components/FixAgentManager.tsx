@@ -19,6 +19,108 @@ interface SiteRow {
   sourceType: string;
 }
 
+// Phase 11 (seotools): live-URL crawl summary (lib/audit/live.ts).
+interface LiveCrawl {
+  startUrl: string;
+  rendering: "static" | "js";
+  renderingNote: string;
+  pagesCrawled: number;
+  pagesBlockedByRobots: number;
+  truncated: boolean;
+  statusCounts: Record<string, number>;
+  robots: { found: boolean };
+  sitemap: { found: boolean; urlCount: number };
+  externalChecked: number;
+}
+
+// Phase 11 (seotools): Core Web Vitals (lib/seo/pagespeed.ts). Ratings are
+// measurement data, not agent states — shown as text, never status colours.
+interface VitalsMetric {
+  value: number;
+  rating: "good" | "needs-improvement" | "poor";
+}
+interface StrategyVitals {
+  strategy: "mobile" | "desktop";
+  field: { scope: "url" | "origin"; lcp: VitalsMetric | null; inp: VitalsMetric | null; cls: VitalsMetric | null } | null;
+  lab: { performanceScore: number | null; lcp: VitalsMetric | null; cls: VitalsMetric | null; tbt: VitalsMetric | null };
+}
+type Vitals =
+  | { unavailable: true; reason: string; url: string; measuredAt: string }
+  | { unavailable?: false; url: string; measuredAt: string; keyed: boolean; strategies: StrategyVitals[]; errors: { strategy: string; reason: string }[] };
+
+const RATING_LABEL: Record<VitalsMetric["rating"], string> = { good: "good", "needs-improvement": "needs work", poor: "poor" };
+
+function metricText(m: VitalsMetric | null, kind: "ms" | "cls"): string {
+  if (!m) return "—";
+  return `${kind === "cls" ? m.value.toFixed(2) : `${Math.round(m.value)} ms`} (${RATING_LABEL[m.rating]})`;
+}
+
+function VitalsSummary({ vitals }: { vitals: Vitals }) {
+  if (vitals.unavailable) {
+    return <p className="mt-2 text-xs text-muted">Core Web Vitals not measured: {vitals.reason}</p>;
+  }
+  return (
+    <div className="mt-3 space-y-3">
+      {vitals.strategies.map((s) => (
+        <div key={s.strategy} className="text-xs">
+          <p className="font-semibold text-ink">
+            {s.strategy === "mobile" ? "Mobile" : "Desktop"} · performance {s.lab.performanceScore ?? "—"}
+          </p>
+          <dl className="mt-1 grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-0.5 text-muted">
+            <dt />
+            <dd>{s.field ? `Real users (${s.field.scope === "origin" ? "site-wide" : "this page"})` : "Real users"}</dd>
+            <dd>Lab</dd>
+            <dt>LCP</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.lcp, "ms") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.lcp, "ms")}</dd>
+            <dt>INP / TBT</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.inp, "ms") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.tbt, "ms")}</dd>
+            <dt>CLS</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.cls, "cls") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.cls, "cls")}</dd>
+          </dl>
+        </div>
+      ))}
+      {vitals.errors.map((e) => (
+        <p key={e.strategy} className="text-xs text-muted">{e.strategy}: {e.reason}</p>
+      ))}
+      <p className="text-[11px] text-muted">
+        PageSpeed Insights · {new Date(vitals.measuredAt).toLocaleString()}{vitals.keyed ? "" : " · keyless quota"}
+      </p>
+    </div>
+  );
+}
+
+// Phase 11 (seotools): sitemap submissions (lib/seo/sitemap-submit.ts).
+interface SitemapSubmission {
+  id: string;
+  target: "gsc" | "indexnow";
+  status: "submitted" | "not_connected" | "needs_reconnect" | "failed";
+  urlCount: number;
+  detail: string | null;
+  createdAt: string;
+}
+
+const SUBMIT_TARGET_LABEL: Record<SitemapSubmission["target"], string> = { gsc: "Search Console", indexnow: "IndexNow" };
+const SUBMIT_STATUS_LABEL: Record<SitemapSubmission["status"], string> = {
+  submitted: "Submitted",
+  not_connected: "Not connected",
+  needs_reconnect: "Needs reconnect",
+  failed: "Failed",
+};
+
+interface LiveAudit {
+  id: string;
+  status: string;
+  targetUrl: string | null;
+  totalIssues: number;
+  errorIssues: number;
+  createdAt: string;
+  crawl: LiveCrawl | null;
+  vitals: Vitals | null;
+}
+
 interface Settings {
   enabled: boolean;
   allowedCategories: string[];
@@ -110,6 +212,9 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [liveAudit, setLiveAudit] = useState<LiveAudit | null>(null);
+  const [liveUrl, setLiveUrl] = useState("");
+  const [submissions, setSubmissions] = useState<SitemapSubmission[]>([]);
 
   const loadSites = useCallback(async () => {
     const res = await fetch(`/api/websites?projectId=${projectId}`);
@@ -133,6 +238,12 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     }
     setSettings(data.settings);
     setAudit(data.latestAudit);
+    setLiveAudit(data.latestLiveAudit ?? null);
+    fetch(`/api/websites/${siteId}/sitemap?projectId=${projectId}`)
+      .then((r) => (r.ok ? r.json() : { submissions: [] }))
+      .then((d) => setSubmissions(d.submissions ?? []))
+      .catch(() => setSubmissions([]));
+    setLiveUrl((prev) => prev || data.latestLiveAudit?.targetUrl || data.site?.liveUrl || "");
     setIssues(data.issues ?? []);
     setRuns(data.fixRuns ?? []);
   }, [siteId, projectId]);
@@ -194,6 +305,74 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
       setNotice(`Audit complete — ${data.issueCount} issue${data.issueCount === 1 ? "" : "s"} found${data.mock ? " (mock data)" : ""}.`);
       loadInbox();
     }
+  }
+
+  async function runLiveAudit() {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/audit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, mode: "live", url: liveUrl.trim() || undefined }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) setError(data.error ?? "Live audit failed");
+    else {
+      setNotice(`Live crawl complete — ${data.issueCount} issue${data.issueCount === 1 ? "" : "s"} found.`);
+      loadInbox();
+    }
+  }
+
+  async function draftStructuredData() {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/structured-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) setError(data.error ?? "Couldn't draft structured data");
+    else if (!data.saved) setNotice("Every page already carries this structured data — nothing to draft.");
+    else setNotice(`Saved draft #${data.revision.number} with structured data on ${data.pages.filter((p: { changed: boolean }) => p.changed).length} pages. Review and apply it in Site drafts — nothing is live yet.`);
+  }
+
+  async function sitemapAction(action: "rebuild" | "submit") {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/sitemap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, action }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error ?? "Sitemap action failed");
+      return;
+    }
+    if (action === "rebuild") {
+      setNotice(
+        data.skipped === "user_managed"
+          ? `Your hand-written sitemap.xml was kept; robots.txt points at ${data.sitemapUrl}.`
+          : `Sitemap rebuilt with ${data.urlCount} pages${data.written.length ? "" : " (no changes)"}. It goes live with the next deploy.`,
+      );
+    } else {
+      setNotice(
+        (data.results as { target: SitemapSubmission["target"]; status: SitemapSubmission["status"] }[])
+          .map((r) => `${SUBMIT_TARGET_LABEL[r.target]}: ${SUBMIT_STATUS_LABEL[r.status].toLowerCase()}`)
+          .join(" · "),
+      );
+    }
+    loadInbox();
   }
 
   async function setIssueStatus(issueId: string, status: "approved" | "ignored") {
@@ -355,6 +534,83 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                 {audit.mock ? " — mock data" : ""} · {new Date(audit.createdAt).toLocaleString()}
               </p>
             )}
+
+            {/* Phase 11 (seotools): crawl the live site */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Live site</h3>
+              <p className="mt-1 text-xs text-muted">
+                Crawls the published pages: status codes, redirects, canonical, hreflang, noindex, structured data, robots.txt and sitemap — and measures Core Web Vitals for the start page.
+              </p>
+              <input
+                type="url"
+                value={liveUrl}
+                onChange={(e) => setLiveUrl(e.target.value)}
+                placeholder="https://example.com"
+                aria-label="Live site URL"
+                className="mt-2 w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 font-mono text-xs"
+              />
+              <button onClick={runLiveAudit} disabled={busy}
+                className="mt-2 rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                {busy ? "Working…" : "Crawl live site"}
+              </button>
+              {liveAudit?.crawl && (
+                <dl className="mt-3 space-y-1 text-xs text-muted">
+                  <div className="flex justify-between gap-2"><dt>Pages crawled</dt><dd className="text-ink">{liveAudit.crawl.pagesCrawled}{liveAudit.crawl.truncated ? " (budget reached)" : ""}</dd></div>
+                  <div className="flex justify-between gap-2"><dt>Status codes</dt><dd className="font-mono text-ink">{Object.entries(liveAudit.crawl.statusCounts).map(([k, v]) => `${k} ${v}`).join(" · ") || "—"}</dd></div>
+                  <div className="flex justify-between gap-2"><dt>robots.txt / sitemap</dt><dd className="text-ink">{liveAudit.crawl.robots.found ? "found" : "missing"} / {liveAudit.crawl.sitemap.found ? `${liveAudit.crawl.sitemap.urlCount} URLs` : "missing"}</dd></div>
+                  {liveAudit.crawl.pagesBlockedByRobots > 0 && <div className="flex justify-between gap-2"><dt>Skipped (robots.txt)</dt><dd className="text-ink">{liveAudit.crawl.pagesBlockedByRobots}</dd></div>}
+                  <div className="flex justify-between gap-2"><dt>Outbound links checked</dt><dd className="text-ink">{liveAudit.crawl.externalChecked}</dd></div>
+                  <div><dt className="sr-only">Rendering</dt><dd>{liveAudit.crawl.rendering === "js" ? "JavaScript-rendered" : "Static HTML"} — {liveAudit.crawl.renderingNote}</dd></div>
+                  <div><dd>{liveAudit.totalIssues} issues · {new Date(liveAudit.createdAt).toLocaleString()}</dd></div>
+                </dl>
+              )}
+              {liveAudit?.vitals && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <h4 className="text-xs font-semibold text-ink">Core Web Vitals</h4>
+                  <VitalsSummary vitals={liveAudit.vitals} />
+                </div>
+              )}
+            </div>
+
+            {/* Phase 11 (seotools): sitemap rebuild + submission */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Sitemap</h3>
+              <p className="mt-1 text-xs text-muted">
+                sitemap.xml and the robots.txt Sitemap line are rebuilt when a draft is applied and before each deploy. Submit them once the site is live.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button onClick={() => sitemapAction("rebuild")} disabled={busy}
+                  className="rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                  Rebuild sitemap
+                </button>
+                <button onClick={() => sitemapAction("submit")} disabled={busy}
+                  className="rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                  Submit to search engines
+                </button>
+              </div>
+              {submissions.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-muted">
+                  {submissions.slice(0, 4).map((sub) => (
+                    <li key={sub.id}>
+                      <span className="font-medium text-ink">{SUBMIT_TARGET_LABEL[sub.target]}</span> · {SUBMIT_STATUS_LABEL[sub.status]} · {new Date(sub.createdAt).toLocaleString()}
+                      {sub.detail && <span className="block">{sub.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Phase 11 (seotools): JSON-LD as a site draft */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Structured data</h3>
+              <p className="mt-1 text-xs text-muted">
+                Adds schema.org JSON-LD (organisation, website, breadcrumbs, FAQs) to every page as a draft you review before it goes live.
+              </p>
+              <button onClick={draftStructuredData} disabled={busy}
+                className="mt-2 rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                {busy ? "Working…" : "Draft structured data"}
+              </button>
+            </div>
           </div>
 
           {/* Inbox */}

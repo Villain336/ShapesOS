@@ -56,8 +56,23 @@ function localHit(key: string, windowMs: number, now: number): { n: number; star
 }
 
 export async function storeHit(kind: keyof typeof STORE_LIMITS, storeId: string, ip: string | null, now: number = Date.now()): Promise<StoreHit> {
-  const { limit, windowMs } = STORE_LIMITS[kind];
-  const key = `shop:${kind}:${storeId}:${ip ?? "no-ip"}`;
+  return publicEndpointHit(`shop:${kind}`, STORE_LIMITS[kind], storeId, ip, now);
+}
+
+/**
+ * Fixed-window hit for any public endpoint, keyed scope + resource id +
+ * client IP (Phase 12 (people): event registration reuses it). Shared
+ * counter store when configured, the per-process fallback otherwise.
+ */
+export async function publicEndpointHit(
+  scope: string,
+  rule: { limit: number; windowMs: number },
+  resourceId: string,
+  ip: string | null,
+  now: number = Date.now(),
+): Promise<StoreHit> {
+  const { limit, windowMs } = rule;
+  const key = `${scope}:${resourceId}:${ip ?? "no-ip"}`;
   const store = sharedCounterStore();
   if (store) {
     try {

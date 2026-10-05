@@ -40,6 +40,7 @@ import {
   type MailProviderName,
 } from "./provider";
 import { FakeMailProvider } from "./fake";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 import { LobProvider } from "./lob";
 import { PostGridProvider } from "./postgrid";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
@@ -74,6 +75,15 @@ function constructProvider(
 }
 
 /**
+ * Phase 11 (conncore): no Lob/PostGrid row → the render-only fake, which
+ * production refuses ("direct mail is not connected").
+ */
+export function fallbackMailProvider(): ResolvedMailProvider {
+  assertFakeProviderAllowed("direct mail");
+  return { provider: new FakeMailProvider(), mode: "test", providerRowId: null, providerName: "fake" };
+}
+
+/**
  * Resolve the workspace's mail provider. No row → fake (render-only).
  * Mode "test" → real provider built with the TEST key (render-only at the
  * provider). Mode "live" → real provider with the LIVE key (real postage —
@@ -84,9 +94,7 @@ export async function resolveMailProvider(workspaceId: string): Promise<Resolved
     where: { workspaceId },
     orderBy: { updatedAt: "desc" },
   });
-  if (!row) {
-    return { provider: new FakeMailProvider(), mode: "test", providerRowId: null, providerName: "fake" };
-  }
+  if (!row) return fallbackMailProvider();
   const mode: MailProviderMode = row.mode === "live" ? "live" : "test";
   const enc = mode === "live" ? row.liveKeyEnc : row.testKeyEnc;
   if (!enc) {

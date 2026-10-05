@@ -392,3 +392,43 @@ export async function notifyTicketSlaBreached(input: TicketSlaBreachedInput, db:
     return 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 13 (twincore): digital twin alerts (dock overdue, bin low, machine
+// stopped while late, register left open) → editors, once per condition.
+// ---------------------------------------------------------------------------
+
+export interface TwinAlertInput {
+  workspaceId: string;
+  siteId: string;
+  siteName: string;
+  objectId: string;
+  objectLabel: string;
+  message: string;
+  /** Names the condition's record (lib/twin/derive.ts alertCandidates) — one notification per recipient per condition. */
+  dedupKey: string;
+}
+
+/** "Dock 3: TRK-1 is 45 min past its ETA" → editors, linking to the object on the twin. */
+export async function notifyTwinAlert(input: TwinAlertInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const editors = await membersAtLeast(db, input.workspaceId, "editor");
+    return await createAndEmit(
+      db,
+      editors.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: `${input.siteName} · ${input.objectLabel}`,
+        body: input.message.slice(0, 500),
+        href: `/dashboard/ops/twin/${encodeURIComponent(input.siteId)}?object=${encodeURIComponent(input.objectId)}`,
+        sourceType: "twin_object",
+        sourceId: input.objectId,
+        dedupKey: input.dedupKey,
+      })),
+    );
+  } catch (e) {
+    warn("twin_alert", e);
+    return 0;
+  }
+}

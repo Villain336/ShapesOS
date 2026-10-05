@@ -10,8 +10,8 @@
 //      grant check inside resolveConnectorTool.
 //   3. Role: ToolDef.minRole.
 //   4. Confirmation gate: a non-safe tool runs only after the user's "yes",
-//      or when a per-agent auto-approve rule covers a Tier 0/1 action;
-//      destructive tools always ask.
+//      or when a per-agent auto-approve rule covers a Tier 0–2 action
+//      (Phase 14); Tier 3 and destructive tools always ask.
 //   5. Run + audit + run event.
 //
 // Moved out of lib/chat/agent.ts so lib/agents/loop.ts can use it without an
@@ -56,7 +56,7 @@ export interface ChatToolCall {
   autoApproved?: string;
   /**
    * Phase 5: on a pending proposal, the automation action a per-agent rule
-   * could cover (Tier 0/1 only) — the chat offers "do this without asking".
+   * could cover (Phase 14: Tier 0–2) — the chat offers "do this without asking".
    * Absent = this kind of action always asks.
    */
   autoAction?: string;
@@ -206,8 +206,8 @@ export async function executeTool(
     return null;
   }
   // Confirmation gate: non-safe tools only run after an explicit "yes" —
-  // or, Phase 5, when a per-agent auto-approve rule covers a Tier 0/1
-  // action. Destructive tools always ask.
+  // or, Phase 5, when a per-agent auto-approve rule covers the action
+  // (Phase 14: Tier 0–2). Tier 3 and destructive tools always ask.
   let autoReason: string | undefined;
   if (tool.kind !== "safe" && !ctx.confirmed) {
     const decision =
@@ -222,7 +222,8 @@ export async function executeTool(
       call.status = "pending_confirmation";
       call.resultSummary = `Proposed ${tool.name} (${tool.kind}) — awaiting confirmation`;
       if (ctx.grant) call.grant = [...ctx.grant];
-      if (decision && decision.tier <= 1) call.autoAction = toolAction(tool.name);
+      // Phase 14: offered on every Tier 0–2 call (never Tier 3 / destructive).
+      if (decision?.offerAuto) call.autoAction = toolAction(tool.name);
       await runEvent(ctx, `Waiting for your OK: ${tool.name}`, { kind: "tool_result", tool: tool.name, status: "pending_confirmation", toolKind: tool.kind, ...ids }, "gate");
       return null;
     }

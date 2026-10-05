@@ -40,6 +40,8 @@ export interface ApplyInput {
   provider?: LocalDirProvider;
   /** Test seam: audit log writer. */
   log?: typeof logSiteChange;
+  /** Phase 11 (seotools): rebuild the sitemap after applying a draft (default true). */
+  refreshSitemap?: boolean;
 }
 
 export interface ApplyOutcome {
@@ -111,6 +113,14 @@ export async function applySiteRevision(input: ApplyInput): Promise<ApplyOutcome
       ).catch(() => undefined);
     }
     throw err;
+  }
+
+  // Phase 11 (seotools): rebuild sitemap.xml / robots.txt / IndexNow key for
+  // the applied draft's pages (best effort — never fails the apply).
+  // Restoring a backup stays an exact revert: no rebuild.
+  if (rev.status === "draft" && input.refreshSitemap !== false) {
+    const { refreshSiteSitemap } = await import("@/lib/seo/sitemap");
+    await refreshSiteSitemap({ siteId: input.siteId, projectId: input.projectId, provider }).catch(() => undefined);
   }
 
   await log({
