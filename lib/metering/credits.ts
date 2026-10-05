@@ -183,6 +183,11 @@ export const CREDIT_COSTS = {
   /** One GEO (AI visibility) prompt run or its judge call: the engine's
    * estimated USD × 4, rounded up (1 = the floor). */
   geo_prompt_run: { credits: 1, basis: "cost-plus", description: "AI visibility (GEO) prompt run at 4× cost", category: "data" },
+  /** One Context.dev call on the PLATFORM key, per Context.dev credit it
+   * costs (Context.dev pricing, checked 2026-10-05: Developer overage $2.20
+   * per 1,000 credits = $0.0022; ~4× → 1 credit). A workspace's own
+   * Context.dev key is free. Charged at the budget gate before the call. */
+  contextdev_call: { credits: 1, basis: "cost-plus", description: "Context.dev (platform key): per Context.dev credit", category: "data" },
   /** Penpot design-token import. 0 credits: Penpot is the user's own
    * instance (BYO) — the event exists for per-tenant usage visibility only
    * (the import route has metered it since Phase 11; the action was missing
@@ -194,6 +199,9 @@ export const CREDIT_COSTS = {
 
 /** Model tokens are charged at 1.5× the provider's list cost. */
 export const LLM_TOKEN_COST_MULTIPLIER = 1.5;
+
+/** Credits per Context.dev credit on the platform key (≈4× $0.0022). */
+export const CONTEXTDEV_PLATFORM_CREDITS_PER_VENDOR_CREDIT = 1;
 
 /** Phase 10 intelligence vendor calls are charged at 4× their USD cost. */
 export const INTELLIGENCE_VENDOR_MULTIPLIER = 4;

@@ -27,7 +27,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
-import { meter } from "@/lib/metering/service";
+import { capFits, checkCap, meter } from "@/lib/metering/service";
 import {
   ProviderNotConfiguredError,
   sha256Hex,
@@ -579,6 +579,19 @@ export interface ExecuteResult {
   spendCents: number;
   mode: MailProviderMode;
   renderedOnly: boolean;
+  /** Phase 15.2: the send stopped because the workspace's credit cap was
+   *  reached; the remaining pieces stay queued (nothing charged for them). */
+  stoppedAtCap?: boolean;
+  capMessage?: string;
+}
+
+/**
+ * Phase 15.2: credits for one mail piece — the provider's per-piece cost at
+ * HOSTED_MARGIN_MULTIPLIER (2×), 1 credit = 1¢, rounded up.
+ */
+export function mailPieceCredits(perPieceCents: number): number {
+  if (!(perPieceCents > 0)) return 0;
+  return Math.ceil(perPieceCents * HOSTED_MARGIN_MULTIPLIER);
 }
 
 export async function executeCampaign(
@@ -649,6 +662,7 @@ export async function executeCampaign(
     renderedOnly: !liveMode,
   };
 
+  const pieceCredits = mailPieceCredits(perPieceCents);
   for (const piece of sendable) {
     const addr = piece.addressSnapshot as unknown as MailAddress;
     // Consent gate (mirrors the R3 messaging dispatcher).
@@ -669,6 +683,19 @@ export async function executeCampaign(
         });
         out.suppressed++;
         continue;
+      }
+    }
+    // Phase 15.2: stop the send on cap_exceeded — the piece's credits must
+    // fit (or overage be on) BEFORE postage is spent. The remaining pieces
+    // stay queued and nothing is charged for them.
+    if (pieceCredits > 0) {
+      const cap = await checkCap(workspaceId);
+      if (!capFits(cap, pieceCredits)) {
+        out.stoppedAtCap = true;
+        out.capMessage =
+          `Credit cap reached (${cap.used.toLocaleString()} of ${cap.capCredits.toLocaleString()} credits used) — ` +
+          `${out.sent} piece${out.sent === 1 ? "" : "s"} sent, the rest stay queued. Raise the cap or add credits in Settings → Usage.`;
+        break;
       }
     }
     try {
@@ -696,7 +723,11 @@ export async function executeCampaign(
         await meter({
           workspaceId,
           action: "mail_piece",
-          credits: perPieceCents, // 1 credit = $0.01; pass-through provider cost
+          // Phase 15.2: provider cost × HOSTED_MARGIN_MULTIPLIER (1 credit = 1¢).
+          // Recorded after the fact — the piece was sent (the cap was checked
+          // before it); idempotent per piece.
+          credits: pieceCredits,
+          afterTheFact: true,
           idempotencyKey: `mail-send:${piece.id}`,
           evidenceRef: `mail-piece:${piece.id}:${effectiveName}`,
         });
@@ -715,7 +746,8 @@ export async function executeCampaign(
   await prisma.mailCampaign.update({
     where: { id: campaign.id },
     data: {
-      status: out.failed > 0 && out.sent === 0 ? "failed" : "complete",
+      // Phase 15.2: stopped at the cap → "cap_reached" (remaining pieces queued).
+      status: out.stoppedAtCap ? "cap_reached" : out.failed > 0 && out.sent === 0 ? "failed" : "complete",
       mailedAt: new Date(),
       actualCostCents: out.spendCents,
     },

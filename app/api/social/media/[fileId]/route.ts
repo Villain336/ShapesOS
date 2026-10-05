@@ -8,13 +8,14 @@ import { readFile } from "@/lib/filesystem/service";
 import { SOCIAL_MEDIA_ROOT } from "@/lib/social/publications";
 import { NotFoundError } from "@/lib/api/errors";
 import { guardWorkspace, socialError } from "../../_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const INLINE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/quicktime", "video/webm"]);
 
-export async function GET(_req: Request, ctx: { params: Promise<{ fileId: string }> }) {
+async function handleGET(_req: Request, ctx: { params: Promise<{ fileId: string }> }) {
   try {
     const { workspace } = await guardWorkspace();
     const { fileId } = await ctx.params;
@@ -36,3 +37,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ fileId: string
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);

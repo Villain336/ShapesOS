@@ -146,18 +146,22 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
     envVars: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
   });
 
+  // Phase 15.1: Context.dev is "Both" — the workspace's own key, else the
+  // platform key (CONTEXTDEV_API_KEY, charged in credits).
   const ctx = facts.contextDevConnected;
+  const ctxPlatform = set(env, "CONTEXTDEV_API_KEY");
   out.push({
     key: "contextdev",
     label: "Web research and crawling (Context.dev)",
-    mode: ctx ? "live" : "off",
-    detail:
-      ctx === null
-        ? "Could not check this workspace's Context.dev key."
-        : ctx
-          ? "Live with this workspace's Context.dev key."
+    mode: ctx || ctxPlatform ? "live" : "off",
+    detail: ctx
+      ? "Live with this workspace's own Context.dev key (no credits)."
+      : ctxPlatform
+        ? "Live on the platform Context.dev key — 1 credit per Context.dev credit. Connect your own key to use none."
+        : ctx === null
+          ? "Could not check this workspace's Context.dev key."
           : "Off — research, brand sync and page monitors report \"not connected\" until this workspace connects a Context.dev key.",
-    envVars: [],
+    envVars: ["CONTEXTDEV_API_KEY"],
   });
 
   // Campaign / sequence email: messaging provider (default fake).

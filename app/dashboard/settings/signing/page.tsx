@@ -9,6 +9,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import { SigningPanel } from "@/components/settings/SigningPanel";
 import { documensoStatus } from "@/lib/integrations/documenso";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,8 @@ export default async function SigningSettingsPage() {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
 
-  const status = documensoStatus();
+  // Phase 15.1: this workspace's own Documenso (a shared one is refused on hosted).
+  const status = await withWorkspaceSidecars(workspace.id, () => documensoStatus());
 
   return (
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">

@@ -23,6 +23,7 @@
 //   GET    /public/v1/posts?from=&to= → scheduled posts
 //   DELETE /public/v1/posts/{id}
 
+import { currentSidecarSource, sidecarEnv, sidecarRefusalMessage } from "./sidecar-tenancy";
 export const POSTIZ_TIMEOUT_MS = 15_000;
 export const PUBLIC_V1 = "/public/v1";
 
@@ -31,9 +32,12 @@ export const POSTIZ_NOT_CONFIGURED_MESSAGE =
   "Postiz isn't connected. Set POSTIZ_URL and POSTIZ_API_KEY in Settings → Providers, then try again.";
 
 export function getPostizConfig(): { url: string; apiKey: string } {
+  // Phase 15.1: the workspace's own Postiz, else env — refused on hosted
+  // (lib/integrations/sidecar-tenancy.ts).
+  const env = sidecarEnv("postiz");
   return {
-    url: (process.env.POSTIZ_URL ?? "").replace(/\/+$/, ""),
-    apiKey: (process.env.POSTIZ_API_KEY ?? "").trim(),
+    url: (env.POSTIZ_URL ?? "").replace(/\/+$/, ""),
+    apiKey: (env.POSTIZ_API_KEY ?? "").trim(),
   };
 }
 
@@ -45,7 +49,9 @@ export function postizStatus() {
 }
 
 function notConfigured(): never {
-  throw new PostizConfigError(POSTIZ_NOT_CONFIGURED_MESSAGE);
+  throw new PostizConfigError(
+    currentSidecarSource("postiz") === "refused" ? sidecarRefusalMessage("postiz") : POSTIZ_NOT_CONFIGURED_MESSAGE,
+  );
 }
 
 // ── Errors ─────────────────────────────────────────────────────────────

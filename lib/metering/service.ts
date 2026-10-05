@@ -172,6 +172,21 @@ export interface CapStatus {
   trialExpired?: boolean;
   /** Phase 15.2: set when the workspace spends an agency pool (the owner's id). */
   poolWorkspaceId?: string;
+  /** Phase 15.2: true when the hard cap applies (a charge past `remaining`
+   *  would be refused); false for self-hosted / auto-overage / opted-out. */
+  hardCap?: boolean;
+}
+
+/**
+ * Phase 15.2: would a charge of `credits` pass right now? Advisory, like
+ * checkCap (meter() is authoritative) — for callers that must check an
+ * exact amount BEFORE spending money they can't take back (a mail piece).
+ */
+export function capFits(cap: CapStatus, credits: number): boolean {
+  if (cap.trialExpired) return credits <= 0;
+  if (credits <= 0) return true;
+  if (!cap.hardCap) return true;
+  return cap.remaining >= credits;
 }
 
 // ── Internals ────────────────────────────────────────────────────────────────
@@ -586,6 +601,7 @@ export async function checkCap(requestedWorkspaceId: string): Promise<CapStatus>
     used,
     autoOverage,
     trialExpired,
+    hardCap: blockAtCap && !autoOverage,
     ...(workspaceId !== requestedWorkspaceId ? { poolWorkspaceId: workspaceId } : {}),
   };
 }

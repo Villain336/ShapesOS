@@ -216,6 +216,18 @@ export async function runPanel(
 ): Promise<GeoRunResult> {
   const panel: GeoPanel | null = await getPanel(workspaceId, panelId);
   if (!panel) throw new Error(`Panel ${panelId} not found in workspace.`);
+  // Phase 15.2: prompt runs are charged in credits (4× the engine's USD,
+  // recordApiMeter → geo_prompt_run): a capped workspace is refused before
+  // any engine is asked.
+  {
+    const { checkCap } = await import("@/lib/metering/service");
+    const cap = await checkCap(workspaceId);
+    if (!cap.allowed) {
+      throw new Error(
+        `Credit cap reached (${cap.used.toLocaleString()} of ${cap.capCredits.toLocaleString()} credits used). Raise the cap or add credits in Settings → Usage.`,
+      );
+    }
+  }
   const engines = (opts.engines ?? [...GEO_ENGINES]).filter((e) => GEO_ENGINES.includes(e));
   const reps = opts.reps ?? panel.nReps;
   const runId = opts.runId ?? `georun_${Date.now().toString(36)}`;

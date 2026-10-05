@@ -15,6 +15,7 @@ import { guardWorkspace, readJson, sidecarError } from "../../../../integrations
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { queueClipDraftToPostiz } from "../../../_postiz-choke";
 import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ const BodySchema = z.object({
   platformTypes: z.record(z.string(), z.string().trim().min(1).max(64)).optional(),
 });
 
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
     // Same write-tier protection as the direct Postiz posts route — queueing
@@ -82,3 +83,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return sidecarError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

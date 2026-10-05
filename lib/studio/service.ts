@@ -9,6 +9,7 @@ import { randomBytes } from "crypto";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
 import { queuePostizDraft } from "@/lib/integrations/postiz";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 import {
   createMockPorkbunPort,
   createPorkbunPort,
@@ -645,12 +646,13 @@ export async function useAssetInSocialPost(
   if (!args.channelIds.length) {
     throw new Error("Pick at least one Postiz channel — connect one under Social first.");
   }
-  const draft = await queuePostizDraft({
+  // Phase 15.1: this workspace's own Postiz (a shared one is refused on hosted).
+  const draft = await withWorkspaceSidecars(workspaceId, () => queuePostizDraft({
     content: args.text,
     channelIds: args.channelIds,
     platformTypes: args.platformTypes,
     mediaUrls: asset.url ? [asset.url] : [],
-  });
+  }));
   await auditStudio(db, workspaceId, projectId, "studio_asset_sent_to_social", `Asset queued as Postiz draft: ${asset.name}.`, actor);
   return draft;
 }

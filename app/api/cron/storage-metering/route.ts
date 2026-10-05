@@ -16,6 +16,8 @@
 //
 // Idempotency: storagequota:<workspaceId>:<YYYY-MM> — exactly once per
 // workspace per month; re-running the cron never double-charges.
+// Phase 15.2: the run also meters each live Twilio tracking number's monthly
+// rental (phone_number_month, phone-number:<numberId>:<YYYY-MM>).
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -23,6 +25,7 @@ import { cronGate } from "@/lib/cron/gate";
 import { getQuota } from "@/lib/filesystem/service";
 import { meter, type MeterResult } from "@/lib/metering/service";
 import { gbOverQuota } from "@/lib/metering/wiring";
+import { meterNumberRentals } from "@/lib/calls/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +51,13 @@ export async function POST(req: NextRequest) {
 
   const month = new Date().toISOString().slice(0, 7); // YYYY-MM
   const results: WorkspaceResult[] = [];
+  const rentals: Array<{ workspaceId: string; numbers: number; charged: number }> = [];
 
   for (const ws of workspaces) {
+    // Phase 15.2: the same monthly run meters live tracking-number rentals
+    // (phone_number_month, idempotent per number-month — lib/calls/billing.ts).
+    rentals.push({ workspaceId: ws.id, ...(await meterNumberRentals(ws.id, month).catch(() => ({ numbers: 0, charged: 0 }))) });
+
     let quota: { usedBytes: number; limitBytes: number };
     try {
       quota = await getQuota({ workspaceId: ws.id });
@@ -96,5 +104,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return Response.json({ ok: true, month, results });
+  return Response.json({ ok: true, month, results, numberRentals: rentals.filter((r) => r.numbers > 0) });
 }

@@ -336,7 +336,7 @@ check("campaign actualCostCents = 85", doneCamp.actualCostCents === 85, String(d
   const mv = events.find((e) => e.action === "mail_verification");
   check("mail_verification credits = 5", mv?.credits === 5, String(mv?.credits));
   const mp = events.find((e) => e.action === "mail_piece");
-  check("mail_piece credits = 85 (pass-through)", mp?.credits === 85, String(mp?.credits));
+  check("mail_piece credits = 170 (85¢ provider cost × HOSTED_MARGIN_MULTIPLIER 2, Phase 15.2)", mp?.credits === 170, String(mp?.credits));
 }
 
 // --- consent gates ---

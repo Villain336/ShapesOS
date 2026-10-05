@@ -170,3 +170,7 @@ lib/knowledge/contextdev/__tests__/brandsync-db.test.ts
 lib/authority/intelligence/__tests__/disconnect-db.test.ts
 # Phase 15.2 (keys): model tokens billed at ceil(cost × 1.5) through meter(); BYOK recorded at 0 with keySource "workspace" + credits saved; idempotent per call; a capped workspace refused BEFORE the call (nothing sent); generate() metered; value-priced calls not charged twice; agency pool shared by client workspaces, capped and alerted as one (stubbed Anthropic SDK / fake OpenAI fetch — MOCK).
 lib/metering/__tests__/token-billing-db.test.ts
+# Phase 15.1 (keys): a workspace's own keys — model key validated before save (invalid never stored), stored encrypted, never returned by the API, used by the router for that workspace only, removed at once; sidecar instance SSRF-checked (https on hosted) and used only in its workspace's scope (others refused the shared instance on hosted); Smartlead/Instantly from the vault, never host env on hosted. Real routes, stubbed session, FAKE provider check (MOCK).
+lib/providers/__tests__/workspace-keys-db.test.ts
+# Phase 15.2 (keys): metered gaps — direct mail at 2× stops at the cap (rest queued, uncharged); sandbox minutes once per lifetime (docker free); Twilio minutes/transcription/number-month idempotent + no number bought at the cap; intelligence vendor calls at 4× (own key free) + GEO runs + cap refusal; Context.dev platform key charged at the gate (cap releases the reservation); studio image route gated + charged once. All vendors FAKE (MOCK).
+lib/metering/__tests__/metered-gaps-db.test.ts

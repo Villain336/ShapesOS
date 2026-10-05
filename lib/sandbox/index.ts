@@ -231,6 +231,18 @@ async function resolveSandbox(workspaceId: string, lineage: RunLineage): Promise
   if (!avail.ok) throw new SandboxUnavailableError(avail.reason);
   const provider = getSandboxProvider();
   if (!provider) throw new SandboxUnavailableError("no sandbox provider is configured.");
+  // Phase 15.2: a paid sandbox (E2B / Daytona) is not started for a capped
+  // workspace — its minutes are charged in credits when it ends.
+  const { isPaidSandboxProvider } = await import("./metering");
+  if (isPaidSandboxProvider(provider.name)) {
+    const { checkCap } = await import("@/lib/metering/service");
+    const cap = await checkCap(workspaceId);
+    if (!cap.allowed) {
+      throw new SandboxUnavailableError(
+        `the workspace's credit cap is reached (${cap.used.toLocaleString()} of ${cap.capCredits.toLocaleString()} credits used) — raise the cap or add credits in Settings → Usage.`,
+      );
+    }
+  }
   const owner = lineage.rootRunId;
   const sb = await provider.create({ workspaceId, runId: owner });
   const secretEnc = await encryptSecret(sb).catch(() => null);

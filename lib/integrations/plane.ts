@@ -19,6 +19,7 @@
 // variants) are missing on self-hosted Community Edition — this client only
 // uses the documented, widely-confirmed projects/issues paths.
 
+import { currentSidecarSource, sidecarEnv, sidecarRefusalMessage } from "./sidecar-tenancy";
 export const PLANE_TIMEOUT_MS = 15_000;
 export const PLANE_MAX_PER_PAGE = 100;
 
@@ -33,10 +34,12 @@ export interface PlaneConfig {
 }
 
 export function getPlaneConfig(): PlaneConfig {
+  // Phase 15.1: the workspace's own Plane, else env — refused on hosted.
+  const env = sidecarEnv("plane");
   return {
-    baseUrl: (process.env.PLANE_BASE_URL ?? "").replace(/\/+$/, "").trim(),
-    apiKey: (process.env.PLANE_API_KEY ?? "").trim(),
-    workspaceSlug: (process.env.PLANE_WORKSPACE_SLUG ?? "").trim(),
+    baseUrl: (env.PLANE_BASE_URL ?? "").replace(/\/+$/, "").trim(),
+    apiKey: (env.PLANE_API_KEY ?? "").trim(),
+    workspaceSlug: (env.PLANE_WORKSPACE_SLUG ?? "").trim(),
   };
 }
 
@@ -48,7 +51,9 @@ export function planeStatus() {
 }
 
 function notConfigured(): never {
-  throw new PlaneConfigError(PLANE_NOT_CONFIGURED_MESSAGE);
+  throw new PlaneConfigError(
+    currentSidecarSource("plane") === "refused" ? sidecarRefusalMessage("plane") : PLANE_NOT_CONFIGURED_MESSAGE,
+  );
 }
 
 // ── Errors ───────────────────────────────────────────────────────────────────

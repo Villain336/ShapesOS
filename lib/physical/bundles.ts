@@ -151,6 +151,13 @@ export async function createBundle(input: CreateBundleInput): Promise<BundleWith
   // provider's counter resets per process, so a restarted process can re-mint
   // an e164 that already exists: retry purchase on e164 P2002.
   const provider = getProvider();
+  // Phase 15.2: a live tracking number costs credits every month — refused
+  // for a capped workspace before anything is bought.
+  {
+    const { numberPurchaseDenial } = await import("@/lib/calls/billing");
+    const denial = await numberPurchaseDenial(input.workspaceId, provider.name);
+    if (denial) throw new Error(denial);
+  }
   for (let attempt = 0; attempt < 8; attempt++) {
     const slug = await uniqueSlug(slugBase);
     const promoCode = await uniquePromoCode();
@@ -194,6 +201,11 @@ export async function createBundle(input: CreateBundleInput): Promise<BundleWith
           include: { number: { select: { id: true, e164: true, status: true } } },
         });
       });
+      // Phase 15.2: the first month's rental of the live number (idempotent).
+      {
+        const { meterNumberMonth } = await import("@/lib/calls/billing");
+        if (bundle.numberId) await meterNumberMonth({ workspaceId: input.workspaceId, numberId: bundle.numberId, provider: provider.name });
+      }
       return bundle;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

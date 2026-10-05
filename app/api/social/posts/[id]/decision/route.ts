@@ -14,6 +14,7 @@ import { getSocialProvider } from "@/lib/social/provider";
 import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { ForbiddenError } from "@/lib/api/errors";
 import { guardWorkspace, readJson, socialError } from "../../../_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ const Body = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     const rl = await checkRateLimitAsync(`postiz-post:ws:${workspace.id}`, "write");
@@ -46,3 +47,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

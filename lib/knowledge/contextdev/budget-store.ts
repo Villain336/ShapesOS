@@ -11,6 +11,27 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { decideBudget, DEFAULT_DAILY_CAP_CREDITS, type BudgetVerdict } from "./budgets";
+import { contextDevKeySource } from "./keys";
+import { CONTEXTDEV_PLATFORM_CREDITS_PER_VENDOR_CREDIT } from "@/lib/metering/credits";
+
+/** Phase 15.1: meter a platform-key Context.dev call (no-op on the workspace's own key). */
+async function chargePlatformContextDev(
+  workspaceId: string,
+  vendorCredits: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (vendorCredits <= 0) return { ok: true };
+  if ((await contextDevKeySource(workspaceId)) !== "platform") return { ok: true };
+  const { meter } = await import("@/lib/metering/service");
+  const r = await meter({
+    workspaceId,
+    action: "contextdev_call",
+    credits: vendorCredits * CONTEXTDEV_PLATFORM_CREDITS_PER_VENDOR_CREDIT,
+    keySource: "platform",
+    idempotencyKey: `contextdev:${workspaceId}:${randomUUID()}`,
+    evidenceRef: `contextdev:${vendorCredits}`,
+  });
+  return r.ok ? { ok: true } : { ok: false, message: r.message };
+}
 
 /** UTC day key: YYYY-MM-DD. */
 export function todayKey(d: Date = new Date()): string {
@@ -111,6 +132,23 @@ export async function checkAndReserve(
     RETURNING credits_used AS "creditsUsed", cap_credits AS "capCredits"`;
   const row = reserved[0];
   if (row) {
+    // Phase 15.1: a call on the PLATFORM key is charged in credits here, at
+    // the gate, before the vendor is asked (a capped workspace is refused and
+    // its daily reservation released). The workspace's own key is free.
+    const charge = await chargePlatformContextDev(workspaceId, estimatedCost);
+    if (!charge.ok) {
+      await prisma.$executeRaw`
+        UPDATE context_dev_budgets
+           SET credits_used = GREATEST(0, credits_used - ${estimatedCost}), updated_at = now()
+         WHERE workspace_id = ${workspaceId} AND day = ${day}`;
+      const after = await getDailyBudget(workspaceId, day);
+      return {
+        decision: "needs_approval",
+        reason: charge.message,
+        remainingAfter: Math.max(0, after.capCredits - after.usedToday),
+        budget: after,
+      };
+    }
     return {
       decision: "allow",
       reason: "Within today's budget",

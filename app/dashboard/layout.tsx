@@ -28,6 +28,7 @@ import { chatwootWidgetConfig } from "@/lib/integrations/chatwoot";
 // defaults when the sidecar is unconfigured.
 import { GrowthBookProvider } from "@/components/experiments/GrowthBookProvider";
 import { growthBookSdkConfig } from "@/lib/integrations/growthbook";
+import { sidecarEnv, withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 // Phase 13 Wave A (theming): tenant-scoped brand theme root.
 import { BrandTheme } from "@/components/BrandTheme";
 import { sanitizeBrandHex } from "@/lib/brand-theme";
@@ -79,10 +80,14 @@ export default async function DashboardLayout({
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
   // widget mounts only when the operator explicitly opted in.
-  const chatwoot = chatwootWidgetConfig();
-  // Phase 12 (embeds): GrowthBook public SDK config (client key is public
-  // by design; the Admin API key never leaves the server).
-  const gbConfig = growthBookSdkConfig();
+  // Phase 15.1: both read this workspace's own instance (hosted refuses a
+  // shared one; self-hosted keeps the env instance).
+  const { chatwoot, gbConfig } = await withWorkspaceSidecars(workspace.id, () => ({
+    chatwoot: chatwootWidgetConfig(),
+    // Phase 12 (embeds): GrowthBook public SDK config (client key is public
+    // by design; the Admin API key never leaves the server).
+    gbConfig: growthBookSdkConfig(sidecarEnv("growthbook")),
+  }));
 
   // Phase 13 Wave A (theming): the workspace's DEFAULT brand kit drives the
   // primary accent. Null = the Agentic OS default: black primary actions

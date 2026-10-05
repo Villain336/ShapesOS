@@ -18,6 +18,10 @@ import { z } from "zod";
 import { guardWorkspace, httpErrorResponse, readJson } from "../_lib";
 import { ImageConfigError, ImageRequestError, generateImage } from "@/lib/images/openai";
 import { LlmProviderError } from "@/lib/llm/errors";
+import { randomUUID } from "node:crypto";
+import { checkCap, meter } from "@/lib/metering/service";
+import { imageGenerationCredits } from "@/lib/metering/credits";
+import { capDeniedMessage } from "@/lib/metering/wiring";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +38,7 @@ const BodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    await guardWorkspace({ editor: true });
+    const { user, workspace } = await guardWorkspace({ editor: true });
     const parsed = BodySchema.safeParse(await readJson(req));
     if (!parsed.success) {
       return Response.json({ error: "Invalid request body." }, { status: 400 });
@@ -42,10 +46,32 @@ export async function POST(req: Request) {
     const { prompt, size } = parsed.data;
     const dims = SIZES[size];
 
+    // Phase 15.2: the studio image route is metered like the chat tool —
+    // a capped workspace never reaches OpenAI, and each image is charged
+    // IMAGE_CREDITS_BY_QUALITY (medium, 22 credits at 1024×1024) once.
+    const quality = "medium" as const;
+    const cap = await checkCap(workspace.id);
+    if (!cap.allowed) {
+      return Response.json({ error: capDeniedMessage(cap.used, cap.capCredits), code: "cap_exceeded" }, { status: 402 });
+    }
+    const chargeKey = `studio-image:${workspace.id}:${randomUUID()}`;
+
     let b64: string;
     try {
-      const result = await generateImage({ prompt, size: dims.api, n: 1 }, { signal: req.signal });
+      const result = await generateImage({ prompt, size: dims.api, n: 1, quality }, { signal: req.signal });
       b64 = result.images[0]!.bytes.toString("base64");
+      // Debit after the image exists (the work is done and paid for):
+      // recorded even past the cap; idempotent per generation.
+      await meter({
+        workspaceId: workspace.id,
+        actorId: user.id,
+        action: "image_generation",
+        credits: imageGenerationCredits({ quality, size: dims.api }),
+        keySource: "platform",
+        afterTheFact: true,
+        idempotencyKey: chargeKey,
+        evidenceRef: `studio-image:${size}`,
+      }).catch((err) => console.error("[studio-image] metering failed:", err instanceof Error ? err.message : err));
     } catch (e) {
       if (e instanceof ImageConfigError) {
         return Response.json(

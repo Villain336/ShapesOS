@@ -15,6 +15,7 @@ import {
   type GrowthBookFeature,
 } from "@/lib/integrations/growthbook";
 import { getWorkspaceFlagOverrides } from "@/lib/integrations/growthbook-overrides";
+import { sidecarEnv, withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ export async function GET() {
 
   const overrides = await getWorkspaceFlagOverrides(workspace.id);
   try {
-    const features = await listGrowthBookFeatures();
+    // Phase 15.1: this workspace's own GrowthBook (refused shared on hosted).
+    const features = await withWorkspaceSidecars(workspace.id, () => listGrowthBookFeatures(fetch, sidecarEnv("growthbook")));
     return Response.json({
       features: applyFlagOverrides(features, overrides),
       source: "growthbook",

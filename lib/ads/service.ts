@@ -11,6 +11,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { secrets } from "@/lib/secrets";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { queuePostizDraft } from "@/lib/integrations/postiz";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 import {
   buildAdPrompt,
   estimateCostCents,
@@ -853,12 +854,13 @@ export async function sendCreativeToSocial(
   const text = args.text.trim();
   if (!text) throw new AdGuardError("Post text is required.");
   if (!args.channelIds.length) throw new AdGuardError("Pick at least one Postiz channel.");
-  const draft = await queuePostizDraft({
+  // Phase 15.1: this workspace's own Postiz (a shared one is refused on hosted).
+  const draft = await withWorkspaceSidecars(workspaceId, () => queuePostizDraft({
     content: text,
     channelIds: args.channelIds,
     platformTypes: args.platformTypes,
     mediaUrls: assets.map((a) => a.url),
-  });
+  }));
   await auditAds(db, workspaceId, projectId, "ad_sent_to_social", `Ad creative queued as Postiz draft: ${creative.name}`, actor);
   return draft;
 }

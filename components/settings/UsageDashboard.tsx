@@ -51,8 +51,20 @@ interface SummaryData {
   byAction: Record<string, number>;
   byProject: Record<string, number>;
   periodStart: string;
-  cap: { allowed: boolean; remaining: number; capCredits: number };
+  cap: { allowed: boolean; remaining: number; capCredits: number; poolWorkspaceId?: string };
+  /** Phase 15.2 */
+  byCategory?: Record<"ai" | "data" | "messaging" | "compute" | "other", number>;
+  byokSavedCredits?: number;
+  pool?: { ownerWorkspaceId: string; role: "owner" | "member"; used: number; byWorkspace?: Record<string, number> };
 }
+
+const CATEGORY_LABELS: Record<"ai" | "data" | "messaging" | "compute" | "other", string> = {
+  ai: "AI",
+  data: "Data",
+  messaging: "Messaging",
+  compute: "Compute",
+  other: "Other",
+};
 
 interface ProjectInfo {
   id: string;
@@ -77,6 +89,23 @@ const ACTION_LABELS: Record<string, string> = {
   connector_sync: "Connector syncs",
   storage_over_quota: "Storage over quota",
   composio_tool_call: "Composio tool calls",
+  // Phase 15.2
+  llm_tokens: "AI model calls (tokens)",
+  image_generation: "AI images",
+  sandbox_minute: "Code sandbox minutes",
+  call_minute: "Voice call minutes",
+  call_transcription_minute: "Call transcription minutes",
+  phone_number_month: "Tracking numbers",
+  intelligence_vendor_call: "Data vendor calls",
+  geo_prompt_run: "AI visibility prompt runs",
+  contextdev_call: "Context.dev (platform key)",
+  mail_piece: "Direct mail pieces",
+  mail_verification: "Address verifications",
+  sms_send: "SMS segments",
+  email_send: "Emails",
+  enrichment_lookup: "Enrichment lookups",
+  prospect_research: "Prospect research (AI)",
+  penpot_import: "Penpot imports",
 };
 
 function actionLabel(a: string): string {
@@ -218,6 +247,46 @@ export default function UsageDashboard({ workspaceId }: { workspaceId: string })
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className={cardCls}>
+              <h3 className="mb-3 text-sm font-semibold text-ink">By category</h3>
+              <table className="w-full text-sm">
+                <tbody>
+                  {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((c) => (
+                    <tr key={c} className="border-t border-line">
+                      <td className="py-2 pr-2 text-ink">{CATEGORY_LABELS[c]}</td>
+                      <td className="py-2 text-right font-medium tabular-nums text-ink">{fmt(data.byCategory?.[c] ?? 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-muted">
+                AI model calls are charged at 1.5× the provider&apos;s token cost; data vendors at 4× their cost.
+              </p>
+            </div>
+            <div className={cardCls}>
+              <h3 className="mb-1 text-sm font-semibold text-ink">Your own model keys</h3>
+              {(data.byokSavedCredits ?? 0) > 0 ? (
+                <>
+                  <div className="mt-1 text-2xl font-bold tabular-nums text-ink">{fmt(data.byokSavedCredits ?? 0)}</div>
+                  <p className="text-sm text-muted">
+                    credits your own key saved this period — those model calls used no AI credits.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted">
+                  Bring your own Anthropic or OpenAI key in Settings → Providers and model calls on it use no AI
+                  credits, on the same plan.
+                </p>
+              )}
+              <a href="/dashboard/settings/providers#providers-your-keys" className={`${btnGhost} mt-3`}>
+                Manage keys
+              </a>
+            </div>
+          </div>
+
+          <PoolCard data={data} />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className={cardCls}>
               <h3 className="mb-3 text-sm font-semibold text-ink">By action</h3>
               {Object.keys(data.byAction).length === 0 ? (
                 <p className="text-sm text-muted">No metered actions this period yet.</p>
@@ -277,6 +346,113 @@ export default function UsageDashboard({ workspaceId }: { workspaceId: string })
           <ComposioUsageCard workspaceId={workspaceId} />
           <RecordingStorageCard workspaceId={workspaceId} />
         </>
+      )}
+    </div>
+  );
+}
+
+interface PoolPayload {
+  plan: string | null;
+  role: "owner" | "member" | "none";
+  owner: { id: string; name: string } | null;
+  members: Array<{ workspaceId: string; name: string; plan: string }>;
+  candidates: Array<{ workspaceId: string; name: string; plan: string }>;
+}
+
+/** Phase 15.2: agency credit pooling — one pool for the agency's client workspaces. */
+function PoolCard({ data }: { data: SummaryData }) {
+  const [pool, setPool] = useState<PoolPayload | null>(null);
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/usage/pool");
+      if (r.ok) setPool(await r.json());
+    } catch {
+      /* the card stays hidden */
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (!pool || pool.role === "none") return null;
+
+  async function change(method: "POST" | "DELETE", clientWorkspaceId: string) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await fetch(
+        method === "POST" ? "/api/usage/pool" : `/api/usage/pool?clientWorkspaceId=${encodeURIComponent(clientWorkspaceId)}`,
+        { method, headers: { "Content-Type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify({ clientWorkspaceId }) } : {}) },
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Could not update the pool.");
+      setPick("");
+      await load();
+    } catch (err) {
+      setNotice({ kind: "error", message: err instanceof Error ? err.message : "Could not update the pool." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (pool.role === "member") {
+    return (
+      <div className={cardCls}>
+        <h3 className="mb-1 text-sm font-semibold text-ink">Pooled credits</h3>
+        <p className="text-sm text-muted">
+          This workspace spends the pooled credits of <span className="font-semibold text-ink">{pool.owner?.name}</span>. The
+          agency workspace manages the cap. {fmt(data.pool?.used ?? 0)} credits used across the pool this period.
+        </p>
+      </div>
+    );
+  }
+
+  const byWs = data.pool?.byWorkspace ?? {};
+  return (
+    <div className={cardCls}>
+      <h3 className="mb-1 text-sm font-semibold text-ink">Pooled client workspaces</h3>
+      <p className="mb-3 text-sm text-muted">
+        Your Agency plan&apos;s credits are one pool: client workspaces added here spend it, and the cap and the 80% alert
+        apply to the pool as a whole.
+      </p>
+      {notice && <Notice notice={notice} />}
+      {pool.members.length === 0 ? (
+        <p className="text-sm text-muted">No client workspaces in the pool yet.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <tbody>
+            {pool.members.map((m) => (
+              <tr key={m.workspaceId} className="border-t border-line">
+                <td className="py-2 pr-2 text-ink">{m.name}</td>
+                <td className="py-2 pr-2 text-right font-medium tabular-nums text-ink">{fmt(byWs[m.workspaceId] ?? 0)}</td>
+                <td className="py-2 text-right">
+                  <button type="button" disabled={busy} onClick={() => change("DELETE", m.workspaceId)} className={btnGhost}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {pool.candidates.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select aria-label="Workspace to add to the pool" value={pick} onChange={(e) => setPick(e.target.value)} className={inputCls}>
+            <option value="">Add a client workspace…</option>
+            {pool.candidates.map((c) => (
+              <option key={c.workspaceId} value={c.workspaceId}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={busy || !pick} onClick={() => change("POST", pick)} className={btnPrimary}>
+            Add to pool
+          </button>
+        </div>
       )}
     </div>
   );

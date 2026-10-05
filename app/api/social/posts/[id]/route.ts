@@ -9,13 +9,14 @@ import { deleteOrCancelPost, getPost, updatePost } from "@/lib/social/publicatio
 import { deletePostizPost } from "@/lib/integrations/postiz";
 import { log } from "@/lib/observability/log";
 import { PostBodySchema, guardWorkspace, readJson, socialError, toChannels, toMedia } from "../../_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+async function handleGET(_req: Request, ctx: Ctx) {
   try {
     const { workspace } = await guardWorkspace();
     const { id } = await ctx.params;
@@ -25,7 +26,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
 }
 
-export async function PATCH(req: Request, ctx: Ctx) {
+async function handlePATCH(req: Request, ctx: Ctx) {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
     const { id } = await ctx.params;
@@ -42,7 +43,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+async function handleDELETE(_req: Request, ctx: Ctx) {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
     const { id } = await ctx.params;
@@ -59,3 +60,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);
+export const PATCH = sidecarScoped(handlePATCH);
+export const DELETE = sidecarScoped(handleDELETE);
