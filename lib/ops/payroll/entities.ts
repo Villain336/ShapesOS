@@ -32,6 +32,7 @@ const lazyAdmin = () => import("./admin");
 
 export const salaryStructureDef: OpsEntityDef = {
   slug: "salary-structures",
+  createEntitlement: "payroll", // Phase 15.3 (pricing): payroll is Pro and up
   label: "Salary structure",
   delegate: "opsSalaryStructure",
   createSchema: z.object({
@@ -86,6 +87,7 @@ const assignmentFields = {
 
 export const salaryAssignmentDef: OpsEntityDef = {
   slug: "salary-assignments",
+  createEntitlement: "payroll",
   label: "Salary assignment",
   delegate: "opsSalaryAssignment",
   createSchema: z.object({
@@ -112,6 +114,7 @@ export const salaryAssignmentDef: OpsEntityDef = {
 
 export const payRunDef: OpsEntityDef = {
   slug: "pay-runs",
+  createEntitlement: "payroll",
   label: "Pay run",
   delegate: "opsPayRun",
   createSchema: z.object({

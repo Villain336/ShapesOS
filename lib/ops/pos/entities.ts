@@ -21,6 +21,7 @@ const svc = () => import("./service");
 
 export const posRegisterDef: OpsEntityDef = {
   slug: "pos-registers",
+  createEntitlement: "pos", // Phase 15.3 (pricing): POS is Pro and up
   label: "Register",
   delegate: "opsPosRegister",
   createSchema: z.object({
@@ -50,6 +51,7 @@ export const posRegisterDef: OpsEntityDef = {
 
 export const posSessionDef: OpsEntityDef = {
   slug: "pos-sessions",
+  createEntitlement: "pos", // Phase 15.3: opening a till is a POS entry point
   label: "Till session",
   delegate: "opsPosSession",
   // Opening a till: the cash float in the drawer.

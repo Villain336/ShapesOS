@@ -82,7 +82,9 @@ console.log("metering battery");
   let threw = false;
   try { credits.creditsFor("nope_not_real"); } catch { threw = true; }
   check("unknown action throws in creditsFor", threw);
-  check("tier pools starter/pro/agency", credits.TIER_INCLUDED_CREDITS.starter === 2500 && credits.TIER_INCLUDED_CREDITS.pro === 10000 && credits.TIER_INCLUDED_CREDITS.agency === 30000);
+  // Phase 15.3: pools = base × INCLUDED_CREDITS_MULTIPLIER (owner knob, ×2 after the Phase 17 evaluation).
+  const M = credits.INCLUDED_CREDITS_MULTIPLIER;
+  check("tier pools starter/pro/business/agency", credits.TIER_INCLUDED_CREDITS.starter === 4000 * M && credits.TIER_INCLUDED_CREDITS.pro === 15000 * M && credits.TIER_INCLUDED_CREDITS.business === 40000 * M && credits.TIER_INCLUDED_CREDITS.agency === 30000 * M);
 }
 
 // ── 2. happy path + idempotency replay ───────────────────────────────────────
@@ -222,7 +224,9 @@ const wsD = await makeWorkspace("starter");
   check("summary(A) has no rows from E", !("ai_article" in sumA.byAction) || sumA.byAction["ai_article"] === undefined);
   const sumE = await getUsageSummary({ workspaceId: wsE.id });
   check("summary(E) sees its own charge", sumE.byAction["ai_article"] === 15 && sumE.used === 15);
-  check("summary contract shape", sumE.included === 2500 && sumE.purchased === 0 && sumE.remaining === 2485 && typeof sumE.periodStart === "string");
+  // Phase 15.3: the starter pool comes from the constants.
+  const starterPool = credits.TIER_INCLUDED_CREDITS.starter;
+  check("summary contract shape", sumE.included === starterPool && sumE.purchased === 0 && sumE.remaining === starterPool - 15 && typeof sumE.periodStart === "string");
 }
 
 // ── 11. T5: ledger tamper attempts ───────────────────────────────────────────
@@ -281,7 +285,7 @@ const wsF = await makeWorkspace("pro");
     return Math.abs(top.expiresAt.getTime() - d.getTime()) < 86400000 * 2;
   })());
   const sum = await getUsageSummary({ workspaceId: wsA.id });
-  check("summary reflects purchased pool", sum.purchased === 5000 && sum.remaining === 5000 + 2500 - sum.used);
+  check("summary reflects purchased pool", sum.purchased === 5000 && sum.remaining === 5000 + credits.TIER_INCLUDED_CREDITS.starter - sum.used);
 }
 
 // ── 15. default rows for untouched workspaces ────────────────────────────────

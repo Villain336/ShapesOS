@@ -1,8 +1,11 @@
 // ShapesOS — SCIM provisioning tokens for this workspace (Phase 4a).
 //
-// GET  → { tokens, endpoint } (owner only)
+// GET  → { tokens, endpoint, entitled, upgradeMessage } (owner only)
 // POST { name } → { token, raw } — the raw token is returned ONCE and never
 //      stored (SHA-256 only). Owner only; audited.
+// Phase 15.3 (pricing): SCIM is a plan feature (Business, Agency,
+// self-hosted). POST on a plan without it → 403 upgrade_required; GET still
+// lists existing tokens (so an owner can revoke them) and says entitled=false.
 // scim_tokens is FORCE RLS: every read/write runs in withWorkspaceScope.
 
 import { BadRequestError, ForbiddenError, errorResponse } from "@/lib/api/errors";
@@ -14,6 +17,8 @@ import { auditEvent } from "@/lib/auditlog";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { mintScimToken } from "@/lib/scim/auth";
 import { appBaseUrl } from "@/lib/workspace/invite-mail";
+import { EntitlementError, entitlementDenied, hasEntitlement } from "@/lib/billing/entitlements-server";
+import { featureUpgradeMessage } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +52,13 @@ export async function GET(req: Request) {
       tx.scimToken.findMany({ where: { workspaceId: ctx.workspace.id }, orderBy: { createdAt: "desc" } }),
     );
     const base = appBaseUrl(process.env, new URL(req.url).origin) ?? new URL(req.url).origin;
-    return Response.json({ tokens: tokens.map(view), endpoint: `${base}/api/scim/v2` });
+    const entitled = await hasEntitlement(ctx.workspace.id, "scim");
+    return Response.json({
+      tokens: tokens.map(view),
+      endpoint: `${base}/api/scim/v2`,
+      entitled,
+      upgradeMessage: entitled ? null : featureUpgradeMessage("scim"),
+    });
   } catch (err) {
     return errorResponse(err, "GET /api/settings/security/scim-tokens");
   }
@@ -59,6 +70,10 @@ export async function POST(req: Request) {
   try {
     const ctx = await ownerContext();
     if (!ctx) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    // Phase 15.3 (pricing): no new provisioning tokens without the SCIM feature.
+    if (!(await hasEntitlement(ctx.workspace.id, "scim"))) {
+      return entitlementDenied(new EntitlementError(featureUpgradeMessage("scim"), "scim"));
+    }
     const v = validateBody(Schema, await readJsonBody(req));
     if (!v.ok) return v.error;
     const minted = mintScimToken(ctx.workspace.id);

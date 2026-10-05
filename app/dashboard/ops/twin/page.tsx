@@ -5,6 +5,7 @@ import { TwinSitesList, type TwinSiteRow } from "@/components/twin/TwinSitesList
 import { requireOpsViewer } from "@/lib/ops/page-guard";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { listSites } from "@/lib/twin/state";
+import { PlanFeatureNotice } from "@/components/billing/PlanFeatureNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +26,17 @@ export default async function Page() {
   }
   // Drafts are for the people who can edit them.
   const visible = canEdit ? sites : sites.filter((s) => s.status === "published");
-  return <TwinSitesList sites={visible} canEdit={canEdit} canAddSample={canAddSample} loadError={loadError} />;
+  const list = <TwinSitesList sites={visible} canEdit={canEdit} canAddSample={canAddSample} loadError={loadError} />;
+  // Phase 15.3 (pricing): the digital twin is Pro and up, with a per-plan
+  // site count (Pro 3). Renders nothing on self-hosted, trial and Business.
+  const notice = canEdit
+    ? await PlanFeatureNotice({ workspaceId, userId, feature: "digital_twin", limit: { key: "twin_sites", used: sites.length } })
+    : null;
+  if (!notice) return list;
+  return (
+    <div className="flex flex-col gap-4">
+      {notice}
+      {list}
+    </div>
+  );
 }

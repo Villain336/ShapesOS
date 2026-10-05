@@ -29,6 +29,7 @@ import { EVENT_ENTITIES } from "./events/entities";
 // Phase 13 (twincore): the digital twin's sites, layout objects, dock bookings.
 import { TWIN_ENTITIES } from "./twin/entities";
 import type { Prisma } from "@prisma/client";
+import type { Feature } from "@/lib/billing/entitlements";
 
 export interface OpsGatedTransition {
   /** The PATCH field whose move to one of `to` is a gated write. */
@@ -81,6 +82,15 @@ export interface OpsEntityDef {
    */
   readRole?: "viewer" | "editor" | "admin";
   writeRole?: "editor" | "admin";
+  // ---- Phase 15.3 (pricing) ----
+  /**
+   * Plan feature needed to CREATE this entity (lib/billing/entitlements.ts).
+   * opsCreate refuses with a 403 upgrade message when the workspace's plan
+   * lacks it — every creation path (routes, agent tools, the twin sample
+   * site) goes through opsCreate, so this is the one enforcement point.
+   * Reads, edits and closing out existing records are never blocked.
+   */
+  createEntitlement?: Feature;
 }
 
 export interface OpsEntityHooks {

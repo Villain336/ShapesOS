@@ -160,3 +160,7 @@ lib/chat/__tests__/delegation-db.test.ts
 lib/scheduler/__tests__/skill-tree-db.test.ts
 # Phase 16 (deleg): Settings → Automation → Automatic delegation API (viewer reads, editor writes, bounded, RLS) and the run plan view route (404 across workspaces).
 lib/agents/delegation/__tests__/delegation-routes-db.test.ts
+# Phase 15.3 (pricing): plan gates — digital twin refused on Starter and past Pro's site limit, allowed on Business/trial/self-hosted; POS + payroll creation refused on Starter, allowed on Pro/trial/self-hosted; compute refused after a downgrade (cancel still works); SCIM token route refuses a plan without SCIM and a valid token stops authenticating after a downgrade.
+lib/billing/__tests__/plan-gates-db.test.ts
+# Phase 15.3 (pricing): extra seats as a Stripe QUANTITY line against a labelled FAKE Stripe client — sync idempotent (no write when in step, retries and concurrent syncs never double-charge); a member past the included seats is refused (402, nothing added or charged) without the admin's confirmation and allowed with it (audited); removal lowers the quantity; SCIM uses approved seats and is refused past them; a downgrade never bills above the approved seats; no subscription = hard limit.
+lib/billing/__tests__/seat-billing-db.test.ts

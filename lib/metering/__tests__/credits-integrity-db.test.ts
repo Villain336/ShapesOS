@@ -14,6 +14,10 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPlanChange, applyTopUp, meter } from "../service";
 import { includedCreditsForPlan } from "../credits";
+
+const STARTER = includedCreditsForPlan("starter");
+const PRO = includedCreditsForPlan("pro");
+const AGENCY = includedCreditsForPlan("agency");
 import { checkAndReserve, getDailyBudget, setDailyCap, todayKey } from "@/lib/knowledge/contextdev/budget-store";
 import { DEFAULT_DAILY_CAP_CREDITS } from "@/lib/knowledge/contextdev/budgets";
 
@@ -62,7 +66,8 @@ after(async () => {
 describe("plan change re-syncs the credit pool and cap", () => {
   it("upgrade starter → agency lifts the pool and the cap; downgrade lowers both", async () => {
     // Exhaust the starter pool (balance + cap rows created from starter).
-    assert.equal((await charge(WS_PLAN, 2500)).ok, true);
+    // Phase 15.3: pool numbers come from the constants (credits.ts), not literals.
+    assert.equal((await charge(WS_PLAN, STARTER)).ok, true);
     const blocked = await charge(WS_PLAN, 10);
     assert.equal(blocked.ok, false);
     assert.equal((blocked as { reason?: string }).reason, "cap_exceeded");
@@ -72,25 +77,25 @@ describe("plan change re-syncs the credit pool and cap", () => {
     assert.equal(up.capCredits, includedCreditsForPlan("agency"));
     const s = await state(WS_PLAN);
     assert.equal(s.plan, "agency");
-    assert.equal(s.bal?.includedCredits, 30000);
-    assert.equal(s.cap?.capCredits, 30000);
+    assert.equal(s.bal?.includedCredits, AGENCY);
+    assert.equal(s.cap?.capCredits, AGENCY);
     assert.equal((await charge(WS_PLAN, 10)).ok, true, "upgraded workspace can spend");
 
     const down = await applyPlanChange(WS_PLAN, "starter");
-    assert.equal(down.includedCredits, 2500);
-    assert.equal(down.capCredits, 2500);
-    assert.equal((await charge(WS_PLAN, 10)).ok, false, "downgrade no longer keeps 30,000/month");
+    assert.equal(down.includedCredits, STARTER);
+    assert.equal(down.capCredits, STARTER);
+    assert.equal((await charge(WS_PLAN, 10)).ok, false, "downgrade no longer keeps the agency pool");
   });
 
   it("keeps an admin's headroom: cap moves by the pool delta", async () => {
-    await prisma.spendCap.update({ where: { workspaceId: WS_PLAN }, data: { capCredits: 3000 } }); // pool 2500 + 500
+    await prisma.spendCap.update({ where: { workspaceId: WS_PLAN }, data: { capCredits: STARTER + 500 } }); // pool + 500 headroom
     const r = await applyPlanChange(WS_PLAN, "pro");
-    assert.equal(r.includedCredits, 10000);
-    assert.equal(r.capCredits, 10500);
+    assert.equal(r.includedCredits, PRO);
+    assert.equal(r.capCredits, PRO + 500);
   });
 
   it("concurrent plan changes + charges leave pool and cap consistent with the final plan", async () => {
-    assert.equal((await charge(WS_RACE, 1)).ok, true); // rows from starter: pool 2500, cap 2500
+    assert.equal((await charge(WS_RACE, 1)).ok, true); // rows from starter: pool = cap = STARTER
     const plans = ["agency", "pro", "starter", "agency", "pro"] as const;
     await Promise.all([
       ...plans.map((p) => applyPlanChange(WS_RACE, p)),
@@ -107,22 +112,22 @@ describe("expired top-ups lower the cap", () => {
   it("5,000 expired purchased credits are not spendable after rollover", async () => {
     assert.equal((await charge(WS_EXP, 1)).ok, true); // rows from starter
     await applyTopUp(WS_EXP, { creditsAdded: 5000, expiresAt: new Date(Date.now() + 86_400_000) });
-    assert.equal((await state(WS_EXP)).cap?.capCredits, 7500);
+    assert.equal((await state(WS_EXP)).cap?.capCredits, STARTER + 5000);
     // Rewind: the top-up expired yesterday and the period is last month's.
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1, 1);
     lastMonth.setHours(0, 0, 0, 0);
     await prisma.creditBalance.update({
       where: { workspaceId: WS_EXP },
-      data: { purchasedExpiresAt: new Date(Date.now() - 86_400_000), periodStart: lastMonth, usedCredits: 7000 },
+      data: { purchasedExpiresAt: new Date(Date.now() - 86_400_000), periodStart: lastMonth, usedCredits: STARTER + 4500 },
     });
-    const r = await charge(WS_EXP, 7000);
+    const r = await charge(WS_EXP, STARTER + 4500);
     assert.equal(r.ok, false, "expired credits must not be spendable");
     assert.equal((r as { reason?: string }).reason, "cap_exceeded");
     const s = await state(WS_EXP);
     assert.equal(s.bal?.purchasedCredits, 0);
-    assert.equal(s.cap?.capCredits, 2500, "cap back to the paid pool");
-    assert.equal((await charge(WS_EXP, 2500)).ok, true, "the included pool is still spendable");
+    assert.equal(s.cap?.capCredits, STARTER, "cap back to the paid pool");
+    assert.equal((await charge(WS_EXP, STARTER)).ok, true, "the included pool is still spendable");
   });
 });
 

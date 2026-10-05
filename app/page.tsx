@@ -66,6 +66,10 @@ export default function Home() {
             ShapesOS
           </span>
           <div className="flex items-center gap-2">
+            {/* Phase 15.3: public pricing page (rendered from the plan constants). */}
+            <Link href="/pricing" className={quietNav}>
+              Pricing
+            </Link>
             <Link href="/login" className={quietNav}>
               Sign in
             </Link>

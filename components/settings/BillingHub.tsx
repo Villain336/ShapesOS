@@ -1,4 +1,5 @@
-// Marketr — billing hub (Phase 13 Wave A).
+// Marketr — billing hub (Phase 13 Wave A; Phase 15.3 pricing: base fee +
+// seats + credits, the Business plan, an annual toggle and extra seats).
 // Plans & pricing, current subscription, and Stripe Customer Portal entry —
 // all admin-gated server-side by the page. Card data, keys, and Stripe
 // Price ids never touch this UI: purchases happen on Stripe Checkout, and
@@ -15,7 +16,10 @@ import {
   Check,
   CreditCard,
   ArrowRight,
+  RefreshCw,
+  Users,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -59,17 +63,50 @@ interface PlanCard {
   tagline: string;
   priceDisplay: string;
   priceCents: number;
+  annualPriceDisplay: string;
+  annualPriceCents: number;
   includedCredits: number;
+  includedSeats: number | null;
+  extraSeatCents: number;
+  /** The plan's lines: seats, credits, workspaces, twin, then features (from the constants). */
   features: string[];
   badge: string | null;
   purchasable: boolean;
+  purchasableAnnual: boolean;
 }
 
 interface PlansData {
   configured: boolean;
   currentPlan: string;
+  currentInterval: "month" | "year" | null;
   plans: PlanCard[];
 }
+
+/** Mirrors lib/billing/seats.ts SeatSummary. */
+interface SeatsData {
+  plan: string;
+  included: number | null;
+  used: number;
+  extra: number;
+  approvedExtra: number;
+  billedExtra: number;
+  targetExtra: number;
+  unapprovedExtra: number;
+  perSeatCents: number | null;
+  interval: "month" | "year";
+  billable: boolean;
+  billableReason: string | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+}
+
+type Interval = "month" | "year";
+
+const usd = (cents: number) =>
+  `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+const segBase =
+  "inline-flex h-control-sm items-center rounded-full px-4 text-sm font-semibold aos-press";
 
 interface SubData {
   configured: boolean;
@@ -79,6 +116,7 @@ interface SubData {
     status: string;
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string | null;
+    interval?: "month" | "year" | null;
   } | null;
   hasPaymentMethod: boolean;
 }
@@ -114,16 +152,26 @@ export default function BillingHub({
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<Interval>("month");
+  const [seats, setSeats] = useState<SeatsData | null>(null);
+  const [seatTarget, setSeatTarget] = useState("");
+  const [seatBusy, setSeatBusy] = useState(false);
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [pr, sr] = await Promise.all([
+      const [pr, sr, seatsRes] = await Promise.all([
         fetch(`/api/billing/plans?${q}`),
         fetch(`/api/billing/subscription?${q}`),
+        fetch(`/api/billing/seats?${q}`),
       ]);
+      if (seatsRes.ok) {
+        const sj = (await seatsRes.json()) as SeatsData;
+        setSeats(sj);
+        setSeatTarget(String(sj.approvedExtra));
+      }
       if (!pr.ok) throw new Error("Failed to load plans");
       // A 503 from the subscription endpoint means Stripe isn't configured —
       // that's an honest no-key state, not a failure. Render the needs banner.
@@ -134,7 +182,9 @@ export default function BillingHub({
         if (!sr.ok) throw new Error("Failed to load subscription");
         subJson = await sr.json();
       }
-      setPlans(await pr.json());
+      const pj = (await pr.json()) as PlansData;
+      setPlans(pj);
+      if (pj.currentInterval) setBillingInterval(pj.currentInterval);
       setSub(subJson);
     } catch (err) {
       setNotice({ kind: "error", message: err instanceof Error ? err.message : "Failed to load billing" });
@@ -169,7 +219,7 @@ export default function BillingHub({
       const r = await fetch(`/api/billing/subscription?${q}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId, planId }),
+        body: JSON.stringify({ workspaceId, planId, interval: billingInterval }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? "Failed to start checkout");
@@ -196,6 +246,68 @@ export default function BillingHub({
       setNotice({ kind: "error", message: err instanceof Error ? err.message : "Failed to open the billing portal" });
     } finally {
       setOpeningPortal(false);
+    }
+  };
+
+  const postSeats = async (payload: Record<string, unknown>) => {
+    const r = await fetch(`/api/billing/seats?${q}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ workspaceId, ...payload }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (j.seats) {
+      setSeats(j.seats);
+      setSeatTarget(String(j.seats.approvedExtra));
+    }
+    return { r, j };
+  };
+
+  // Raising the approved extra seats is a money decision: the confirm dialog
+  // shows the price, and only then is confirmSeatCharge sent.
+  const approveSeats = async () => {
+    if (!seats || seats.perSeatCents === null) return;
+    const next = Number(seatTarget);
+    if (!Number.isInteger(next) || next < 0) {
+      setNotice({ kind: "error", message: "Approved extra seats must be a whole number." });
+      return;
+    }
+    const more = next - seats.approvedExtra;
+    if (more > 0) {
+      const ok = await confirmAction({
+        title: `Approve ${more} more extra seat${more === 1 ? "" : "s"}?`,
+        description:
+          `Each extra seat costs ${usd(seats.perSeatCents)} per ${seats.interval}, billed only while a member uses it ` +
+          `(up to ${usd(seats.perSeatCents * more)} more per ${seats.interval}, prorated). Admins, SCIM and SSO can then add ` +
+          `members up to ${(seats.included ?? 0) + next} without asking again.`,
+        confirmLabel: "Approve and bill when used",
+      });
+      if (!ok) return;
+    }
+    setSeatBusy(true);
+    setNotice(null);
+    try {
+      const { r, j } = await postSeats({ approvedExtraSeats: next, confirmSeatCharge: more > 0 });
+      if (!r.ok) throw new Error(j.error ?? "Couldn't change the approved seats");
+      setNotice({ kind: "ok", message: `Approved extra seats: ${next}.` });
+    } catch (err) {
+      setNotice({ kind: "error", message: err instanceof Error ? err.message : "Couldn't change the approved seats" });
+    } finally {
+      setSeatBusy(false);
+    }
+  };
+
+  const resyncSeats = async () => {
+    setSeatBusy(true);
+    setNotice(null);
+    try {
+      const { r, j } = await postSeats({ action: "sync" });
+      if (!r.ok) throw new Error(j.sync?.error ?? j.error ?? "Seat sync failed");
+      setNotice({ kind: "ok", message: "Seats are in sync with Stripe." });
+    } catch (err) {
+      setNotice({ kind: "error", message: err instanceof Error ? err.message : "Seat sync failed" });
+    } finally {
+      setSeatBusy(false);
     }
   };
 
@@ -287,15 +399,117 @@ export default function BillingHub({
             </div>
           </section>
 
-          {/* Plans / pricing — driven by the admin-configurable catalogue */}
+          {/* Seats (Phase 15.3): included, extra, approved ceiling, Stripe sync */}
+          {seats && seats.included !== null && (
+            <section>
+              <h2 className="text-sm font-semibold text-ink">Seats</h2>
+              <div className={`${cardCls} mt-2`}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Users className="h-5 w-5 text-subtle" aria-hidden />
+                  <p className="text-base font-semibold text-ink">
+                    {seats.used} used of {seats.included} included
+                  </p>
+                  {seats.extra > 0 && (
+                    <span className={chipCls}>
+                      {seats.extra} extra
+                      {seats.perSeatCents !== null ? ` at ${usd(seats.perSeatCents)} / ${seats.interval}` : ""}
+                    </span>
+                  )}
+                </div>
+                <table className="mt-3 w-full text-left text-sm">
+                  <tbody>
+                    <tr className="border-b border-line">
+                      <th scope="row" className="py-2 pr-3 font-medium text-ink">Extra seats billed on Stripe</th>
+                      <td className="py-2 text-ink">{seats.billedExtra}</td>
+                    </tr>
+                    <tr className="border-b border-line">
+                      <th scope="row" className="py-2 pr-3 font-medium text-ink">Extra seats you approved</th>
+                      <td className="py-2 text-ink">{seats.approvedExtra}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row" className="py-2 pr-3 font-medium text-ink">Last synced</th>
+                      <td className="py-2 text-muted">
+                        {seats.lastSyncedAt ? new Date(seats.lastSyncedAt).toLocaleString() : "Not yet"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {seats.unapprovedExtra > 0 && (
+                  <p className="mt-3 text-[13px] text-ink">
+                    {seats.unapprovedExtra} member{seats.unapprovedExtra === 1 ? " is" : "s are"} past your approved
+                    seats (for example after a plan change) and {seats.unapprovedExtra === 1 ? "isn't" : "aren't"} billed.
+                    Approve more extra seats below, or remove members.
+                  </p>
+                )}
+                {seats.syncError && (
+                  <div className="mt-3">
+                    <Notice notice={{ kind: "error", message: `Seat sync with Stripe failed: ${seats.syncError}` }} />
+                  </div>
+                )}
+                {seats.billable ? (
+                  <div className="mt-4 flex flex-wrap items-end gap-2">
+                    <div>
+                      <label htmlFor="seat-target" className="block text-xs font-semibold text-muted">
+                        Approved extra seats
+                      </label>
+                      <input
+                        id="seat-target"
+                        type="number"
+                        min={0}
+                        step={1}
+                        inputMode="numeric"
+                        value={seatTarget}
+                        onChange={(e) => setSeatTarget(e.target.value)}
+                        className="mt-1 h-control-sm w-28 rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink focus:border-focus focus:outline-none"
+                      />
+                    </div>
+                    <button className={btnPrimary} disabled={seatBusy || seatTarget === String(seats.approvedExtra)} onClick={approveSeats}>
+                      {seatBusy ? "Saving…" : "Save approved seats"}
+                    </button>
+                    <button className={btnGhost} disabled={seatBusy} onClick={resyncSeats}>
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                      Sync with Stripe
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[13px] text-muted">{seats.billableReason}</p>
+                )}
+                <p className="mt-3 text-xs text-muted">
+                  Extra seats are only charged after an admin confirms the price — when adding a member past
+                  your seats, or by approving seats here (needed for SCIM and SSO, which can&rsquo;t ask).
+                  Removing members lowers the bill automatically. A plan change resets the approval, since
+                  the per-seat price changes with the plan.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* Plans / pricing — driven by the plan constants (lib/billing/plans.ts) */}
           <section>
-            <h2 className="text-sm font-semibold text-ink">Plans</h2>
-            <div className="mt-2 grid gap-4 md:grid-cols-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">Plans</h2>
+              <div role="group" aria-label="Billing interval" className="inline-flex gap-1 rounded-full bg-hover p-1">
+                {(["month", "year"] as const).map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-pressed={billingInterval === i}
+                    onClick={() => setBillingInterval(i)}
+                    className={`${segBase} ${billingInterval === i ? "bg-ink text-white" : "text-ink hover:bg-paper"}`}
+                  >
+                    {i === "month" ? "Monthly" : "Annual, 2 months free"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {plans.plans.map((p) => {
-                const isCurrent = p.id === plans.currentPlan;
+                const isCurrent =
+                  p.id === plans.currentPlan && (plans.currentInterval ?? "month") === billingInterval;
+                const purchasable = billingInterval === "year" ? p.purchasableAnnual : p.purchasable;
                 const actionText = !plans.configured
                   ? "Billing not enabled"
-                  : !p.purchasable
+                  : !purchasable
                     ? "Not purchasable yet"
                     : isCurrent
                       ? "Current plan"
@@ -315,12 +529,16 @@ export default function BillingHub({
                     <p className="text-lg font-semibold text-ink">{p.name}</p>
                     <p className="mt-0.5 text-[13px] text-muted">{p.tagline}</p>
                     <p className="mt-3">
-                      <span className="text-3xl font-bold tracking-tight text-ink">{p.priceDisplay}</span>
-                      <span className="text-sm text-muted"> / month</span>
+                      <span className="text-3xl font-bold tracking-tight text-ink">
+                        {billingInterval === "year" ? p.annualPriceDisplay : p.priceDisplay}
+                      </span>
+                      <span className="text-sm text-muted"> / {billingInterval === "year" ? "year" : "month"}</span>
                     </p>
-                    <p className="mt-1 text-[13px] text-muted">
-                      {p.includedCredits.toLocaleString()} included credits / month
-                    </p>
+                    {billingInterval === "year" && (
+                      <p className="mt-1 text-[13px] text-muted">
+                        {usd(Math.round(p.annualPriceCents / 12))} / month, billed yearly
+                      </p>
+                    )}
                     <ul className="mt-4 flex flex-1 flex-col gap-1.5">
                       {p.features.map((f) => (
                         <li key={f} className="flex items-start gap-2 text-[13px] text-muted">
@@ -330,8 +548,8 @@ export default function BillingHub({
                       ))}
                     </ul>
                     <button
-                      className={`${isCurrent || !plans.configured || !p.purchasable ? btnGhost : btnPrimary} mt-5 w-full`}
-                      disabled={isCurrent || !plans.configured || !p.purchasable || buying !== null}
+                      className={`${isCurrent || !plans.configured || !purchasable ? btnGhost : btnPrimary} mt-5 w-full`}
+                      disabled={isCurrent || !plans.configured || !purchasable || buying !== null}
                       onClick={() => choose(p.id)}
                     >
                       {buying === p.id ? "Redirecting to checkout…" : actionText}
@@ -341,10 +559,10 @@ export default function BillingHub({
                         Plan purchases need Stripe keys on this deployment.
                       </p>
                     ) : (
-                      !p.purchasable && (
+                      !purchasable && (
                         <p className="mt-2 text-xs text-muted">
-                          This plan isn&rsquo;t linked to a Stripe price yet — ask the host to
-                          configure it.
+                          This plan{billingInterval === "year" ? "'s annual option" : ""} isn&rsquo;t linked to a Stripe
+                          price yet — ask the host to configure it.
                         </p>
                       )
                     )}
@@ -354,10 +572,15 @@ export default function BillingHub({
             </div>
             <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               <p>
-                Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
-                names, prices, and features are configured by the ShapesOS host in{" "}
+                Every plan is a base fee with seats and AI credits included; extra seats are billed per seat
+                once you confirm them. Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
+                prices, seats and credits are configured by the ShapesOS host in{" "}
                 <code className="rounded bg-canvas px-1 font-mono text-xs">lib/billing/plans.ts</code>{" "}
-                (editable defaults, not fetched from Stripe).
+                (not fetched from Stripe). See the public{" "}
+                <Link href="/pricing" className="font-medium text-ink underline underline-offset-2">
+                  pricing page
+                </Link>
+                .
               </p>
             </div>
           </section>

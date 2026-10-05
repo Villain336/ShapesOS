@@ -19,12 +19,20 @@ import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
 import { deploymentMode, lapsedPlanFor } from "@/lib/billing/trial";
 import {
   PLANS,
+  isBillingInterval,
+  isPaidPlanId,
+  isSeatStripePrice,
   planById,
-  planIdForStripePrice,
+  planForStripePrice,
   stripePriceIdFor,
+  stripeSeatPriceIdFor,
+  type BillingInterval,
   type BillingPlan,
   type PaidPlanId,
 } from "@/lib/billing/plans";
+import { billedSeatQuantity } from "@/lib/billing/seats";
+import { planLimit } from "@/lib/billing/entitlements";
+import { seatsUsed } from "@/lib/billing/entitlements-server";
 
 // ── Errors ───────────────────────────────────────────────────────────────────
 
@@ -666,11 +674,12 @@ export class StripeBillingSink implements BillingSink {
   ): Promise<{ url: string; sessionId: string }> {
     this.requireConfigured();
     const plan = planById(req.planId);
-    const priceId = stripePriceIdFor(plan);
+    const interval: BillingInterval = req.interval ?? "month";
+    const priceId = stripePriceIdFor(plan, interval);
     if (!priceId) {
       throw new Error(
-        `Plan "${plan.name}" isn't linked to a Stripe price yet — ` +
-          `set ${plan.stripePriceEnv} on the hosted deployment to make it purchasable.`,
+        `Plan "${plan.name}" (${interval === "year" ? "annual" : "monthly"}) isn't linked to a Stripe price yet — ` +
+          `set ${interval === "year" ? plan.stripeAnnualPriceEnv : plan.stripePriceEnv} on the hosted deployment to make it purchasable.`,
       );
     }
     const workspaceId = (req.workspaceId ?? "").trim();
@@ -682,9 +691,11 @@ export class StripeBillingSink implements BillingSink {
     const session = await this.client().checkout.sessions.create({
       mode: "subscription",
       ...(bw.stripeCustomerId ? { customer: bw.stripeCustomerId } : { customer_creation: "always" }),
+      // The base fee only: extra seats are added afterwards as a quantity line
+      // by syncSeatQuantity, capped at what an admin approved (Phase 15.3).
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { workspaceId, planId: plan.id, kind: "plan-subscription" },
-      subscription_data: { metadata: { workspaceId, planId: plan.id } },
+      metadata: { workspaceId, planId: plan.id, interval, kind: "plan-subscription" },
+      subscription_data: { metadata: { workspaceId, planId: plan.id, interval } },
       success_url: req.successUrl,
       cancel_url: req.cancelUrl,
     });
@@ -760,13 +771,20 @@ export class StripeBillingSink implements BillingSink {
       status: sub.status,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       currentPeriodEnd: subscriptionPeriodEnd(sub),
+      interval: subscriptionItemsOf(sub).plan?.interval ?? (isBillingInterval(session.metadata?.interval) ? session.metadata.interval : "month"),
     });
     await prisma.billingWorkspace
       .update({ where: { workspaceId }, data: { stripeCustomerId: customerId } })
       .catch(() => null);
     if (!prior || prior.planId !== planId) {
       await setWorkspacePlan(workspaceId, planId as Plan, `subscribed via Stripe (${subscriptionId})`);
+    } else if (prior.stripeSubscriptionId !== subscriptionId) {
+      await resetSeatApproval(workspaceId, `new subscription ${subscriptionId}`);
     }
+    // Phase 15.3: bring the seat line in line with the new plan (never above
+    // the admin-approved extra seats). Best-effort: a failure is recorded and
+    // shown in Billing with a retry; it never fails the webhook.
+    await this.syncSeatQuantity(workspaceId).catch(() => null);
     return {
       ok: true,
       applied: { workspaceId, credits: 0, alreadyApplied: false, kind: "subscription_checkout" },
@@ -784,7 +802,41 @@ export class StripeBillingSink implements BillingSink {
     sub: Stripe.Subscription,
     deleted: boolean,
   ): Promise<WebhookResult> {
-    return syncSubscriptionFromStripe(sub, deleted);
+    const result = await syncSubscriptionFromStripe(sub, deleted);
+    // Phase 15.3: a plan change moves the included seats (and the seat Price);
+    // re-derive the seat line. Our own quantity updates come back here as
+    // customer.subscription.updated and find nothing to change (no loop).
+    if (result.ok && result.applied?.workspaceId) {
+      await this.syncSeatQuantity(result.applied.workspaceId).catch(() => null);
+    }
+    return result;
+  }
+
+  /**
+   * Phase 15.3: make the subscription's extra-seat QUANTITY line match
+   * min(seats used − included, admin-approved extra seats). Idempotent:
+   * it reads the live subscription first and writes only when the line
+   * differs, with an idempotency key per (subscription, sync version,
+   * quantity), so a retry or a concurrent sync never double-charges.
+   * Raising the approved ceiling is NOT done here — only an admin's
+   * confirmation does that (lib/billing/seats-server.ts).
+   * Stripe calls (stripe.com/docs/api/subscription_items):
+   *   create  POST /v1/subscription_items {subscription, price, quantity, proration_behavior}
+   *   update  POST /v1/subscription_items/:id {quantity, price?, proration_behavior}
+   *   delete  DELETE /v1/subscription_items/:id {proration_behavior}
+   */
+  async syncSeatQuantity(workspaceId: string): Promise<SeatSyncResult> {
+    this.requireConfigured();
+    try {
+      return await syncSeatQuantityWith(this.client(), workspaceId);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await prisma.billingWorkspace
+        .update({ where: { workspaceId }, data: { seatSyncError: message.slice(0, 500) } })
+        .catch(() => null);
+      await auditBilling(workspaceId, `Billing: seat quantity sync failed — ${message.slice(0, 300)}`);
+      throw e;
+    }
   }
 
   /**
@@ -1282,6 +1334,8 @@ export async function getOverageState(workspaceId: string): Promise<OverageState
 export interface SubscriptionCheckoutRequest {
   workspaceId: string;
   planId: string;
+  /** Phase 15.3: monthly (default) or annual base fee ("2 months free"). */
+  interval?: BillingInterval;
   successUrl: string;
   cancelUrl: string;
 }
@@ -1303,6 +1357,7 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
   status                     TEXT NOT NULL,
   cancel_at_period_end       BOOLEAN NOT NULL DEFAULT false,
   current_period_end         TIMESTAMPTZ,
+  billing_interval           TEXT,
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 )`;
@@ -1323,6 +1378,8 @@ export interface SubscriptionRow {
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: Date | null;
+  /** Phase 15.3: the base fee's interval (null on rows from before 15.3 = monthly). */
+  interval: BillingInterval | null;
 }
 
 async function readSubscriptionRow(workspaceId: string): Promise<SubscriptionRow | null> {
@@ -1336,9 +1393,10 @@ async function readSubscriptionRow(workspaceId: string): Promise<SubscriptionRow
       status: string;
       cancel_at_period_end: boolean;
       current_period_end: Date | null;
+      billing_interval: string | null;
     }>
   >`SELECT workspace_id, stripe_subscription_id, stripe_customer_id, plan_id,
-          status, cancel_at_period_end, current_period_end
+          status, cancel_at_period_end, current_period_end, billing_interval
      FROM billing_subscriptions WHERE workspace_id = ${workspaceId} LIMIT 1`;
   const r = rows[0];
   if (!r) return null;
@@ -1350,7 +1408,43 @@ async function readSubscriptionRow(workspaceId: string): Promise<SubscriptionRow
     status: r.status,
     cancelAtPeriodEnd: r.cancel_at_period_end,
     currentPeriodEnd: r.current_period_end,
+    interval: isBillingInterval(r.billing_interval) ? r.billing_interval : null,
   };
+}
+
+/** Phase 15.3: the workspace's subscription row (seat billing reads it). */
+export function getSubscriptionRow(workspaceId: string): Promise<SubscriptionRow | null> {
+  return readSubscriptionRow(workspaceId);
+}
+
+/** Subscription statuses on which Stripe still bills the subscription's items. */
+export const BILLABLE_SUBSCRIPTION_STATUSES: readonly string[] = ["active", "trialing", "past_due"];
+
+/**
+ * The base-fee item and the extra-seat item of a subscription. The plan is
+ * read from the item whose Price is a configured base-fee Price — never from
+ * items.data[0], which may be the seat line (Phase 15.3).
+ */
+export function subscriptionItemsOf(sub: Stripe.Subscription): {
+  planItem: Stripe.SubscriptionItem | null;
+  plan: { planId: PaidPlanId; interval: BillingInterval } | null;
+  seatItem: Stripe.SubscriptionItem | null;
+} {
+  const items = sub.items?.data ?? [];
+  let planItem: Stripe.SubscriptionItem | null = null;
+  let plan: { planId: PaidPlanId; interval: BillingInterval } | null = null;
+  let seatItem: Stripe.SubscriptionItem | null = null;
+  for (const item of items) {
+    const priceId = item.price?.id ?? null;
+    const p = planForStripePrice(priceId);
+    if (p && !planItem) {
+      planItem = item;
+      plan = p;
+    } else if (isSeatStripePrice(priceId) && !seatItem) {
+      seatItem = item;
+    }
+  }
+  return { planItem, plan, seatItem };
 }
 
 async function writeSubscriptionRow(row: {
@@ -1362,16 +1456,18 @@ async function writeSubscriptionRow(row: {
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: Date | null;
+  /** Phase 15.3: null keeps the stored interval. */
+  interval?: BillingInterval | null;
 }): Promise<void> {
   await ensureSubscriptionsTable();
   await prisma.$executeRaw`
     INSERT INTO billing_subscriptions
       (workspace_id, stripe_subscription_id, stripe_customer_id,
        stripe_checkout_session_id, plan_id, status, cancel_at_period_end,
-       current_period_end, updated_at)
+       current_period_end, billing_interval, updated_at)
     VALUES (${row.workspaceId}, ${row.stripeSubscriptionId}, ${row.stripeCustomerId},
             ${row.stripeCheckoutSessionId ?? null}, ${row.planId}, ${row.status},
-            ${row.cancelAtPeriodEnd}, ${row.currentPeriodEnd}, now())
+            ${row.cancelAtPeriodEnd}, ${row.currentPeriodEnd}, ${row.interval ?? null}, now())
     ON CONFLICT (workspace_id) DO UPDATE SET
       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
       stripe_customer_id = EXCLUDED.stripe_customer_id,
@@ -1380,11 +1476,15 @@ async function writeSubscriptionRow(row: {
       status = EXCLUDED.status,
       cancel_at_period_end = EXCLUDED.cancel_at_period_end,
       current_period_end = EXCLUDED.current_period_end,
+      billing_interval = COALESCE(EXCLUDED.billing_interval, billing_subscriptions.billing_interval),
       updated_at = now()`;
 }
 
 function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
-  const ts = (sub as { current_period_end?: number }).current_period_end;
+  // Newer Stripe API versions carry the period on each item, not the subscription.
+  const ts =
+    (sub as { current_period_end?: number }).current_period_end ??
+    (sub.items?.data?.[0] as { current_period_end?: number } | undefined)?.current_period_end;
   return typeof ts === "number" ? new Date(ts * 1000) : null;
 }
 
@@ -1397,6 +1497,24 @@ async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: strin
   // an upgraded workspace is never left capped at the old tier's pool.
   await applyPlanChange(workspaceId, planId);
   await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
+  // Phase 15.3: an admin approved extra seats at THAT plan's per-seat price;
+  // a different plan has a different price, so the approval never carries over.
+  await resetSeatApproval(workspaceId, `plan changed to ${planId}`);
+}
+
+/**
+ * Phase 15.3: drop the admin-approved extra-seat ceiling (plan change, a new
+ * subscription, or the subscription ended). Extra seats are then billed
+ * again only after an admin confirms them at the current price.
+ */
+async function resetSeatApproval(workspaceId: string, why: string): Promise<void> {
+  const r = await prisma.billingWorkspace.updateMany({
+    where: { workspaceId, approvedExtraSeats: { gt: 0 } },
+    data: { approvedExtraSeats: 0 },
+  });
+  if (r.count > 0) {
+    await auditBilling(workspaceId, `Billing: approved extra seats reset to 0 (${why}) — an admin confirms extra seats again at the current price`);
+  }
 }
 
 export interface SubscriptionState {
@@ -1447,8 +1565,10 @@ export async function syncSubscriptionFromStripe(
   if (!bw) return { ok: true, ignored: true, reason: "unknown_customer" };
   const workspaceId = bw.workspaceId;
 
-  const priceId = sub.items?.data?.[0]?.price?.id ?? null;
-  const planId = planIdForStripePrice(priceId);
+  // Phase 15.3: a subscription carries the base fee AND (maybe) an extra-seat
+  // quantity line — the plan comes from the base-fee item, whatever its index.
+  const { plan } = subscriptionItemsOf(sub);
+  const planId = plan?.planId ?? null;
   const ended = deleted || ["canceled", "unpaid", "incomplete_expired"].includes(sub.status);
 
   const prior = await readSubscriptionRow(workspaceId);
@@ -1460,6 +1580,7 @@ export async function syncSubscriptionFromStripe(
     status: deleted ? "canceled" : sub.status,
     cancelAtPeriodEnd: sub.cancel_at_period_end,
     currentPeriodEnd: subscriptionPeriodEnd(sub),
+    interval: plan?.interval ?? null,
   });
 
   if (ended) {
@@ -1486,4 +1607,107 @@ export async function syncSubscriptionFromStripe(
       kind: deleted ? "subscription_deleted" : "subscription_updated",
     },
   };
+}
+
+
+// ── Extra seats as a Stripe quantity line (Phase 15.3) ──────────────────────
+
+export type SeatSyncStatus =
+  /** The seat line already matched — nothing was sent to Stripe. */
+  | "unchanged"
+  /** The seat line was created, updated or removed on Stripe. */
+  | "synced"
+  /** No billable subscription (none, ended, or a plan without extra seats): nothing to bill. */
+  | "not_billable";
+
+export interface SeatSyncResult {
+  status: SeatSyncStatus;
+  workspaceId: string;
+  /** The quantity now on Stripe (0 = no seat line). */
+  quantity?: number;
+  /** What was sent: create | update | delete. */
+  action?: "create" | "update" | "delete";
+  reason?: string;
+}
+
+/** The minimal Stripe surface seat sync uses (the real client, or a labelled fake in tests). */
+export type SeatStripeClient = Pick<Stripe, "subscriptions" | "subscriptionItems">;
+
+/**
+ * The seat sync core (see StripeBillingSink.syncSeatQuantity). Exported for
+ * tests that pass a FAKE client; production goes through the sink.
+ */
+export async function syncSeatQuantityWith(client: SeatStripeClient, workspaceId: string): Promise<SeatSyncResult> {
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+  if (!ws) return { status: "not_billable", workspaceId, reason: "unknown workspace" };
+  const [row, bw] = await Promise.all([
+    readSubscriptionRow(workspaceId),
+    prisma.billingWorkspace.upsert({ where: { workspaceId }, update: {}, create: { workspaceId } }),
+  ]);
+  const recordBilled = (quantity: number, bumpVersion: boolean) =>
+    prisma.billingWorkspace.update({
+      where: { workspaceId },
+      data: {
+        billedExtraSeats: quantity,
+        seatsSyncedAt: new Date(),
+        seatSyncError: null,
+        ...(bumpVersion ? { seatSyncVersion: { increment: 1 } } : {}),
+      },
+    });
+
+  if (!row || !BILLABLE_SUBSCRIPTION_STATUSES.includes(row.status) || !isPaidPlanId(ws.plan)) {
+    if (bw.billedExtraSeats !== 0) await recordBilled(0, false);
+    // The approval belonged to a subscription that no longer bills.
+    if (row && !BILLABLE_SUBSCRIPTION_STATUSES.includes(row.status)) await resetSeatApproval(workspaceId, `subscription ${row.status}`);
+    return { status: "not_billable", workspaceId, quantity: 0, reason: !row ? "no subscription" : `subscription ${row.status}` };
+  }
+
+  const sub = await client.subscriptions.retrieve(row.stripeSubscriptionId);
+  const { plan: subPlan, seatItem } = subscriptionItemsOf(sub);
+  const interval: BillingInterval = subPlan?.interval ?? row.interval ?? "month";
+  const plan = planById(ws.plan);
+  const seatPrice = stripeSeatPriceIdFor(plan, interval);
+  const used = await seatsUsed(workspaceId);
+  const desired = billedSeatQuantity({ used, included: planLimit(ws.plan, "seats"), approvedExtra: bw.approvedExtraSeats });
+  const current = seatItem?.quantity ?? 0;
+  const priceOk = !seatItem || seatItem.price?.id === seatPrice;
+
+  if (current === desired && priceOk) {
+    if (bw.billedExtraSeats !== desired || bw.seatSyncError) await recordBilled(desired, false);
+    return { status: "unchanged", workspaceId, quantity: desired };
+  }
+  if (desired > 0 && !seatPrice) {
+    throw new Error(
+      `${plan.name} extra seats (${interval === "year" ? "annual" : "monthly"}) aren't linked to a Stripe price — ` +
+        `set ${interval === "year" ? plan.stripeSeatAnnualPriceEnv : plan.stripeSeatPriceEnv}.`,
+    );
+  }
+
+  // Stripe rejects a reused key with different parameters, so the key names
+  // everything the request carries (subscription, version, quantity, price).
+  const idempotencyKey = `seats:${row.stripeSubscriptionId}:v${bw.seatSyncVersion + 1}:q${desired}:${seatPrice ?? "none"}`;
+  let action: SeatSyncResult["action"];
+  if (desired === 0) {
+    await client.subscriptionItems.del(seatItem!.id, { proration_behavior: "create_prorations" }, { idempotencyKey });
+    action = "delete";
+  } else if (seatItem) {
+    await client.subscriptionItems.update(
+      seatItem.id,
+      { quantity: desired, ...(priceOk ? {} : { price: seatPrice! }), proration_behavior: "create_prorations" },
+      { idempotencyKey },
+    );
+    action = "update";
+  } else {
+    await client.subscriptionItems.create(
+      { subscription: row.stripeSubscriptionId, price: seatPrice!, quantity: desired, proration_behavior: "create_prorations" },
+      { idempotencyKey },
+    );
+    action = "create";
+  }
+  await recordBilled(desired, true);
+  await auditBilling(
+    workspaceId,
+    `Billing: extra-seat quantity ${current} → ${desired} on ${row.stripeSubscriptionId} (${action}; ${used} seats used, ${bw.approvedExtraSeats} extra approved)`,
+  );
+  return { status: "synced", workspaceId, quantity: desired, action };
 }

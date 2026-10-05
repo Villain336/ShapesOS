@@ -34,6 +34,8 @@ import {
   scimBool,
 } from "./http";
 import type { ScimContext } from "./auth";
+import { checkSeatForNewMember, syncSeatsBestEffort } from "@/lib/billing/seats-server";
+import { seatProvisioningRefusal } from "@/lib/billing/seats";
 
 type Tx = Prisma.TransactionClient;
 
@@ -294,7 +296,13 @@ async function applyUserUpdate(tx: Tx, ctx: ScimContext, member: WorkspaceMember
 
 export async function createUser(ctx: ScimContext, base: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const attrs = userAttrsFrom(body, true);
-  return withWorkspaceScope(ctx.workspaceId, async (tx) => {
+  // Phase 15.3 (pricing): an identity provider can't confirm a seat charge.
+  // Within the included seats (or extra seats an admin already approved) the
+  // user is provisioned; past them SCIM is refused (403) — never charged.
+  const seat = await checkSeatForNewMember(ctx.workspaceId, { confirmed: false });
+  const refusal = seatProvisioningRefusal(seat);
+  if (refusal) throw new ScimError(403, refusal);
+  const created = await withWorkspaceScope(ctx.workspaceId, async (tx) => {
     const existing = await tx.workspaceMember.findFirst({
       where: { workspaceId: ctx.workspaceId, email: { equals: attrs.email!, mode: "insensitive" } },
       select: { id: true },
@@ -317,6 +325,8 @@ export async function createUser(ctx: ScimContext, base: string, body: Record<st
     await audit(tx, ctx.workspaceId, "scim_user_provisioned", `SCIM provisioned ${attrs.email} as ${SCIM_DEFAULT_ROLE}`);
     return toScimUser(created, base);
   });
+  if (seat.kind === "within_approved") await syncSeatsBestEffort(ctx.workspaceId);
+  return created;
 }
 
 export async function replaceUser(
@@ -436,6 +446,8 @@ export async function deleteUser(ctx: ScimContext, id: string): Promise<void> {
     await tx.workspaceMember.delete({ where: { id: member.id, workspaceId: ctx.workspaceId } });
     await audit(tx, ctx.workspaceId, "scim_user_deleted", `SCIM removed ${member.email ?? member.id}`);
   });
+  // Phase 15.3 (pricing): one seat fewer can lower the extra-seat quantity.
+  await syncSeatsBestEffort(ctx.workspaceId);
 }
 
 // ---------------------------------------------------------------------------

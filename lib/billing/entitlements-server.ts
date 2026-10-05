@@ -2,7 +2,7 @@
 // The pure table lives in ./entitlements.ts (client-safe); these helpers read
 // a workspace's plan (workspaces.plan — not an RLS table) and enforce it.
 
-import type { Plan } from "@prisma/client";
+import type { Plan, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   EntitlementError,
@@ -62,6 +62,30 @@ export async function requireWithinLimit(
   if (max !== null && used >= max) {
     throw new EntitlementError(limitUpgradeMessage(limit, max), limit);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Inside a transaction (Phase 15.3: digital_twin / payroll / pos gates)
+// ---------------------------------------------------------------------------
+
+/** The minimal transaction surface the Tx gates need (workspaces is not an RLS table). */
+export type PlanTx = Pick<Prisma.TransactionClient, "workspace">;
+
+export const planOfTx = (tx: PlanTx): PlanLookup => async (workspaceId) =>
+  (await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } }))?.plan ?? null;
+
+/**
+ * requireEntitlement for code that already runs in a workspace transaction
+ * (the ops DocType service, the twin sample site): reads the plan through
+ * the same transaction. Throws EntitlementError (403, upgrade message).
+ */
+export async function requireEntitlementTx(tx: PlanTx, workspaceId: string, feature: Feature): Promise<void> {
+  await requireEntitlement(workspaceId, feature, planOfTx(tx));
+}
+
+/** requireWithinLimit through a transaction (e.g. twin sites counted in the same tx). */
+export async function requireWithinLimitTx(tx: PlanTx, workspaceId: string, limit: LimitKey, used: number): Promise<void> {
+  await requireWithinLimit(workspaceId, limit, used, planOfTx(tx));
 }
 
 // ---------------------------------------------------------------------------
