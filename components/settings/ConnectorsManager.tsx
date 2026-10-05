@@ -480,7 +480,7 @@ export default function ConnectorsManager({
             </button>
           )}
           {/* Phase 11 (bizsync): sync status, mappings and run log. */}
-          {(c.key === "shopify" || c.key === "quickbooks" || c.key === "xero") && (
+          {(c.key === "shopify" || c.key === "quickbooks" || c.key === "xero" || c.key === "gusto") && (
             <Link href={`/dashboard/settings/connectors/sync?provider=${c.key}`} className={btnGhost}>
               Sync settings
             </Link>
