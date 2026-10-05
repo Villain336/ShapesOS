@@ -234,7 +234,7 @@ export async function connectShopifySingleStore(
   // Non-secret display/routing meta, like the OAuth path's { shop, label }.
   const { prisma } = await import("@/lib/prisma");
   const connection = await prisma.connectorConnection.update({
-    where: { id: stored.id },
+    where: { id: stored.id, workspaceId: input.workspaceId },
     data: { meta: { label, shop: String(built.payload.shop), authMode: input.mode } },
   });
   const { onBizsyncConnected } = await import("../install");

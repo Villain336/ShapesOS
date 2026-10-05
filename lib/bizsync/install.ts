@@ -64,7 +64,7 @@ export async function onBizsyncConnected(input: {
     } catch {
       meta.gustoError = "Connected, but Gusto's company could not be read yet — it is retried on first use.";
     }
-    await prisma.connectorConnection.update({ where: { id: connection.id }, data: { meta: meta as Record<string, string> } });
+    await prisma.connectorConnection.update({ where: { id: connection.id, workspaceId: connection.workspaceId }, data: { meta: meta as Record<string, string> } });
     return;
   }
   if (input.connectorKey === "xero") {

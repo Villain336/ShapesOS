@@ -286,7 +286,7 @@ export async function sendPayRunToGusto(workspaceId: string, runId: string, auth
         warnings: plan.warnings,
       };
       await tx.opsPayRunProviderSync.upsert({
-        where: { payRunId_provider: { payRunId: runId, provider: P } },
+        where: { payRunId_provider: { payRunId: runId, provider: P }, workspaceId },
         create: { workspaceId, payRunId: runId, provider: P, status: "sent", remotePayrollId: payroll.payroll_uuid, sentDigest: run.computeDigest, sentAt: now, sentBy: actor.userId, summary: newSummary as unknown as Prisma.InputJsonValue },
         update: { status: "sent", remotePayrollId: payroll.payroll_uuid, sentDigest: run.computeDigest, sentAt: now, sentBy: actor.userId, summary: newSummary as unknown as Prisma.InputJsonValue },
       });
