@@ -31,6 +31,7 @@ import {
   type ComposerAgentKey,
   type ComposerToolKey,
 } from "@/lib/aos/composer";
+import type { GroupAvailability } from "@/lib/agents/grants";
 import { OPEN_COMPOSER_EVENT } from "./lib";
 
 const AGENTS = composerAgents();
@@ -64,6 +65,20 @@ export function NewTaskDialog() {
   const [sending, setSending] = useState(false);
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   const projectsRef = useRef<Promise<ProjectRow[]> | null>(null);
+  // Phase 8: which tool groups this server can run (the Code chip lights up
+  // when a sandbox provider is available). Null until loaded = unavailable.
+  const [availability, setAvailability] = useState<GroupAvailability | null>(null);
+
+  const loadAvailability = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents/tool-availability", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { groups?: GroupAvailability };
+      setAvailability(data.groups ?? null);
+    } catch {
+      // Leave it unavailable: the chip says so.
+    }
+  }, []);
 
   const loadProjects = useCallback(async (): Promise<ProjectRow[]> => {
     if (!projectsRef.current) {
@@ -91,8 +106,9 @@ export function NewTaskDialog() {
       setOpen(true);
       projectsRef.current = null; // re-read: a project may have been added
       void loadProjects();
+      void loadAvailability();
     },
-    [loadProjects],
+    [loadProjects, loadAvailability],
   );
 
   // Event (sidebar pill, Overview button, ⌘K action) + ⌘N / Ctrl+N.
@@ -170,7 +186,7 @@ export function NewTaskDialog() {
       setError("Add a project first. Tasks run inside a project.");
       return;
     }
-    const options = taskThreadOptions(draft);
+    const options = taskThreadOptions(draft, availability);
     queueTask({
       projectId: project.id,
       content: composeTaskMessage(draft),
@@ -220,10 +236,10 @@ export function NewTaskDialog() {
               key: t.key,
               label: t.label,
               pressed: tools.includes(t.key),
-              unavailable: chipUnavailable(agent, t.key),
+              unavailable: chipUnavailable(agent, t.key, availability),
             }))}
             onToggleTool={(k) => {
-              if (chipUnavailable(agent, k as ComposerToolKey)) return;
+              if (chipUnavailable(agent, k as ComposerToolKey, availability)) return;
               setTools((prev) => (prev.includes(k as ComposerToolKey) ? prev.filter((x) => x !== k) : [...prev, k as ComposerToolKey]));
             }}
             helper={

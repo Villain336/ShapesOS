@@ -4,7 +4,7 @@
 
 export { LogoMark, Wordmark } from "./LogoMark";
 export { StatusShape, type ShapeTone, type StatusShapeProps } from "./StatusShape";
-export { StatusBadge } from "./StatusBadge";
+export { StatusBadge, NeutralBadge } from "./StatusBadge";
 export { ToolChip, toolIcon, TOOL_ICONS } from "./ToolChip";
 export { AgentAvatar, AvatarStack, CountBadge, KeyCap, KeyCaps } from "./AgentAvatar";
 export { aosButton, type AosButtonVariant, type AosButtonSize } from "./button";

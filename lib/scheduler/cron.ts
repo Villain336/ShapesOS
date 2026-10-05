@@ -260,6 +260,28 @@ export function nextRunAfterInZone(s: CronSchedule, from: Date, tz: string): Dat
     const month = d.getUTCMonth() + 1;
     const day = d.getUTCDate();
     if (!dayMatches(s, { day, month, weekday: d.getUTCDay() })) continue;
+    // Fast path: the zone's offset is the same at both ends of the day, so
+    // the day has no DST transition and wall time → instant is one fixed
+    // shift (two conversions, not one per candidate). The first matching
+    // wall time at or after the start is then the answer.
+    // (A day whose midnight doesn't exist — a zone that springs forward at
+    // 00:00 — takes the transition path too.)
+    const dayUtc = Date.UTC(year, month - 1, day);
+    const midnight = zonedTimeToUtc(year, month, day, 0, tz).date;
+    const offset = dayUtc - midnight.getTime();
+    const mp = zonedParts(midnight, tz);
+    const midnightExists = mp.day === day && mp.hour === 0 && mp.minute === 0;
+    const lastMinute = zonedTimeToUtc(year, month, day, 23 * 60 + 59, tz).date.getTime();
+    if (midnightExists && dayUtc + (23 * 60 + 59) * MINUTE_MS - lastMinute === offset) {
+      for (const h of hours) {
+        for (const m of minutes) {
+          const t = dayUtc + (h * 60 + m) * MINUTE_MS - offset;
+          if (t >= start) return new Date(t);
+        }
+      }
+      continue;
+    }
+    // Transition day: convert each candidate (the DST rules above).
     // Wall times far before the start on its own day are long past.
     const minWall = i === 0 ? local.minutes - DST_SLACK_MIN : -1;
     let best: number | null = null;

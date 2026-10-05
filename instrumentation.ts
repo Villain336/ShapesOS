@@ -8,6 +8,9 @@
 //                     when cronRunnerDecision() allows it: CRON_RUNNER=internal
 //                     (the default on a production server) and CRON_SECRET
 //                     set; never during `next build`, in tests or on edge.
+//                     Phase 8: then the in-app agent worker
+//                     (lib/agents/queue/worker.ts) unless AGENT_WORKER is
+//                     external (a separate `worker` service) or off.
 //   onRequestError()  errors Next caught itself (render, route, action,
 //                     proxy): one structured log line, plus a Sentry report
 //                     when SENTRY_DSN is set (lib/observability/sentry.ts).
@@ -35,6 +38,13 @@ export async function register(): Promise<void> {
   } catch (err) {
     const { log } = await import("./lib/observability/log");
     log.error("in-app cron runner failed to start", { err: err instanceof Error ? err.message : String(err) });
+  }
+  try {
+    const { startAgentWorkerFromEnv } = await import("./lib/agents/queue/worker");
+    await startAgentWorkerFromEnv(process.env);
+  } catch (err) {
+    const { log } = await import("./lib/observability/log");
+    log.error("in-app agent worker failed to start", { err: err instanceof Error ? err.message : String(err) });
   }
 }
 

@@ -11,6 +11,8 @@ import { InvoiceDetail } from "./InvoiceDetail";
 import { NewInvoiceModal } from "./NewInvoiceModal";
 import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 import { activateOnKey } from "@/lib/ui/keyboard";
+// Phase 10 (finance): real invoice numbers (INV-0001) once sent.
+import { invoiceLabel } from "@/components/ops-finance/InvoiceFinancePanel";
 
 export interface OpsInvoice {
   id: string;
@@ -22,6 +24,13 @@ export interface OpsInvoice {
   sentAt: string | null;
   dueAt: string | null;
   createdAt: string;
+  // Phase 10 (finance): number, partial payments, credit notes, delivery.
+  kind?: "invoice" | "credit_note";
+  number?: string | null;
+  paidCents?: number;
+  creditedCents?: number;
+  deliveryStatus?: string | null;
+  paymentLinkUrl?: string | null;
 }
 
 export interface CustomerRef {
@@ -225,7 +234,7 @@ export function InvoicesTab() {
                 const c = inv.customerId ? customers[inv.customerId] : undefined;
                 return (
                   <tr key={inv.id} onClick={() => setSelectedId(inv.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedId(inv.id))} className={trClickableCls}>
-                    <td className="font-semibold text-ink">INV-{shortInvoiceId(inv.id)}</td>
+                    <td className="font-semibold text-ink">{invoiceLabel(inv)}</td>
                     <td>
                       {c ? (
                         <>

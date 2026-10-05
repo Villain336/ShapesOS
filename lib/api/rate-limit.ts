@@ -39,6 +39,9 @@ const AUTH_READ_PATHS = new Set([
   "/api/auth/providers",
 ]);
 
+/** Phase 10 (portal): client-portal sign-in routes (auth tier, IP-keyed). */
+const PORTAL_AUTH_PATHS = new Set(["/api/portal/login", "/api/portal/link"]);
+
 /**
  * Routes that burn LLM / skill-execution budget. Matched against the concrete
  * request pathname (e.g. /api/workflows/abc123/run). Keep this list tight:
@@ -63,6 +66,8 @@ export function classifyTier(pathname: string, method: string): RateLimitTier {
   if (pathname.startsWith("/api/auth/")) {
     return AUTH_READ_PATHS.has(pathname) ? "read" : "auth";
   }
+  // Phase 10 (portal): client-portal sign-in is a sign-in surface too.
+  if (PORTAL_AUTH_PATHS.has(pathname)) return "auth";
   const m = method.toUpperCase();
   // Read tier is the GET/listing traffic — checked before the AI patterns so
   // that history/list GETs on AI-adjacent routes (chat threads, autopilot

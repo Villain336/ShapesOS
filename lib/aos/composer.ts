@@ -12,7 +12,7 @@
 // call outside them is refused. Nothing the client sends can widen a grant.
 
 import { LEAD_AGENT, SUB_AGENTS, isSubAgentKey, type SubAgentKey } from "./agents";
-import { AGENT_MAX_GROUPS, COMPOSER_TOOL_GROUPS, UNAVAILABLE_GROUPS, type ToolGroup } from "@/lib/agents/grants";
+import { AGENT_MAX_GROUPS, COMPOSER_TOOL_GROUPS, unavailableGroups, type GroupAvailability, type ToolGroup } from "@/lib/agents/grants";
 
 /** Same bound as the chat messages route (MAX_CONTENT). */
 export const TASK_MAX_CHARS = 4000;
@@ -73,13 +73,15 @@ export function chipGroup(key: ComposerToolKey): ToolGroup {
 }
 
 /**
- * Why a chip can't be picked for this agent (null = it can). Unavailable
- * groups (the code runner before the sandbox ships) and groups beyond the
- * agent's maximum are offered but disabled — never faked.
+ * Why a chip can't be picked for this agent (null = it can). Groups that are
+ * unavailable on this server (Phase 8: the code runner without a sandbox
+ * provider — `availability` comes from GET /api/agents/tool-availability)
+ * and groups beyond the agent's maximum are offered but disabled — never faked.
  */
-export function chipUnavailable(agent: ComposerAgentKey, key: ComposerToolKey): string | null {
+export function chipUnavailable(agent: ComposerAgentKey, key: ComposerToolKey, availability?: GroupAvailability | null): string | null {
   const group = chipGroup(key);
-  if (UNAVAILABLE_GROUPS.has(group)) return "Not available yet — the code runner arrives with the sandbox.";
+  const why = unavailableGroups(availability).get(group);
+  if (why) return `Not available — ${why}`;
   if (!AGENT_MAX_GROUPS[agent].includes(group)) {
     const name = agent === "lead" ? LEAD_AGENT.name : SUB_AGENTS[agent].name;
     return `${name} doesn't use this tool.`;
@@ -88,8 +90,8 @@ export function chipUnavailable(agent: ComposerAgentKey, key: ComposerToolKey): 
 }
 
 /** Thread-creation options for a task (POST /api/chat/threads). */
-export function taskThreadOptions(draft: TaskDraft): { agentKey: ComposerAgentKey; tools: ToolGroup[] } {
-  const tools = draft.tools.filter((k) => !chipUnavailable(draft.agent, k)).map(chipGroup);
+export function taskThreadOptions(draft: TaskDraft, availability?: GroupAvailability | null): { agentKey: ComposerAgentKey; tools: ToolGroup[] } {
+  const tools = draft.tools.filter((k) => !chipUnavailable(draft.agent, k, availability)).map(chipGroup);
   return { agentKey: draft.agent, tools };
 }
 

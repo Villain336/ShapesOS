@@ -51,6 +51,9 @@ export default function McpManager() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   // Phase 4a: false when the plan doesn't include API/MCP access.
   const [entitled, setEntitled] = useState(true);
+  // Phase 11 (conncore): whether "on/off" is the plan default or the admin's switch.
+  const [source, setSource] = useState<"explicit_on" | "explicit_off" | "plan_default">("plan_default");
+  const [planDefault, setPlanDefault] = useState(false);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [clients, setClients] = useState<OAuthClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +74,8 @@ export default function McpManager() {
       if (!res.ok) throw new Error(data.error ?? "Failed to load");
       setEnabled(data.enabled);
       setEntitled(data.entitled !== false);
+      if (data.source) setSource(data.source);
+      setPlanDefault(data.planDefault === true);
       setKeys(data.keys);
       const cres = await fetch("/api/mcp/oauth/clients");
       const cdata = await cres.json().catch(() => ({ clients: [] }));
@@ -98,6 +103,7 @@ export default function McpManager() {
       return;
     }
     setEnabled(data.enabled);
+    if (data.source) setSource(data.source);
   }
 
   function toggleScope(tool: McpToolName) {
@@ -187,13 +193,22 @@ export default function McpManager() {
         <h2 className="text-base font-semibold text-ink">MCP server</h2>
         <p className="mt-1 text-sm text-muted">
           Expose this workspace to MCP clients (Claude Code, Claude, ChatGPT) over streamable HTTP
-          at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. Disabled by default — enabling
-          opens a new authenticated API surface for this workspace.
+          at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. On by default on Pro and Agency
+          plans, off otherwise. Callers still need a key or an OAuth sign-in you approve; turning it off closes
+          the surface for this workspace.
         </p>
         <div className="mt-4 rounded-lg border border-line">
           <SwitchRow
             title="Enable MCP server for this workspace"
-            description={entitled ? "Off by default. Turn it on before creating keys" : "Not included in your plan"}
+            description={
+              !entitled
+                ? "Not included in your plan"
+                : source === "plan_default"
+                  ? `${planDefault ? "On" : "Off"} by default on your plan`
+                  : source === "explicit_off"
+                    ? "Turned off for this workspace"
+                    : "Turned on for this workspace"
+            }
             checked={enabled === true}
             disabled={!entitled && enabled !== true}
             onChange={(v) => {

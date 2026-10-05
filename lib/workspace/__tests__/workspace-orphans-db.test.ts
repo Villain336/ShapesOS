@@ -21,6 +21,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { createWorkspaceForUser, deleteWorkspace, KEEP_ON_WORKSPACE_DELETE } from "../lifecycle";
+import { postEntry } from "@/lib/ops/accounting";
 
 type Tx = Prisma.TransactionClient;
 
@@ -125,6 +126,33 @@ async function valueFor(c: Column): Promise<string> {
   throw new Error(`no synthetic value for type ${t} (${c.col})`);
 }
 
+// Columns whose CHECK constraint only accepts specific values (a synthetic
+// string never passes them), keyed by table.
+const FIXED_VALUES: Record<string, Record<string, string>> = {
+  ops_accounting_links: { provider: "quickbooks" },
+  ops_accounting_exports: { provider: "quickbooks" },
+  // Phase 12 (people): events run forward in time; registration and payslip
+  // money must reconcile (amount = unit × qty; net = gross − deductions − tax).
+  ops_events: { starts_at: "2030-01-01T10:00:00.000Z", ends_at: "2030-01-01T12:00:00.000Z" },
+  ops_event_sessions: { starts_at: "2030-01-01T10:00:00.000Z", ends_at: "2030-01-01T12:00:00.000Z" },
+  ops_event_registrations: { quantity: "1", unit_price_cents: "0", amount_cents: "0" },
+  ops_payslips: {
+    gross_cents: "0",
+    pre_tax_deduction_cents: "0",
+    taxable_wages_cents: "0",
+    employee_tax_cents: "0",
+    post_tax_deduction_cents: "0",
+    net_cents: "0",
+    employer_tax_cents: "0",
+    employer_contrib_cents: "0",
+  },
+  // Phase 14 (connectors): a pay run's Gusto sync row — a synced row needs its
+  // synced_at (ops_pay_run_provider_syncs_state_chk).
+  ops_pay_run_provider_syncs: { provider: "gusto", status: "synced", synced_at: "2030-01-01T10:00:00.000Z" },
+  // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
+  ops_sites: { grid_w: "10", grid_d: "10" },
+};
+
 // Committed rows per table (one is enough; parents are shared).
 const made = new Map<string, Record<string, unknown>>();
 // Rows created in tables WITHOUT workspace_id (global parents), for cleanup.
@@ -155,6 +183,7 @@ async function synth(
       const fk = fks.find((f) => f.col === c.col);
       let v: unknown;
       if (c.col === "workspace_id") v = ws;
+      else if (FIXED_VALUES[table]?.[c.col] !== undefined) v = FIXED_VALUES[table]![c.col];
       else if (fk && c.notnull && !c.hasdef) {
         const parent = fk.reftable === table ? null : await synth(tx, fk.reftable, ws, pending, depth + 1);
         if (!parent) throw new Error(`self-referencing NOT NULL key ${table}.${c.col}`);
@@ -242,6 +271,26 @@ describe("catalog guard", () => {
 
 describe("delete leaves nothing behind", () => {
   it("one row lands in every workspace-owned table", async () => {
+    // Phase 10: the ledger only accepts balanced entries (a deferred trigger
+    // checks each entry at commit), so the journal tables get a real
+    // two-line entry instead of the generic one-row-per-table insert.
+    await withWorkspaceScope(doomed, async (tx) => {
+      const { entry } = await postEntry(tx as Tx, { workspaceId: doomed, userId: OWNER }, {
+        sourceType: "manual",
+        memo: "orphan check",
+        lines: [
+          { account: { key: "cash" }, debitCents: 100, creditCents: 0 },
+          { account: { key: "ar" }, debitCents: 0, creditCents: 100 },
+        ],
+      });
+      made.set("ops_journal_entries", { id: entry.id });
+      made.set("ops_journal_lines", { entry_id: entry.id });
+      const [account] = await (tx as Tx).$queryRawUnsafe<{ id: string }[]>(
+        `SELECT id FROM ops_accounts WHERE workspace_id = $1 LIMIT 1`,
+        doomed,
+      );
+      made.set("ops_accounts", { id: account!.id, workspace_id: doomed });
+    });
     for (const table of tables) {
       if (made.has(table)) continue;
       const pending = new Map<string, Record<string, unknown>>();

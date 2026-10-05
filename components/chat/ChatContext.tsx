@@ -15,6 +15,7 @@ import {
 } from "react";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { confirmAction } from "@/lib/ui/feedback";
+import { emptyStreamingTurn, foldAguiEvent, readSseFrames, type StreamingTurn } from "./agui-stream";
 
 export interface ChatThread {
   id: string;
@@ -110,6 +111,27 @@ export function useChat(): ChatContextValue {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChat must be used inside <ChatProvider>");
   return ctx;
+}
+
+/** Phase 14: the chat context when there is one (cards also render outside the chat). */
+export function useOptionalChat(): ChatContextValue | null {
+  return useContext(ChatContext);
+}
+
+/**
+ * Phase 5 / 14: save a "do this without asking" rule (PUT /api/automation/settings).
+ * Returns null on success, else the server's message. setAutoApprove uses it;
+ * so do approval cards rendered outside the chat.
+ */
+export async function putAutoApproveRule(agentKey: string, action: string, on: boolean): Promise<string | null> {
+  const res = await fetch("/api/automation/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agentKey, action, behavior: on ? "auto" : "ask" }),
+  });
+  if (res.ok) return null;
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  return data.error ?? "Couldn't save the rule.";
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
@@ -295,16 +317,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
         setMessages((prev) => [...prev, optimistic]);
         setSending(true);
-        const res = await fetch(`/api/chat/threads/${threadId}/messages`, {
+        // Phase 8: the turn streams (AG-UI SSE): the assistant's text shows
+        // while it arrives; the thread is re-read at the end for the
+        // authoritative rows (tool rows, proposals, the final text).
+        const res = await fetch("/api/agents/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            threadId,
             content: text,
             ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
           }),
         });
-        const data = await res.json();
-        if (!res.ok) {
+        if (!res.ok || !res.body) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
           setMessages((prev) => [
             ...prev.filter((m) => m.id !== optimistic.id),
             {
@@ -319,17 +345,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
         // Attachments were accepted — clear the staged tray.
         if (staged && attachmentIds.length > 0) setPendingAttachments([]);
+        let live = emptyStreamingTurn();
+        const startedAt = new Date().toISOString();
+        const show = (turn: StreamingTurn) => {
+          const bubbles: ChatMessage[] = turn.messages
+            .filter((m) => m.text.trim())
+            .map((m) => ({ id: `live-${m.id}`, role: "assistant", content: m.text, toolCalls: null, createdAt: startedAt }));
+          setMessages((prev) => [...prev.filter((m) => !m.id.startsWith("live-")), ...bubbles]);
+        };
+        for await (const frame of readSseFrames(res.body)) {
+          const next = foldAguiEvent(live, frame);
+          if (next !== live) {
+            live = next;
+            show(live);
+          }
+        }
         // Re-fetch the thread for the authoritative message list (includes tool rows).
         const threadRes = await fetch(`/api/chat/threads/${threadId}`);
         if (threadRes.ok) {
           const tdata = await threadRes.json();
           setMessages(tdata.messages ?? []);
           setThreadTask(toThreadTask(tdata.thread));
-        }
-        if (data.threadTitle) {
-          setThreads((prev) =>
-            prev.map((t) => (t.id === threadId ? { ...t, title: data.threadTitle } : t)),
-          );
+          const title = tdata.thread?.title as string | undefined;
+          if (title) setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, title } : t)));
+        } else if (live.error) {
+          setMessages((prev) => [
+            ...prev,
+            { id: `err-${Date.now()}`, role: "assistant", content: `Something went wrong: ${live.error}`, toolCalls: null, createdAt: new Date().toISOString() },
+          ]);
         }
       } finally {
         sendingRef.current = false;
@@ -384,16 +427,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setAutoApprove = useCallback(async (agentKey: string, action: string, on: boolean) => {
-    const res = await fetch("/api/automation/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentKey, action, behavior: on ? "auto" : "ask" }),
-    });
-    if (res.ok) return null;
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    return data.error ?? "Couldn't save the rule.";
-  }, []);
+  const setAutoApprove = useCallback(
+    (agentKey: string, action: string, on: boolean) => putAutoApproveRule(agentKey, action, on),
+    [],
+  );
 
   return (
     <ChatContext.Provider

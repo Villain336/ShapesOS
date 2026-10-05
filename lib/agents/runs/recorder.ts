@@ -59,6 +59,19 @@ export type ScreencastFrameHandler = (jpeg: Buffer) => void | Promise<void>;
 export interface RecorderPage {
   goto(url: string): Promise<void>;
   /**
+   * Phase 8 (browser tools): the actions an agent's browser_act / extract
+   * steps drive. Optional so stub launchers stay minimal; the production
+   * launcher implements all of them over the Playwright page.
+   */
+  click?(selector: string, opts?: { timeoutMs?: number }): Promise<void>;
+  fill?(selector: string, value: string, opts?: { timeoutMs?: number }): Promise<void>;
+  waitFor?(target: { selector?: string; ms?: number; timeoutMs?: number }): Promise<void>;
+  screenshot?(filePath: string): Promise<void>;
+  /** innerText of up to `limit` elements matching the selector. */
+  extract?(selector: string, opts?: { limit?: number; timeoutMs?: number }): Promise<string[]>;
+  title?(): Promise<string>;
+  url?(): string;
+  /**
    * Slice 7: start CDP screencast on this page. Resolves with a stop
    * function; every captured frame is delivered as JPEG bytes to onFrame.
    * Absent on stub launchers and on browser builds without the CDP
@@ -79,11 +92,19 @@ export interface RecorderContext {
   videoPath(): Promise<string | null>;
 }
 
+/**
+ * Phase 8: decides whether the browser may load a URL (every request,
+ * redirect hop and subresource). The browser tools pass the SSRF guard from
+ * lib/safe-url.ts; refused requests are aborted.
+ */
+export type RequestGuard = (url: string) => Promise<boolean>;
+
 export interface RecorderBrowser {
   newContext(opts: {
     recordVideoDir: string;
     videoWidth: number;
     videoHeight: number;
+    guardRequest?: RequestGuard;
   }): Promise<RecorderContext>;
   close(): Promise<void>;
 }
@@ -104,7 +125,23 @@ export const playwrightLauncher: BrowserLauncher = {
             dir: cOpts.recordVideoDir,
             size: { width: cOpts.videoWidth, height: cOpts.videoHeight },
           },
+          // Phase 8: a service worker could fetch around the request guard.
+          ...(cOpts.guardRequest ? { serviceWorkers: "block" as const } : {}),
         });
+        const guard = cOpts.guardRequest;
+        if (guard) {
+          // Every request (navigation, redirect hop, subresource) is checked.
+          await ctx.route("**/*", async (route) => {
+            const u = route.request().url();
+            if (/^(data|blob|about):/i.test(u) || (await guard(u).catch(() => false))) await route.continue();
+            else await route.abort("blockedbyclient");
+          });
+          await ctx.routeWebSocket(/.*/, async (ws) => {
+            const httpUrl = ws.url().replace(/^ws(s?):/i, "http$1:");
+            if (await guard(httpUrl).catch(() => false)) ws.connectToServer();
+            else await ws.close({ code: 1008, reason: "blocked" });
+          });
+        }
         return {
           async tracingStart(tOpts) {
             await ctx.tracing.start({
@@ -120,6 +157,20 @@ export const playwrightLauncher: BrowserLauncher = {
             const page: Page = await ctx.newPage();
             return {
               goto: (url: string) => page.goto(url).then(() => undefined),
+              click: (selector, o) => page.click(selector, { timeout: o?.timeoutMs ?? 15_000 }),
+              fill: (selector, value, o) => page.fill(selector, value, { timeout: o?.timeoutMs ?? 15_000 }),
+              waitFor: async (t) => {
+                if (t.selector) await page.waitForSelector(t.selector, { timeout: t.timeoutMs ?? 15_000 });
+                else await page.waitForTimeout(Math.min(Math.max(t.ms ?? 1000, 0), 30_000));
+              },
+              screenshot: (filePath) => page.screenshot({ path: filePath }).then(() => undefined),
+              extract: async (selector, o) => {
+                await page.waitForSelector(selector, { timeout: o?.timeoutMs ?? 10_000, state: "attached" }).catch(() => undefined);
+                const all = await page.locator(selector).allInnerTexts();
+                return all.slice(0, o?.limit ?? 20);
+              },
+              title: () => page.title(),
+              url: () => page.url(),
               // Slice 7: real CDP screencast (Page.startScreencast → JPEG
               // frames). The ack loop throttles capture to consumer speed:
               // the next frame is only sent after we ack the current one.
@@ -219,6 +270,8 @@ export interface RecorderOptions {
   watch?: boolean;
   /** Timeline sink — lifecycle.ts persists these as AgentRunEvent rows. */
   onTimelineEvent?: (event: AgentRunEventInput) => void | Promise<void>;
+  /** Phase 8: per-request URL guard (SSRF) handed to the browser context. */
+  guardRequest?: RequestGuard;
 }
 
 export interface StoppedRecording {
@@ -243,8 +296,8 @@ export interface StoppedRecording {
  * idempotent-ish: it always releases the slot and closes the browser.
  */
 export class AgentRunRecorder {
-  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch">> &
-    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch"> & { artifactDir: string };
+  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest">> &
+    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest"> & { artifactDir: string };
   private browser: RecorderBrowser | null = null;
   private context: RecorderContext | null = null;
   private slotHeld = false;
@@ -278,6 +331,7 @@ export class AgentRunRecorder {
         recordVideoDir: this.opts.artifactDir,
         videoWidth: RECORDING_VIDEO_SIZE.width,
         videoHeight: RECORDING_VIDEO_SIZE.height,
+        ...(this.opts.guardRequest ? { guardRequest: this.opts.guardRequest } : {}),
       });
       await this.context.tracingStart({ screenshots: true, snapshots: true, sources: true });
       const page = await this.context.newPage();

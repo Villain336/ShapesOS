@@ -5,9 +5,10 @@
 //   TaskBar        — who is working on this thread (the lead or one sub-agent),
 //                    the tools the task is limited to, and Stop while it works.
 //   AutoApproveRow — on a pending proposal the server marked auto-eligible
-//                    (Tier 0/1), "Let Writer draft content without asking":
-//                    writes a per-agent automation rule. Tier 2/3 actions never
-//                    get the row — they always ask.
+//                    (Phase 14: Tier 0–2), "Let Writer draft content without
+//                    asking": writes a per-agent automation rule. Tier 3
+//                    (money, irreversible) and destructive calls never get the
+//                    row — they always ask.
 //
 // Everything here is a request; the server decides (lib/agents/grants.ts,
 // lib/automation/policy.ts).

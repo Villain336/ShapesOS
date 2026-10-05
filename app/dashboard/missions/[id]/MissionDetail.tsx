@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { closeOnEscape } from "@/lib/ui/keyboard";
 import { toast, toastError } from "@/lib/ui/feedback";
-import { AgentTree, ApprovalCard, Banner, RunTimeline, StatusBadge, aosButton } from "@/components/aos";
+import { AgentTree, ApprovalCard, Banner, NeutralBadge, RunTimeline, StatusBadge, aosButton } from "@/components/aos";
 import { needsReconnect } from "@/lib/aos/home";
 import type { MissionView } from "@/lib/aos/agents";
 import { approvalQuestion, approveLabelFor, missionAgentIndex } from "@/lib/aos/approvals";
@@ -54,14 +54,6 @@ function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
-    </span>
-  );
-}
-
-function NeutralBadge({ label }: { label: string }) {
-  return (
-    <span className="inline-flex h-badge shrink-0 items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
-      {label}
     </span>
   );
 }

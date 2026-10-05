@@ -11,8 +11,10 @@ export type AgentRunKind = "mission" | "playbook" | "browser" | "follow_up" | "c
 export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 /** Timeline event types (spec §4) — agui = protocol events, gate = Phase 14
- *  gate decisions, browser = Playwright actions, note = freeform. */
-export type AgentRunEventType = "agui" | "gate" | "browser" | "note";
+ *  gate decisions, browser = Playwright actions, note = freeform, usage =
+ *  Phase 7 model-call tokens + estimated cost (not a timeline step), text =
+ *  Phase 8 streamed model text chunks (not a timeline step either). */
+export type AgentRunEventType = "agui" | "gate" | "browser" | "note" | "usage" | "text";
 
 export const TERMINAL_RUN_STATUSES: ReadonlySet<AgentRunStatus> = new Set([
   "succeeded",

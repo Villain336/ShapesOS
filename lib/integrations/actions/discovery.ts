@@ -25,6 +25,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { V1_ACTION_CATALOG, V1_COMPOSIO_APPS } from "@/lib/integrations/actions/risk";
 import { BadRequestError } from "@/lib/api/errors";
 import { createHash } from "node:crypto";
+import { FakeProviderRefusedError, fakeProvidersAllowed } from "@/lib/env/secrets";
 import {
   createComposioHttp,
   getComposioBaseUrl,
@@ -412,8 +413,21 @@ export const fixtureToolRouter: ComposioToolRouter = {
 export function getToolRouter(): ComposioToolRouter {
   const key = process.env.COMPOSIO_API_KEY?.trim();
   if (key) return liveRouterFor(key);
+  // Phase 11 (conncore): the fixture catalogue is never shown in production —
+  // no key lists no toolkits and a tool lookup says "Composio is not connected".
+  if (!fakeProvidersAllowed()) return notConnectedToolRouter;
   return fixtureToolRouter;
 }
+
+/** Phase 11 (conncore): production router when COMPOSIO_API_KEY is unset. */
+export const notConnectedToolRouter: ComposioToolRouter = {
+  async listToolkits(): Promise<ComposioToolkit[]> {
+    return [];
+  },
+  async getToolkitTools(): Promise<ComposioToolkitTool[]> {
+    throw new FakeProviderRefusedError("Composio");
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Catalog refresh — upserts the discovered tools into ComposioToolCatalog.

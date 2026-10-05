@@ -9,11 +9,26 @@ const allMockLlm: InventoryFacts["llm"] = {
   copy: { isLive: false, model: "claude-haiku-4-5", fallback: "ANTHROPIC_API_KEY is not set", singleKey: null, failover: null },
   bulk: { isLive: false, model: "gpt-5-nano", fallback: "LLM_API_KEY/OPENAI_API_KEY is not set", singleKey: null, failover: null },
   background: { isLive: false, model: "gpt-5-nano:flex", fallback: "LLM_API_KEY/OPENAI_API_KEY is not set", singleKey: null, failover: null },
+  lead: { isLive: false, model: "claude-opus-5-5", fallback: "ANTHROPIC_API_KEY is not set", singleKey: null, failover: null },
+  subagent: { isLive: false, model: "claude-sonnet-5-5", fallback: "ANTHROPIC_API_KEY is not set", singleKey: null, failover: null },
+  code: { isLive: false, model: "claude-opus-5-5", fallback: "ANTHROPIC_API_KEY is not set", singleKey: null, failover: null },
+  code_max: { isLive: false, model: "claude-opus-5-5", fallback: "ANTHROPIC_API_KEY is not set", singleKey: null, failover: null },
 };
 const allLiveLlm: InventoryFacts["llm"] = {
   copy: { isLive: true, model: "claude-haiku-4-5", fallback: null, singleKey: null, failover: "gpt-5.4-nano" },
   bulk: { isLive: true, model: "gpt-5-nano", fallback: null, singleKey: null, failover: "claude-haiku-4-5" },
   background: { isLive: true, model: "gpt-5-nano:flex", fallback: null, singleKey: null, failover: "claude-haiku-4-5" },
+  lead: { isLive: true, model: "claude-opus-5-5", fallback: null, singleKey: null, failover: "gpt-5.5" },
+  subagent: { isLive: true, model: "claude-sonnet-5-5", fallback: null, singleKey: null, failover: "gpt-5.5" },
+  code: { isLive: true, model: "claude-opus-5-5", fallback: null, singleKey: null, failover: "gpt-5.5" },
+  code_max: {
+    isLive: true,
+    model: "claude-opus-5-5",
+    fallback: null,
+    singleKey: null,
+    failover: "gpt-5.5",
+    retention: 'Default "claude-fable-5-1" swapped: claude-fable-5-1 requires 30-day data retention (not zero-retention); set LLM_ALLOW_RETENTION_MODELS=1 to use it.',
+  },
 };
 
 const by = (entries: FeatureStatus[], key: string) => {
@@ -26,6 +41,10 @@ const REQUIRED = [
   "llm-copy",
   "llm-bulk",
   "llm-background",
+  "llm-lead",
+  "llm-subagent",
+  "llm-code",
+  "llm-code_max",
   "images",
   "seo-data",
   "contextdev",
@@ -86,6 +105,15 @@ describe("mockInventory", () => {
     assert.equal(by(blank, "images").mode, "off");
   });
 
+  it("images report the image model, and an off-list LLM_IMAGE_MODEL is off (the service refuses it)", () => {
+    const live = mockInventory({ OPENAI_API_KEY: "x" }, { llm: allMockLlm, contextDevConnected: false });
+    assert.equal(by(live, "images").mode, "live");
+    assert.match(by(live, "images").detail, /gpt-image-2/);
+    const offList = mockInventory({ OPENAI_API_KEY: "x", LLM_IMAGE_MODEL: "dall-e-3" }, { llm: allMockLlm, contextDevConnected: false });
+    assert.equal(by(offList, "images").mode, "off");
+    assert.match(by(offList, "images").detail, /not on the OpenAI image allow-list/);
+  });
+
   it("DataForSEO needs both login and password", () => {
     const inv = mockInventory({ DATAFORSEO_LOGIN: "l" }, { llm: allMockLlm, contextDevConnected: false });
     assert.equal(by(inv, "seo-data").mode, "mock");
@@ -129,6 +157,15 @@ describe("mockInventory", () => {
     const inv = mockInventory({}, { llm: allMockLlm, contextDevConnected: null });
     assert.equal(by(inv, "contextdev").mode, "off");
     assert.match(by(inv, "contextdev").detail, /Could not check/);
+  });
+
+  it("agent workloads are listed, with the covered-model swap explained", () => {
+    const inv = mockInventory({}, { llm: allLiveLlm, contextDevConnected: false });
+    assert.match(by(inv, "llm-lead").detail, /Live on claude-opus-5-5\. Fails over to gpt-5\.5/);
+    assert.match(by(inv, "llm-code_max").detail, /requires 30-day data retention/);
+    assert.ok(by(inv, "llm-code_max").envVars.includes("LLM_MODEL_CODE_MAX"));
+    const mocked = mockInventory({}, { llm: allMockLlm, contextDevConnected: false });
+    assert.equal(by(mocked, "llm-subagent").mode, "mock");
   });
 
   it("single-key explanation reaches the LLM entry", () => {

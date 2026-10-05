@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { liveRequest, type LiveDeps, type TokenSource, tokenSourceFrom } from "@/lib/connectors/m21/live/http";
 import { buildLocalPost, parseLocationRef, GBP_V4_BASE } from "@/lib/connectors/m21/live/gbp";
 import { loadLiveCredential } from "@/lib/connectors/m21/live/credentials";
+import { FakeProviderRefusedError, fakeProvidersAllowed } from "@/lib/env/secrets";
 import { MockGbpProvider, type GbpInsight, type GbpPost, type GbpPostInput, type GbpProvider, gbpManagementEnabled } from "./gbp";
 
 export const GBP_PERFORMANCE_BASE = "https://businessprofileperformance.googleapis.com/v1";
@@ -187,5 +188,26 @@ export async function gbpProviderForWorkspace(workspaceId: string): Promise<GbpP
     const auth = tokenSourceFrom(credential, { refreshCredential });
     if (auth) return new GbpLiveProvider(auth);
   }
+  return gbpFallbackProvider();
+}
+
+/** Phase 11 (conncore): no labelled mock posts/insights in production. */
+export function gbpFallbackProvider(): GbpProvider {
+  if (!fakeProvidersAllowed()) return new NotConnectedGbpProvider();
   return new MockGbpProvider();
+}
+
+/** Phase 11 (conncore): production stand-in when GBP is not connected. */
+export class NotConnectedGbpProvider implements GbpProvider {
+  readonly name = "not_connected";
+  readonly isLive = false;
+  isConfigured(): boolean {
+    return false;
+  }
+  private refuse(): never {
+    throw new FakeProviderRefusedError("Google Business Profile");
+  }
+  listPosts = async (): Promise<never> => this.refuse();
+  createPost = async (): Promise<never> => this.refuse();
+  insights = async (): Promise<never> => this.refuse();
 }

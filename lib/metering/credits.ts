@@ -116,7 +116,58 @@ export const CREDIT_COSTS = {
    * actions/month on the platform key; see lib/integrations/actions/budget.ts).
    * 1 credit = $0.01. */
   composio_tool_call: { credits: 1, basis: "cost-plus", description: "Composio action: 1 hosted tool call" },
+  // ── Phase 7: LLM token usage (chat()/chatStream(), lib/llm/usage.ts) ──
+  /** One model call: token counts, model and estimated vendor cost are on
+   * the event row (usage_events.llm_*). Zero credits for now — it makes
+   * token spend visible per workspace and per agent run; charging credits
+   * for it (and a per-run cost cap) is a pricing decision for Phase 8, and
+   * value-priced actions (ai_article …) already include their model cost. */
+  llm_tokens: { credits: 0, basis: "passthrough", description: "LLM tokens: one model call (tokens + estimated cost recorded)" },
+  // ── Phase 7: OpenAI image generation (lib/images) ──
+  /** One generated or edited image, medium quality, 1024x1024. cost-plus
+   * (~4x) on OpenAI's own GPT Image 2 table (image-generation guide,
+   * "Calculating costs", checked 2026-10-04): $0.053 → 22 credits. Low and
+   * high quality, larger sizes and Batch (50% off) are priced by
+   * imageGenerationCredits() and passed as meter()'s `credits` override. */
+  image_generation: { credits: 22, basis: "cost-plus", description: "AI image: 1 image (OpenAI image model)" },
+  // ── MCP free reads (lib/mcp/scopes.ts TOOL_CREDIT_PASSTHROUGH) ──
+  // These passthrough actions were never in the table, so the metering
+  // service refused them as unknown and the MCP tools failed closed
+  // ("Metering is temporarily unavailable") for every caller. Free — reads
+  // of the workspace's own data; the usage row is the audit trail.
+  project_list: { credits: 0, basis: "free", description: "MCP: list projects" },
+  skill_list: { credits: 0, basis: "free", description: "MCP: list scheduled skills" },
+  usage_summary: { credits: 0, basis: "free", description: "MCP: usage summary" },
+  dataset_ask: { credits: 0, basis: "free", description: "MCP: ask the business-data dataset" },
+  dataset_adapter_pull: { credits: 0, basis: "free", description: "MCP: dataset adapter pull" },
 } as const satisfies Record<string, CreditCostDef>;
+
+/** Credits per 1024x1024 image by quality: ~4x OpenAI's GPT Image 2 price
+ *  ($0.006 / $0.053 / $0.211), rounded up. */
+export const IMAGE_CREDITS_BY_QUALITY = { low: 3, medium: 22, high: 85 } as const;
+
+/**
+ * Credits for `n` images. The three standard sizes and "auto" are priced at
+ * 1024x1024 (the dearest of the three in OpenAI's table); a custom
+ * WIDTHxHEIGHT above 1024x1024 scales by pixel count (an estimate — OpenAI
+ * bills output tokens, which grow with size). Batch jobs are half price, as
+ * OpenAI's Batch API is. Never below 1 per image.
+ */
+export function imageGenerationCredits(args: {
+  quality: keyof typeof IMAGE_CREDITS_BY_QUALITY;
+  size?: string | null;
+  n?: number;
+  batch?: boolean;
+}): number {
+  const per = IMAGE_CREDITS_BY_QUALITY[args.quality];
+  let scale = 1;
+  const m = /^(\d+)x(\d+)$/.exec((args.size ?? "").trim());
+  const standard = ["1024x1024", "1536x1024", "1024x1536"].includes((args.size ?? "").trim());
+  if (m && !standard) scale = Math.max(1, (Number(m[1]) * Number(m[2])) / (1024 * 1024));
+  const n = Math.max(1, Math.floor(args.n ?? 1));
+  const total = Math.ceil(per * scale * (args.batch ? 0.5 : 1)) * n;
+  return Math.max(n, total);
+}
 
 /** Action keys meter() accepts. */
 export type MeteredAction = keyof typeof CREDIT_COSTS;

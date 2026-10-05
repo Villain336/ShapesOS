@@ -141,6 +141,12 @@ export function classifyError(err: unknown): Mapped {
   if (isZodError(err)) {
     return { status: 400, body: { error: "Invalid request.", details: zodDetails(err.issues) } };
   }
+  // Phase 11: a provider that is not connected in production (lib/env/secrets
+  // FakeProviderRefusedError) is a setup state the user can fix, not a crash:
+  // 409 with the "not_connected" code and the message naming what to connect.
+  if (err instanceof Error && err.name === "FakeProviderRefusedError" && (err as { code?: unknown }).code === "not_connected") {
+    return { status: 409, body: { error: err.message, code: "not_connected" } };
+  }
   if (err instanceof SyntaxError && /JSON/i.test(err.message)) {
     return { status: 400, body: { error: "Invalid JSON body." } };
   }

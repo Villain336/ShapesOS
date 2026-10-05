@@ -117,7 +117,16 @@ const keyOf: Record<string, string> = {
   notion: "notion", resend: "resend", webflow: "webflow", wordpress: "wordpress",
   gmail: "gmail", "google-calendar": "google-calendar",
   "google-business-profile": "google-business-profile",
+  // Phase 11 wave A (conncore) + wave B (devtools, bizsync).
+  outlook: "outlook", "outlook-calendar": "outlook-calendar", slack: "slack",
+  hubspot: "hubspot", linear: "linear", jira: "jira", airtable: "airtable",
+  supabase: "supabase", netlify: "netlify", shopify: "shopify",
+  quickbooks: "quickbooks", xero: "xero",
+  // Phase 14 (connectors).
+  gusto: "gusto",
 };
+// Shared helpers that live beside the adapters but are not connectors.
+const sharedNativeModules = new Set(["accounting"]);
 const expectedMock = new Set([...mockFromHeaders].map((f) => keyOf[f]).filter(Boolean));
 ok(
   "MOCK_ONLY set matches adapter MOCK-ONLY headers",
@@ -127,7 +136,7 @@ ok(
 );
 // Phase 4b wired GSC, GA4, Drive, Notion, Meta Ads and Google Ads live.
 ok("exactly 0 mock-only adapters (Phase 4b live wiring)", MOCK_ONLY_ADAPTER_KEYS.size === 0);
-ok("every native adapter file is mapped to a registry key", readdirSync(nativeDir).filter((f) => f.endsWith(".ts")).every((f) => keyOf[f.replace(/\.ts$/, "")]));
+ok("every native adapter file is mapped to a registry key", readdirSync(nativeDir).filter((f) => f.endsWith(".ts")).map((f) => f.replace(/\.ts$/, "")).filter((f) => !sharedNativeModules.has(f)).every((f) => keyOf[f]));
 // The six formerly mock-only adapters expose a live health check (one cheap,
 // fixed provider endpoint) used only by the manual check route.
 for (const f of ["ga4", "google-search-console", "google-drive", "notion", "meta-ads", "google-ads", "google-business-profile"]) {

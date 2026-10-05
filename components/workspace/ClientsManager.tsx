@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { DoorOpen, Pencil, Plus, Trash2, X } from "lucide-react";
 import { FormError } from "./FormError";
 import { btnPrimary, btnQuiet, btnSmallDanger, btnSmallSecondary, cardCls, inputCls, labelCls } from "./aos";
 
@@ -21,6 +21,8 @@ interface ClientRow {
   reports: number;
   brandKits: number;
   pipelines: number;
+  // Phase 10 (portal)
+  portalEnabled?: boolean;
 }
 
 const ROLE_LABEL: Record<ClientRow["viewerRole"], string> = { viewer: "Can view", editor: "Can edit", admin: "Full access" };
@@ -271,6 +273,8 @@ export default function ClientsManager() {
                     <span className="inline-flex h-badge items-center rounded-full bg-paper px-2.5 text-sm font-semibold text-ink shadow-control">
                       {ROLE_LABEL[c.viewerRole]}
                     </span>
+                    {/* Phase 10 (portal) */}
+                    <div className="mt-1 text-sm text-muted">Portal {c.portalEnabled ? "on" : "off"}</div>
                   </td>
                   <td className="px-4 py-3 text-ink">
                     {SCHEDULE_LABEL(c.reportSchedule)}
@@ -284,6 +288,11 @@ export default function ClientsManager() {
                   {canEdit && (
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
+                        {/* Phase 10 (portal): portal switch, linked records, sessions */}
+                        <Link href={`/dashboard/settings/clients/${c.id}`} className={btnSmallSecondary}>
+                          <DoorOpen size={14} aria-hidden />
+                          Portal
+                        </Link>
                         <button type="button" className={btnSmallSecondary} onClick={() => setEditing(c.id)}>
                           <Pencil size={14} aria-hidden />
                           Edit

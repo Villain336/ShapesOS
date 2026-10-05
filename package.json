@@ -121,6 +121,8 @@
     "clsx": "^2.1.1",
     "cn": "^0.4.0",
     "diff": "^9.0.0",
+    "docx": "^9.8.1",
+    "exceljs": "^4.4.0",
     "glimm": "^0.3.1",
     "grapesjs": "^0.23.6",
     "grapesjs-preset-newsletter": "^1.0.2",

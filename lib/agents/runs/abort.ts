@@ -26,6 +26,30 @@ export function abortRun(runId: string, reason = "Stopped by the user"): boolean
   return true;
 }
 
+/**
+ * Phase 8: a worker lost its lease on a run (another worker may own it now).
+ * Aborting with this reason stops the local work WITHOUT finishing the run:
+ * the loop treats it as a hand-off, never as the user's Stop.
+ */
+export class LeaseLostError extends Error {
+  constructor(message = "The worker lost its lease on this run") {
+    super(message);
+    this.name = "LeaseLostError";
+  }
+}
+
+/** Abort the run's in-flight work in this process with a specific reason. */
+export function abortRunWith(runId: string, reason: Error): boolean {
+  const c = controllers.get(runId);
+  if (!c) return false;
+  if (!c.signal.aborted) c.abort(reason);
+  return true;
+}
+
+export function isLeaseLost(signal: AbortSignal | undefined): boolean {
+  return !!signal?.aborted && (signal.reason as { name?: unknown } | undefined)?.name === "LeaseLostError";
+}
+
 /** Forget a finished run's controller. */
 export function releaseRunAbort(runId: string): void {
   controllers.delete(runId);

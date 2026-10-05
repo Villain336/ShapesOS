@@ -11,6 +11,9 @@ import { prisma } from "@/lib/prisma";
 import { CONTEXTDEV_CONNECTOR_KEY } from "@/lib/knowledge/contextdev/keys";
 import { mockInventory, notLive, type FeatureMode } from "@/lib/providers/mock-inventory";
 import { unsplashStatus } from "@/lib/design/unsplash";
+import { sandboxAvailability } from "@/lib/sandbox";
+import { sandboxConfig } from "@/lib/sandbox/config";
+import { decryptHostingConfig, hostingKindLabel } from "@/lib/deploy";
 /* PROVIDER:pexels */ import { pexelsStatus } from "@/lib/design/pexels"; /* END */
 /* PROVIDER:pixabay */ import { pixabayStatus } from "@/lib/design/pixabay"; /* END */
 /* PROVIDER:cloudinary */ import { cloudinaryStatus } from "@/lib/design/cloudinary"; /* END */
@@ -35,6 +38,11 @@ const LLM_WORKLOADS = [
   ["copy", "Client-facing copy"],
   ["bulk", "Agent loop, skills, summaries"],
   ["background", "Background jobs"],
+  // Phase 7: the agent runtime's workloads (chat() with native tools).
+  ["lead", "Lead agent and planner"],
+  ["subagent", "Sub-agents"],
+  ["code", "Code agent"],
+  ["code_max", "Code agent, escalation"],
 ] as const;
 
 const MODE_LABEL: Record<FeatureMode, string> = {
@@ -83,7 +91,19 @@ export default async function ProvidersSettingsPage() {
     })
     .then((c) => c !== null)
     .catch(() => null);
-  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected });
+  // Phase 8: the code sandbox provider (cheap check, cached 30 s).
+  const sandbox = await sandboxAvailability().catch(() => null);
+  const sandboxCfg = sandboxConfig();
+  // Phase 9: hosting connections (per connection, demo flag in the encrypted blob).
+  const hosting = await prisma.hostingConnection
+    .findMany({ where: { project: { workspaceId: workspace.id } }, select: { target: true, configEnc: true } })
+    .then((rows) => {
+      const out = { live: [] as string[], demo: [] as string[] };
+      for (const r of rows) (decryptHostingConfig(r).demo === true ? out.demo : out.live).push(hostingKindLabel(r.target));
+      return out;
+    })
+    .catch(() => null);
+  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected, sandbox, hosting });
   const mocked = notLive(inventory);
   const live = inventory.filter((f) => f.mode === "live");
   const unsplash = unsplashStatus();
@@ -212,7 +232,9 @@ export default async function ProvidersSettingsPage() {
           workloads that default to the other provider switch to this
           provider&apos;s default (single-key mode); a model you set
           explicitly is never swapped. When both keys are set, a rate limit
-          or outage fails over to the other provider.
+          or outage fails over to the other provider. The four agent
+          workloads serve the agent runtime; Claude Fable 5.1 needs 30-day
+          data retention, so it runs only with LLM_ALLOW_RETENTION_MODELS=1.
         </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
@@ -230,7 +252,10 @@ export default async function ProvidersSettingsPage() {
                 return (
                   <tr key={w} className="border-b border-line align-top last:border-0">
                     <td className="py-2 pr-3 text-xs text-ink">{label}</td>
-                    <td className="py-2 pr-3 font-mono text-xs text-ink">{r.model}</td>
+                    <td className="py-2 pr-3 text-xs text-ink">
+                      <span className="font-mono">{r.model}</span>
+                      {r.effort ? <span className="block text-muted">Effort {r.effort}</span> : null}
+                    </td>
                     <td className="py-2 pr-3">
                       <ModeChip mode={r.isLive ? "live" : "mock"} />
                     </td>
@@ -242,7 +267,8 @@ export default async function ProvidersSettingsPage() {
                             : r.source === "legacy"
                               ? "Set by the deprecated LLM_MODEL variable."
                               : "Default model."}
-                          {r.singleKey ? <> {r.singleKey}</> : null}{" "}
+                          {r.singleKey ? <> {r.singleKey}</> : null}
+                          {r.retention ? <> {r.retention}</> : null}{" "}
                           {r.failover ? (
                             <>
                               Fails over to <span className="font-mono">{r.failover}</span>.
@@ -267,6 +293,8 @@ export default async function ProvidersSettingsPage() {
             <dd className="font-mono text-xs">
               ANTHROPIC_API_KEY, OPENAI_API_KEY (or LLM_API_KEY),
               LLM_MODEL_COPY, LLM_MODEL_BULK, LLM_MODEL_BACKGROUND,
+              LLM_MODEL_LEAD, LLM_MODEL_SUBAGENT, LLM_MODEL_CODE,
+              LLM_MODEL_CODE_MAX, LLM_ALLOW_RETENTION_MODELS,
               LLM_FAILOVER, LLM_SELF_HOST, LLM_BASE_URL
             </dd>
           </div>
@@ -277,6 +305,57 @@ export default async function ProvidersSettingsPage() {
             enough: every workload then runs live on that provider.
           </p>
         )}
+      </section>
+
+      <section
+        className="rounded-lg border border-line bg-paper/60 p-5"
+        aria-labelledby="providers-sandbox"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="providers-sandbox" className="font-medium">Code sandbox</h2>
+          <StatusBadge ok={!!sandbox?.ok} label={sandbox?.ok ? "available" : "not available"} />
+        </div>
+        <p className="mt-1 text-xs text-subtle">
+          Where agents write and run code: one isolated sandbox per agent run,
+          destroyed when the run ends, is stopped or sits idle. Nothing runs on
+          this host. Without a provider the Code tools stay off and say why.
+        </p>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-subtle">Provider</dt>
+            <dd className="font-mono text-xs">{sandbox?.provider ?? "off"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-subtle">Status</dt>
+            <dd className="text-xs">{sandbox ? (sandbox.ok ? "Answering" : sandbox.reason) : "Could not be checked."}</dd>
+          </div>
+          {sandboxCfg.provider === "docker" && (
+            <div className="md:col-span-2">
+              <dt className="text-xs text-subtle">Image</dt>
+              <dd className="break-all font-mono text-xs">{sandboxCfg.docker.image}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-xs text-subtle">Limits per sandbox</dt>
+            <dd className="text-xs">
+              {sandboxCfg.resources.cpus} CPU, {sandboxCfg.resources.memoryMb} MB memory, {sandboxCfg.resources.pids} processes,{" "}
+              {sandboxCfg.resources.diskMb ? `${sandboxCfg.resources.diskMb} MB disk` : "disk not capped"}; idle after{" "}
+              {Math.round(sandboxCfg.idleSeconds / 60)} min
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-subtle">Network</dt>
+            <dd className="text-xs">Only {sandboxCfg.egressAllow.length} allowed hosts (package registries, GitHub)</dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-subtle">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              SANDBOX_PROVIDER, DOCKER_HOST, SANDBOX_IMAGE, SANDBOX_CPUS, SANDBOX_MEMORY_MB,
+              SANDBOX_PIDS, SANDBOX_DISK_MB, SANDBOX_IDLE_MINUTES, SANDBOX_EGRESS_ALLOW,
+              E2B_API_KEY, DAYTONA_API_KEY
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <div className="rounded-lg border border-line bg-paper/60 p-5">

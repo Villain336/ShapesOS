@@ -32,6 +32,20 @@ const EXPECTED_KEYS = [
   "gmail",
   "google-calendar",
   "google-business-profile",
+  "outlook",
+  "outlook-calendar",
+  "slack",
+  "hubspot",
+  // Phase 11 (devtools).
+  "linear",
+  "jira",
+  "airtable",
+  "supabase",
+  "netlify",
+  "shopify", // Phase 11 (bizsync)
+  "quickbooks", // Phase 11 (bizsync)
+  "xero", // Phase 11 (bizsync)
+  "gusto", // Phase 14 (connectors)
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -44,7 +58,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 14);
+    assert.equal(BUILT_IN_CONNECTORS.length, 27); // Phase 11: +5 devtools (linear, jira, airtable, supabase, netlify), +3 bizsync (shopify, quickbooks, xero); Phase 14: +gusto
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

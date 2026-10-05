@@ -6,7 +6,8 @@
 //
 // Gate chain per request (order matters):
 //   1. Bearer auth → tenant ctx (generic 401, reasons stay server-side)
-//   2. Workspace mcpEnabled (fresh read every request — T8)
+//   2. Workspace mcpEnabled (fresh read every request — T8; Phase 11: unset =
+//      the plan default, lib/mcp/enabled.ts)
 //   3. Per-credential rate limit (T4)
 //   4. JSON-RPC shape validation (single call only, no batches)
 //   5. Method dispatch; tools/call additionally: scope check → meter → run → audit
@@ -19,7 +20,8 @@ import { meterToolCall } from "./metering";
 import { mcpAudit } from "./audit";
 import { getTool, listTools, toolInputJsonSchema, ToolError, type ToolDef } from "./tools";
 import { scopeForTool, MCP_TOOL_NAMES, type McpToolName } from "./scopes";
-import { featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
+import { featureUpgradeMessage } from "@/lib/billing/entitlements";
+import { mcpEffectiveState } from "./enabled";
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26"];
 const SERVER_INFO = { name: "marketr", version: "0.1.0" };
@@ -67,8 +69,10 @@ function parseRequest(body: unknown): { ok: true; req: JsonRpcRequest } | { ok: 
 async function workspaceMcpState(workspaceId: string): Promise<{ enabled: boolean; entitled: boolean }> {
   const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true, plan: true } });
   // Phase 4a: API/MCP access is a plan entitlement, checked on every call so
-  // a downgrade closes the surface immediately.
-  return { enabled: ws?.mcpEnabled === true, entitled: planHasFeature(ws?.plan, "api_access") };
+  // a downgrade closes the surface immediately. Phase 11 (conncore): on by
+  // default for paid plans unless the workspace turned it off (lib/mcp/enabled.ts).
+  const state = mcpEffectiveState(ws);
+  return { enabled: state.on, entitled: state.entitled };
 }
 
 function credentialId(ctx: McpAuthContext): string {

@@ -11,6 +11,7 @@
 // bind() requires an appointed licensed partner id (LICENSED PARTNER model,
 // Tico 2026-10-01) and fails closed with PARTNER_NOT_APPOINTED without one.
 
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 import {
   InsuranceVendorError,
   MockCoverForceVendor,
@@ -36,6 +37,8 @@ export class CoverForceVendor implements InsuranceVendor {
   private readonly fixtures = new MockCoverForceVendor();
 
   constructor(config: CoverForceConfig = { mode: "fixture" }) {
+    // Phase 11 (conncore): fixture quotes/binds are refused in production.
+    if (config.mode === "fixture") assertFakeProviderAllowed("insurance carrier (CoverForce)");
     this.mode = config.mode;
     if (config.mode === "live" && !config.apiKey) {
       throw new InsuranceVendorError(

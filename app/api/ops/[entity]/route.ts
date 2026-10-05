@@ -14,7 +14,7 @@ import type { NextRequest } from "next/server";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { OPS_ENTITY_SLUGS } from "@/lib/ops/entities";
+import { OPS_ENTITY_MAP, OPS_ENTITY_SLUGS } from "@/lib/ops/entities";
 import {
   OpsError,
   OpsGateError,
@@ -27,19 +27,28 @@ import {
 import { errorResponse } from "@/lib/api/errors";
 import { intQuery, parseQuery, z } from "@/lib/api/validate";
 import { emitInvoicePaid } from "@/lib/webhooks/emit";
+// Phase 10 (finance): post-commit email delivery of sent invoices / quotes.
+import { deliverAfterSend } from "@/lib/ops/finance/after-commit";
 
 export const dynamic = "force-dynamic";
 
-type Role = "viewer" | "editor";
+type Role = "viewer" | "editor" | "admin";
 
 async function opsGuard(min: Role): Promise<OpsActor | Response> {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (min === "editor" && !(await requireWorkspaceRole(user.id, workspace.id, "editor"))) {
-    return Response.json({ error: "Forbidden: editor role required" }, { status: 403 });
+  if (min !== "viewer" && !(await requireWorkspaceRole(user.id, workspace.id, min))) {
+    return Response.json({ error: `Forbidden: ${min} role required` }, { status: 403 });
   }
   return { userId: user.id, workspaceId: workspace.id };
+}
+
+// Phase 12 (people): an entity may raise its minimum role (payroll is
+// admin-only); unknown slugs fall through to the default and 404 below.
+function roleFor(entity: string, op: "read" | "write"): Role {
+  const def = OPS_ENTITY_MAP[entity];
+  return op === "read" ? def?.readRole ?? "viewer" : def?.writeRole ?? "editor";
 }
 
 function opsError(err: unknown) {
@@ -64,10 +73,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ entity: string }> },
 ) {
-  const gate = await opsGuard("viewer");
+  const { entity } = await params;
+  const gate = await opsGuard(roleFor(entity, "read"));
   if (gate instanceof Response) return gate;
   try {
-    const { entity } = await params;
     const def = opsEntityDef(entity);
     const q = req.nextUrl.searchParams;
     const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), q);
@@ -91,10 +100,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ entity: string }> },
 ) {
-  const gate = await opsGuard("editor");
+  const { entity } = await params;
+  const gate = await opsGuard(roleFor(entity, "write"));
   if (gate instanceof Response) return gate;
   try {
-    const { entity } = await params;
     const def = opsEntityDef(entity);
     const body = await readJson(req);
     if (body && typeof body === "object" && "__invalid" in (body as Record<string, unknown>)) {
@@ -114,9 +123,16 @@ export async function POST(
         { status: 202 },
       );
     }
+    // Phase 12 (people): a confirmed staff registration enrolls the
+    // registrant in the event's reminder sequence after the commit.
+    if (def.slug === "event-registrations" && result.row.status === "confirmed") {
+      const { afterConfirmed } = await import("@/lib/ops/events/registrations");
+      await afterConfirmed(gate.workspaceId, String(result.row.id));
+    }
     // A reused invoice idempotency key returns the original row (200).
     return Response.json(
-      { entity: def.slug, row: result.row },
+      // Phase 14: autoApproved names the rule that approved an automatable gate.
+      { entity: def.slug, row: result.row, ...(result.autoApproved ? { autoApproved: result.autoApproved } : {}) },
       { status: result.action === "idempotent_replay" ? 200 : 201 },
     );
   } catch (err) {
@@ -128,10 +144,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ entity: string }> },
 ) {
-  const gate = await opsGuard("editor");
+  const { entity } = await params;
+  const gate = await opsGuard(roleFor(entity, "write"));
   if (gate instanceof Response) return gate;
   try {
-    const { entity } = await params;
     const def = opsEntityDef(entity);
     const body = await readJson(req);
     if (body && typeof body === "object" && "__invalid" in (body as Record<string, unknown>)) {
@@ -156,7 +172,16 @@ export async function PATCH(
     if (def.slug === "invoices" && row && row.status === "paid" && (body as Record<string, unknown>)?.status === "paid") {
       await emitInvoicePaid(gate.workspaceId, row);
     }
-    return Response.json({ entity: def.slug, row: result.row });
+    // Phase 10 (finance): an approved send emails the document with its PDF
+    // AFTER the send committed (best-effort; the outcome is recorded on it).
+    const delivery = await deliverAfterSend(gate, def.slug, row, body);
+    return Response.json({
+      entity: def.slug,
+      row: result.row,
+      ...(delivery ? { delivery } : {}),
+      // Phase 14: autoApproved names the rule that approved an automatable gate.
+      ...(result.autoApproved ? { autoApproved: result.autoApproved } : {}),
+    });
   } catch (err) {
     return opsError(err);
   }

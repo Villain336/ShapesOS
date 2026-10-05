@@ -6,7 +6,8 @@
 //   POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
 //     → query_performance() (dimension query) and page_performance()
 //       (dimension page), paged by startRow
-// Auth: OAuth2 Bearer (scope webmasters.readonly), refresh-on-401 through
+// Auth: OAuth2 Bearer (scope webmasters — read + sitemap submit since Phase 11;
+// older connections hold webmasters.readonly), refresh-on-401 through
 // the vault; 429/5xx/quota-403 back off and retry. Phase 6: the HTTP client
 // is the one in lib/intelligence/gsc/api.ts, shared with the bulk snapshot
 // cron (lib/intelligence/gsc/client.ts) — there is no second GSC client.
