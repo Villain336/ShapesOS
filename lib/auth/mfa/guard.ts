@@ -15,7 +15,7 @@
 import { auth } from "@/auth";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
 import { HttpError, UnauthorizedError } from "@/lib/api/errors";
-import { loginLockedOut, recordLoginFailure, recordLoginSuccess } from "@/lib/auth/rate-limit";
+import { loginLockedOutAsync, recordLoginFailureAsync, recordLoginSuccessAsync } from "@/lib/auth/rate-limit";
 import { recentlyVerified } from "./session-token";
 import { verifySecondFactorCode } from "./store";
 
@@ -60,14 +60,14 @@ export async function requireReauth(
   if (!code) throw new ReauthRequiredError();
   const ip = clientIpFromHeaders(req.headers);
   const key = `2fa:${user.id}`;
-  if (loginLockedOut(ip, key)) {
+  if (await loginLockedOutAsync(ip, key)) {
     throw new HttpError(429, "Too many wrong codes. Wait a while and try again.", { code: "locked" });
   }
   const method = await verifySecondFactorCode(user.id, code);
   if (!method) {
-    recordLoginFailure(ip, key);
+    await recordLoginFailureAsync(ip, key);
     throw new ReauthRequiredError("That code didn't work. Try a new code from your app, or a recovery code.");
   }
-  recordLoginSuccess(ip, key);
+  await recordLoginSuccessAsync(ip, key);
   return method;
 }

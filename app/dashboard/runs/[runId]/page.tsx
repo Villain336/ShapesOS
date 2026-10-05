@@ -11,9 +11,13 @@
 // Artifacts stream through the scoped API route — the page only ever
 // builds route URLs, never filesystem paths. Approvals are decided in
 // /dashboard/approvals; this page links out.
+// Phase 8 (ship): a Changes section shows the run's diff (the newest patch a
+// git tool stored on a run event — never the client's) with Approve (the
+// pending push / PR runs through the chat confirmation path), Reject and
+// stop, and Ask for changes (a note into the run's thread).
 
 import Link from "next/link";
-import { ArrowLeft, Download, Video } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Video } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { getMembership, roleAtLeast } from "@/lib/authz";
@@ -23,10 +27,17 @@ import { prisma } from "@/lib/prisma";
 import { Banner, aosButton } from "@/components/aos";
 import { missionDisplayName } from "@/lib/aos/missions";
 import { needsReconnect } from "@/lib/aos/home";
-import { clockTime, runAgentName, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
+import { clockTime, runAgentName, runPrompt, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
+import { TOOL_GROUP_LABELS, isToolGroup } from "@/lib/agents/grants";
 import { humanize } from "@/lib/approvals/format";
+import { isStreamEvent, isUsageEvent, runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
+import { loadRunReview } from "@/lib/ship/review";
 import { LiveWatch } from "./LiveWatch";
+import { ChangesReview } from "./ChangesReview";
 import { RunTimelinePanel } from "./RunTimelinePanel";
+import { RestoreCheckpointButton } from "./RestoreCheckpointButton";
+import { sandboxRowForRun } from "@/lib/sandbox/store";
+import { isSandboxOutputEvent, previewLinks, sandboxRunView } from "@/lib/sandbox/run-view";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +118,15 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const run = await getAgentRun(workspace.id, runId);
   if (!run) notFound();
 
-  const [events, membership] = await Promise.all([listAgentRunEvents(workspace.id, runId), getMembership(user.id, workspace.id)]);
+  const [allEvents, membership] = await Promise.all([listAgentRunEvents(workspace.id, runId), getMembership(user.id, workspace.id)]);
+  // Phase 7: model-call usage events are bookkeeping (cost per run), not
+  // steps — they are summed into the facts below and kept off the timeline.
+  const usage = runUsageTotals(allEvents);
+  // Phase 8: streamed text and sandbox output are shown live / as a console
+  // below, not as timeline steps.
+  const events = allEvents.filter((e) => !isUsageEvent(e) && !isStreamEvent(e) && !isSandboxOutputEvent(e));
+  const sandboxRow = await sandboxRowForRun(workspace.id, runId).catch(() => null);
+  const sandboxView = sandboxRow ? sandboxRunView(allEvents) : null;
 
   // The run's mission: its name, state, plan (steps still to come) and the
   // approvals waiting on a person. Read-only here; decisions happen in the inbox.
@@ -133,7 +152,9 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const pendingApprovals = mission?.approvals ?? [];
 
   // Who started it: mission runs are the lead's; otherwise the member, else the run's agent.
-  let starter = runAgentName(run.kind);
+  let starter = runAgentName(run.kind, run.agentKey);
+  const agentName = runAgentName(run.kind, run.agentKey);
+  const prompt = runPrompt(run.agentState);
   if (run.kind !== "mission" && run.startedBy && !run.startedBy.includes(":")) {
     const member = await prisma.workspaceMember.findFirst({
       where: { workspaceId: workspace.id, userId: run.startedBy },
@@ -163,6 +184,31 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
       ? { missionId: mission.id, can: mission.status === "paused" ? ("resume" as const) : ("pause" as const) }
       : null;
 
+  // Phase 5: Stop — editors, or whoever started the run (the route re-checks).
+  const stopRunId = live && (canControl || run.startedBy === user.id) ? run.id : null;
+  const [parentRun, childRuns] = await Promise.all([
+    run.parentRunId ? getAgentRun(workspace.id, run.parentRunId) : Promise.resolve(null),
+    withWorkspaceScope(workspace.id, (tx) =>
+      tx.agentRun.findMany({
+        where: { workspaceId: workspace.id, parentRunId: run.id },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, agentKey: true, kind: true, status: true },
+      }),
+    ),
+  ]);
+  const tools = run.allowedTools.filter(isToolGroup).filter((g) => g !== "workspace" && g !== "delegate");
+
+  // Phase 8 (ship): the run's diff, branch / PR and any push or PR waiting on a person.
+  const review = await loadRunReview(workspace.id, run.id);
+  const threadOwner = review?.threadId
+    ? (await prisma.aiChatThread.findFirst({ where: { id: review.threadId }, select: { userId: true } }))?.userId ?? null
+    : null;
+  const ownsThread = threadOwner === user.id;
+  const showChanges = !!review && (review.changes !== null || review.ship !== null || review.pending !== null);
+  const sourceLabel = review?.changes
+    ? `from ${review.changes.source.tool.replace(/_/g, " ")} at ${clockTime(review.changes.source.at)}${review.changes.source.runId !== run.id ? " in an earlier step" : ""}`
+    : "no diff recorded yet";
+
   const recording = run.recording;
   const videoUrl = recording?.videoPath ? `/api/agent-runs/${run.id}/recording/video` : null;
   const traceUrl = recording?.tracePath ? `/api/agent-runs/${run.id}/recording/trace` : null;
@@ -176,9 +222,12 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const failure = typeof lastError === "string" && lastError.trim() ? lastError.trim() : (lastEvent?.summary ?? null);
 
   const facts: Array<[string, string]> = [
+    ["Agent", run.parentRunId ? `${agentName} (sub-agent)` : agentName],
+    ...(run.allowedTools.length ? ([["Tools", tools.length ? tools.map((g) => TOOL_GROUP_LABELS[g]).join(", ") : "Workspace data only"]] as Array<[string, string]>) : []),
     ["Started", fmtTime(run.createdAt)],
     ["Ended", run.endedAt ? fmtTime(run.endedAt) : "Still going"],
     ["Duration", fmtDuration(durationMs)],
+    ...runUsageFacts(usage),
     ["Steps recorded", String(events.length)],
     ["Browser steps", String(recording?.stepCount ?? 0)],
     ["Artifacts", fmtBytes(recording?.sizeBytes ?? 0)],
@@ -194,25 +243,52 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <RunTimelinePanel
-            title={runTitle(run.kind, mission?.name)}
+            title={runTitle(run.kind, mission?.name, prompt)}
             subtitle={`${starter} started this run at ${clockTime(run.createdAt)}${mission && run.kind !== "mission" ? ` · ${mission.name}` : ""}`}
             status={timeline.status}
             neutral={timeline.neutral}
             steps={timeline.steps}
             completed={timeline.completed}
             control={control}
+            stopRunId={stopRunId}
           />
 
           {/* Slice 7: live watch — mounted ONLY while the run is running.
               Finished runs show the recorded video instead. */}
           {run.status === "running" ? <LiveWatch runId={run.id} /> : null}
+
+          {showChanges && review ? (
+            <ChangesReview
+              runId={run.id}
+              files={review.changes?.files ?? []}
+              truncated={review.changes?.truncated ?? false}
+              additions={review.changes?.additions ?? 0}
+              deletions={review.changes?.deletions ?? 0}
+              sourceLabel={sourceLabel}
+              ship={
+                review.ship
+                  ? {
+                      repo: review.ship.repo,
+                      branch: review.ship.branch,
+                      branchUrl: review.ship.branchUrl,
+                      prUrl: review.ship.prUrl,
+                      prNumber: review.ship.prNumber,
+                    }
+                  : null
+              }
+              pendingTool={review.pending?.tool ?? null}
+              canApprove={canControl && ownsThread}
+              canAsk={canControl && ownsThread && !!review.threadId}
+              canReject={!!review.threadId && (canControl || run.startedBy === user.id) && (review.pending !== null || live)}
+            />
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
           {run.status === "failed" && failure ? (
             <Banner
               status="failed"
-              title={`${runTitle(run.kind, mission?.name)} stopped`}
+              title={`${runTitle(run.kind, mission?.name, prompt)} stopped`}
               description={needsReconnect(failure) ? `${failure.replace(/[.\s]+$/, "")}. Reconnect to resume.` : failure}
               action={needsReconnect(failure) ? { label: "Reconnect", href: "/dashboard/settings/connectors" } : null}
             />
@@ -278,6 +354,87 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
               </p>
             ) : null}
           </Section>
+
+          {/* Phase 5: the sub-agent tree — who handed this run its work, and
+              the sub-agents it handed work to. */}
+          {parentRun || childRuns.length > 0 ? (
+            <Section title="Sub-agents" description={parentRun ? "This run was handed off by the lead" : "Work this run handed off"} bodyClassName="px-5 py-2">
+              <ul className="divide-y divide-line">
+                {parentRun ? (
+                  <li className="flex items-center justify-between gap-3 py-2.5 text-md">
+                    <span className="text-muted">Handed off by</span>
+                    <Link href={`/dashboard/runs/${parentRun.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
+                      {runAgentName(parentRun.kind, parentRun.agentKey)}
+                    </Link>
+                  </li>
+                ) : null}
+                {childRuns.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-2.5 text-md">
+                    <Link href={`/dashboard/runs/${c.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
+                      {runAgentName(c.kind, c.agentKey)}
+                    </Link>
+                    <span className="text-sm text-muted capitalize">{c.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
+          {/* Phase 8: the run's code sandbox — previews of the ports it
+              exposed (served through the authenticated preview route), its
+              checkpoints (restorable while the sandbox lives) and the tail
+              of the command output. */}
+          {sandboxRow && sandboxView ? (
+            <Section
+              title="Code sandbox"
+              description={
+                sandboxRow.status === "active"
+                  ? run.threadId
+                    ? `Running on ${sandboxRow.provider} — kept for this chat thread until it sits idle`
+                    : `Running on ${sandboxRow.provider} — destroyed when the run ends`
+                  : `Ended ${sandboxRow.destroyedAt ? fmtTime(sandboxRow.destroyedAt) : ""} — checkpoints can no longer be restored`
+              }
+              bodyClassName="flex flex-col gap-4 p-5"
+            >
+              {sandboxRow.status === "active" && sandboxRow.exposedPorts.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {previewLinks(run.id, sandboxRow.exposedPorts).map((l) => (
+                    <a key={l.port} href={l.href} target="_blank" rel="noopener noreferrer" className={aosButton({ variant: "secondary", size: "sm" })}>
+                      <ExternalLink className="size-4" aria-hidden />
+                      Preview port {l.port}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+              {sandboxView.checkpoints.length > 0 ? (
+                <ul className="divide-y divide-line">
+                  {sandboxView.checkpoints.slice(0, 20).map((c) => (
+                    <li key={c.snapshotId} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-md font-semibold text-ink">
+                          {c.files.length ? c.files.slice(0, 3).join(", ") + (c.files.length > 3 ? ` +${c.files.length - 3}` : "") : "Checkpoint"}
+                        </p>
+                        <p className="aos-mono truncate text-sm text-muted">
+                          {c.snapshotId} · {clockTime(new Date(c.createdAt))}
+                          {sandboxView.restoredSnapshotIds.includes(c.snapshotId) ? " · restored" : ""}
+                        </p>
+                      </div>
+                      {sandboxRow.status === "active" && (canControl || run.startedBy === user.id) && (!c.sandboxId || c.sandboxId === sandboxRow.sandboxId) ? (
+                        <RestoreCheckpointButton runId={run.id} snapshotId={c.snapshotId} />
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted">No checkpoints yet — one is taken after each batch of file edits.</p>
+              )}
+              {sandboxView.output.length > 0 ? (
+                <pre className="aos-mono max-h-80 overflow-auto rounded-md bg-canvas p-3 text-sm whitespace-pre-wrap text-ink">
+                  {sandboxView.output.map((o) => o.text).join("")}
+                </pre>
+              ) : null}
+            </Section>
+          ) : null}
 
           {/* Recording: video + trace download. Bytes stream through the
               workspace-scoped API route; no filesystem paths reach the client. */}

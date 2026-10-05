@@ -18,7 +18,11 @@ M1 does **not** build a second OAuth flow. Tokens live in the M21 vault:
   the SC property, e.g. `sc-domain:example.com`).
 - `getGscToken()` (`client.ts`) resolves the binding → decrypts → silently
   refreshes when the token is expired or near-expiry → throws a
-  reconnect prompt when refresh fails.
+  reconnect prompt when refresh fails; a 401 mid-pull refreshes once more.
+- HTTP: `api.ts` is the only Search Console client. The bulk cron
+  (`client.ts`) and the M21 agent-tool adapter
+  (`lib/connectors/m21/native/google-search-console.ts`) both call it; it
+  rides the shared live connector layer (`lib/connectors/m21/live/http.ts`).
 
 ## API caps (honored in code)
 
@@ -27,7 +31,7 @@ M1 does **not** build a second OAuth flow. Tokens live in the M21 vault:
 | Rows | ~50,000/day/search-type/property | paginate `startRow`/`rowLimit: 25000`; hard stop at 50k with `truncated: true` on the run |
 | Rate | 1,200 QPM/site | in-process throttle in `client.ts` |
 | Hourly data | `HOURLY_ALL`, last ~30 days only | hourly pulls chunk into 24h windows; chunks older than 30d are skipped, not failed |
-| 429/5xx | — | exponential backoff + jitter, 4 retries, honors `Retry-After` |
+| 429/5xx/quota 403 | — | exponential backoff + jitter, 4 retries, honors `Retry-After` (shared live layer) |
 
 Every API call is metered into `api_meter` (`vendor: "google_gsc"`,
 `meter: serp_call` — the only search-data bucket in `ApiMeterKind`, filter

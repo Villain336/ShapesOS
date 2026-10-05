@@ -42,6 +42,8 @@ export interface ComposerTool {
   key: string;
   label: string;
   pressed: boolean;
+  /** Why the chip can't be picked for the chosen agent (disables it). */
+  unavailable?: string | null;
 }
 
 export function TaskComposer({
@@ -211,7 +213,15 @@ export function TaskComposer({
         ) : null}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2" role="group" aria-label="Tools for this task">
           {tools.map((t) => (
-            <ToolChip key={t.key} name={t.label} pressed={t.pressed} onClick={() => onToggleTool?.(t.key)} className="max-sm:gap-1 max-sm:px-2.5" />
+            <ToolChip
+              key={t.key}
+              name={t.label}
+              pressed={t.pressed && !t.unavailable}
+              disabled={!!t.unavailable}
+              title={t.unavailable ?? undefined}
+              onClick={() => onToggleTool?.(t.key)}
+              className="max-sm:gap-1 max-sm:px-2.5"
+            />
           ))}
         </div>
         <button

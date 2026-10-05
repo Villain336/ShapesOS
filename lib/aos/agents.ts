@@ -124,6 +124,10 @@ export interface AgentRunInput {
   missionId: string | null;
   createdAt: string;
   endedAt: string | null;
+  /** Phase 5: the agent that ran it ("lead" or a sub-agent key). */
+  agentKey?: string | null;
+  /** Phase 5: the task it was given (chat runs). */
+  task?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,9 +351,16 @@ function isRecent(iso: string | null, now: Date, recentMs: number): boolean {
 
 /** Standalone runs (not tied to a listed mission) hang off the lead too. */
 function runNode(r: AgentRunInput, status: AosStatus): AgentNode {
-  const name = RUN_KIND_NAMES[r.kind] ?? "Agent run";
-  const line =
+  // Phase 5: a run says which agent ran it; that name wins over the kind's.
+  const name =
+    r.agentKey === "lead"
+      ? LEAD_AGENT.name
+      : isSubAgentKey(r.agentKey)
+        ? SUB_AGENTS[r.agentKey].name
+        : (RUN_KIND_NAMES[r.kind] ?? "Agent run");
+  const state =
     status === "running" ? "In progress" : status === "queued" ? "Waiting to start" : status === "failed" ? "Run failed" : "Finished";
+  const line = r.task ? `${state} · ${oneLine(r.task, 48)}` : state;
   return {
     key: `run:${r.id}`,
     name,

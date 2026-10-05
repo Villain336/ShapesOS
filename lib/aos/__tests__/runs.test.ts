@@ -39,6 +39,12 @@ describe("names", () => {
     assert.equal(runAgentName("mission"), "Strategist");
     assert.equal(runAgentName("browser"), "Browser agent");
     assert.equal(runAgentName("weird"), "Agent");
+    // Phase 5: the run's own agent wins over its kind.
+    assert.equal(runAgentName("chat", "drafter"), "Writer");
+    assert.equal(runAgentName("chat", "lead"), "Strategist");
+    assert.equal(runAgentName("chat", null), "Strategist");
+    assert.equal(runTitle("chat", null, "Draft the renewal email.  Then schedule it"), "Draft the renewal email");
+    assert.equal(runTitle("chat", null, null), "Task");
     assert.equal(runTitle("mission", "Weekly competitor brief"), "Weekly competitor brief");
     assert.equal(runTitle("browser", null), "Browser run");
   });
@@ -72,7 +78,13 @@ describe("toolCallFromPayload", () => {
     assert.equal(t.duration, "0.8 s");
   });
 
-  it("is null when nothing names a tool", () => {
+  it("leaves loop plumbing and ship patches out of the arguments", () => {
+    const t = toolCallFromPayload({ tool: "git_diff", kind: "tool_result", toolUseId: "call_1", recorded: true, status: "executed", patch: "diff --git a/x b/x" })!;
+    assert.equal(t.name, "git_diff");
+    assert.deepEqual(t.args, [["status", "executed"]]);
+  });
+
+    it("is null when nothing names a tool", () => {
     assert.equal(toolCallFromPayload({ startUrl: "https://x" }), null);
     assert.equal(toolCallFromPayload(null), null);
   });

@@ -10,16 +10,16 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Film, Workflow } from "lucide-react";
+import { ChevronRight, Film, GitPullRequest, Workflow } from "lucide-react";
 import type { AgentRunStatus as PrismaRunStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { getMembership } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { AgentRunStatus } from "@/lib/agents/runs/types";
-import { AgentAvatar, FilterPill, StatusBadge } from "@/components/aos";
+import { AgentAvatar, FilterPill, NeutralBadge, StatusBadge, aosButton } from "@/components/aos";
 import { missionDisplayName } from "@/lib/aos/missions";
-import { clockTime, runAgentName, runStatus, runTitle } from "@/lib/aos/runs";
+import { clockTime, runAgentName, runPrompt, runStatus, runTitle } from "@/lib/aos/runs";
 import type { AosStatus } from "@/lib/aos/status";
 
 export const dynamic = "force-dynamic";
@@ -55,14 +55,6 @@ function fmtDay(d: Date): string {
   return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${clockTime(d)}`;
 }
 
-function NeutralBadge({ label }: { label: string }) {
-  return (
-    <span className="inline-flex h-6 shrink-0 items-center rounded-full bg-paper px-2.5 text-xs font-semibold text-muted shadow-control">
-      {label}
-    </span>
-  );
-}
-
 export default async function RunsIndexPage({
   searchParams,
 }: {
@@ -91,6 +83,9 @@ export default async function RunsIndexPage({
         threadId: true,
         createdAt: true,
         endedAt: true,
+        agentKey: true,
+        parentRunId: true,
+        agentState: true,
         recording: { select: { stepCount: true, videoPath: true } },
         _count: { select: { events: true } },
       },
@@ -132,11 +127,18 @@ export default async function RunsIndexPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="aos-heading">Runs</h1>
-        <p className="mt-1 text-md text-muted">
-          Every agent run in {workspace.name}. Open one to follow its steps, tool calls and recording.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="aos-heading">Runs</h1>
+          <p className="mt-1 text-md text-muted">
+            Every agent run in {workspace.name}. Open one to follow its steps, tool calls and recording.
+          </p>
+        </div>
+        {/* Phase 9 (repos): the repositories agents work on, and their pull requests. */}
+        <Link href="/dashboard/runs/repositories" className={aosButton({ variant: "secondary", size: "sm" })}>
+          <GitPullRequest className="size-4" aria-hidden />
+          Repositories
+        </Link>
       </div>
 
       <nav aria-label="Filter runs by status" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -188,7 +190,7 @@ export default async function RunsIndexPage({
               const pendingCount = r.missionId ? (pendingBy.get(r.missionId) ?? 0) : 0;
               const aos = runStatus(r.status, pendingCount);
               const mName = r.missionId ? (missionName.get(r.missionId) ?? null) : null;
-              const agent = runAgentName(r.kind);
+              const agent = runAgentName(r.kind, r.agentKey);
               const ended = r.endedAt?.getTime() ?? (r.status === "running" || r.status === "queued" ? now : null);
               const duration = ended === null ? "—" : fmtDuration(ended - r.createdAt.getTime());
               return (
@@ -198,7 +200,7 @@ export default async function RunsIndexPage({
                       {aos ? (
                         <StatusBadge status={aos} size="sm" label={aos === "done" ? "Done" : undefined} />
                       ) : (
-                        <NeutralBadge label="Cancelled" />
+                        <NeutralBadge label="Cancelled" size="sm" />
                       )}
                     </div>
                     <div className="order-1 flex min-w-0 items-center gap-3 lg:order-none">
@@ -208,7 +210,7 @@ export default async function RunsIndexPage({
                           href={`/dashboard/runs/${r.id}`}
                           className="block truncate text-base leading-5 font-semibold text-ink after:absolute after:inset-0 after:content-['']"
                         >
-                          {runTitle(r.kind, mName)}
+                          {runTitle(r.kind, mName, runPrompt(r.agentState))}
                         </Link>
                         <p className="truncate text-sm text-muted">
                           {agent}
@@ -222,6 +224,8 @@ export default async function RunsIndexPage({
                                 Mission
                               </Link>
                             </>
+                          ) : r.parentRunId ? (
+                            " · Handed off by the lead"
                           ) : r.threadId ? (
                             " · Chat thread"
                           ) : null}

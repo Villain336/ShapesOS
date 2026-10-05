@@ -1,4 +1,5 @@
-// Marketr — deploy a site's working copy to Vercel / Cloudflare Pages (milestone 9).
+// Marketr — deploy a site's working copy to Vercel / Cloudflare Pages /
+// Netlify (milestone 9; Netlify + same-project redeploys in Phase 9).
 // POST /api/websites/[id]/deploy-hosting { projectId, connectionId }
 //   → { ok, url, deploymentId, status, mock }
 // Collects every file in the site's local working copy, deploys through the
@@ -20,6 +21,7 @@ import {
   ownedHostingConnection,
   type DeployFile,
 } from "@/lib/deploy";
+import { refreshSiteSitemap } from "@/lib/seo/sitemap";
 
 export async function POST(
   req: NextRequest,
@@ -41,6 +43,9 @@ export async function POST(
 
   try {
     const working = await getSiteIdeProvider(site);
+    // Phase 11 (seotools): what goes live carries a fresh sitemap.xml,
+    // robots.txt Sitemap line and IndexNow key file (best effort).
+    await refreshSiteSitemap({ siteId: site.id, projectId: site.projectId, provider: working }).catch(() => undefined);
     const paths = await collectAllFiles(working);
     if (!paths.length)
       return Response.json({ error: "The site has no files to deploy." }, { status: 400 });
@@ -51,7 +56,14 @@ export async function POST(
       files.push({ path: p.replace(/^\//, ""), content });
     }
 
-    const result = await target.deploy(files, { projectName: site.name });
+    // Phase 9: deploy into the provider project this site's last deploy
+    // through this connection went to (Netlify sites have no stable name).
+    const prior = await prisma.deployment.findFirst({
+      where: { siteId: site.id, connectionId: conn.id, providerProject: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { providerProject: true },
+    });
+    const result = await target.deploy(files, { projectName: site.name, project: prior?.providerProject ?? null });
 
     const deployment = await prisma.deployment.create({
       data: {
@@ -63,6 +75,7 @@ export async function POST(
         deploymentId: result.deploymentId,
         status: result.status,
         mock: result.mock === true,
+        providerProject: result.project ?? prior?.providerProject ?? null,
       },
     });
 

@@ -47,6 +47,24 @@ RUN chmod 0755 /usr/local/bin/shapesos-backup \
 USER postgres
 CMD ["shapesos-backup", "--loop"]
 
+# --- worker --- Phase 8 agent worker (compose `worker` service): claims
+# agent_jobs and runs the agent loop (scripts/worker.mts). Same source and
+# dependencies as the app, run with tsx (no Next build needed).
+FROM base AS worker
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV DATABASE_URL="postgresql://marketr:marketr@localhost:5432/marketr?schema=public"
+RUN npx prisma generate
+ENV DATABASE_URL=""
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
+ && mkdir -p /app/.data /app/.run-artifacts \
+ && chown -R nextjs:nodejs /app/.data /app/.run-artifacts
+USER nextjs
+CMD ["node", "node_modules/tsx/dist/cli.mjs", "scripts/worker.mts"]
+
 # --- runner ---
 FROM base AS runner
 RUN apk add --no-cache openssl
@@ -57,6 +75,12 @@ ENV NODE_ENV=production
 ARG MARKETR_GIT_COMMIT=""
 ENV MARKETR_GIT_COMMIT=$MARKETR_GIT_COMMIT
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+# Runtime state directories (compose mounts named volumes here). Created and
+# owned by the app user so a fresh named volume inherits that ownership and is
+# writable: .data (reports, logos, site copies, local files), .run-artifacts
+# (agent run recordings), data/corpus (knowledge corpus).
+RUN mkdir -p /app/.data /app/.run-artifacts /app/data/corpus \
+ && chown -R nextjs:nodejs /app/.data /app/.run-artifacts /app/data
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

@@ -32,6 +32,15 @@
 //     matched) each time. The subject is now "<provider>:<providerAccountId>".
 //   - CAPTCHA step-up on the credentials login after repeated failures
 //     (lib/auth/captcha.ts; no-op unless a provider is configured).
+//
+// Phase 6 (email accounts, lib/auth/email/*): anyone can sign up with an
+// email address. Two more Credentials providers, subject "email:<address>":
+//   - "email-password": verified email + scrypt password, with the same
+//     lockout, CAPTCHA step-up and audit events as the admin login.
+//   - "email-link": a single-use token from a verify or magic-link email
+//     (Auth.js's email provider needs a DB adapter; this stays stateless).
+// Both go through the same signIn/jwt callbacks below, so invite-only mode,
+// the second-factor pending session and the 2FA policy apply unchanged.
 
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
@@ -45,19 +54,22 @@ import { provisionSsoUser } from "./lib/sso";
 // ---------------------------------------------------------------------------
 // Day-1 hardening (H1/M8): brute-force protection on the credentials login.
 // See lib/auth/rate-limit.ts — two independent dimensions (per-IP across
-// accounts, per-account across IPs), in-memory, single-instance by design.
+// accounts, per-account across IPs), shared across replicas in Postgres with
+// the in-memory lockout as the fallback (Phase 6; never fails open).
 // ---------------------------------------------------------------------------
 import {
-  loginLockedOut,
-  recordLoginFailure,
-  recordLoginSuccess,
+  loginLockedOutAsync,
+  recordLoginFailureAsync,
+  recordLoginSuccessAsync,
 } from "./lib/auth/rate-limit";
 import { clientIpFromHeaders } from "./lib/api/client-ip";
 import { INVITE_REQUIRED_PATH, signInAllowed, signupMode } from "./lib/auth/signup";
 import { CredentialsSignin, type Session } from "next-auth";
-import { captchaRequired, verifyCaptchaToken } from "./lib/auth/captcha";
+import { captchaRequiredAsync, verifyCaptchaToken } from "./lib/auth/captcha";
 import { authorizePasskey, authorizeTwoFactor, type MfaSignInMarker } from "./lib/auth/mfa/authorize";
 import {
+  EMAIL_LINK_PROVIDER_ID,
+  EMAIL_PASSWORD_PROVIDER_ID,
   PASSKEY_PROVIDER_ID,
   TWO_FACTOR_PROVIDER_ID,
   applySignIn,
@@ -66,6 +78,7 @@ import {
 } from "./lib/auth/mfa/session-token";
 import { factorSummary } from "./lib/auth/mfa/store";
 import { linkScimMembersOnSsoLogin } from "./lib/scim/link";
+import { authorizeEmailLink, authorizeEmailPassword } from "./lib/auth/email/authorize";
 
 /** The CAPTCHA step-up is due and the attempt carried no valid token. */
 class CaptchaRequiredError extends CredentialsSignin {
@@ -187,25 +200,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ip = clientIp(req as Request | undefined);
 
         // Fail closed under lockout: don't even compare the password.
-        if (loginLockedOut(ip, email || "unknown")) {
+        if (await loginLockedOutAsync(ip, email || "unknown")) {
           console.warn(`[auth] login blocked (rate limit): ${email || "unknown"} from ${ip ?? "unknown ip"}`);
           return null;
         }
         // Phase 4a step-up: after N failures a CAPTCHA must pass first
         // (no-op without CAPTCHA_PROVIDER; see lib/auth/captcha.ts).
-        if (captchaRequired(ip, email || "unknown")) {
+        if (await captchaRequiredAsync(ip, email || "unknown")) {
           const captchaToken = typeof credentials?.captchaToken === "string" ? credentials.captchaToken : "";
           if (!(await verifyCaptchaToken(captchaToken, ip))) throw new CaptchaRequiredError();
         }
         if (!adminEmail || !adminPassword || !email) {
           if (email) {
-            recordLoginFailure(ip, email);
+            await recordLoginFailureAsync(ip, email);
             await auditAuthEvent("auth_login_failed", `login failed for ${email} (no admin credential configured)`);
           }
           return null;
         }
         if (safeEqual(email, adminEmail) && safeEqual(password, adminPassword)) {
-          recordLoginSuccess(ip, email);
+          await recordLoginSuccessAsync(ip, email);
           await auditAuthEvent("auth_login_succeeded", `admin login succeeded for ${email} from ${ip ?? "unknown ip"}`);
           return {
             id: `admin:${adminEmail}`,
@@ -213,7 +226,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: adminEmail,
           };
         }
-        recordLoginFailure(ip, email);
+        await recordLoginFailureAsync(ip, email);
         await auditAuthEvent(
           "auth_login_failed",
           `login failed for ${email} from ${ip ?? "unknown ip"}`,
@@ -237,6 +250,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "Passkey",
       credentials: { challengeId: { label: "Challenge", type: "text" }, response: { label: "Response", type: "text" } },
       authorize: (credentials, req) => authorizePasskey(credentials ?? {}, req as Request),
+    }),
+    // Phase 6: email + password accounts (verified addresses only).
+    Credentials({
+      id: EMAIL_PASSWORD_PROVIDER_ID,
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        captchaToken: { label: "CAPTCHA", type: "hidden" },
+      },
+      authorize: (credentials, req) => authorizeEmailPassword(credentials ?? {}, req as Request | undefined),
+    }),
+    // Phase 6: one-time email link (verification or magic link).
+    Credentials({
+      id: EMAIL_LINK_PROVIDER_ID,
+      name: "Email link",
+      credentials: { token: { label: "Token", type: "text" } },
+      authorize: (credentials, req) => authorizeEmailLink(credentials ?? {}, req as Request | undefined),
     }),
     ...extraProviders,
   ],

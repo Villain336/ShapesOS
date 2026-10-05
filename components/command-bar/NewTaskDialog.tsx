@@ -6,10 +6,11 @@
 // "New task" action and ⌘N / Ctrl+N (where the browser lets a page have it).
 // It hands the task to the lead agent (Strategist) by default, or straight to
 // a sub-agent, through the EXISTING task path: an assistant chat thread on
-// the workspace's project (lib/aos/composer.ts explains the message). Files
-// upload with the attachment API the assistant already uses. Nothing here
-// widens what an agent may do: write tools still propose and wait for the
-// human's confirmation in the thread.
+// the workspace's project. Files upload with the attachment API the
+// assistant already uses. Phase 5: the picked agent and tool chips create
+// the thread as that agent with that tool grant, and the server enforces
+// both (lib/aos/composer.ts). Write tools still propose and wait for the
+// human's OK unless a per-agent rule says otherwise.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,7 @@ import { TaskComposer, type ComposerFile } from "@/components/aos/Composer";
 import { useChat } from "@/components/chat/ChatContext";
 import {
   attachmentError,
+  chipUnavailable,
   COMPOSER_TOOLS,
   composeTaskMessage,
   composerAgents,
@@ -25,9 +27,11 @@ import {
   isComposerAgentKey,
   pickTaskProject,
   taskPromptError,
+  taskThreadOptions,
   type ComposerAgentKey,
   type ComposerToolKey,
 } from "@/lib/aos/composer";
+import type { GroupAvailability } from "@/lib/agents/grants";
 import { OPEN_COMPOSER_EVENT } from "./lib";
 
 const AGENTS = composerAgents();
@@ -61,6 +65,20 @@ export function NewTaskDialog() {
   const [sending, setSending] = useState(false);
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   const projectsRef = useRef<Promise<ProjectRow[]> | null>(null);
+  // Phase 8: which tool groups this server can run (the Code chip lights up
+  // when a sandbox provider is available). Null until loaded = unavailable.
+  const [availability, setAvailability] = useState<GroupAvailability | null>(null);
+
+  const loadAvailability = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents/tool-availability", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { groups?: GroupAvailability };
+      setAvailability(data.groups ?? null);
+    } catch {
+      // Leave it unavailable: the chip says so.
+    }
+  }, []);
 
   const loadProjects = useCallback(async (): Promise<ProjectRow[]> => {
     if (!projectsRef.current) {
@@ -88,8 +106,9 @@ export function NewTaskDialog() {
       setOpen(true);
       projectsRef.current = null; // re-read: a project may have been added
       void loadProjects();
+      void loadAvailability();
     },
-    [loadProjects],
+    [loadProjects, loadAvailability],
   );
 
   // Event (sidebar pill, Overview button, ⌘K action) + ⌘N / Ctrl+N.
@@ -167,10 +186,13 @@ export function NewTaskDialog() {
       setError("Add a project first. Tasks run inside a project.");
       return;
     }
+    const options = taskThreadOptions(draft, availability);
     queueTask({
       projectId: project.id,
       content: composeTaskMessage(draft),
       attachmentIds: files.map((f) => f.attachmentId).filter((x): x is string => !!x),
+      agentKey: options.agentKey,
+      tools: options.tools,
     });
     setTab("ai");
     setOpen(false);
@@ -206,14 +228,26 @@ export function NewTaskDialog() {
               setPrompt(v);
               if (error) setError(null);
             }}
-            helper={noProject ? "Tasks run inside a project. Add one under SEO projects first." : undefined}
             error={error}
             files={files}
             onAddFiles={(list) => void addFiles(list)}
             onRemoveFile={(id) => setFiles((prev) => prev.filter((f) => f.id !== id))}
-            tools={COMPOSER_TOOLS.map((t) => ({ key: t.key, label: t.label, pressed: tools.includes(t.key) }))}
-            onToggleTool={(k) =>
-              setTools((prev) => (prev.includes(k as ComposerToolKey) ? prev.filter((x) => x !== k) : [...prev, k as ComposerToolKey]))
+            tools={COMPOSER_TOOLS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              pressed: tools.includes(t.key),
+              unavailable: chipUnavailable(agent, t.key, availability),
+            }))}
+            onToggleTool={(k) => {
+              if (chipUnavailable(agent, k as ComposerToolKey, availability)) return;
+              setTools((prev) => (prev.includes(k as ComposerToolKey) ? prev.filter((x) => x !== k) : [...prev, k as ComposerToolKey]));
+            }}
+            helper={
+              noProject
+                ? "Tasks run inside a project. Add one under SEO projects first."
+                : tools.length > 0
+                  ? "Only the picked tools (plus reading this workspace) — enforced for the whole task."
+                  : undefined
             }
             onSend={() => void send()}
             sending={sending}

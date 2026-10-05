@@ -216,7 +216,9 @@ console.log("proxy choke point");
 {
   const proxy = readFileSync(join(ROOT, "proxy.ts"), "utf8");
   ok("proxy.ts exists at repo root", true);
-  ok("matcher covers /api/*", /matcher:\s*["']\/api\/:path\*["']/.test(proxy));
+  // The matcher is a single string or (Phase 3, CSP on every page) an array
+  // whose first entry is the /api catch-all.
+  ok("matcher covers /api/*", /matcher:\s*(?:\[\s*(?:\/\/[^\n]*\n\s*)*)?["']\/api\/:path\*["']/.test(proxy));
   ok("uses classifyTier + checkRateLimit", /classifyTier/.test(proxy) && /checkRateLimit/.test(proxy));
   ok("oversize guard returns 400 (adversarial contract)", /status:\s*400/.test(proxy));
   ok("429 path returns tooManyRequests", /tooManyRequests/.test(proxy));

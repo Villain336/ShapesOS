@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { sendCreativeToSocial } from "@/lib/ads/service";
 import { ownedProject, readJson, requireEditor } from "../../../_lib";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (denied) return denied;
   // Same write-tier protection as the other Postiz draft routes — queueing a
   // draft is a real-world write against platform quota.
-  const rl = checkRateLimit(`postiz-post:ws:${project.workspaceId}`, "write");
+  const rl = await checkRateLimitAsync(`postiz-post:ws:${project.workspaceId}`, "write");
   if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
   try {
     const draft = await sendCreativeToSocial(

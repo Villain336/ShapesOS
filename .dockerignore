@@ -1,0 +1,43 @@
+# ShapesOS — Docker build context (Phase 6). Keeps host state out of the
+# image: `COPY . .` in the builder must never pick up a host node_modules
+# (wrong-platform native binaries over the image's own `npm ci`), a local
+# .env (secrets baked into a layer), or runtime data.
+
+# dependencies + build output (the image installs and builds its own)
+node_modules
+**/node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# runtime state (named volumes in docker-compose.yml)
+.data
+.run-artifacts
+data
+.pgdata
+db-backups
+
+# tests, tooling, VCS
+.git
+.github
+.claude
+coverage
+test-results
+playwright-report
+scripts/e2e/report
+scripts/e2e/.auth.json
+scripts/e2e/.e2e-ids.json
+screenshots
+*.log
+logs

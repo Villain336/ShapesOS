@@ -1,8 +1,9 @@
 // Marketr — Phase 15 slice 3: toolkit directory + WorkspaceToolkit enablement
 // (spec §§3/7; locked: FULL FIREHOSE, NO PACKS).
 //
-// The directory lists every toolkit the tool router knows (~8 fixture
-// toolkits today, 100+ when the live Composio key lands), with per-workspace
+// The directory lists every toolkit the tool router knows (8 fixture
+// toolkits without a key; Composio's live directory when COMPOSIO_API_KEY
+// is set — Phase 6), with per-workspace
 // connection state, enablement state, tool counts and tier breakdowns.
 //
 // Enablement semantics (the gate enforces this in gate.ts proposeAction):
@@ -44,6 +45,25 @@ export const TOOLKIT_CATEGORY: Record<string, ToolkitCategory> = {
   zendesk: "support",
 };
 
+/**
+ * Live directory: map Composio's category names onto our six buckets.
+ * First match wins; unknown categories fall back to "productivity".
+ */
+const CATEGORY_HINTS: Array<[RegExp, ToolkitCategory]> = [
+  [/support|helpdesk|ticket/, "support"],
+  [/payment|billing|finance|accounting|commerce/, "payments"],
+  [/crm|sales|marketing/, "crm"],
+  [/communicat|chat|email|messag|social/, "comms"],
+  [/file|document|storage|drive|spreadsheet/, "files"],
+];
+
+export function categoryFromHints(categories: string[] | undefined): ToolkitCategory | null {
+  for (const c of categories ?? []) {
+    for (const [re, cat] of CATEGORY_HINTS) if (re.test(c)) return cat;
+  }
+  return null;
+}
+
 export const TOOLKIT_CATEGORIES: ToolkitCategory[] = [
   "comms",
   "crm",
@@ -80,7 +100,7 @@ export interface ToolkitDirectoryEntry {
   tierBreakdown: TierBreakdown;
 }
 
-/** Known toolkit slugs from the active router (fixture today, live later). */
+/** Known toolkit slugs from the active router (live with a key, fixtures otherwise). */
 export async function listKnownToolkits(): Promise<string[]> {
   return (await getToolRouter().listToolkits()).map((t) => t.toolkitSlug);
 }
@@ -220,6 +240,14 @@ export async function listDirectory(
         if (!d.classified) breakdown.unclassified += 1;
         else breakdown[d.tier] += 1;
       }
+    } else if (tk.toolCount !== undefined) {
+      // Live directory, toolkit not discovered for this workspace yet: show
+      // Composio's advertised count without fetching every toolkit's tools
+      // (hundreds of calls per page load). Until a catalog refresh derives
+      // their tiers they are unclassified — and the gate treats an
+      // undiscovered tool exactly that way (conservative floor).
+      toolCount = tk.toolCount;
+      breakdown = { low: 0, medium: 0, high: 0, unclassified: tk.toolCount };
     } else {
       const fixtureTools = await router.getToolkitTools(tk.toolkitSlug);
       toolCount = fixtureTools.length;
@@ -235,7 +263,7 @@ export async function listDirectory(
       appKey: tk.appKey,
       label: tk.label,
       description: tk.description,
-      category: TOOLKIT_CATEGORY[tk.toolkitSlug] ?? "productivity",
+      category: TOOLKIT_CATEGORY[tk.toolkitSlug] ?? categoryFromHints(tk.categories) ?? "productivity",
       connected: connectedAppKeys.has(tk.appKey),
       enabled: explicit ?? V1_TOOLKIT_SLUGS.includes(tk.toolkitSlug),
       toolCount,

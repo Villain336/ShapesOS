@@ -1,0 +1,62 @@
+# ShapesOS — Phase 9: opt-in real-API smoke tests (scripts/live/*.mts).
+#
+# Manual only (workflow_dispatch) — never on push or pull_request, so normal
+# CI stays credential-free. Each provider SKIPS unless its secrets are set in
+# this repository's Actions secrets. Deploy + rollback checks create real
+# deployments, so they also need the "deploy_writes" input (scratch projects
+# only — never production sites).
+#
+# NOTE: workflows reference secrets.* only — no hardcoded values, ever.
+
+name: live-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Comma-separated providers (github,wordpress,webflow,vercel,cloudflare,netlify,anthropic); empty = all"
+        required: false
+        default: ""
+      deploy_writes:
+        description: "Also deploy + roll back on Vercel / Cloudflare / Netlify scratch projects"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LIVE_ONLY: ${{ inputs.only }}
+      LIVE_DEPLOY_WRITE: ${{ inputs.deploy_writes && '1' || '' }}
+      LIVE_GITHUB_TOKEN: ${{ secrets.LIVE_GITHUB_TOKEN }}
+      LIVE_GITHUB_REPO: ${{ secrets.LIVE_GITHUB_REPO }}
+      LIVE_GITHUB_BRANCH: ${{ secrets.LIVE_GITHUB_BRANCH }}
+      LIVE_WORDPRESS_URL: ${{ secrets.LIVE_WORDPRESS_URL }}
+      LIVE_WORDPRESS_USER: ${{ secrets.LIVE_WORDPRESS_USER }}
+      LIVE_WORDPRESS_APP_PASSWORD: ${{ secrets.LIVE_WORDPRESS_APP_PASSWORD }}
+      LIVE_WEBFLOW_TOKEN: ${{ secrets.LIVE_WEBFLOW_TOKEN }}
+      LIVE_WEBFLOW_SITE_ID: ${{ secrets.LIVE_WEBFLOW_SITE_ID }}
+      LIVE_VERCEL_TOKEN: ${{ secrets.LIVE_VERCEL_TOKEN }}
+      LIVE_VERCEL_TEAM_ID: ${{ secrets.LIVE_VERCEL_TEAM_ID }}
+      LIVE_VERCEL_PROJECT: ${{ secrets.LIVE_VERCEL_PROJECT }}
+      LIVE_CLOUDFLARE_TOKEN: ${{ secrets.LIVE_CLOUDFLARE_TOKEN }}
+      LIVE_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.LIVE_CLOUDFLARE_ACCOUNT_ID }}
+      LIVE_CLOUDFLARE_PROJECT: ${{ secrets.LIVE_CLOUDFLARE_PROJECT }}
+      LIVE_NETLIFY_TOKEN: ${{ secrets.LIVE_NETLIFY_TOKEN }}
+      LIVE_NETLIFY_SITE_ID: ${{ secrets.LIVE_NETLIFY_SITE_ID }}
+      LIVE_ANTHROPIC_API_KEY: ${{ secrets.LIVE_ANTHROPIC_API_KEY }}
+      LIVE_ANTHROPIC_MODEL: ${{ secrets.LIVE_ANTHROPIC_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: Live smoke tests
+        run: npx tsx scripts/live/run-all.mts

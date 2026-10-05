@@ -18,6 +18,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { SafetyViolationError } from "./safety";
+import { fakeOrRefuse } from "@/lib/env/secrets";
 
 export type CardProviderName = "fake" | "brex" | "ramp";
 export type VirtualCardStatus = "active" | "suspended" | "closed";
@@ -241,7 +242,8 @@ export function cardProviderFor(name: CardProviderName, env: NodeJS.ProcessEnv =
       return new RampCardAdapter({ mode });
     case "fake":
     default:
-      return new FakeCardProvider();
+      // Phase 11 (conncore): fake virtual cards are refused in production.
+      return fakeOrRefuse("virtual card", () => new FakeCardProvider(), env);
   }
 }
 

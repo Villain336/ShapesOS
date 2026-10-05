@@ -272,3 +272,21 @@ describe("visibleBranches", () => {
     assert.deepEqual(visibleBranches(list, 0), { shown: [], hidden: 5 });
   });
 });
+
+describe("chat runs in the tree (Phase 5)", () => {
+  it("names a standalone run by the agent that ran it, with its task", () => {
+    const tree = deriveAgentTree({
+      missions: [],
+      runs: [
+        { id: "r1", kind: "chat", status: "running", missionId: null, createdAt: NOW.toISOString(), endedAt: null, agentKey: "drafter", task: "Draft the renewal email for Acme. Then send." },
+        { id: "r2", kind: "browser", status: "running", missionId: null, createdAt: NOW.toISOString(), endedAt: null },
+      ],
+      now: NOW,
+    });
+    const names = tree!.branches.map((b) => b.name);
+    assert.ok(names.includes("Writer"), names.join(","));
+    assert.ok(names.includes("Browser run"));
+    const writer = tree!.branches.find((b) => b.name === "Writer")!;
+    assert.equal(writer.line, "In progress · Draft the renewal email for Acme");
+  });
+});

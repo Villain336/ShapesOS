@@ -15,6 +15,7 @@ import {
 } from "react";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { confirmAction } from "@/lib/ui/feedback";
+import { emptyStreamingTurn, foldAguiEvent, readSseFrames, type StreamingTurn } from "./agui-stream";
 
 export interface ChatThread {
   id: string;
@@ -40,6 +41,15 @@ export interface PendingAttachment {
 }
 
 export type ChatTab = "ai" | "team";
+
+/** Phase 5: the open thread's task profile (server-computed). */
+export interface ThreadTask {
+  agentKey: string;
+  /** Effective tool groups (lib/agents/grants.ts). */
+  allowedTools: string[];
+  /** The run working right now (Stop targets it), if any. */
+  liveRunId: string | null;
+}
 
 export interface ChatSession {
   projectId: string;
@@ -72,6 +82,16 @@ interface ChatContextValue {
    * sends it as the first message of a new thread once `projectId` is open.
    */
   queueTask: (task: QueuedTask) => void;
+  /** Phase 5: the open thread's agent + tool grant. */
+  threadTask: ThreadTask | null;
+  /** Phase 5: stop whatever the open thread's agent is doing. */
+  stop: () => Promise<void>;
+  stopping: boolean;
+  /**
+   * Phase 5: let an agent run one kind of action without asking (a per-agent
+   * automation rule). Resolves to an error message, or null on success.
+   */
+  setAutoApprove: (agentKey: string, action: string, on: boolean) => Promise<string | null>;
 }
 
 /** A composed task waiting for the assistant page to open its project. */
@@ -79,6 +99,10 @@ export interface QueuedTask {
   projectId: string;
   content: string;
   attachmentIds: string[];
+  /** Phase 5: the agent the task is handed to (default the lead). */
+  agentKey?: string;
+  /** Phase 5: tool groups to limit the task to (empty = agent defaults). */
+  tools?: string[];
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -87,6 +111,27 @@ export function useChat(): ChatContextValue {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChat must be used inside <ChatProvider>");
   return ctx;
+}
+
+/** Phase 14: the chat context when there is one (cards also render outside the chat). */
+export function useOptionalChat(): ChatContextValue | null {
+  return useContext(ChatContext);
+}
+
+/**
+ * Phase 5 / 14: save a "do this without asking" rule (PUT /api/automation/settings).
+ * Returns null on success, else the server's message. setAutoApprove uses it;
+ * so do approval cards rendered outside the chat.
+ */
+export async function putAutoApproveRule(agentKey: string, action: string, on: boolean): Promise<string | null> {
+  const res = await fetch("/api/automation/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agentKey, action, behavior: on ? "auto" : "ask" }),
+  });
+  if (res.ok) return null;
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  return data.error ?? "Couldn't save the rule.";
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
@@ -102,6 +147,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // message of a fresh thread once the assistant has loaded that project.
   const [queuedTask, setQueuedTask] = useState<QueuedTask | null>(null);
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
+  const [threadTask, setThreadTask] = useState<ThreadTask | null>(null);
+  const [stopping, setStopping] = useState(false);
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
   const sendingRef = useRef(false);
   const sessionRef = useRef<ChatSession | null>(null);
   sessionRef.current = session;
@@ -131,6 +180,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setThreads([]);
     setActiveId(null);
     setMessages([]);
+    setThreadTask(null);
     setSending(false);
     setPendingAttachments([]);
     setLoadedProjectId(null);
@@ -174,6 +224,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) return;
     const data = await res.json();
     setMessages(data.messages ?? []);
+    setThreadTask(toThreadTask(data.thread));
   }, []);
 
   const newThread = useCallback(async () => {
@@ -190,6 +241,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setThreads((prev) => [t, ...prev]);
     setActiveId(t.id);
     setMessages([]);
+    setThreadTask(toThreadTask(data.thread));
   }, []);
 
   const deleteThread = useCallback(
@@ -210,6 +262,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           else {
             setActiveId(null);
             setMessages([]);
+            setThreadTask(null);
           }
         }
         return rest;
@@ -224,7 +277,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
    * cleared once the server accepts them.
    */
   const deliver = useCallback(
-    async (threadIdIn: string | null, text: string, attachmentIds: string[], staged: boolean) => {
+    async (
+      threadIdIn: string | null,
+      text: string,
+      attachmentIds: string[],
+      staged: boolean,
+      task?: { agentKey?: string; tools?: string[] },
+    ) => {
       const s = sessionRef.current;
       if (!text || sendingRef.current || !s || !s.canEdit) return;
       sendingRef.current = true;
@@ -234,13 +293,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           const res = await fetch("/api/chat/threads", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ projectId: s.projectId }),
+            // Phase 5: the server computes and enforces the task's grant.
+            body: JSON.stringify({
+              projectId: s.projectId,
+              ...(task?.agentKey ? { agentKey: task.agentKey } : {}),
+              ...(task?.tools?.length ? { tools: task.tools } : {}),
+            }),
           });
           if (!res.ok) return;
           const data = await res.json();
           threadId = data.thread.id as string;
           setThreads((prev) => [data.thread, ...prev]);
           setActiveId(threadId);
+          setThreadTask(toThreadTask(data.thread));
           if (!threadIdIn) setMessages([]);
         }
         const optimistic: ChatMessage = {
@@ -252,16 +317,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
         setMessages((prev) => [...prev, optimistic]);
         setSending(true);
-        const res = await fetch(`/api/chat/threads/${threadId}/messages`, {
+        // Phase 8: the turn streams (AG-UI SSE): the assistant's text shows
+        // while it arrives; the thread is re-read at the end for the
+        // authoritative rows (tool rows, proposals, the final text).
+        const res = await fetch("/api/agents/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            threadId,
             content: text,
             ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
           }),
         });
-        const data = await res.json();
-        if (!res.ok) {
+        if (!res.ok || !res.body) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
           setMessages((prev) => [
             ...prev.filter((m) => m.id !== optimistic.id),
             {
@@ -276,16 +345,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
         // Attachments were accepted — clear the staged tray.
         if (staged && attachmentIds.length > 0) setPendingAttachments([]);
+        let live = emptyStreamingTurn();
+        const startedAt = new Date().toISOString();
+        const show = (turn: StreamingTurn) => {
+          const bubbles: ChatMessage[] = turn.messages
+            .filter((m) => m.text.trim())
+            .map((m) => ({ id: `live-${m.id}`, role: "assistant", content: m.text, toolCalls: null, createdAt: startedAt }));
+          setMessages((prev) => [...prev.filter((m) => !m.id.startsWith("live-")), ...bubbles]);
+        };
+        for await (const frame of readSseFrames(res.body)) {
+          const next = foldAguiEvent(live, frame);
+          if (next !== live) {
+            live = next;
+            show(live);
+          }
+        }
         // Re-fetch the thread for the authoritative message list (includes tool rows).
         const threadRes = await fetch(`/api/chat/threads/${threadId}`);
         if (threadRes.ok) {
           const tdata = await threadRes.json();
           setMessages(tdata.messages ?? []);
-        }
-        if (data.threadTitle) {
-          setThreads((prev) =>
-            prev.map((t) => (t.id === threadId ? { ...t, title: data.threadTitle } : t)),
-          );
+          setThreadTask(toThreadTask(tdata.thread));
+          const title = tdata.thread?.title as string | undefined;
+          if (title) setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, title } : t)));
+        } else if (live.error) {
+          setMessages((prev) => [
+            ...prev,
+            { id: `err-${Date.now()}`, role: "assistant", content: `Something went wrong: ${live.error}`, toolCalls: null, createdAt: new Date().toISOString() },
+          ]);
         }
       } finally {
         sendingRef.current = false;
@@ -316,8 +403,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (!q || !session || session.projectId !== q.projectId || loadedProjectId !== q.projectId) return;
     setQueuedTask(null);
     if (!session.canEdit) return;
-    void deliver(null, q.content.trim(), q.attachmentIds, false);
+    void deliver(null, q.content.trim(), q.attachmentIds, false, { agentKey: q.agentKey, tools: q.tools });
   }, [queuedTask, session, loadedProjectId, deliver]);
+
+  // Phase 5: Stop. The message request is still open while the agent works,
+  // so this is a separate request; the agent loop sees the stop before its
+  // next model or tool call (and an in-flight model call is aborted).
+  const stop = useCallback(async () => {
+    const id = activeIdRef.current;
+    if (!id) return;
+    setStopping(true);
+    try {
+      await fetch(`/api/chat/threads/${id}/stop`, { method: "POST" });
+      const threadRes = await fetch(`/api/chat/threads/${id}`);
+      if (threadRes.ok) {
+        const tdata = await threadRes.json();
+        // Don't clobber the optimistic turn while the request is in flight.
+        if (!sendingRef.current) setMessages(tdata.messages ?? []);
+        setThreadTask(toThreadTask(tdata.thread));
+      }
+    } finally {
+      setStopping(false);
+    }
+  }, []);
+
+  const setAutoApprove = useCallback(
+    (agentKey: string, action: string, on: boolean) => putAutoApproveRule(agentKey, action, on),
+    [],
+  );
 
   return (
     <ChatContext.Provider
@@ -340,9 +453,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         removePendingAttachment,
         clearPendingAttachments,
         queueTask,
+        threadTask,
+        stop,
+        stopping,
+        setAutoApprove,
       }}
     >
       {children}
     </ChatContext.Provider>
   );
+}
+
+/** Phase 5: read the task profile off a thread payload. */
+function toThreadTask(t: unknown): ThreadTask | null {
+  if (!t || typeof t !== "object") return null;
+  const o = t as { agentKey?: unknown; allowedTools?: unknown; liveRunId?: unknown };
+  return {
+    agentKey: typeof o.agentKey === "string" ? o.agentKey : "lead",
+    allowedTools: Array.isArray(o.allowedTools) ? o.allowedTools.filter((x): x is string => typeof x === "string") : [],
+    liveRunId: typeof o.liveRunId === "string" ? o.liveRunId : null,
+  };
 }

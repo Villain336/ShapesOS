@@ -20,9 +20,11 @@
 //        write POST/PUT/PATCH/DELETE                         60 req/min per user
 //        ai    LLM / skill-execution routes                  20 req/min per user
 //
-// Runs on the Node.js runtime (Next 16 default). The limiter is in-memory and
-// single-instance by design — same documented stance as lib/auth/rate-limit.ts.
-// Front with a shared limiter (Redis etc.) if you run replicas.
+// Runs on the Node.js runtime (Next 16 default; `runtime` can't be set in a
+// proxy). Phase 6: the limiter state is shared across replicas in Postgres
+// (checkRateLimitAsync, RATE_LIMIT_STORE — lib/api/rate-limit-store.ts loads
+// Prisma lazily, only when that store is selected) and fails open to the
+// per-process in-memory limiter if the database errors or is slow.
 //
 // NOTE: this intentionally does NOT validate request bodies — body schemas
 // live per-route via lib/api/validate.ts (zod), where the shape is known.
@@ -33,7 +35,7 @@ import { hasSessionCookie, readSessionToken } from "./lib/auth/mfa/token";
 import { pendingSubject } from "./lib/auth/mfa/session-token";
 import {
   classifyTier,
-  checkRateLimit,
+  checkRateLimitAsync,
   rateLimitKey,
   tooManyRequests,
   clientIp,
@@ -139,7 +141,7 @@ export async function proxy(req: NextRequest) {
   }
 
   const key = rateLimitKey(tier, userId, clientIp(req.headers));
-  const result = checkRateLimit(key, tier);
+  const result = await checkRateLimitAsync(key, tier);
   if (!result.allowed) {
     return withCsp(tooManyRequests(result.retryAfterMs));
   }

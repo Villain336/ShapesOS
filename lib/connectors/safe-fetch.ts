@@ -25,6 +25,9 @@ export interface SafeFetchOptions {
   resolve?: ResolveFn;
   fetchFn?: typeof fetch;
   maxRedirects?: number;
+  /** Phase 11 (seotools): told about every redirect hop that is followed
+   *  (the site audit reports redirect chains). Never changes behaviour. */
+  onRedirect?: (hop: { from: string; to: string; status: number }) => void;
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -76,6 +79,7 @@ export async function safeFetch(
       headers = new Headers(headers);
       for (const h of CROSS_ORIGIN_STRIPPED_HEADERS) headers.delete(h);
     }
+    opts.onRedirect?.({ from: current, to: next, status: res.status });
     current = next;
     if (res.status === 301 || res.status === 302 || res.status === 303) {
       // Browser behavior: drop the body, follow as GET.

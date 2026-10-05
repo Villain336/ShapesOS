@@ -34,7 +34,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     return forbidden("connectors.connect permission required.");
   }
   try {
-    const { url } = startOAuthFlow(user.id, workspaceId, key, req.nextUrl.origin);
+    // Phase 11 (bizsync): Shopify needs ?shop=<store>.myshopify.com.
+    const shop = req.nextUrl.searchParams.get("shop");
+    const { url } = startOAuthFlow(user.id, workspaceId, key, req.nextUrl.origin, { shop });
     const u = new URL(url);
     u.searchParams.set("redirect_uri", callbackUrl(req, key));
     return Response.json({ url: u.toString() });
