@@ -312,7 +312,11 @@ export function Composer({
               <span className="mb-1 block text-[13px] font-semibold text-ink">Channels ({picked.length} selected)</span>
               {allChannels.length === 0 ? (
                 <p className="rounded-md bg-canvas px-3 py-2 text-[13px] text-muted">
-                  {mode === "none" ? "Connect Postiz to pick channels." : "No channels connected yet. Connect them in Postiz."}
+                  {mode === "none"
+                    ? "Connect Postiz to pick channels."
+                    : mode === "zernio"
+                      ? "No channels connected yet. Connect them in Settings → Connectors → Zernio."
+                      : "No channels connected yet. Connect them in Postiz."}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">

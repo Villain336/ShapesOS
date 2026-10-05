@@ -124,6 +124,8 @@ const keyOf: Record<string, string> = {
   quickbooks: "quickbooks", xero: "xero",
   // Phase 14 (connectors).
   gusto: "gusto",
+  // Phase 15.4 (zernio).
+  zernio: "zernio",
 };
 // Shared helpers that live beside the adapters but are not connectors.
 const sharedNativeModules = new Set(["accounting"]);

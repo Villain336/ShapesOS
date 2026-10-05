@@ -16,6 +16,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { log } from "@/lib/observability/log";
 import { postTitle, readRefs, refreshStatuses, type RefreshResult } from "./publications";
 import { getSocialProvider, type DailyMetric, type SocialProvider } from "./provider";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 import { slugCampaign, defaultCampaign } from "./utm";
 
 /** Posts older than this stop being re-polled (platform numbers settle). */
@@ -125,13 +126,11 @@ export async function syncSocialWorkspace(
 
 /** Cron sweep: every workspace with posts in flight or recently published. */
 export async function runSocialSync(now: Date = new Date()): Promise<{ workspaces: number } & SyncResult> {
-  const provider = getSocialProvider();
   const total: { workspaces: number } & SyncResult = {
     workspaces: 0,
     refresh: { checked: 0, published: 0, failed: 0 },
     ingest: { posts: 0, rows: 0, errors: 0 },
   };
-  if (!provider) return total;
   const workspaces = await prisma.workspace.findMany({ select: { id: true } });
   const since = new Date(now.getTime() - INGEST_LOOKBACK_DAYS * 86_400_000);
   for (const ws of workspaces) {
@@ -141,9 +140,17 @@ export async function runSocialSync(now: Date = new Date()): Promise<{ workspace
       }),
     );
     if (active === 0) continue;
-    total.workspaces++;
     try {
-      const r = await syncSocialWorkspace(ws.id, provider, now);
+      // Phase 15.1: each workspace's provider is chosen inside its own
+      // sidecar scope (its own Postiz; a shared one is refused on hosted).
+      // The selection itself (getSocialProvider) is unchanged.
+      const r = await withWorkspaceSidecars(ws.id, async () => {
+        // Phase 15.4 (zernio): the provider is per workspace (its Zernio profile).
+        const provider = getSocialProvider(ws.id);
+        return provider ? syncSocialWorkspace(ws.id, provider, now) : null;
+      });
+      if (!r) continue;
+      total.workspaces++;
       for (const k of Object.keys(total.refresh) as Array<keyof RefreshResult>) total.refresh[k] += r.refresh[k];
       for (const k of Object.keys(total.ingest) as Array<keyof IngestResult>) total.ingest[k] += r.ingest[k];
     } catch (e) {

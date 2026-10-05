@@ -149,6 +149,12 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
   // Phase 14 (connectors): a pay run's Gusto sync row — a synced row needs its
   // synced_at (ops_pay_run_provider_syncs_state_chk).
   ops_pay_run_provider_syncs: { provider: "gusto", status: "synced", synced_at: "2030-01-01T10:00:00.000Z" },
+  // Phase 15.4 (zernio): the tables' state checks (…_mode_chk, …_status_chk,
+  // …_month_chk "YYYY-MM").
+  zernio_profiles: { mode: "mock" },
+  zernio_accounts: { status: "connected" },
+  zernio_ad_validations: { status: "passed" },
+  zernio_account_usage: { month: "2030-01", status: "included" },
   // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
   ops_sites: { grid_w: "10", grid_d: "10" },
 };

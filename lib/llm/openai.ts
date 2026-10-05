@@ -42,7 +42,7 @@
 import { LlmProviderError, kindForStatus, parseRetryAfter } from "./errors";
 import { estimateCostMicroUsd } from "./pricing";
 import { checkToolUse } from "./tool-input";
-import { recordChatUsage } from "./usage";
+import { assertModelSpendAllowed, recordChatUsage } from "./usage";
 import type {
   ChatContentBlock,
   ChatEffort,
@@ -52,6 +52,7 @@ import type {
   ChatStreamEvent,
   ChatUsage,
   LlmGenerateOptions,
+  LlmKeySource,
   LlmProvider,
 } from "./types";
 
@@ -80,6 +81,27 @@ export interface OpenAiCompatibleOptions {
   workload?: string | null;
   /** Phase 7: effort applied when a chat request names none. */
   defaultEffort?: ChatEffort | null;
+  /** Phase 15: whose key this is (metering). Default "platform", or
+   *  "self_host" when selfHost is set (a local model costs no credits). */
+  keySource?: LlmKeySource;
+}
+
+/** Phase 15.2: token usage of a /chat/completions response (generate()).
+ *  prompt_tokens includes the cached part; inputTokens is the uncached rest. */
+export function mapChatCompletionsUsage(u: unknown): ChatUsage {
+  const o = (u ?? {}) as {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number } | null;
+  };
+  const prompt = Math.max(0, Math.floor(o.prompt_tokens ?? 0));
+  const cached = Math.min(Math.max(0, Math.floor(o.prompt_tokens_details?.cached_tokens ?? 0)), prompt);
+  return {
+    inputTokens: prompt - cached,
+    outputTokens: Math.max(0, Math.floor(o.completion_tokens ?? 0)),
+    cacheReadTokens: cached,
+    cacheWriteTokens: 0,
+  };
 }
 
 /** GPT-5 family and o-series reasoning models (hosted OpenAI semantics). */
@@ -411,6 +433,8 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
   private readonly backoffMs: number;
   private readonly workload: string | null;
   private readonly defaultEffort: ChatEffort | null;
+  /** Phase 15: "workspace" for a workspace's own key (0 credits). */
+  readonly keySource: LlmKeySource;
 
   constructor(
     private readonly apiKey: string,
@@ -428,6 +452,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
     this.backoffMs = options.backoffMs ?? 1_000;
     this.workload = options.workload ?? null;
     this.defaultEffort = options.defaultEffort ?? null;
+    this.keySource = options.keySource ?? (this.selfHost ? "self_host" : "platform");
   }
 
   isConfigured(): boolean {
@@ -562,10 +587,28 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
   async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     this.assertConfigured();
     const signal = opts?.signal;
+    // Phase 15.2: a capped workspace is refused before anything is sent.
+    await assertModelSpendAllowed(opts?.usage, this.keySource, this.name);
     const body = buildChatCompletionsBody(this.model, prompt, opts?.maxTokens ?? DEFAULT_MAX_TOKENS, this.selfHost);
     return this.withRetry(async () => {
       const conn = await this.open("/chat/completions", body, signal);
       const json = await this.readJson(conn, signal);
+      // Phase 15.2: generate() is metered like chat(); tokens were spent even
+      // when the text is empty, so record first (idempotent per response id).
+      if (opts?.usage) {
+        const j = json as { id?: unknown; usage?: unknown };
+        const usage = mapChatCompletionsUsage(j?.usage);
+        await recordChatUsage({
+          context: opts.usage,
+          workload: this.workload,
+          provider: this.name,
+          model: this.model,
+          usage,
+          costMicroUsd: estimateCostMicroUsd(this.model, usage),
+          responseId: typeof j?.id === "string" ? j.id : null,
+          keySource: this.keySource,
+        });
+      }
       const choice = (
         json as { choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }> }
       )?.choices?.[0];
@@ -603,11 +646,13 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       usage: res.usage,
       costMicroUsd: res.costMicroUsd,
       responseId: res.id,
+      keySource: this.keySource,
     });
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
     this.assertConfigured();
+    await assertModelSpendAllowed(req.usage, this.keySource, this.name);
     const { body, notes } = buildResponsesBody(this.model, req, {
       selfHost: this.selfHost,
       stream: false,
@@ -626,6 +671,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
 
   async *chatStream(req: ChatRequest): AsyncGenerator<ChatStreamEvent> {
     this.assertConfigured();
+    await assertModelSpendAllowed(req.usage, this.keySource, this.name);
     const { body, notes } = buildResponsesBody(this.model, req, {
       selfHost: this.selfHost,
       stream: true,

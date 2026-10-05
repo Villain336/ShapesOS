@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function ConnectorsSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string; error?: string; tab?: string }>;
+  searchParams: Promise<{ connected?: string; error?: string; tab?: string; zernio?: string; zernio_error?: string }>;
 }) {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -21,7 +21,7 @@ export default async function ConnectorsSettingsPage({
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
 
-  const { connected, error, tab } = await searchParams;
+  const { connected, error, tab, zernio, zernio_error } = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,6 +38,8 @@ export default async function ConnectorsSettingsPage({
         connectedKey={connected ?? null}
         errorMsg={error ?? null}
         initialTab={tab === "health" ? "health" : undefined}
+        zernioNotice={zernio ? zernio.slice(0, 300) : null}
+        zernioError={zernio_error ? zernio_error.slice(0, 300) : null}
       />
     </div>
   );

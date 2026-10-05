@@ -17,7 +17,9 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { meter } from "@/lib/metering/service";
 import { auditEvent } from "@/lib/auditlog";
-import { getLlmProviderFor, WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { getLlmProviderForWorkspace, valueActionMeterFields } from "@/lib/llm/workspace";
+import { creditsFor } from "@/lib/metering/credits";
 import type { FileChangeAction } from "@prisma/client";
 import { NotFoundError } from "@/lib/api/errors";
 
@@ -156,7 +158,11 @@ export async function researchProspect(
   const contextBlock = buildContext(ctx);
 
   // 1) Company summary — background workload (cheap model).
-  const background = getLlmProviderFor("background");
+  // Phase 15.1: the workspace's own model key when it has one; the model
+  // work is part of the value-priced prospect_research action (recorded,
+  // not charged twice).
+  const usageCtx = { workspaceId, actorId: actorUserId ?? null, billing: "included" as const };
+  const background = await getLlmProviderForWorkspace("background", usageCtx);
   const summaryPrompt = [
     "Write a 2-3 sentence research summary of this prospect for a B2B sales rep.",
     "Focus on what the company does, its scale, and why it might need marketing help.",
@@ -179,7 +185,7 @@ export async function researchProspect(
   }
 
   // 2) Icebreakers + first lines + talking points — copy workload.
-  const copy = getLlmProviderFor("copy");
+  const copy = await getLlmProviderForWorkspace("copy", usageCtx);
   const outreachPrompt = [
     "You are writing cold-outreach research for a B2B sales rep. Using the prospect context below,",
     "respond with ONLY a JSON object (no markdown fences, no commentary) shaped like:",
@@ -233,6 +239,7 @@ export async function researchProspect(
     workspaceId,
     actorId: actorUserId ?? null,
     action: "prospect_research",
+    ...valueActionMeterFields(creditsFor("prospect_research"), [background, copy]),
     idempotencyKey: `research:${prospect.id}:${randomUUID()}`,
     evidenceRef: `prospect:${prospect.id}`,
   }).catch(() => null);

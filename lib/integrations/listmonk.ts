@@ -24,6 +24,7 @@
 //   GET    /api/campaigns/{id}/report/summary → stats
 
 /** Base URL of the Listmonk instance (no trailing slash). */
+import { currentSidecarSource, sidecarEnv, sidecarRefusalMessage } from "./sidecar-tenancy";
 export const LISTMONK_TIMEOUT_MS = 15_000;
 
 /** Honest unconfigured-credentials message. Names the env vars; never their values. */
@@ -31,10 +32,12 @@ export const LISTMONK_NOT_CONFIGURED_MESSAGE =
   "Listmonk isn't connected. Set LISTMONK_URL, LISTMONK_USER and LISTMONK_TOKEN in Settings → Providers, then try again.";
 
 export function getListmonkConfig(): { url: string; user: string; token: string } {
+  // Phase 15.1: the workspace's own Listmonk, else env — refused on hosted.
+  const env = sidecarEnv("listmonk");
   return {
-    url: (process.env.LISTMONK_URL ?? "").replace(/\/+$/, ""),
-    user: (process.env.LISTMONK_USER ?? "").trim(),
-    token: (process.env.LISTMONK_TOKEN ?? "").trim(),
+    url: (env.LISTMONK_URL ?? "").replace(/\/+$/, ""),
+    user: (env.LISTMONK_USER ?? "").trim(),
+    token: (env.LISTMONK_TOKEN ?? "").trim(),
   };
 }
 
@@ -46,7 +49,9 @@ export function listmonkStatus() {
 }
 
 function notConfigured(): never {
-  throw new ListmonkConfigError(LISTMONK_NOT_CONFIGURED_MESSAGE);
+  throw new ListmonkConfigError(
+    currentSidecarSource("listmonk") === "refused" ? sidecarRefusalMessage("listmonk") : LISTMONK_NOT_CONFIGURED_MESSAGE,
+  );
 }
 
 // ── Errors ─────────────────────────────────────────────────────────────

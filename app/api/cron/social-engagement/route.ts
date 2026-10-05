@@ -12,6 +12,7 @@
 import { cronGate } from "@/lib/cron/gate";
 import { runSocialSync, syncSocialWorkspace } from "@/lib/social/engagement";
 import { getSocialProvider } from "@/lib/social/provider";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,9 +21,13 @@ export async function POST(req: Request) {
   const gate = await cronGate(req);
   if (gate instanceof Response) return gate;
   if (!gate.isCron) {
-    const provider = getSocialProvider();
-    if (!provider) return Response.json({ skipped: "no social provider configured" });
-    return Response.json(await syncSocialWorkspace(gate.workspaceId!, provider));
+    // Phase 15.1: the signed-in workspace's own sidecar scope.
+    return withWorkspaceSidecars(gate.workspaceId!, async () => {
+      // Phase 15.4: the provider is per workspace (its Zernio profile on hosted).
+      const provider = getSocialProvider(gate.workspaceId);
+      if (!provider) return Response.json({ skipped: "no social provider configured" });
+      return Response.json(await syncSocialWorkspace(gate.workspaceId!, provider));
+    });
   }
   return Response.json(await runSocialSync());
 }

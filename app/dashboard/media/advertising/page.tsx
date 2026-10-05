@@ -10,6 +10,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { ensureAdPlatforms } from "@/lib/adplatforms/oauth";
 import { ADS_PLATFORMS } from "@/lib/adplatforms/types";
+import { zernioMode } from "@/lib/zernio/config";
 import AdsTabs from "./_components/AdsTabs";
 import ConnectButton from "./_components/ConnectButton";
 
@@ -53,6 +54,12 @@ export default async function AdvertisingPage() {
     }),
     prisma.spendProposal.count({ where: { workspaceId: workspace.id, status: "pending" } }),
   ]);
+
+  // Phase 15.4 (zernio): when the Zernio platform key is configured it is the
+  // preferred way in (7 networks, one card) — listed first; the direct
+  // connectors stay for customers who connect a network themselves.
+  const zernioLive = zernioMode() === "live";
+  platforms.sort((a, b) => (zernioLive ? Number(b.key === "zernio") - Number(a.key === "zernio") : 0));
 
   const accountsByPlatform = new Map<string, typeof accounts>();
   for (const a of accounts) {

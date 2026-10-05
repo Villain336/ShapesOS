@@ -63,9 +63,11 @@ async function makeWorkspace(plan: "starter" | "pro" | "agency" | "self_hosted" 
 
 console.log("metering battery");
 
-// ── 1. credit table v2 matches spec Appendix A + Phase 3 additions ──────────
+// ── 1. credit table v3 matches spec Appendix A + Phase 3 additions ──────────
 {
-  check("table version is 2", credits.CREDIT_TABLE_VERSION === 2);
+  // Phase 15.2: v3 — llm_tokens is cost-based (1.5×), new metered actions.
+  check("table version is 3", credits.CREDIT_TABLE_VERSION === 3);
+  check("llm_tokens is cost-based at 1.5×", (credits.CREDIT_COSTS as any).llm_tokens.basis === "cost-plus" && credits.LLM_TOKEN_COST_MULTIPLIER === 1.5 && credits.llmTokenCredits(11_000) === 2);
   const expected: Record<string, number> = {
     rank_check: 1, serp_analysis: 1, keyword_research: 40, keyword_ideas: 50,
     keyword_gap: 50, site_audit: 30, backlink_summary: 10, content_brief: 5,

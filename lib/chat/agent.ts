@@ -46,6 +46,7 @@
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRole } from "@prisma/client";
 import { getLlmProviderFor } from "@/lib/llm";
+import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import { workloadForAgent } from "@/lib/llm/router";
 import type { ChatMessage, ChatToolResultBlock } from "@/lib/llm/types";
 import { getTool, type ToolContext } from "./tools";
@@ -716,9 +717,13 @@ function loopContext(input: AgentTurnInput, confirmed = false): LoopContext {
   };
 }
 
-/** Is a live model routed for this agent's workload? (else: mock mode) */
-export function agentIsLive(agentKey: AgentKey, mode: "build" | "default"): boolean {
-  return getLlmProviderFor(workloadForAgent(agentKey, { mode })).isLive;
+/** Is a live model routed for this agent's workload? (else: mock mode)
+ *  Phase 15.1: with a workspace, its own model key counts — a workspace that
+ *  brought its key runs live even when the host has no platform key. */
+export async function agentIsLive(agentKey: AgentKey, mode: "build" | "default", workspaceId?: string): Promise<boolean> {
+  const workload = workloadForAgent(agentKey, { mode });
+  if (!workspaceId) return getLlmProviderFor(workload).isLive;
+  return (await resolveWorkloadForWorkspace(workload, workspaceId)).provider.isLive;
 }
 
 /** Phase 16: may this grant hand work to sub-agents at all? */
@@ -876,7 +881,7 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   }
 
   // 2. Mock mode: deterministic rule-based router.
-  if (!agentIsLive(agentKey, mode)) {
+  if (!(await agentIsLive(agentKey, mode, baseCtx.workspaceId))) {
     // Attachments still bind to the thread in mock mode.
     await buildAttachmentSection(projectId, threadId, attachmentIds);
     const { text, toolCalls } = await mockTurn(baseCtx, trimmed);
@@ -990,7 +995,7 @@ async function confirmPending(
   }
 
   // Phase 8: the model carries on from the transcript that proposed it.
-  if (inline.length && byRun.size === 0 && !cancelled && agentIsLive(agentKey, mode)) {
+  if (inline.length && byRun.size === 0 && !cancelled && (await agentIsLive(agentKey, mode, baseCtx.workspaceId))) {
     const state = await continuationState(turn, inline).catch(() => null);
     if (state) {
       const loop = await runAgentLoop({

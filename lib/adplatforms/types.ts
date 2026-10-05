@@ -12,6 +12,10 @@ export const ADS_PLATFORM_KEYS = [
   "stackadapt",
   "walmart",
   "spotify",
+  // Phase 15.4 (zernio): Meta, Google, TikTok, LinkedIn, Pinterest, X and
+  // OpenAI ads through the Zernio platform key (lib/zernio). Preferred when
+  // configured; the native Meta/Google Ads connectors and these adapters stay.
+  "zernio",
 ] as const;
 
 export type AdsPlatformKey = (typeof ADS_PLATFORM_KEYS)[number];
@@ -72,6 +76,16 @@ export const ADS_PLATFORMS: Record<AdsPlatformKey, AdsPlatformDef> = {
     supportsApiLaunch: false,
     supportsReportingApi: false,
     guidedOnly: true,
+  },
+  zernio: {
+    key: "zernio",
+    displayName: "Zernio (Meta, Google, TikTok, LinkedIn, Pinterest, X, OpenAI)",
+    // Platform key (ZERNIO_API_KEY): the customer connects ad accounts on
+    // Settings → Connectors → Zernio; nothing is stored in the vault.
+    authKind: "api_key",
+    supportsApiLaunch: true,
+    supportsReportingApi: true,
+    guidedOnly: false,
   },
   spotify: {
     key: "spotify",

@@ -11,10 +11,11 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import {
-  getLlmProviderFor,
   llmStatus,
   WORKLOAD_MAX_TOKENS,
 } from "@/lib/llm";
+import { getLlmProviderForWorkspace, valueActionMeterFields } from "@/lib/llm/workspace";
+import { creditsFor } from "@/lib/metering/credits";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
@@ -64,7 +65,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Phase D: client-facing draft → "copy" workload (claude-haiku-4-5).
-  const llm = getLlmProviderFor("copy");
+  // Phase 15.1: the workspace's own model key when it has one; the tokens
+  // are part of the value-priced ai_article (recorded, not charged twice).
+  const llm = await getLlmProviderForWorkspace("copy", {
+    workspaceId: contentItem.project.workspaceId,
+    projectId: contentItem.projectId,
+    actorId: user.id,
+    billing: "included",
+  });
   const prompt = buildDraftPrompt(brief);
 
   let draft: string;
@@ -117,6 +125,7 @@ export async function POST(req: NextRequest) {
     workspaceId: contentItem.project.workspaceId,
     projectId: contentItem.projectId,
     action: "ai_article",
+    ...valueActionMeterFields(creditsFor("ai_article"), [llm]),
     idempotencyKey: `aiarticle:${contentItem.id}:${contentItem.updatedAt.getTime()}`,
     evidenceRef: `ai-article:${contentItem.id}`,
   }).catch(() => {});

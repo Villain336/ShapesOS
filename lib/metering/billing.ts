@@ -1274,7 +1274,9 @@ async function unbilledOverageCredits(
     : Prisma.sql``;
   const rows = await prisma.$queryRaw<Array<{ total: bigint | null }>>`
     SELECT SUM(overage_credits) AS total FROM usage_events
-    WHERE workspace_id = ${workspaceId}
+    -- Phase 15.2: an agency pays the overage its client workspaces charged
+    -- to its pool (charged_to_workspace_id); a pooled client pays none.
+    WHERE COALESCE(charged_to_workspace_id, workspace_id) = ${workspaceId}
       AND overage_credits > 0
       AND (${watermark}::timestamptz IS NULL OR occurred_at > ${watermark}::timestamptz)
       ${beforeClause}`;

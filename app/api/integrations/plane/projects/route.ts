@@ -9,10 +9,11 @@ import {
   PlaneConfigError,
   listPlaneProjects,
 } from "@/lib/integrations/plane";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function handleGET() {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -29,3 +30,7 @@ export async function GET() {
     return Response.json({ error: message, code: "plane_failed" }, { status });
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);

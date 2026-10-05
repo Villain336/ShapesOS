@@ -85,15 +85,28 @@ export async function touchSandboxRow(workspaceId: string, runId: string): Promi
   );
 }
 
-/** Mark destroyed; true when this call made the change. */
+/** Mark destroyed; true when this call made the change. Phase 15.2: the
+ *  call that makes the change meters the sandbox's minutes (paid providers
+ *  only, idempotent per lifetime — lib/sandbox/metering.ts). */
 export async function markSandboxDestroyed(workspaceId: string, runId: string): Promise<boolean> {
-  const res = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.agentRunSandbox.updateMany({
+  const endedAt = new Date();
+  const { row, changed } = await withWorkspaceScope(workspaceId, async (tx) => {
+    const before = await tx.agentRunSandbox.findFirst({
       where: { workspaceId, runId, status: "active" },
-      data: { status: "destroyed", destroyedAt: new Date() },
-    }),
-  );
-  return res.count === 1;
+      select: { id: true, provider: true, createdAt: true, lastUsedAt: true },
+    });
+    const res = await tx.agentRunSandbox.updateMany({
+      where: { workspaceId, runId, status: "active" },
+      data: { status: "destroyed", destroyedAt: endedAt },
+    });
+    return { row: before, changed: res.count === 1 };
+  });
+  if (changed && row) {
+    const { meterSandboxLifetime } = await import("./metering");
+    const { sandboxConfig } = await import("./config");
+    await meterSandboxLifetime({ ...row, workspaceId, runId, endedAt, idleSeconds: sandboxConfig().idleSeconds });
+  }
+  return changed;
 }
 
 export async function addExposedPort(workspaceId: string, runId: string, port: number): Promise<void> {

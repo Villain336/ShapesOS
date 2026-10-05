@@ -53,6 +53,8 @@ import {
   type LlmWorkload,
 } from "@/lib/llm/router";
 import { invalidToolResult } from "@/lib/llm/tool-input";
+import { LlmProviderError } from "@/lib/llm/errors";
+import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import type {
   ChatContentBlock,
   ChatMessage,
@@ -317,9 +319,11 @@ export interface AgentLoopResult extends LoopOutcome {
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
-function resolveProvider(deps: AgentLoopDeps | undefined, workload: LlmWorkload): LlmProvider {
+async function resolveProvider(deps: AgentLoopDeps | undefined, workload: LlmWorkload, workspaceId: string): Promise<LlmProvider> {
   const p = deps?.provider;
-  if (!p) return getLlmProviderFor(workload);
+  // Phase 15.1: the workspace's own model key when it has one (BYOK, 0
+  // credits); the platform key otherwise (charged per call, gated by the cap).
+  if (!p) return workspaceId ? (await resolveWorkloadForWorkspace(workload, workspaceId)).provider : getLlmProviderFor(workload);
   return typeof p === "function" ? p(workload) : p;
 }
 
@@ -613,7 +617,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     }
 
     // ── client-side compaction ───────────────────────────────────────────────
-    const provider = resolveProvider(deps, s.workload);
+    const provider = await resolveProvider(deps, s.workload, ctx.workspaceId);
     if (!s.lastServerCompaction && s.lastInputTokens >= limits.compactAtTokens && s.compactions < MAX_COMPACTIONS) {
       await compactClientSide(s, provider, tools, ctx);
       await note(`Compacted the conversation (${s.compactions})`, { kind: "compaction", mode: "client" });
@@ -650,6 +654,17 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       await writer.close();
       if (isRunStopped(err) || ctx.signal?.aborted) {
         return finish({ status: "cancelled", finalText: STOPPED_TEXT, proposal: null });
+      }
+      // Phase 15.2: the credit cap refused the call before it was sent —
+      // nothing ran, nothing was charged; say so plainly.
+      if (err instanceof LlmProviderError && err.kind === "cap_exceeded") {
+        const why = err.message.replace(/^LLM request failed \[[^\]]*\]: /, "");
+        await note(`Stopped: ${why}`, { kind: "cap", cap: "credits" });
+        return finish({
+          status: "capped",
+          finalText: [lastText, `I stopped before calling the model: ${why}`].filter(Boolean).join("\n\n"),
+          proposal: null,
+        });
       }
       const msg = err instanceof Error ? err.message : "unknown error";
       if (/context|too long|prompt is too long/i.test(msg) && s.compactions < MAX_COMPACTIONS && s.messages.length > 1) {

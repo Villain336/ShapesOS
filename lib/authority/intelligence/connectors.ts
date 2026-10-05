@@ -6,6 +6,7 @@
 // being honestly labeled "fixture" everywhere they surface.
 
 import { prisma } from "@/lib/prisma";
+import { deleteConnection } from "@/lib/vault/apikey";
 import type {
   AuditContext, ConnectorKey, ConnectorMode, ConnectorState, ConnectorStatus,
 } from "./types";
@@ -85,13 +86,22 @@ export async function installFixture(
   });
 }
 
-/** Remove a connector's connection row (fixture or real). */
-export async function disconnectConnector(workspaceId: string, key: ConnectorKey) {
+/**
+ * Remove this workspace's connection(s) for a connector (fixture or real).
+ * Phase 15.1 (BUG B): looked up by (workspaceId, connectorKey = vaultKey) and
+ * each deleted through the vault's deleteConnection(connectionId,
+ * workspaceId) — credential first, then the connection, workspace-scoped.
+ * A vault KEY is not a connection id. Returns how many were removed.
+ */
+export async function disconnectConnector(workspaceId: string, key: ConnectorKey): Promise<number> {
   const def = CONNECTOR_DEFS.find((d) => d.key === key);
   if (!def) throw new Error(`Unknown connector: ${key}`);
-  await prisma.connectorConnection.deleteMany({
+  const rows = await prisma.connectorConnection.findMany({
     where: { workspaceId, connectorKey: def.vaultKey },
+    select: { id: true },
   });
+  for (const row of rows) await deleteConnection(row.id, workspaceId);
+  return rows.length;
 }
 
 /** Resolve per-connection status + completeness labels for the whole stack. */

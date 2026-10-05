@@ -33,6 +33,8 @@ export interface DraftDeps {
   approvalStore?: MissionApprovalStore;
   /** Taste options (per-source length caps). */
   taste?: TasteCheckOptions;
+  /** Phase 15: the workspace drafting — its own model key and token metering. */
+  workspaceId?: string;
   /** Called when a draft fails taste (default: console.warn). */
   onTasteReject?: (rejected: TasteRejected) => void;
 }
@@ -78,8 +80,12 @@ export async function generateDraftText(
   profile: ExpertiseProfile,
   deps: DraftDeps = {},
 ): Promise<{ draft: string; taste: TasteCheckResult }> {
-  const generate = deps.generate ?? ((prompt: string) =>
-    getLlmProviderFor("copy").generate(prompt, { maxTokens: 400 }));
+  const generate = deps.generate ?? (async (prompt: string) => {
+    const llm = deps.workspaceId
+      ? await (await import("@/lib/llm/workspace")).getLlmProviderForWorkspace("copy", { workspaceId: deps.workspaceId })
+      : getLlmProviderFor("copy");
+    return llm.generate(prompt, { maxTokens: 400 });
+  });
   const tasteOpts = deps.taste ?? {};
 
   const first = (await generate(draftPrompt(opportunity, profile))).trim();

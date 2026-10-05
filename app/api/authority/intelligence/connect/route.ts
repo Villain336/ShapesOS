@@ -11,7 +11,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { authorityGuard, badRequest, safetyError, readJson } from "@/app/api/authority/_lib";
 import { CONNECTOR_DEFS, installFixture, disconnectConnector } from "@/lib/authority/intelligence/connectors";
-import { storeApiKey, deleteConnection } from "@/lib/vault/apikey";
+import { storeApiKey } from "@/lib/vault/apikey";
 import { authorityAudit } from "@/lib/authority/db";
 
 export const dynamic = "force-dynamic";
@@ -34,13 +34,14 @@ export async function POST(req: NextRequest) {
   try {
     const def = CONNECTOR_DEFS.find((d) => d.key === connector)!;
     if (disconnect) {
-      await disconnectConnector(gate.workspaceId, connector);
-      await deleteConnection(gate.workspaceId, def.vaultKey).catch(() => null);
+      // Phase 15.1 (BUG B): the vault delete runs per connection id
+      // (looked up by workspace + vault key) inside disconnectConnector.
+      const removed = await disconnectConnector(gate.workspaceId, connector);
       await authorityAudit.logAsync({
         workspaceId: gate.workspaceId, actor: gate.userId,
         action: "intelligence_connector_disconnected",
         entityType: "intelligence_connector", entityId: connector,
-        detail: { connector },
+        detail: { connector, removed },
       });
       return Response.json({ ok: true, connector, status: "disconnected" });
     }

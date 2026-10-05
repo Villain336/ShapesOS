@@ -3,7 +3,7 @@
 // Run: npx tsx scripts/verify-m21-connectors.mts
 // Run 3x green before calling this done.
 //
-// Part 1 (no DB, no network): all 27 native adapters resolve; listTools()
+// Part 1 (no DB, no network): all 28 native adapters resolve; listTools()
 // non-empty with unique names and honest mutating flags; mock invoke on 3+
 // adapters returns mock:true; secrets() encrypt→decrypt round-trip; OAuth
 // state sign/verify + tamper rejection + expiry rejection.
@@ -57,7 +57,7 @@ async function main() {
 
   const metas = listBuiltinConnectors();
   // 11 original + Gmail/Calendar (Connector Agent slice 2) + Google Business Profile (Phase 4b).
-  check("27 built-in connectors registered", metas.length === 27); // Phase 11: +5 devtools, +3 bizsync; Phase 14: +gusto
+  check("28 built-in connectors registered", metas.length === 28); // Phase 11: +5 devtools, +3 bizsync; Phase 14: +gusto; Phase 15.4: +zernio
   const expectedKeys = [
     "google-search-console", "ga4", "wordpress", "webflow", "google-drive",
     "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads",
@@ -114,6 +114,19 @@ async function main() {
     }
     for (const t of mustMutate[k] ?? []) {
       check(`${k}.${t}: write tool mutating=true`, tools.some((x) => x.name === t && x.mutating === true));
+    }
+  }
+  // Phase 15.4 (zernio): the platform-key connector (more than 8 tools, so
+  // checked here rather than in the generic loop above).
+  {
+    const z = resolveAdapter("zernio") as unknown as { key: string; authType: string; listTools(): Array<{ name: string; mutating: boolean }> };
+    check("resolveAdapter(zernio)", z.key === "zernio" && z.authType === "none");
+    const zt = z.listTools();
+    for (const name of ["accounts", "ads_accounts", "ads_campaigns", "ads_insights"]) {
+      check(`zernio.${name}: read tool mutating=false`, zt.some((t) => t.name === name && t.mutating === false));
+    }
+    for (const name of ["ads_create", "ads_pause", "ads_resume", "ads_update_budget", "ads_create_lead_form", "ads_create_audience"]) {
+      check(`zernio.${name}: write tool mutating=true`, zt.some((t) => t.name === name && t.mutating === true));
     }
   }
   try {

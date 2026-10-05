@@ -9,6 +9,11 @@
 //     labels it. Allowed outside production, or in production only with
 //     SOCIAL_MOCK_MODE=1 (a production workspace never sees invented numbers
 //     by accident; without Postiz it gets an honest "connect Postiz").
+//   - ZernioSocialProvider (Phase 15.4, lib/social/zernio.ts): the Zernio
+//     platform key (ZERNIO_API_KEY), per workspace (its own Zernio profile).
+//     The DEFAULT publisher on hosted (DEPLOYMENT_MODE=hosted) when the key is
+//     set — the shared Postiz sidecar isn't tenant-safe there. Self-hosted
+//     keeps Postiz first when it is configured; Buffer stays a connector.
 
 import { createHash } from "node:crypto";
 import {
@@ -21,8 +26,11 @@ import {
   type PostizMetricSeries,
 } from "@/lib/integrations/postiz";
 import { normalizePlatform } from "./platforms";
+import { deploymentMode } from "@/lib/billing/trial";
+import { zernioMode } from "@/lib/zernio/config";
+import { ZernioSocialProvider } from "./zernio";
 
-export type ProviderName = "postiz" | "mock";
+export type ProviderName = "postiz" | "mock" | "zernio";
 
 export interface ProviderChannel {
   /** Provider integration id (the dispatch target). */
@@ -277,10 +285,20 @@ export function setSocialProviderForTests(p: SocialProvider | null | undefined):
   override = p;
 }
 
-/** The workspace's social provider, or null when none is available. */
-export function getSocialProvider(): SocialProvider | null {
+/**
+ * The workspace's social provider, or null when none is available.
+ * Phase 15.4 (zernio): pass the workspace — Zernio publishes per workspace
+ * (its own profile). Order: Zernio first on hosted when ZERNIO_API_KEY is
+ * set; then Postiz when configured (gated on hosted by the keys workstream);
+ * then Zernio (self-hosted with only the Zernio key); then the labelled mock.
+ * The keys workstream owns sidecar tenancy — this only adds Zernio.
+ */
+export function getSocialProvider(workspaceId?: string | null): SocialProvider | null {
   if (override !== undefined) return override;
+  const zernio = workspaceId && zernioMode() === "live" ? new ZernioSocialProvider(workspaceId) : null;
+  if (zernio && deploymentMode() === "hosted") return zernio;
   if (postizStatus().configured) return new PostizProvider();
+  if (zernio) return zernio;
   if (socialMockAllowed()) return new MockSocialProvider();
   return null;
 }

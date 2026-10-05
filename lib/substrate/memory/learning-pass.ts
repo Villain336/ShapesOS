@@ -445,8 +445,12 @@ function emptyReport(status: LearningPassReport["status"]): LearningPassReport {
 async function defaultLlmGenerate(
   prompt: string,
   maxTokens: number,
+  workspaceId?: string,
 ): Promise<{ text: string; model: string; live: boolean }> {
-  const provider = getLlmProviderFor("background" as LlmWorkload);
+  // Phase 15: the workspace's own model key when it has one; metered by tokens.
+  const provider = workspaceId
+    ? await (await import("@/lib/llm/workspace")).getLlmProviderForWorkspace("background", { workspaceId })
+    : getLlmProviderFor("background" as LlmWorkload);
   if (!provider.isLive) {
     return { text: "", model: provider.name, live: false };
   }
@@ -897,6 +901,7 @@ export async function executeLearningPass(
       const resolved = await defaultLlmGenerate(
         buildLearningPrompt(workspaceId, materials, dateLabel),
         maxTokens,
+        workspaceId,
       );
       if (!resolved.live) {
         console.warn(

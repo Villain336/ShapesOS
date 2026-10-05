@@ -6,10 +6,11 @@ import { guardWorkspace, httpErrorResponse } from "@/lib/enrichment/guard";
 import { prisma } from "@/lib/prisma";
 import { createDocumensoVendor } from "@/lib/esign/documenso-vendor";
 import { EsignGateError, refreshEnvelope } from "@/lib/esign/envelopes";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function handlePOST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { workspace } = await guardWorkspace();
     const { id } = await ctx.params;
@@ -30,3 +31,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     return httpErrorResponse(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

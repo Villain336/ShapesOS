@@ -28,7 +28,18 @@ const nextConfig: NextConfig = {
   // pushed the GitHub runner out of memory ("runner has received a shutdown
   // signal" during "Collecting page data"). Per Next's turbopackFileSystemCache
   // guide: off where the cache is never kept (CI); local builds keep it warm.
-  experimental: { turbopackFileSystemCacheForBuild: !process.env.CI },
+  //
+  // Phase 15/16 grew the app until the Turbopack COMPILE step alone ("Creating
+  // an optimized production build") outgrew the runner (exit 143, shutdown
+  // signal; ~10.7 GB measured locally). In CI only — where the build is a test
+  // artifact nobody debugs from — also skip Turbopack's source maps and run its
+  // Node plugin work (loaders, PostCSS) in worker threads instead of child
+  // processes, which Next documents as using less memory. Production builds
+  // keep source maps for readable stack traces.
+  experimental: {
+    turbopackFileSystemCacheForBuild: !process.env.CI,
+    ...(process.env.CI ? { turbopackSourceMaps: false, turbopackPluginRuntimeStrategy: "workerThreads" as const } : {}),
+  },
   // No X-Powered-By (also suppresses the "Next.js, Payload" header that
   // withPayload adds when this is left unset).
   poweredByHeader: false,

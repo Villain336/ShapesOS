@@ -8,7 +8,7 @@
 // configured — it never returns fake values.
 
 import { z } from "zod";
-import { getLlmProviderFor } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { buildBatchFillPrompt } from "@/lib/design/ai";
 import { MAX_BATCH_VARIANTS } from "@/lib/design/variables";
 import { guardWorkspace, httpErrorResponse, readJson } from "../_lib";
@@ -66,14 +66,15 @@ function sanitizeRows(parsed: unknown, variables: string[]): Record<string, stri
 
 export async function POST(req: Request) {
   try {
-    await guardWorkspace({ editor: true });
+    const { user, workspace } = await guardWorkspace({ editor: true });
     const parsed = BodySchema.safeParse(await readJson(req));
     if (!parsed.success) {
       return Response.json({ error: "Invalid request body." }, { status: 400 });
     }
     const { brief, variables, count } = parsed.data;
 
-    const provider = getLlmProviderFor("copy");
+    // Phase 15: the workspace's own model key when it has one; metered by tokens.
+    const provider = await getLlmProviderForWorkspace("copy", { workspaceId: workspace.id, actorId: user.id });
     if (!provider.isLive || !provider.isConfigured()) {
       return Response.json(
         {

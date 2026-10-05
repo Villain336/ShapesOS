@@ -12,6 +12,7 @@ import {
   sendListmonkCampaign,
 } from "@/lib/integrations/listmonk";
 import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ const BodySchema = z.object({
   runAt: z.string().trim().optional(),
 });
 
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
     // Send protection: expensive + irreversible sends get a per-workspace
@@ -50,3 +51,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return sidecarError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);

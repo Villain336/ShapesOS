@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { validateWebhook } from "@/lib/calls/webhooks";
+import { meterCallTranscription } from "@/lib/calls/billing";
 
 export async function POST(req: Request) {
   const v = await validateWebhook(req);
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   }
   const call = await prisma.call.findUnique({
     where: { externalSid: CallSid },
-    select: { id: true, summary: true },
+    select: { id: true, summary: true, workspaceId: true, durationSec: true, number: { select: { provider: true } } },
   });
   if (!call) {
     return Response.json({ error: "Unknown call" }, { status: 404 });
@@ -38,5 +39,15 @@ export async function POST(req: Request) {
       summary: !call.summary && TranscriptionText ? TranscriptionText.slice(0, 280) : undefined,
     },
   });
+  // Phase 15.2: meter the transcription once (same key as a transcription
+  // run at finalisation, so whichever path comes first charges it).
+  if (TranscriptionText) {
+    await meterCallTranscription({
+      id: call.id,
+      workspaceId: call.workspaceId,
+      provider: call.number.provider,
+      durationSec: call.durationSec,
+    });
+  }
   return Response.json({ ok: true, status: TranscriptionStatus || "received" });
 }

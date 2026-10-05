@@ -236,6 +236,10 @@ export const CRON_JOBS: readonly CronJob[] = [
   // --- Monthly ------------------------------------------------------------
   { key: "storage-metering", path: "/api/cron/storage-metering", cron: "0 2 1 * *", source: "deploy", timeoutMs: LONG },
   { key: "overage-invoicing", path: "/api/cron/overage-invoicing", cron: "0 3 1 * *", source: "deploy", timeoutMs: LONG },
+  // Phase 15.4 (zernio): connected-account metering, before overage invoicing.
+  { key: "zernio-accounts", path: "/api/cron/zernio-accounts", cron: "30 2 1 * *", source: "deploy", timeoutMs: LONG },
+  // Phase 15.4 (zernio): daily ad-report pull (last 7 days) into ad_reports.
+  { key: "zernio-ads-reports", path: "/api/cron/zernio-ads-reports", cron: "40 5 * * *", source: "deploy", timeoutMs: LONG },
 ];
 
 const parsed = new Map<string, CronSchedule>();

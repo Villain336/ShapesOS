@@ -18,6 +18,7 @@ import { join } from "path";
 import { prisma } from "@/lib/prisma";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { getLlmProviderFor } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { CATEGORY_MAP } from "./categories";
 import { scanSite } from "./scanner";
 import { planFix } from "./fixer";
@@ -114,7 +115,11 @@ export async function runScheduledFixes(input: RunInput): Promise<RunResult> {
   const skipped = issues.length - eligible.length;
 
   // Phase D: audit summaries/fix reasoning → "bulk" workload.
-  const llm = getLlmProviderFor("bulk");
+  // Phase 15: the workspace's own model key when it has one; metered by tokens.
+  const auditProject = await prisma.project.findUnique({ where: { id: input.projectId }, select: { workspaceId: true } });
+  const llm = auditProject
+    ? await getLlmProviderForWorkspace("bulk", { workspaceId: auditProject.workspaceId, projectId: input.projectId })
+    : getLlmProviderFor("bulk");
   const snapshotFiles: Record<string, string> = {};
   const touched = new Set<string>();
   const results: RunResult["issues"] = [];

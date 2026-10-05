@@ -42,7 +42,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { LlmProviderError, kindForStatus, type LlmErrorKind } from "./errors";
 import { estimateCostMicroUsd, priceFor } from "./pricing";
 import { checkToolUse } from "./tool-input";
-import { recordChatUsage } from "./usage";
+import { assertModelSpendAllowed, recordChatUsage } from "./usage";
 import type {
   ChatContentBlock,
   ChatEffort,
@@ -53,6 +53,7 @@ import type {
   ChatStreamEvent,
   ChatUsage,
   LlmGenerateOptions,
+  LlmKeySource,
   LlmProvider,
 } from "./types";
 
@@ -467,6 +468,8 @@ export interface AnthropicProviderOptions {
   defaultEffort?: ChatEffort | null;
   /** Test seam: a stubbed SDK client. */
   client?: AnthropicClientLike;
+  /** Phase 15: whose key this is (metering). Default "platform". */
+  keySource?: LlmKeySource;
 }
 
 export class AnthropicLlmProvider implements LlmProvider {
@@ -477,6 +480,8 @@ export class AnthropicLlmProvider implements LlmProvider {
   private readonly model: string;
   private readonly workload: string | null;
   private readonly defaultEffort: ChatEffort | null;
+  /** Phase 15: "workspace" for a workspace's own key (0 credits). */
+  readonly keySource: LlmKeySource;
 
   constructor(apiKey: string, model: string, options: AnthropicProviderOptions = {}) {
     // Key is passed to the SDK only; never stored in a loggable form.
@@ -490,6 +495,7 @@ export class AnthropicLlmProvider implements LlmProvider {
     this.model = model;
     this.workload = options.workload ?? null;
     this.defaultEffort = options.defaultEffort ?? null;
+    this.keySource = options.keySource ?? "platform";
   }
 
   isConfigured(): boolean {
@@ -507,6 +513,8 @@ export class AnthropicLlmProvider implements LlmProvider {
 
   async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     const maxTokens = opts?.maxTokens ?? 4096;
+    // Phase 15.2: a capped workspace is refused before anything is sent.
+    await assertModelSpendAllowed(opts?.usage, this.keySource, this.name);
     let res: Anthropic.Messages.Message;
     try {
       res = await this.client.messages.create(
@@ -522,6 +530,21 @@ export class AnthropicLlmProvider implements LlmProvider {
       if (opts?.signal?.aborted) throw opts.signal.reason ?? err;
       // Never include key material: provider, status and a sanitized cause.
       throw classifyAnthropicError(err);
+    }
+    // Phase 15.2: generate() is metered like chat() (tokens were spent even
+    // when the text turns out empty, so record first).
+    if (opts?.usage) {
+      const usage = mapUsage(res.usage);
+      await recordChatUsage({
+        context: opts.usage,
+        workload: this.workload,
+        provider: this.name,
+        model: this.model,
+        usage,
+        costMicroUsd: estimateCostMicroUsd(priceFor(this.model) ? this.model : res.model, usage),
+        responseId: res.id ?? null,
+        keySource: this.keySource,
+      });
     }
 
     const text = res.content
@@ -553,6 +576,7 @@ export class AnthropicLlmProvider implements LlmProvider {
       usage: res.usage,
       costMicroUsd: res.costMicroUsd,
       responseId: res.id,
+      keySource: this.keySource,
     });
   }
 
@@ -562,6 +586,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
+    await assertModelSpendAllowed(req.usage, this.keySource, this.name);
     const built = buildAnthropicParams(this.model, req, {
       stream: false,
       defaultEffort: this.defaultEffort,
@@ -581,6 +606,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   }
 
   async *chatStream(req: ChatRequest): AsyncGenerator<ChatStreamEvent> {
+    await assertModelSpendAllowed(req.usage, this.keySource, this.name);
     const built = buildAnthropicParams(this.model, req, {
       stream: true,
       defaultEffort: this.defaultEffort,

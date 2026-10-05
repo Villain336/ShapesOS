@@ -18,6 +18,7 @@ import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
 import McpReadOnlyToolsEditor from "./McpReadOnlyToolsEditor";
 import McpToolPoliciesEditor from "./McpToolPoliciesEditor";
+import ZernioCard from "./ZernioCard";
 import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
@@ -123,11 +124,16 @@ export default function ConnectorsManager({
   connectedKey,
   errorMsg,
   initialTab,
+  zernioNotice = null,
+  zernioError = null,
 }: {
   workspaceId: string;
   connectedKey: string | null;
   errorMsg: string | null;
   initialTab?: "connections" | "health";
+  /** Phase 15.4 (zernio): the result the Zernio connect callback came back with. */
+  zernioNotice?: string | null;
+  zernioError?: string | null;
 }) {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [notice, setNotice] = useState<NoticeState | null>(null);
@@ -403,6 +409,10 @@ export default function ConnectorsManager({
   }
 
   function connectorCard(c: Connector) {
+    // Phase 15.4 (zernio): a platform key with per-platform account connects.
+    if (c.key === "zernio") {
+      return <ZernioCard key={c.key} workspaceId={workspaceId} notice={zernioNotice} errorNotice={zernioError} />;
+    }
     return (
       <div key={c.key} data-testid={`connector-card-${c.key}`} className={cardCls}>
         <div className="flex items-start justify-between gap-2">

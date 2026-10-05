@@ -146,18 +146,22 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
     envVars: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
   });
 
+  // Phase 15.1: Context.dev is "Both" — the workspace's own key, else the
+  // platform key (CONTEXTDEV_API_KEY, charged in credits).
   const ctx = facts.contextDevConnected;
+  const ctxPlatform = set(env, "CONTEXTDEV_API_KEY");
   out.push({
     key: "contextdev",
     label: "Web research and crawling (Context.dev)",
-    mode: ctx ? "live" : "off",
-    detail:
-      ctx === null
-        ? "Could not check this workspace's Context.dev key."
-        : ctx
-          ? "Live with this workspace's Context.dev key."
+    mode: ctx || ctxPlatform ? "live" : "off",
+    detail: ctx
+      ? "Live with this workspace's own Context.dev key (no credits)."
+      : ctxPlatform
+        ? "Live on the platform Context.dev key — 1 credit per Context.dev credit. Connect your own key to use none."
+        : ctx === null
+          ? "Could not check this workspace's Context.dev key."
           : "Off — research, brand sync and page monitors report \"not connected\" until this workspace connects a Context.dev key.",
-    envVars: [],
+    envVars: ["CONTEXTDEV_API_KEY"],
   });
 
   // Campaign / sequence email: messaging provider (default fake).
@@ -244,6 +248,22 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
       ? "Live Composio tool router."
       : "Tool discovery serves a built-in fixture catalogue; no app action reaches Composio.",
     envVars: ["COMPOSIO_API_KEY"],
+  });
+
+  // Phase 15.4 (zernio): the Zernio platform key (LIVE / pre-added) — ads on 7
+  // networks + social on 16 platforms. lib/zernio/config.ts zernioMode().
+  // (The keys workstream owns this page's layout; this is Zernio's own row.)
+  const zernio = set(env, "ZERNIO_API_KEY");
+  out.push({
+    key: "zernio",
+    label: "Ads and social through Zernio (platform key)",
+    mode: zernio ? "live" : fakeProvidersAllowed(env as NodeJS.ProcessEnv) ? "mock" : "off",
+    detail: zernio
+      ? "Live, pre-added: every workspace gets its own Zernio profile and connects accounts on Settings → Connectors → Zernio."
+      : fakeProvidersAllowed(env as NodeJS.ProcessEnv)
+        ? "Runs on the labelled fake Zernio — connect flows, ads and posts are simulated and marked mock."
+        : "Off — Zernio tools and publishing say \"Zernio is not connected\"; nothing is faked.",
+    envVars: ["ZERNIO_API_KEY", "ZERNIO_BASE_URL"],
   });
 
   const ap = normalizeEngineUrl(env.ACTIVEPIECES_URL) !== null && set(env, "ACTIVEPIECES_API_KEY");

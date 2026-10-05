@@ -60,9 +60,14 @@ export function heuristicSentiment(
 export async function classifySentiment(
   text: string | null,
   rating: number | null,
+  /** Phase 15: the workspace the review belongs to — its own model key and
+   *  token metering. Omitted = platform key, unmetered (tests, scripts). */
+  workspaceId?: string,
 ): Promise<{ sentiment: Sentiment; via: "llm" | "heuristic" }> {
   // Phase D: one-word classification → "bulk" workload.
-  const provider = getLlmProviderFor("bulk");
+  const provider = workspaceId
+    ? await (await import("@/lib/llm/workspace")).getLlmProviderForWorkspace("bulk", { workspaceId })
+    : getLlmProviderFor("bulk");
   if (provider.isLive) {
     try {
       const prompt =

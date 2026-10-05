@@ -8,6 +8,7 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { getProvider } from "@/lib/calls/provider";
 import { publicOrigin } from "@/lib/physical/bundles";
+import { meterNumberMonth, numberPurchaseDenial } from "@/lib/calls/billing";
 
 const PurchaseSchema = z.object({
   areaCode: z.string().trim().max(10).optional(),
@@ -51,6 +52,11 @@ export async function POST(req: Request) {
     return Response.json({ error: e instanceof Error ? e.message : "Provider unconfigured" }, { status: 500 });
   }
 
+  // Phase 15.2: a live number costs credits every month — refused for a
+  // capped workspace before anything is bought.
+  const denial = await numberPurchaseDenial(workspace.id, provider.name);
+  if (denial) return Response.json({ error: denial, code: "cap_exceeded" }, { status: 402 });
+
   const origin = publicOrigin(req);
   let purchased;
   try {
@@ -77,6 +83,8 @@ export async function POST(req: Request) {
         status: "active",
       },
     });
+    // Phase 15.2: the first month's rental (idempotent per number-month).
+    await meterNumberMonth({ workspaceId: workspace.id, numberId: number.id, provider: provider.name });
     return Response.json({ number }, { status: 201 });
   } catch (e) {
     // Number bought upstream but row write failed — best effort release so

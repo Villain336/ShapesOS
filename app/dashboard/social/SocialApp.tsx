@@ -317,11 +317,19 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
         <section className={cardCls}>
           <div className="border-b border-line px-4 py-3">
             <h2 className="text-[15px] font-semibold text-ink">Connected channels</h2>
-            <p className="text-[13px] text-muted">Channels connect inside Postiz (its own OAuth). ShapesOS reads them back to publish.</p>
+            <p className="text-[13px] text-muted">
+              {mode === "zernio"
+                ? "Channels are your Zernio accounts — connect them in Settings → Connectors → Zernio."
+                : "Channels connect inside Postiz (its own OAuth). ShapesOS reads them back to publish."}
+            </p>
           </div>
           {channels.length === 0 ? (
             <p className="px-4 py-8 text-center text-[13px] text-muted">
-              {mode === "none" ? "Connect Postiz first." : "No channels yet. Connect X, LinkedIn, Instagram and others in Postiz."}
+              {mode === "none"
+                ? "Connect Postiz first."
+                : mode === "zernio"
+                  ? "No channels yet. Connect X, LinkedIn, Instagram and others in Settings → Connectors → Zernio."
+                  : "No channels yet. Connect X, LinkedIn, Instagram and others in Postiz."}
             </p>
           ) : (
             <div className="overflow-x-auto">

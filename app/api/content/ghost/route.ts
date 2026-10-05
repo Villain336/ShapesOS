@@ -19,6 +19,7 @@ import {
   ghostStatus,
   markdownToHtml,
 } from "@/lib/integrations/ghost";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ async function getItem(userId: string, contentId: string) {
   return item;
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   if (!ghostStatus().configured) {
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const contentId = new URL(req.url).searchParams.get("contentId") ?? "";
@@ -132,3 +133,8 @@ export async function GET(req: Request) {
     throw e;
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const POST = sidecarScoped(handlePOST);
+export const GET = sidecarScoped(handleGET);

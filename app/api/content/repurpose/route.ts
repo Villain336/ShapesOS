@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { readJson } from "@/lib/enrichment/guard";
-import { repurposeContent, REPURPOSE_FORMATS } from "@/lib/content/repurpose";
+import { repurposeContent, REPURPOSE_FORMATS, workspaceRepurposeDeps } from "@/lib/content/repurpose";
 import { captureEpisode } from "@/lib/agents/learning/capture";
 
 export async function POST(req: Request) {
@@ -35,11 +35,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await repurposeContent({
-      topic: body.topic ?? "",
-      format: format.id,
-      topK: body.topK,
-    });
+    const result = await repurposeContent(
+      {
+        topic: body.topic ?? "",
+        format: format.id,
+        topK: body.topK,
+      },
+      await workspaceRepurposeDeps(workspace.id, user.id),
+    );
     // Phase 13B: episode capture — fail-soft, never breaks the response.
     void captureEpisode({
       workspaceId: workspace.id,

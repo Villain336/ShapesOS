@@ -18,32 +18,12 @@ export function currentMeterPeriod(d: Date = new Date()): string {
 }
 
 /**
- * Append a cost-meter row. Append-only by doctrine (no UPDATE/DELETE service
- * methods) — the same as mission_events / command_audit.
+ * Phase 15.2: ONE recordApiMeter. This module used to carry a second copy
+ * that appended the api_meter row but never charged credits; it had no
+ * importers, and a future caller would have bypassed billing. It now
+ * re-exports the charging implementation (./meter.ts).
  */
-export async function recordApiMeter(
-  workspaceId: string,
-  vendor: string,
-  meter: ApiMeterKind | string,
-  quantity: number,
-  costUsd: number,
-): Promise<void> {
-  const period = currentMeterPeriod();
-  await withWorkspaceScope(workspaceId, async (tx: TxClient) => {
-    await tx.apiMeterEntry.create({
-      data: {
-        workspaceId,
-        vendor,
-        meter: meter as ApiMeterKind,
-        quantity: Math.max(0, Math.floor(quantity)),
-        costUsd: Math.max(0, costUsd),
-        period,
-      },
-    });
-  }).catch(() => {
-    // Metering must never break the data path it measures.
-  });
-}
+export { recordApiMeter } from "./meter";
 
 /**
  * Month-to-date metered spend for a workspace (+ optional vendor/meter

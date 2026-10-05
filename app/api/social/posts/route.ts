@@ -8,6 +8,7 @@ import { createPost, listPosts } from "@/lib/social/publications";
 import { BadRequestError } from "@/lib/api/errors";
 import type { SocialPublicationStatus } from "@prisma/client";
 import { PostBodySchema, guardWorkspace, readJson, socialError, toChannels, toMedia } from "../_lib";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ function dateParam(sp: URLSearchParams, key: string): Date | undefined {
   return d;
 }
 
-export async function GET(req: Request) {
+async function handleGET(req: Request) {
   try {
     const { workspace } = await guardWorkspace();
     const sp = new URL(req.url).searchParams;
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     const v = validateBody(PostBodySchema, await readJson(req));
@@ -54,3 +55,8 @@ export async function POST(req: Request) {
     return socialError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);
+export const POST = sidecarScoped(handlePOST);

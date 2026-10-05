@@ -9,6 +9,7 @@
 // - GET {UMAMI_URL}/api/websites/{websiteId}/pageviews → time-series buckets
 // - Auth: `Authorization: Bearer <api-key>` header.
 
+import { sidecarEnv } from "./sidecar-tenancy";
 export const UMAMI_API_BASE_ENV = "UMAMI_URL";
 export const UMAMI_API_KEY_ENV = "UMAMI_API_KEY";
 export const UMAMI_WEBSITE_ID_ENV = "UMAMI_WEBSITE_ID";
@@ -22,7 +23,7 @@ export interface UmamiStatus {
   name: string;
 }
 
-export function umamiStatus(env: Record<string, string | undefined> = process.env): UmamiStatus {
+export function umamiStatus(env: Record<string, string | undefined> = sidecarEnv("umami")): UmamiStatus {
   const statsConfigured = !!(env[UMAMI_API_BASE_ENV] && env[UMAMI_API_KEY_ENV]);
   const snippetConfigured = !!(
     env[UMAMI_WEBSITE_ID_ENV] && env[UMAMI_SCRIPT_URL_ENV]
@@ -35,7 +36,7 @@ export function umamiStatus(env: Record<string, string | undefined> = process.en
 }
 
 /** Public snippet values only — safe to serialize to the client. */
-export function umamiSnippetConfig(env: Record<string, string | undefined> = process.env): {
+export function umamiSnippetConfig(env: Record<string, string | undefined> = sidecarEnv("umami")): {
   websiteId: string;
   scriptUrl: string;
 } | null {
@@ -134,7 +135,7 @@ export async function fetchUmamiStats(
   startAt: number,
   endAt: number,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("umami"),
 ): Promise<UmamiStats> {
   const url =
     `${apiBase(env)}/api/websites/${websiteId(env)}/stats` +
@@ -162,7 +163,7 @@ export async function fetchUmamiPageviews(
   endAt: number,
   unit: "hour" | "day" | "month" = "day",
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("umami"),
 ): Promise<UmamiPageviewBucket[]> {
   const url =
     `${apiBase(env)}/api/websites/${websiteId(env)}/pageviews` +

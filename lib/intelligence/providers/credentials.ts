@@ -77,6 +77,26 @@ export async function getVendorCredentials(workspaceId: string): Promise<VendorC
   return merged;
 }
 
+/**
+ * Phase 15.2: whose key each SERP vendor call uses — the workspace's own
+ * (data_source registry; charged 0 credits) or the platform's env key
+ * (charged at INTELLIGENCE_VENDOR_MULTIPLIER × its USD cost).
+ */
+export async function getVendorKeySources(workspaceId: string): Promise<Record<SerpVendorId, "workspace" | "platform">> {
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.dataSource.findFirst({
+      where: { workspaceId, type: "serp_vendor", status: "active" },
+      orderBy: { updatedAt: "desc" },
+    }),
+  );
+  const cfg = row ? decryptConfig(row.config) : {};
+  return {
+    serper: cfg.serper?.apiKey ? "workspace" : "platform",
+    dataforseo: cfg.dataforseo?.login && cfg.dataforseo?.password ? "workspace" : "platform",
+    talordata: cfg.talordata?.apiKey ? "workspace" : "platform",
+  };
+}
+
 /** Which env vars back each vendor (for the data-costs UI "how to connect" copy). */
 export function vendorEnvVars(): Record<SerpVendorId, string[]> {
   return ENV_VARS;

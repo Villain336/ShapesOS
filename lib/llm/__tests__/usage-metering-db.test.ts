@@ -95,7 +95,10 @@ describe("chat() usage → metering + run cost (DB)", () => {
     assert.ok(ev, "usage event written");
     assert.equal(ev.workspaceId, WS_A);
     assert.equal(ev.action, "llm_tokens");
-    assert.equal(ev.credits, 0);
+    // Phase 15.2: cost-based — ceil($0.011 × 100 × 1.5) = ceil(1.65) = 2.
+    assert.equal(ev.credits, 2);
+    assert.equal(ev.keySource, "platform");
+    assert.equal(ev.waivedCredits, 0);
     assert.equal(ev.actorId, "user-a");
     assert.equal(ev.evidenceRef, `agent_run:${run.id}`);
     assert.equal(ev.llmProvider, "anthropic");
@@ -146,6 +149,13 @@ describe("chat() usage → metering + run cost (DB)", () => {
     assert.equal(res.costMicroUsd, null);
     const ev = await prisma.usageEvent.findUnique({ where: { idempotencyKey: `llm:anthropic:msg_p7_${RUN}_4` } });
     assert.equal(ev?.llmCostMicroUsd, null);
+    // Phase 15.2: the ESTIMATE stays null, but billing never charges 0 — the
+    // unknown model is charged at the most expensive known rates.
+    const { fallbackPrice } = await import("../pricing");
+    const fb = fallbackPrice();
+    const billable = 1000 * fb.input + 200 * fb.output + 5000 * fb.cacheRead + 400 * fb.cacheWrite;
+    assert.equal(ev?.credits, Math.ceil((billable * 150) / 1_000_000));
+    assert.ok((ev?.credits ?? 0) > 0);
     const facts = Object.fromEntries(runUsageFacts(runUsageTotals(await listAgentRunEvents(WS_A, run.id))));
     assert.match(facts["Model cost"], /Unknown/);
   });

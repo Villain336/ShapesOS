@@ -101,13 +101,17 @@ export function resolveSendingPartner(
   const providerName = cfg.provider ?? "smartlead";
   const { relayCampaignIds: relayRaw, deps } = cfg;
   if (isFakeProvider(cfg) && fakeProvidersAllowed()) return createFakeSendingPartner(providerName);
-  requireConfigured("Smartlead/Instantly", cfg, "set SMARTLEAD_API_KEY or INSTANTLY_API_KEY in Settings → Authority.");
+  requireConfigured(
+    "Smartlead/Instantly",
+    cfg,
+    "connect this workspace's own Smartlead or Instantly account in Settings → Providers (self-hosted: SMARTLEAD_API_KEY / INSTANTLY_API_KEY also work).",
+  );
   const relayCampaignIds = parseRelayCampaignIds(relayRaw);
   if (relayCampaignIds.length === 0) {
     const envName = providerName === "instantly" ? "INSTANTLY_RELAY_CAMPAIGN_IDS" : "SMARTLEAD_RELAY_CAMPAIGN_IDS";
     throw new NotConfiguredError(
       providerName,
-      `set ${envName} to the relay campaign id(s) (one per sequence step) whose email step uses {{shapes_subject}} / {{shapes_body}}.`,
+      `add the relay campaign id(s) (one per sequence step) whose email step uses {{shapes_subject}} / {{shapes_body}} in Settings → Providers (self-hosted: ${envName}).`,
     );
   }
   return providerName === "instantly"

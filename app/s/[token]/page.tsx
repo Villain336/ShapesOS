@@ -15,6 +15,7 @@ import { exportPageToSvg } from "@/lib/design/export-svg";
 import { RrwebRecorder } from "@/components/replay/RrwebRecorder";
 import { UmamiTracker } from "@/components/analytics/UmamiTracker";
 import { umamiSnippetConfig } from "@/lib/integrations/umami";
+import { withWorkspaceSidecars } from "@/lib/integrations/sidecar-tenancy";
 import { effectiveWhiteLabel } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
@@ -96,7 +97,8 @@ export default async function PublicSharePage({
   } | null;
   const pages = Array.isArray(doc?.pages) ? doc.pages : [];
   const status = STATUS_LABEL[share.design.approvalStatus] ?? STATUS_LABEL.draft!;
-  const umami = umamiSnippetConfig();
+  // Phase 15.1: the sharing workspace's own Umami (a shared one is refused on hosted).
+  const umami = await withWorkspaceSidecars(share.design.workspace.id, () => umamiSnippetConfig());
 
   // White-label read path: logo + brand color + custom domain for this
   // design's workspace. Missing/empty fields fall back to the defaults.

@@ -5,11 +5,12 @@
 
 import { guardWorkspace, sidecarError } from "../../_lib";
 import { listPostizChannels } from "@/lib/integrations/postiz";
+import { sidecarScoped } from "@/lib/integrations/sidecar-scope";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+async function handleGET() {
   try {
     await guardWorkspace();
     return Response.json({ channels: await listPostizChannels() });
@@ -17,3 +18,7 @@ export async function GET() {
     return sidecarError(e);
   }
 }
+
+// Phase 15.1: run in this workspace's sidecar scope — its own instance;
+// a shared one is refused on hosted (lib/integrations/sidecar-tenancy.ts).
+export const GET = sidecarScoped(handleGET);

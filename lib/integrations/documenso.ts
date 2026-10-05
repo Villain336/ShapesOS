@@ -12,6 +12,7 @@
 //   GET    {url}/api/v1/documents/{id}                                        → { status, ... }
 // Auth: `Authorization: Bearer <api-token>` on every call.
 
+import { sidecarEnv } from "./sidecar-tenancy";
 export const DOCUMENSO_URL_ENV = "DOCUMENSO_URL";
 export const DOCUMENSO_API_KEY_ENV = "DOCUMENSO_API_KEY";
 
@@ -20,7 +21,7 @@ export interface DocumensoStatus {
   name: string;
 }
 
-export function documensoStatus(env: Record<string, string | undefined> = process.env): DocumensoStatus {
+export function documensoStatus(env: Record<string, string | undefined> = sidecarEnv("documenso")): DocumensoStatus {
   const configured = !!(env[DOCUMENSO_URL_ENV] && env[DOCUMENSO_API_KEY_ENV]);
   return { configured, name: "documenso" };
 }
@@ -114,7 +115,7 @@ export async function createDocumensoDocument(
   filename: string,
   title: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<DocumensoDocument> {
   const pdf = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
   const json = (await dsFetch(
@@ -138,7 +139,7 @@ export async function addDocumensoSigners(
   documentId: string,
   signers: DocumensoSigner[],
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<void> {
   for (const signer of signers) {
     await dsFetch(
@@ -162,7 +163,7 @@ export async function addDocumensoSigners(
 export async function sendDocumensoDocument(
   documentId: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<void> {
   await dsFetch(
     `/documents/${encodeURIComponent(documentId)}/send`,
@@ -176,7 +177,7 @@ export async function sendDocumensoDocument(
 export async function getDocumensoDocument(
   documentId: string,
   fetchImpl: FetchImpl = fetch,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = sidecarEnv("documenso"),
 ): Promise<DocumensoDocument> {
   const json = (await dsFetch(
     `/documents/${encodeURIComponent(documentId)}`,
