@@ -53,7 +53,9 @@ export default async function Page({
     .filter((s) => canEdit || s.status === "published")
     .map(({ id, kind, status, name, code }) => ({ id, kind, status, name, code }));
 
-  // The live stream and state routes are editor+ (operator role): viewers get
-  // this server snapshot, refreshed on reload.
-  return <TwinClient key={snapshot.site.id} initial={snapshot} sites={switcher} canEdit={canEdit} live={canEdit} startEditing={sp.edit === "1"} />;
+  // Phase 14 (approvals): every member gets live updates (viewers: published
+  // sites only — the draft check above, and the stream re-checks it each
+  // tick). "Snapshot" shows only when the stream ends for good. Writes stay
+  // editor+ (canEdit).
+  return <TwinClient key={snapshot.site.id} initial={snapshot} sites={switcher} canEdit={canEdit} live startEditing={sp.edit === "1"} />;
 }

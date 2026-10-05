@@ -70,7 +70,8 @@ export function gatePort(): OpsGatePort {
 // ---------------------------------------------------------------------------
 
 function actorOf(ctx: ToolContext): OpsActor {
-  return { userId: ctx.userId, workspaceId: ctx.workspaceId };
+  // Phase 14: the acting agent, so its own automation rule decides automatable ops gates.
+  return { userId: ctx.userId, workspaceId: ctx.workspaceId, ...(ctx.agentKey ? { agentKey: ctx.agentKey } : {}) };
 }
 
 function num(v: unknown, fallback: number, max: number): number {
@@ -140,6 +141,11 @@ function draftWriteResult(label: string, r: OpsWriteResult): ToolResult {
  * fail-open bug and the tool throws instead of reporting success.
  */
 export function moneyWriteResult(r: OpsWriteResult): ToolResult {
+  // Phase 14: an automatable (no-money) gate a rule approved ran under that
+  // approval — report it, naming the rule. Money gates never get here.
+  if (r.outcome === "done" && r.action === "gate_executed" && r.autoApproved) {
+    return { summary: `Done — ${r.autoApproved}.`, details: { row: r.row, autoApproved: r.autoApproved } };
+  }
   if (r.outcome !== "approval_required") {
     throw new Error(
       "marketr: money-moving write executed without a Phase 14 approval — refusing to report success",

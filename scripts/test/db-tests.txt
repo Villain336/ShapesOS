@@ -143,3 +143,6 @@ lib/ops/__tests__/p12-payroll-db.test.ts
 lib/ops/__tests__/p12-events-db.test.ts
 # Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.
 lib/twin/__tests__/twin-db.test.ts
+# Phase 14 (approvals): ops gate automatable slug auto-approves (audited) / money slug never; twin live for viewers (published only, draft refused, stream ends when it goes back to draft; generic route editor+); missions read the rules (drafter auto-approval, executor tier settings).
+lib/twin/__tests__/twin-viewer-db.test.ts
+lib/automation/__tests__/p14-approvals-db.test.ts

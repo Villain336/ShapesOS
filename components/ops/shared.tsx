@@ -177,7 +177,8 @@ export function useGatedWrite(
             body,
           });
         } else {
-          setNote("Done.");
+          // Phase 14: a rule approved an automatable gate — say which.
+          setNote(typeof data.autoApproved === "string" ? `Done — ${data.autoApproved}.` : "Done.");
           onDone(data.row as Record<string, unknown>);
         }
       } catch (e) {

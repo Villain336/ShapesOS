@@ -38,6 +38,10 @@ const svc = () => import("./service");
 
 export const twinSiteDef: OpsEntityDef = {
   slug: "twin-sites",
+  // Phase 14 (approvals): drafts are editor-only — the generic route must not
+  // hand them (or their objects / bookings) to viewers. Viewers read a
+  // PUBLISHED site through /api/twin/sites/[id]/state and /live.
+  readRole: "editor",
   label: "Twin site",
   delegate: "opsSite",
   createSchema: z.object({
@@ -70,6 +74,10 @@ export const twinSiteDef: OpsEntityDef = {
 
 export const twinObjectDef: OpsEntityDef = {
   slug: "twin-objects",
+  // Phase 14 (approvals): drafts are editor-only — the generic route must not
+  // hand them (or their objects / bookings) to viewers. Viewers read a
+  // PUBLISHED site through /api/twin/sites/[id]/state and /live.
+  readRole: "editor",
   label: "Twin object",
   delegate: "opsSiteObject",
   createSchema: z.object({
@@ -123,6 +131,10 @@ export const twinObjectDef: OpsEntityDef = {
 
 export const dockBookingDef: OpsEntityDef = {
   slug: "dock-bookings",
+  // Phase 14 (approvals): drafts are editor-only — the generic route must not
+  // hand them (or their objects / bookings) to viewers. Viewers read a
+  // PUBLISHED site through /api/twin/sites/[id]/state and /live.
+  readRole: "editor",
   label: "Dock booking",
   delegate: "opsDockBooking",
   createSchema: z

@@ -172,6 +172,12 @@ export function TwinClient({ initial, sites, canEdit, live = true, startEditing 
           ) : null}
         </div>
       )}
+      {/* Phase 14: a publish an automation rule approved says so (the draft banner is gone). */}
+      {publish.note && snapshot.site.status === "published" ? (
+        <p role="status" className="rounded-lg border border-line bg-paper px-4 py-2.5 text-sm text-ink">
+          Published. {publish.note}
+        </p>
+      ) : null}
 
       {(webgl === false || failure) && view !== "table" ? (
         <p className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-muted">
