@@ -271,6 +271,14 @@ describe("ops", () => {
 });
 
 describe("regions and settings", () => {
+  it("a release can move the migrate task to a new tag before web and worker", () => {
+    const r = synth({ imageTag: "aaaaaaa", migrateImageTag: "bbbbbbb" });
+    const images = Object.values(r.app.findResources("AWS::ECS::TaskDefinition")).map((d) =>
+      JSON.stringify((d.Properties.ContainerDefinitions as Array<{ Image: unknown }>)[0]!.Image),
+    );
+    assert.equal(images.filter((i) => i.includes(":bbbbbbb")).length, 1);
+    assert.equal(images.filter((i) => i.includes(":aaaaaaa")).length, 2);
+  });
   it("another region keeps the certificate and WAF in us-east-1 (cross-region references)", () => {
     const eu = synth({ region: "eu-central-1", account: "123456789012" });
     assert.equal(eu.stacks.app.region, "eu-central-1");

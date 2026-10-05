@@ -15,8 +15,10 @@ export interface ShapesConfig {
   hostedZoneId?: string;
   /** Add one NAT gateway for a fixed outbound IP (tasks move to private subnets). */
   natGateway: boolean;
-  /** Image tag the services run (release workflow deploys sha tags). */
+  /** Image tag web and worker run (releases deploy git sha tags). */
   imageTag: string;
+  /** Image tag of the migrate task (a release migrates with the new tag first); defaults to imageTag. */
+  migrateImageTag: string;
   logRetentionDays: number;
   monthlyBudgetUsd: number;
   alarmEmail?: string;
@@ -61,6 +63,7 @@ export function readConfig(ctx: ContextReader): ShapesConfig {
     hostedZoneId: str(ctx("hostedZoneId")),
     natGateway: truthy(ctx("natGateway")),
     imageTag: str(ctx("imageTag")) ?? "latest",
+    migrateImageTag: str(ctx("migrateImageTag")) ?? str(ctx("imageTag")) ?? "latest",
     logRetentionDays,
     monthlyBudgetUsd: num(ctx("monthlyBudgetUsd"), 2000, "monthlyBudgetUsd"),
     alarmEmail: str(ctx("alarmEmail")),

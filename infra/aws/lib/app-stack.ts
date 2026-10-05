@@ -146,7 +146,7 @@ export class AppStack extends Stack {
     this.filesBucket.grantReadWrite(appTaskRole);
     this.filesBucket.grantDelete(appTaskRole);
 
-    const image = (r: ecr.IRepository) => ecs.ContainerImage.fromEcrRepository(r, config.imageTag);
+    const image = (r: ecr.IRepository, tag = config.imageTag) => ecs.ContainerImage.fromEcrRepository(r, tag);
 
     // --- web -----------------------------------------------------------------
     const webTask = new ecs.FargateTaskDefinition(this, "WebTask", {
@@ -247,7 +247,7 @@ export class AppStack extends Stack {
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
     });
     this.migrateTask.addContainer("migrate", {
-      image: image(this.repositories.migrate),
+      image: image(this.repositories.migrate, config.migrateImageTag),
       // Composes the OWNER's DATABASE_URL, migrates, then creates/refreshes
       // the app role with APP_DB_PASSWORD (scripts/db/migrate.sh).
       command: [...START, "--owner", "sh", "scripts/db/migrate.sh"],
