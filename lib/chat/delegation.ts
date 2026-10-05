@@ -377,7 +377,7 @@ export async function runDelegatedChild(p: SubagentRunJobPayload, opts: ChildRun
       return { childRunId: p.childRunId, status: "cancelled" };
     }
     const agentMod = await import("./agent");
-    if (!agentMod.agentIsLive(agent, "default")) {
+    if (!(await agentMod.agentIsLive(agent, "default", ws))) {
       await settle({ status: "failed", error: `${agentDisplayName(agent)} needs a live model to work on its own.` });
       await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       return { childRunId: p.childRunId, status: "failed" };

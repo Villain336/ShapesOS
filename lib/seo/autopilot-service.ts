@@ -8,6 +8,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getLlmProviderFor } from "@/lib/llm";
+import type { LlmKeySource } from "@/lib/llm/types";
+import { getLlmProviderForWorkspace, valueActionMeterFields } from "@/lib/llm/workspace";
+import { creditsFor } from "@/lib/metering/credits";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import {
   capCandidates,
@@ -72,15 +75,33 @@ export async function auditAutopilot(
 export interface GeneratedDraft {
   title: string;
   markdown: string;
+  /** Phase 15.1: whose model key wrote it (value-priced refreshes on the
+   *  workspace's own key cost 0 credits). Absent = unknown/platform. */
+  keySource?: LlmKeySource | null;
+  /** Phase 15.1: whether a live model wrote it. */
+  live?: boolean;
 }
 
-/** Generates an AI draft for one candidate. Swappable for tests. */
-export type DraftGenerator = (candidate: AutopilotCandidate) => Promise<GeneratedDraft>;
+/** Generates an AI draft for one candidate. Swappable for tests. Phase 15:
+ *  `meta` carries the workspace so the model call uses its key and is metered. */
+export type DraftGenerator = (
+  candidate: AutopilotCandidate,
+  meta?: { workspaceId: string; projectId: string },
+) => Promise<GeneratedDraft>;
 
 /** Default draft generator: M4 content-engine prompt → swappable LLM provider. */
-export const defaultDraftGenerator: DraftGenerator = async (candidate) => {
+export const defaultDraftGenerator: DraftGenerator = async (candidate, meta) => {
   // Phase D: autopilot drafts are client-facing articles → "copy" workload.
-  const llm = getLlmProviderFor("copy");
+  // Phase 15: with the workspace, its own key and metering. A decay refresh
+  // is charged as the value-priced content_refresh action (tokens recorded,
+  // not charged twice); other drafts are charged by tokens.
+  const llm = meta
+    ? await getLlmProviderForWorkspace("copy", {
+        workspaceId: meta.workspaceId,
+        projectId: meta.projectId,
+        billing: candidate.kind === "decay_refresh" ? "included" : "tokens",
+      })
+    : getLlmProviderFor("copy");
   const prompt = buildDraftPrompt({
     keyword: candidate.brief,
     intent: "informational",
@@ -93,7 +114,12 @@ export const defaultDraftGenerator: DraftGenerator = async (candidate) => {
     mock: true,
   });
   const markdown = await llm.generate(prompt);
-  return { title: candidate.title, markdown };
+  return {
+    title: candidate.title,
+    markdown,
+    live: llm.isLive,
+    keySource: "keySource" in llm ? (llm as { keySource: LlmKeySource | null }).keySource : "platform",
+  };
 };
 
 // Rules
@@ -455,7 +481,7 @@ export async function runAutopilotRule(
       if (await isAutopilotKilled(db, args.workspaceId, args.projectId)) {
         throw new Error("Autopilot killed mid-run — remaining items frozen");
       }
-      const draft = await generate(c);
+      const draft = await generate(c, { workspaceId: args.workspaceId, projectId: args.projectId });
       const byRuleToggle = isAutoApproveEligible(c.kind, rule.autoApprove);
       const byAutomation = byRuleToggle ? null : await ruleDecision(c.kind);
       const eligible = byRuleToggle || byAutomation?.auto === true;
@@ -483,6 +509,10 @@ export async function runAutopilotRule(
           workspaceId: args.workspaceId,
           projectId: args.projectId,
           action: "content_refresh",
+          ...valueActionMeterFields(
+            creditsFor("content_refresh"),
+            draft.keySource !== undefined ? [{ isLive: draft.live ?? true, keySource: draft.keySource ?? null }] : [],
+          ),
           idempotencyKey: `contentrefresh:${item.id}`,
           evidenceRef: `autopilot-item:${item.id}`,
         }).catch((err) => {

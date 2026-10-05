@@ -19,7 +19,7 @@
 // the mission run) and resumes a step's half-finished sub-agent run.
 
 import { prisma } from "@/lib/prisma";
-import { getLlmProviderFor, workloadForAgent } from "@/lib/llm/router";
+import { workloadForAgent } from "@/lib/llm/router";
 import {
   appendAgentRunEvent,
   createAgentRun,
@@ -250,7 +250,10 @@ export async function runMissionJob(
   }
 
   const { tasks, waitingOn } = missionInitialTasks(mission.planSnapshot, { workspaceId, missionId });
-  const live = opts.live ?? getLlmProviderFor(workloadForAgent("researcher")).isLive;
+  // Phase 15.1: the workspace's own model key counts as live.
+  const live =
+    opts.live ??
+    (await (await import("@/lib/llm/workspace")).resolveWorkloadForWorkspace(workloadForAgent("researcher"), workspaceId)).provider.isLive;
   const progress: MissionProgress = { v: "mission", done: {} };
   if (runId) {
     const saved = await prismaTranscriptStore.load(workspaceId, runId).catch(() => null);

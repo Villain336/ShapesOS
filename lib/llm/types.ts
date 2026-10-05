@@ -14,7 +14,20 @@
 export interface LlmGenerateOptions {
   maxTokens?: number;
   signal?: AbortSignal;
+  /**
+   * Phase 15.2: metering context. With it, generate() is gated by the
+   * workspace's credit cap before the call and its token usage is recorded
+   * (and charged) like chat(). Without it nothing is metered.
+   */
+  usage?: ChatUsageContext;
 }
+
+/**
+ * Phase 15: whose key a live provider holds. "platform" = ShapesOS's env key
+ * (charged in credits); "workspace" = the workspace's own key (BYOK, 0
+ * credits); "self_host" = a local OpenAI-compatible model (0 credits).
+ */
+export type LlmKeySource = "platform" | "workspace" | "self_host";
 
 // ── chat(): request ─────────────────────────────────────────────────────────
 
@@ -116,6 +129,12 @@ export interface ChatUsageContext {
   /** AgentRun id: also appends a `usage` event (tokens + estimated cost) to the run. */
   runId?: string | null;
   agentKey?: string | null;
+  /**
+   * Phase 15.2: "tokens" (default) charges the call at 1.5× its provider
+   * cost; "included" records it at 0 credits because a value-priced action
+   * (ai_article, content_brief, …) already charges for the work.
+   */
+  billing?: "tokens" | "included";
 }
 
 export interface ChatRequest {

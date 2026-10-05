@@ -30,8 +30,11 @@ import type { Subtask } from "./runner";
 /** The agent a scheduled skill runs as (the lead's reach, narrowed by the skill). */
 const SKILL_AGENT = "lead" as const;
 
-export function schedulerLoopIsLive(): boolean {
-  return getLlmProviderFor(workloadForAgent(SKILL_AGENT)).isLive;
+/** Phase 15.1: with a workspace, its own model key counts as live. */
+export async function schedulerLoopIsLive(workspaceId?: string): Promise<boolean> {
+  if (!workspaceId) return getLlmProviderFor(workloadForAgent(SKILL_AGENT)).isLive;
+  const { resolveWorkloadForWorkspace } = await import("@/lib/llm/workspace");
+  return (await resolveWorkloadForWorkspace(workloadForAgent(SKILL_AGENT), workspaceId)).provider.isLive;
 }
 
 /** Tool groups a skill's declared tools fall in ("connector.<key>.<tool>" or "<key>.<tool>"). */

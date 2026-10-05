@@ -15,7 +15,8 @@
 // nothing here calls it, ever.
 
 import type { TxClient } from "@/lib/substrate/graph/rls";
-import { getLlmProviderFor, WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { WORKLOAD_MAX_TOKENS } from "@/lib/llm";
+import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { normalizePhrase } from "@/lib/competitors";
 import { listTemplates } from "@/lib/missions/templates";
 import type { ChangeCategory } from "./types";
@@ -186,7 +187,8 @@ export async function summarizeChange(deps: SummarizeDeps): Promise<ChangeSummar
 
   let summary: ChangeSummary | null = null;
   try {
-    const provider = getLlmProviderFor("bulk");
+    // Phase 15: the workspace's own model key when it has one; metered by tokens.
+    const provider = await getLlmProviderForWorkspace("bulk", { workspaceId: deps.workspaceId, projectId: deps.projectId });
     if (provider.isConfigured()) {
       const raw = await provider.generate(buildPrompt(deps, overlapping, category), {
         maxTokens: WORKLOAD_MAX_TOKENS.bulk,

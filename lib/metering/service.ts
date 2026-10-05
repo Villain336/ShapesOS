@@ -18,9 +18,11 @@ import { prisma } from "@/lib/prisma";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import {
   CREDIT_TABLE_VERSION,
+  categoryOf,
   creditsFor,
   includedCreditsForPlan,
   isMeteredAction,
+  type CreditCategory,
 } from "./credits";
 import { BadRequestError } from "@/lib/api/errors";
 import { isTrialExpired, trialExpiredMessage } from "@/lib/billing/trial";
@@ -69,7 +71,30 @@ export interface MeterOptions {
    * is the estimated vendor cost; null when a price is unknown.
    */
   llm?: LlmUsageFields | null;
+  /**
+   * Phase 15: whose key paid for the work — "platform" (charged),
+   * "workspace" (the workspace's own key: callers pass credits 0) or
+   * "self_host" (a local model). Recorded on the row; null = no key choice.
+   */
+  keySource?: KeySource | null;
+  /**
+   * Phase 15: credits this event would have cost on the platform key (BYOK
+   * savings). Non-negative integer; only meaningful with keySource
+   * "workspace".
+   */
+  waivedCredits?: number;
+  /**
+   * Phase 15.2: the work ALREADY happened and was paid for (a model call
+   * that returned, a call that ended, a sandbox that ran). The charge is
+   * recorded even past the cap — the pre-call check (checkCap / the LLM
+   * spend gate) is the gate, and refusing here would only hide real usage.
+   * Idempotency still applies, so a retried record never charges twice.
+   */
+  afterTheFact?: boolean;
 }
+
+export type KeySource = "platform" | "workspace" | "self_host";
+const KEY_SOURCES: ReadonlySet<string> = new Set<KeySource>(["platform", "workspace", "self_host"]);
 
 export interface LlmUsageFields {
   provider: string;
@@ -116,6 +141,22 @@ export interface UsageSummary {
    */
   byKey?: Record<string, number>;
   periodStart: string;
+  /** Phase 15.2: credits by category (AI, data, messaging, compute, other). */
+  byCategory: Record<CreditCategory, number>;
+  /** Phase 15.2: credits the workspace's own model keys saved (BYOK). */
+  byokSavedCredits: number;
+  /**
+   * Phase 15.2: agency credit pooling. Present when this workspace spends an
+   * agency pool (as the owner with client workspaces, or as a client):
+   * the pool owner, the pool's used credits (all its workspaces), and — for
+   * the owner — credits by client workspace.
+   */
+  pool?: {
+    ownerWorkspaceId: string;
+    role: "owner" | "member";
+    used: number;
+    byWorkspace?: Record<string, number>;
+  };
 }
 
 export interface CapStatus {
@@ -129,6 +170,8 @@ export interface CapStatus {
   autoOverage: boolean;
   /** Phase 3: the workspace's hosted trial is over — metered actions are refused. */
   trialExpired?: boolean;
+  /** Phase 15.2: set when the workspace spends an agency pool (the owner's id). */
+  poolWorkspaceId?: string;
 }
 
 // ── Internals ────────────────────────────────────────────────────────────────
@@ -213,6 +256,27 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
   throw new Error("metering: could not lock spend cap");
 }
 
+// ── Agency credit pooling (Phase 15.2) ──────────────────────────────────────
+
+type PoolReader = Pick<Tx, "workspace">;
+
+/**
+ * The workspace whose balance + cap a charge for `workspaceId` lands on:
+ * the Agency-plan workspace it pools into, else itself. A pointer at a
+ * workspace that is no longer on the Agency plan is ignored (fail safe to
+ * the workspace's own pool — never another tenant's).
+ */
+export async function resolvePoolWorkspaceId(db: PoolReader, workspaceId: string): Promise<string> {
+  const ws = await db.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { creditPoolOwnerId: true, creditPoolOwner: { select: { id: true, plan: true, creditPoolOwnerId: true } } },
+  });
+  const owner = ws?.creditPoolOwner;
+  // One level only: an owner that itself points somewhere is not a pool.
+  if (owner && owner.plan === "agency" && !owner.creditPoolOwnerId) return owner.id;
+  return workspaceId;
+}
+
 // ── meter() ──────────────────────────────────────────────────────────────────
 
 /**
@@ -232,9 +296,16 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     idempotencyKey,
     evidenceRef = null,
     llm = null,
+    keySource = null,
+    waivedCredits = 0,
+    afterTheFact = false,
   } = opts;
   if (!workspaceId) throw new Error("metering: workspaceId is required");
   if (!idempotencyKey) throw new Error("metering: idempotencyKey is required");
+  if (keySource !== null && !KEY_SOURCES.has(keySource)) throw new Error(`metering: unknown keySource "${keySource}"`);
+  if (!Number.isInteger(waivedCredits) || waivedCredits < 0) {
+    throw new Error("metering: waivedCredits must be a non-negative integer");
+  }
   const llmData = llm
     ? {
         llmProvider: llm.provider,
@@ -266,7 +337,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
 
   try {
     const txOut = await prisma.$transaction(
-      async (tx): Promise<{ result: MeterResult; alert: { used: number; capCredits: number; alertAtPct: number; periodKey: string } | null }> => {
+      async (tx): Promise<{ result: MeterResult; alert: { poolId: string; used: number; capCredits: number; alertAtPct: number; periodKey: string } | null }> => {
         // T1: idempotency first — a replay returns the prior result, no re-charge.
         const prior = await tx.usageEvent.findUnique({ where: { idempotencyKey } });
         if (prior) {
@@ -299,20 +370,25 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
           }
         }
 
-        // T2: lock balance + cap — concurrent meter() calls serialize here.
-        const bal = await lockBalance(tx, workspaceId);
-        const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
+        // Phase 15.2: an agency client workspace charges the agency's ONE
+        // pool — its balance, cap and alert. The event stays on workspaceId.
+        const poolId = await resolvePoolWorkspaceId(tx, workspaceId);
+
+        // T2: lock balance + cap — concurrent meter() calls serialize here
+        // (for a pool: every workspace in the pool serializes on the owner).
+        const bal = await lockBalance(tx, poolId);
+        const cap = await lockSpendCap(tx, poolId, bal.includedCredits + bal.purchasedCredits);
         // Read the plan after the locks: applyPlanChange takes the same locks,
         // so an upgrade that committed before us is always seen here.
         const ws = await tx.workspace.findUnique({
-          where: { id: workspaceId },
+          where: { id: poolId },
           select: { plan: true, trialEndsAt: true },
         });
         const onTrial = ws?.plan === "trial";
 
         // Phase 3: an ended hosted trial is read-only for metered actions.
         // Zero-cost actions still pass — never punish the outcome.
-        if (charge > 0 && ws && isTrialExpired(ws)) {
+        if (charge > 0 && !afterTheFact && ws && isTrialExpired(ws)) {
           return {
             result: {
               ok: false,
@@ -345,14 +421,14 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             // headroom above or below the pool is kept; never below 0.
             if (purchasedCredits > 0) {
               const capCredits = Math.max(0, cap.capCredits - purchasedCredits);
-              await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
+              await tx.spendCap.update({ where: { workspaceId: poolId }, data: { capCredits } });
               cap.capCredits = capCredits;
             }
             purchasedCredits = 0;
             purchasedExpiresAt = null;
           }
           await tx.creditBalance.update({
-            where: { workspaceId },
+            where: { workspaceId: poolId },
             data: { periodStart, usedCredits, purchasedCredits, purchasedExpiresAt },
           });
         }
@@ -362,7 +438,9 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // the overage; the ledger records it honestly.
         // A trial is always hard-capped: no overage opt-in, no uncapped legacy row.
         const overageAllowed = !onTrial && (cap.autoOverage || !cap.blockAtCap);
-        if (charge > 0 && !overageAllowed && usedCredits + charge > cap.capCredits) {
+        // afterTheFact: the work already happened — record it honestly; the
+        // pre-call gate is what refuses a capped workspace (Phase 15.2).
+        if (charge > 0 && !afterTheFact && !overageAllowed && usedCredits + charge > cap.capCredits) {
           return {
             result: {
               ok: false,
@@ -405,25 +483,28 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             overageCredits,
             idempotencyKey,
             evidenceRef,
+            keySource,
+            waivedCredits,
             ...llmData,
           },
           select: { id: true },
         });
         if (charge > 0) {
           await tx.creditBalance.update({
-            where: { workspaceId },
+            where: { workspaceId: poolId },
             data: { usedCredits: { increment: charge } },
           });
           usedCredits += charge;
         }
 
         // 80% alert, once per period. Armed when lastAlertAt predates the period.
-        let alert: { used: number; capCredits: number; alertAtPct: number; periodKey: string } | null = null;
+        let alert: { poolId: string; used: number; capCredits: number; alertAtPct: number; periodKey: string } | null = null;
         const threshold = Math.floor((cap.capCredits * cap.alertAtPct) / 100);
         const armed = !cap.lastAlertAt || cap.lastAlertAt < periodStart;
         if (charge > 0 && usedCredits >= threshold && armed) {
-          await tx.spendCap.update({ where: { workspaceId }, data: { lastAlertAt: now } });
+          await tx.spendCap.update({ where: { workspaceId: poolId }, data: { lastAlertAt: now } });
           alert = {
+            poolId,
             used: usedCredits,
             capCredits: cap.capCredits,
             alertAtPct: cap.alertAtPct,
@@ -440,16 +521,19 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     if (txOut.alert) {
       const a = txOut.alert;
       const pct = Math.round((a.used / Math.max(1, a.capCredits)) * 100);
+      // A pooled charge alerts the pool owner (the agency), once per period.
+      const pooled = a.poolId !== workspaceId;
       await emitAlert({
-        workspaceId,
+        workspaceId: a.poolId,
         trigger: "metering_cap_warning",
         severity: "warn",
-        title: `Credit usage at ${pct}% of cap`,
+        title: pooled ? `Pooled credit usage at ${pct}% of cap` : `Credit usage at ${pct}% of cap`,
         body:
-          `${a.used.toLocaleString()} of ${a.capCredits.toLocaleString()} credits used this period. ` +
+          `${a.used.toLocaleString()} of ${a.capCredits.toLocaleString()} credits used this period` +
+          `${pooled ? " across the agency's client workspaces" : ""}. ` +
           `Add credits or raise the cap in Settings → Usage to avoid blocked actions.`,
         link: "/dashboard/settings/usage",
-        dedupKey: `metering_cap_warning:${workspaceId}:${a.periodKey}`,
+        dedupKey: `metering_cap_warning:${a.poolId}:${a.periodKey}`,
       }).catch(() => {
         // Alert delivery is best-effort; the charge already committed.
       });
@@ -475,7 +559,9 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
  * auto-overage opt-in, and nothing remains. The scheduler's pre-run gate
  * uses this; the TOCTOU between gate and charge is closed by meter() (T9).
  */
-export async function checkCap(workspaceId: string): Promise<CapStatus> {
+export async function checkCap(requestedWorkspaceId: string): Promise<CapStatus> {
+  // Phase 15.2: an agency client workspace is capped by the agency's pool.
+  const workspaceId = await resolvePoolWorkspaceId(prisma, requestedWorkspaceId);
   const [bal, cap, ws] = await Promise.all([
     prisma.creditBalance.findUnique({ where: { workspaceId } }),
     prisma.spendCap.findUnique({ where: { workspaceId } }),
@@ -500,6 +586,7 @@ export async function checkCap(workspaceId: string): Promise<CapStatus> {
     used,
     autoOverage,
     trialExpired,
+    ...(workspaceId !== requestedWorkspaceId ? { poolWorkspaceId: workspaceId } : {}),
   };
 }
 
@@ -517,48 +604,93 @@ export async function getUsageSummary(opts: {
   keyId?: string;
 }): Promise<UsageSummary> {
   const { workspaceId } = opts;
-  const bal = await prisma.creditBalance.findUnique({ where: { workspaceId } });
+  // Phase 15.2: the pool this workspace spends (itself unless pooled), and
+  // the workspaces sharing it. The balance and cap are the pool's.
+  const poolId = await resolvePoolWorkspaceId(prisma, workspaceId);
+  const members = await prisma.workspace.findMany({
+    where: { creditPoolOwnerId: poolId },
+    select: { id: true },
+  });
+  const pooled = poolId !== workspaceId || members.length > 0;
+  const isOwner = pooled && poolId === workspaceId;
+  const poolIds = [poolId, ...members.map((m) => m.id)];
+
+  const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: poolId } });
   let included = bal?.includedCredits ?? 0;
   if (!bal) {
-    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+    const ws = await prisma.workspace.findUnique({ where: { id: poolId }, select: { plan: true } });
     included = includedCreditsForPlan(ws?.plan ?? "self_hosted");
   }
   const purchased = bal?.purchasedCredits ?? 0;
   const start = opts.periodStart ? new Date(opts.periodStart) : (bal?.periodStart ?? monthStart(new Date()));
+  // The owner's summary covers every workspace in its pool (so the ledger
+  // reconciles with the pool counter); a client sees its own usage.
+  const scopeIds = isOwner ? poolIds : [workspaceId];
   const where: Prisma.UsageEventWhereInput = {
-    workspaceId,
+    workspaceId: scopeIds.length === 1 ? scopeIds[0] : { in: scopeIds },
     occurredAt: { gte: start },
     ...(opts.projectId ? { projectId: opts.projectId } : {}),
     ...(opts.keyId ? { keyId: opts.keyId } : {}),
   };
-  const [byActionRows, byProjectRows, byKeyRows] = await Promise.all([
+  const [byActionRows, byProjectRows, byKeyRows, waived, byWorkspaceRows] = await Promise.all([
     prisma.usageEvent.groupBy({ by: ["action"], where, _sum: { credits: true } }),
     prisma.usageEvent.groupBy({ by: ["projectId"], where, _sum: { credits: true } }),
     // byKey only when unfiltered (contract: sibling MCP track).
     opts.keyId
       ? Promise.resolve([])
       : prisma.usageEvent.groupBy({ by: ["keyId"], where, _sum: { credits: true } }),
+    prisma.usageEvent.aggregate({ where: { ...where, keySource: "workspace" }, _sum: { waivedCredits: true } }),
+    pooled
+      ? prisma.usageEvent.groupBy({
+          by: ["workspaceId"],
+          where: { workspaceId: { in: poolIds }, occurredAt: { gte: start } },
+          _sum: { credits: true },
+        })
+      : Promise.resolve([]),
   ]);
   const byAction: Record<string, number> = {};
   const byProject: Record<string, number> = {};
+  const byCategory: Record<CreditCategory, number> = { ai: 0, data: 0, messaging: 0, compute: 0, other: 0 };
   let used = 0;
   for (const r of byActionRows) {
     const c = r._sum.credits ?? 0;
     byAction[r.action] = c;
+    byCategory[categoryOf(r.action)] += c;
     used += c;
   }
   for (const r of byProjectRows) {
     byProject[r.projectId ?? "workspace"] = r._sum.credits ?? 0;
   }
+  let poolUsed = used;
+  let byWorkspace: Record<string, number> | undefined;
+  if (pooled) {
+    poolUsed = 0;
+    byWorkspace = {};
+    for (const r of byWorkspaceRows) {
+      const c = r._sum.credits ?? 0;
+      byWorkspace[r.workspaceId] = c;
+      poolUsed += c;
+    }
+  }
   const summary: UsageSummary = {
     used,
     included,
     purchased,
-    remaining: Math.max(0, included + purchased - used),
+    remaining: Math.max(0, included + purchased - poolUsed),
     byAction,
     byProject,
     periodStart: start.toISOString(),
+    byCategory,
+    byokSavedCredits: waived._sum.waivedCredits ?? 0,
   };
+  if (pooled) {
+    summary.pool = {
+      ownerWorkspaceId: poolId,
+      role: isOwner ? "owner" : "member",
+      used: poolUsed,
+      ...(isOwner ? { byWorkspace } : {}),
+    };
+  }
   if (!opts.keyId) {
     // Null keyId = non-MCP charges; surfaced as the "direct" bucket.
     const byKey: Record<string, number> = {};
@@ -585,6 +717,9 @@ export async function applyTopUp(
     throw new BadRequestError("top-up credits must be a positive integer");
   }
   return prisma.$transaction(async (tx) => {
+    // Phase 15.2: credits bought in an agency client workspace go to the
+    // pool it spends — never stranded on a balance nothing charges.
+    workspaceId = await resolvePoolWorkspaceId(tx, workspaceId);
     const bal = await lockBalance(tx, workspaceId);
     const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
     const purchasedExpiresAt =
@@ -670,6 +805,13 @@ export async function setSpendCap(
     throw new BadRequestError("alertAtPct must be an integer 1–100");
   }
   return prisma.$transaction(async (tx) => {
+    // Phase 15.2: a client workspace in an agency pool does not set the
+    // agency's cap — the agency manages it from its own workspace.
+    if ((await resolvePoolWorkspaceId(tx, workspaceId)) !== workspaceId) {
+      throw new BadRequestError(
+        "This workspace spends its agency's pooled credits; the agency workspace manages the spend cap.",
+      );
+    }
     const bal = await lockBalance(tx, workspaceId);
     const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
     const data: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number; autoOverage?: boolean } = {};

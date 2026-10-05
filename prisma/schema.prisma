@@ -542,6 +542,14 @@ model Workspace {
   // are refused until the workspace picks a paid plan (lib/billing/trial.ts).
   trialEndsAt DateTime? @map("trial_ends_at")
 
+  // Phase 15.2 (keys): agency credit pooling. A client workspace that points
+  // at an Agency-plan workspace spends that workspace's ONE credit pool (its
+  // balance, cap and 80% alert — lib/metering/service.ts resolvePool). Usage
+  // events stay attributed to the client workspace. Null = own pool.
+  creditPoolOwnerId String?     @map("credit_pool_owner_id")
+  creditPoolOwner   Workspace?  @relation("CreditPool", fields: [creditPoolOwnerId], references: [id], onDelete: SetNull)
+  creditPoolMembers Workspace[] @relation("CreditPool")
+
   // Phase 3: first-run onboarding wizard. Null completedAt = not finished or
   // skipped yet (existing workspaces were backfilled as completed);
   // onboardingStep is the resume point.
@@ -1099,6 +1107,7 @@ model Workspace {
   opsSiteObjects              OpsSiteObject[]
   opsDockBookings             OpsDockBooking[]
 
+  @@index([creditPoolOwnerId])
   @@map("workspaces")
 }
 
@@ -4021,11 +4030,20 @@ model UsageEvent {
   llmCacheReadTokens  Int?    @map("llm_cache_read_tokens")
   llmCacheWriteTokens Int?    @map("llm_cache_write_tokens")
   llmCostMicroUsd     BigInt? @map("llm_cost_micro_usd")
+  // Phase 15 (keys): whose key paid for the call — "platform" (ShapesOS's
+  // key, charged in credits), "workspace" (the workspace's own key, BYOK:
+  // 0 credits) or "self_host" (a local model). Null for actions without a
+  // key choice.
+  keySource           String? @map("key_source")
+  // Phase 15 (keys): credits this event WOULD have cost on the platform key
+  // (BYOK savings on Settings → Usage). 0 unless keySource is "workspace".
+  waivedCredits       Int     @default(0) @map("waived_credits")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
   @@index([projectId])
   @@index([workspaceId, keyId])
+  @@index([workspaceId, keySource])
   @@map("usage_events")
 }
 

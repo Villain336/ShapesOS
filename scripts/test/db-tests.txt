@@ -168,3 +168,5 @@ lib/billing/__tests__/seat-billing-db.test.ts
 lib/knowledge/contextdev/__tests__/brandsync-db.test.ts
 # Phase 15.1 (keys): BUG B — intelligence connector disconnect deletes the workspace's connection by its connection id through the vault (was deleteConnection(workspaceId, vaultKey), always "not found"); other workspaces untouched.
 lib/authority/intelligence/__tests__/disconnect-db.test.ts
+# Phase 15.2 (keys): model tokens billed at ceil(cost × 1.5) through meter(); BYOK recorded at 0 with keySource "workspace" + credits saved; idempotent per call; a capped workspace refused BEFORE the call (nothing sent); generate() metered; value-priced calls not charged twice; agency pool shared by client workspaces, capped and alerted as one (stubbed Anthropic SDK / fake OpenAI fetch — MOCK).
+lib/metering/__tests__/token-billing-db.test.ts

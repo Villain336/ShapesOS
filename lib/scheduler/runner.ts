@@ -267,7 +267,7 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
     if (deps.runSubtask !== undefined) runLive = deps.runSubtask;
     else {
       const live = await import("./live");
-      runLive = live.schedulerLoopIsLive() ? live.runSkillSubtaskLive : null;
+      runLive = (await live.schedulerLoopIsLive(run.workspaceId)) ? live.runSkillSubtaskLive : null;
     }
 
     // T7: per-run semaphore + cross-run guard (active subagents of sibling

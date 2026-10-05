@@ -6,9 +6,23 @@
 // ledger as every other charge, with the token counts, model and estimated
 // vendor cost on the event row. No parallel ledger.
 //
-// `llm_tokens` is a zero-credit passthrough action today (see credits.ts):
-// the row makes token spend visible per workspace and per run; whether hosted
-// plans charge credits for it is a pricing decision, not this module's.
+// Phase 15.2: `llm_tokens` is cost-based. Each call is charged
+// ceil(provider cost USD × 100 × 1.5) credits (credits.ts llmTokenCredits),
+// on the BILLABLE cost (pricing.ts billableCostMicroUsd — an unknown price is
+// charged at the most expensive known rate, never 0). A call on the
+// workspace's own key (keySource "workspace") or a local model ("self_host")
+// is recorded at 0 credits; the workspace-key row carries the credits it
+// saved (waivedCredits). A call inside a value-priced action (context
+// billing "included") is recorded at 0 — that action charges the work.
+//
+// Idempotent per call: the key is llm:<provider>:<response id>, so a record
+// that runs twice for the same response charges once (meter() T1).
+//
+// The cap check runs BEFORE the call (assertModelSpendAllowed, called by
+// the adapters): a capped workspace is refused cleanly with a
+// non-retryable LlmProviderError("cap_exceeded") and nothing is sent. The
+// debit at the end runs with afterTheFact (the call already happened), so
+// a call that crosses the cap is still recorded honestly.
 //
 // With a runId the call also appends a `usage` event to the AgentRun
 // timeline (tokens + estimated cost), which the run viewer sums into the
@@ -19,8 +33,11 @@
 // never record — nothing was spent.
 
 import { randomUUID } from "node:crypto";
-import { formatMicroUsd } from "./pricing";
-import type { ChatUsage, ChatUsageContext } from "./types";
+import { billableCostMicroUsd, formatMicroUsd } from "./pricing";
+import { LlmProviderError } from "./errors";
+// credits.ts is pure (no DB): safe to import statically from the adapters' graph.
+import { llmTokenCredits as llmTokenCreditsSync } from "@/lib/metering/credits";
+import type { ChatUsage, ChatUsageContext, LlmKeySource } from "./types";
 
 export interface ChatUsageRecord {
   context: ChatUsageContext;
@@ -31,7 +48,28 @@ export interface ChatUsageRecord {
   costMicroUsd: number | null;
   /** Provider message / response id — makes the ledger row idempotent. */
   responseId: string | null;
+  /** Phase 15: whose key served the call. Default "platform". */
+  keySource?: LlmKeySource;
 }
+
+/**
+ * Phase 15.2: the credits one call is charged and the credits it saved.
+ * Pure — the single source of the token-billing rule.
+ */
+export function llmCallCharge(rec: Pick<ChatUsageRecord, "model" | "usage" | "keySource"> & { billing?: ChatUsageContext["billing"] }): {
+  credits: number;
+  waivedCredits: number;
+  billableCostMicroUsd: number;
+  priced: boolean;
+} {
+  const { costMicroUsd, priced } = billableCostMicroUsd(rec.model, rec.usage);
+  const list = llmTokenCreditsSync(costMicroUsd);
+  const source = rec.keySource ?? "platform";
+  if (rec.billing === "included") return { credits: 0, waivedCredits: 0, billableCostMicroUsd: costMicroUsd, priced };
+  if (source === "platform") return { credits: list, waivedCredits: 0, billableCostMicroUsd: costMicroUsd, priced };
+  return { credits: 0, waivedCredits: source === "workspace" ? list : 0, billableCostMicroUsd: costMicroUsd, priced };
+}
+
 
 export type ChatUsageRecorder = (rec: ChatUsageRecord) => Promise<void>;
 
@@ -63,11 +101,18 @@ async function recordToMetering(rec: ChatUsageRecord): Promise<void> {
   // unit tests and scripts that never record usage.
   const { meter } = await import("@/lib/metering/service");
   const idempotencyKey = `llm:${rec.provider}:${rec.responseId ?? randomUUID()}`;
+  const charge = llmCallCharge({ ...rec, billing: ctx.billing });
   const result = await meter({
     workspaceId: ctx.workspaceId,
     projectId: ctx.projectId ?? null,
     actorId: ctx.actorId ?? null,
     action: "llm_tokens",
+    credits: charge.credits,
+    keySource: rec.keySource ?? "platform",
+    waivedCredits: charge.waivedCredits,
+    // The call already happened (and was paid for): record it even past the
+    // cap. The pre-call gate refused capped workspaces.
+    afterTheFact: true,
     idempotencyKey,
     evidenceRef: ctx.runId ? `agent_run:${ctx.runId}` : null,
     llm: {
@@ -112,6 +157,67 @@ export function __setChatUsageRecorder(fn: ChatUsageRecorder | null): () => void
   return () => {
     recorder = prev;
   };
+}
+
+// ── Phase 15.2: the pre-call spend gate ─────────────────────────────────────
+
+export type ChatSpendGate = (ctx: ChatUsageContext) => Promise<{ allowed: true } | { allowed: false; message: string }>;
+
+async function capGate(ctx: ChatUsageContext): Promise<{ allowed: true } | { allowed: false; message: string }> {
+  const { checkCap } = await import("@/lib/metering/service");
+  const cap = await checkCap(ctx.workspaceId);
+  if (cap.allowed) return { allowed: true };
+  if (cap.trialExpired) {
+    const { trialExpiredMessage } = await import("@/lib/billing/trial");
+    return { allowed: false, message: trialExpiredMessage(null) };
+  }
+  return {
+    allowed: false,
+    message:
+      `Credit cap reached (${cap.used.toLocaleString()} of ${cap.capCredits.toLocaleString()} credits used). ` +
+      `Raise the cap or add credits in Settings → Usage, or add your own model key in Settings → Providers.`,
+  };
+}
+
+let spendGate: ChatSpendGate = capGate;
+
+/** Test seam: replace the cap gate. Returns a restore fn. */
+export function __setChatSpendGate(fn: ChatSpendGate | null): () => void {
+  const prev = spendGate;
+  spendGate = fn ?? capGate;
+  return () => {
+    spendGate = prev;
+  };
+}
+
+/**
+ * Refuse a platform-key model call for a capped workspace BEFORE it is sent.
+ * No context (nothing metered), the workspace's own key, a local model, or
+ * a call inside a value-priced action → no gate. A refusal throws a
+ * non-retryable LlmProviderError("cap_exceeded"). If the cap cannot be READ
+ * (database unavailable) the call proceeds and the warning is logged — the
+ * after-the-fact debit still records it; the cap, not an outage, refuses.
+ */
+export async function assertModelSpendAllowed(
+  ctx: ChatUsageContext | null | undefined,
+  keySource: LlmKeySource,
+  provider: string,
+): Promise<void> {
+  if (!ctx?.workspaceId || keySource !== "platform" || ctx.billing === "included") return;
+  let verdict: Awaited<ReturnType<ChatSpendGate>>;
+  try {
+    verdict = await spendGate(ctx);
+  } catch (err) {
+    console.warn(
+      `[llm-usage] could not check the credit cap for workspace ${ctx.workspaceId}: ${
+        err instanceof Error ? err.message : String(err)
+      } — the call proceeds and is recorded after it returns`,
+    );
+    return;
+  }
+  if (!verdict.allowed) {
+    throw new LlmProviderError({ provider, kind: "cap_exceeded", detail: verdict.message });
+  }
 }
 
 /** Record one call's usage. Never throws. No context → nothing to record. */
