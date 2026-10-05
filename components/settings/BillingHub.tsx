@@ -572,8 +572,7 @@ export default function BillingHub({
             <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               <p>
                 Every plan is a base fee with seats and AI credits included; extra seats are billed per seat
-                once you confirm them. A workspace that brings its own model key uses no AI credits for those
-                calls. Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
+                once you confirm them. Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
                 prices, seats and credits are configured by the ShapesOS host in{" "}
                 <code className="rounded bg-canvas px-1 font-mono text-xs">lib/billing/plans.ts</code>{" "}
                 (not fetched from Stripe). See the public{" "}

@@ -25,7 +25,15 @@
 // Pure and client-safe: no database, no Stripe import.
 
 import type { Plan } from "@prisma/client";
-import { TIER_INCLUDED_CREDITS, TRIAL_INCLUDED_CREDITS } from "@/lib/metering/credits";
+import {
+  CREDITS_PER_DOLLAR,
+  CREDIT_COSTS,
+  IMAGE_CREDITS_BY_QUALITY,
+  OVERAGE_CREDITS_PER_CENT,
+  TIER_INCLUDED_CREDITS,
+  TOPUP_PACKS,
+  TRIAL_INCLUDED_CREDITS,
+} from "@/lib/metering/credits";
 import {
   FEATURES,
   INCLUDED_SEATS,
@@ -435,5 +443,42 @@ export function pricingCatalog(): { paid: PlanOffer[]; trial: PlanOffer; selfHos
     paid: PRICING_ORDER.map((id) => planOffer(id)),
     trial: planOffer("trial"),
     selfHosted: planOffer("self_hosted"),
+  };
+}
+
+// ── Public pricing page (/pricing) ────────────────────────────────────────
+
+export interface PricingPageData {
+  paid: PlanOffer[];
+  trial: PlanOffer;
+  selfHosted: PlanOffer;
+  annualBilledMonths: number;
+  /** "1 credit = $0.01". */
+  creditValueDisplay: string;
+  /** What credits buy, from the live credit table (lib/metering/credits.ts). */
+  creditExamples: Array<{ label: string; credits: string }>;
+  topUps: Array<{ priceDisplay: string; credits: number }>;
+  overagePerCreditDisplay: string;
+}
+
+/** Everything /pricing shows, derived from the constants (no number is typed on the page). */
+export function pricingPageData(): PricingPageData {
+  const c = pricingCatalog();
+  const img = Object.values(IMAGE_CREDITS_BY_QUALITY).map((v) => n(v));
+  return {
+    ...c,
+    annualBilledMonths: ANNUAL_BILLED_MONTHS,
+    creditValueDisplay: `1 credit = ${formatUsd(100 / CREDITS_PER_DOLLAR)}`,
+    creditExamples: [
+      { label: "Keyword research run", credits: n(CREDIT_COSTS.keyword_research.credits) },
+      { label: "Site audit", credits: n(CREDIT_COSTS.site_audit.credits) },
+      { label: "AI article", credits: n(CREDIT_COSTS.ai_article.credits) },
+      { label: "An AI image (low, medium or high quality)", credits: `${img.slice(0, -1).join(", ")} or ${img[img.length - 1]}` },
+      { label: "Scheduled agent skill run (base fee)", credits: n(CREDIT_COSTS.skill_run_base.credits) },
+      // Model-token metering (Phase 15.2) isn't built yet, so no per-turn
+      // figure is promised here; add it from the 15.2 constant when it lands.
+    ],
+    topUps: TOPUP_PACKS.map((p) => ({ priceDisplay: formatUsd(p.priceCents), credits: p.credits })),
+    overagePerCreditDisplay: `$${(1 / OVERAGE_CREDITS_PER_CENT / 100).toFixed(3)}`,
   };
 }
