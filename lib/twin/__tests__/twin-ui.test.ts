@@ -378,6 +378,7 @@ describe("search, facts, kpis, links", () => {
     assert.equal(formatKpiValue({ value: 4973, unit: "count" }), "4,973");
     assert.equal(formatKpiValue({ value: 91.6, unit: "pct" }), "92%");
     assert.equal(formatKpiValue({ value: 226_150, unit: "cents" }), "$2,261.50");
+    assert.equal(formatKpiValue({ value: null, unit: "pct" }), "—");
     assert.equal(recordHref({ type: "work_center", id: "x" }), "/dashboard/ops/manufacturing?view=work-centres");
     assert.equal(recordHref(null), null);
     assert.equal(agentsByObject(WAREHOUSE_FIXTURE).get("o_w_dock_4")?.[0]?.status, "needs");

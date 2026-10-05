@@ -144,7 +144,8 @@ export type TwinKpiKey =
 export interface TwinKpi {
   key: TwinKpiKey;
   label: string;
-  value: number;
+  /** null = no data behind it yet (e.g. no deliveries in the window) — shown as "—", never as 0. */
+  value: number | null;
   unit: "count" | "pct" | "cents";
   /** small context line ("3 docks busy", "of 6 deliveries") */
   hint: string | null;

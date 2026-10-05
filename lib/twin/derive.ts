@@ -618,14 +618,15 @@ export function deriveKpis(input: KpiInput): TwinKpi[] {
     {
       key: "on_time_delivery_30d",
       label: "On-time delivery",
-      value: otd.pct,
+      // No finished deliveries → no rate (a 0% here would read as "all late").
+      value: otd.total ? otd.pct : null,
       unit: "pct",
       hint: otd.total ? `${otd.onTime} of ${otd.total} deliveries, 30 days` : "No deliveries in 30 days",
     },
   ];
   if (input.kind === "factory") {
     const wcs = input.workCenters;
-    const avg = wcs.length ? Math.round(wcs.reduce((s, w) => s + w.utilisationPct, 0) / wcs.length) : 0;
+    const avg = wcs.length ? Math.round(wcs.reduce((s, w) => s + w.utilisationPct, 0) / wcs.length) : null;
     const running = wcs.filter((w) => w.status === "running").length;
     kpis.push({ key: "work_center_utilisation", label: "Work centre utilisation", value: avg, unit: "pct", hint: `${running} of ${wcs.length} running · 7 days` });
   }

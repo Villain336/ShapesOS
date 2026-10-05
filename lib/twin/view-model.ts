@@ -57,6 +57,7 @@ export function formatCents(c: number): string {
 }
 
 export function formatKpiValue(k: Pick<TwinKpi, "value" | "unit">): string {
+  if (k.value === null) return "—";
   if (k.unit === "pct") return `${Math.round(k.value)}%`;
   if (k.unit === "cents") return formatCents(k.value);
   return formatCount(k.value);

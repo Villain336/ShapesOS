@@ -269,7 +269,10 @@ describe("KPIs and shipments", () => {
     assert.deepEqual(fac.at(-1), { key: "work_center_utilisation", label: "Work centre utilisation", value: 25, unit: "pct", hint: "1 of 2 running · 7 days" });
     const store = deriveKpis({ ...base, kind: "store" });
     assert.deepEqual(store.slice(3).map((k) => [k.key, k.value, k.unit]), [["open_registers", 1, "count"], ["sales_today", 5000, "cents"]]);
-    assert.equal(deriveKpis({ ...base, bookings: [], kind: "warehouse" })[2]!.hint, "No deliveries in 30 days");
+    const none = deriveKpis({ ...base, bookings: [], kind: "warehouse" })[2]!;
+    assert.equal(none.hint, "No deliveries in 30 days");
+    assert.equal(none.value, null, "no deliveries is no rate, not 0%");
+    assert.equal(deriveKpis({ ...base, workCenters: [], kind: "factory" }).at(-1)!.value, null, "no work centres is no utilisation");
   });
 
   it("inbound steps follow the PO and the booking timestamps", () => {

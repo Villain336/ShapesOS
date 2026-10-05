@@ -72,7 +72,7 @@ function objectBy(snap: TwinSnapshot, ref: string | undefined, kind?: TwinObject
 // ---------------------------------------------------------------------------
 
 export function summarizeSnapshot(s: TwinSnapshot): ToolResult {
-  const kpi = s.kpis.map((k) => `${k.label} ${k.unit === "pct" ? `${k.value}%` : k.unit === "cents" ? money(k.value) : k.value}${k.hint ? ` (${k.hint})` : ""}`);
+  const kpi = s.kpis.map((k) => `${k.label} ${k.value === null ? "no data yet" : k.unit === "pct" ? `${k.value}%` : k.unit === "cents" ? money(k.value) : k.value}${k.hint ? ` (${k.hint})` : ""}`);
   const docks = s.objects.filter((o) => o.state.kind === "dock_door" && o.state.status !== "free");
   const dockLines = docks.map((o) => {
     const st = o.state as Extract<TwinObject["state"], { kind: "dock_door" }>;
