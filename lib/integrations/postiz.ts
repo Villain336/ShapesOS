@@ -94,17 +94,23 @@ export interface PostizPost {
 
 // ── HTTP plumbing ──────────────────────────────────────────────────────
 
-async function postizFetch(path: string, opts: RequestInit = {}): Promise<unknown> {
+async function postizFetch(
+  path: string,
+  opts: RequestInit = {},
+  timeoutMs: number = POSTIZ_TIMEOUT_MS,
+): Promise<unknown> {
   const { url, apiKey } = getPostizConfig();
   if (!url || !apiKey) notConfigured();
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), POSTIZ_TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  // Multipart bodies set their own boundary Content-Type.
+  const isForm = typeof FormData !== "undefined" && opts.body instanceof FormData;
   try {
     const res = await fetch(`${url}${PUBLIC_V1}${path}`, {
       ...opts,
       signal: ctrl.signal,
       headers: {
-        "Content-Type": "application/json",
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         // Postiz public API: raw API key in the Authorization header —
         // no "Bearer" prefix (per its docs).
         Authorization: apiKey,
@@ -237,6 +243,10 @@ export function buildPostizPayload(
     if (!Number.isFinite(when.getTime())) throw new PostizConfigError("date must be a valid date/time.");
     if (when.getTime() <= Date.now()) throw new PostizConfigError("Scheduled date must be in the future.");
     payload.date = when.toISOString();
+  } else {
+    // The create-post docs list `date` as required for every type; "now"
+    // and "draft" carry the current time.
+    payload.date = new Date().toISOString();
   }
   return payload;
 }
@@ -321,8 +331,153 @@ export async function queuePostizDraft(input: {
   const str = (v: unknown): string | null =>
     typeof v === "string" && v.length > 0 ? v : null;
   const postizRef =
+    parseCreatedPosts(raw)[0]?.postId ??
     str(r?.id) ??
     str((r?.data as Record<string, unknown> | undefined)?.id) ??
     "draft";
   return { postizRef, raw };
+}
+
+// ── Phase 4b: media upload, created-post refs, post states, analytics ──
+// Verified 2026-10-03 against docs.postiz.com/public-api:
+//   POST /public/v1/upload (multipart, field "file"; images + MP4 only)
+//     → { id, name, path, organizationId, createdAt, updatedAt }
+//   POST /public/v1/posts → [ { postId, integration } ] (one per channel)
+//   GET  /public/v1/posts?startDate=&endDate= (ISO, UTC)
+//     → { posts: [ { id, content, publishDate, releaseURL,
+//                    state: QUEUE|PUBLISHED|ERROR|DRAFT,
+//                    integration: { id, providerIdentifier, name } } ] }
+//   GET  /public/v1/analytics/post/{postId}?date=<days>
+//     → [ { label, data: [ { total, date } ], percentageChange } ]
+
+/** Uploads can be large (video); give them longer than a JSON call. */
+export const POSTIZ_UPLOAD_TIMEOUT_MS = 120_000;
+
+/** Upload raw bytes to Postiz (multipart) and return its hosted reference. */
+export async function uploadPostizFile(
+  bytes: Uint8Array,
+  filename: string,
+  mimeType: string,
+): Promise<PostizMedia> {
+  if (!bytes.length) throw new PostizConfigError("Media file is empty.");
+  const form = new FormData();
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  form.append("file", new Blob([copy.buffer], { type: mimeType }), filename);
+  const body = (await postizFetch("/upload", { method: "POST", body: form }, POSTIZ_UPLOAD_TIMEOUT_MS)) as
+    | Record<string, unknown>
+    | null;
+  const r = body ?? {};
+  const id = typeof r.id === "string" && r.id ? r.id : undefined;
+  const path = typeof r.path === "string" && r.path ? r.path : undefined;
+  if (!path) throw new PostizApiError(502, "Postiz upload returned no media path.", null);
+  return { ...(id ? { id } : {}), path };
+}
+
+export interface PostizCreatedPost {
+  postId: string;
+  integrationId: string | null;
+}
+
+/** Parse the create-post response ([{ postId, integration }]). */
+export function parseCreatedPosts(raw: unknown): PostizCreatedPost[] {
+  const arr = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).data)
+      ? ((raw as Record<string, unknown>).data as unknown[])
+      : [];
+  const out: PostizCreatedPost[] = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    const postId = typeof r.postId === "string" ? r.postId : typeof r.id === "string" ? r.id : "";
+    if (!postId) continue;
+    const integ = r.integration;
+    const integrationId =
+      typeof integ === "string"
+        ? integ
+        : integ && typeof integ === "object" && typeof (integ as Record<string, unknown>).id === "string"
+          ? ((integ as Record<string, unknown>).id as string)
+          : null;
+    out.push({ postId, integrationId });
+  }
+  return out;
+}
+
+/** Create posts from a prebuilt payload; returns one ref per channel. */
+export async function createPostizPosts(payload: Record<string, unknown>): Promise<PostizCreatedPost[]> {
+  const raw = await postizFetch("/posts", { method: "POST", body: JSON.stringify(payload) });
+  return parseCreatedPosts(raw);
+}
+
+export type PostizPostState = "QUEUE" | "PUBLISHED" | "ERROR" | "DRAFT" | "UNKNOWN";
+
+export interface PostizPostStatus {
+  id: string;
+  state: PostizPostState;
+  publishDate: string | null;
+  releaseUrl: string | null;
+  integrationId: string | null;
+  providerIdentifier: string | null;
+}
+
+export function mapPostStatus(raw: unknown): PostizPostStatus {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const integ = (r.integration ?? {}) as Record<string, unknown>;
+  const st = String(r.state ?? "").toUpperCase();
+  const state: PostizPostState =
+    st === "QUEUE" || st === "PUBLISHED" || st === "ERROR" || st === "DRAFT" ? st : "UNKNOWN";
+  return {
+    id: String(r.id ?? ""),
+    state,
+    publishDate: typeof r.publishDate === "string" ? r.publishDate : null,
+    releaseUrl: typeof r.releaseURL === "string" && r.releaseURL ? r.releaseURL : null,
+    integrationId: typeof integ.id === "string" ? integ.id : null,
+    providerIdentifier: typeof integ.providerIdentifier === "string" ? integ.providerIdentifier : null,
+  };
+}
+
+/** Post states in a window (documented startDate/endDate parameters). */
+export async function listPostizPostStatuses(startDate: Date, endDate: Date): Promise<PostizPostStatus[]> {
+  const sp = new URLSearchParams({ startDate: startDate.toISOString(), endDate: endDate.toISOString() });
+  const body = (await postizFetch(`/posts?${sp.toString()}`)) as unknown;
+  const arr = Array.isArray(body)
+    ? body
+    : body && typeof body === "object" && Array.isArray((body as Record<string, unknown>).posts)
+      ? ((body as Record<string, unknown>).posts as unknown[])
+      : [];
+  return arr.map(mapPostStatus).filter((p) => p.id.length > 0);
+}
+
+export interface PostizMetricSeries {
+  label: string;
+  data: Array<{ date: string; total: number }>;
+}
+
+export function parseAnalytics(raw: unknown): PostizMetricSeries[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PostizMetricSeries[] = [];
+  for (const s of raw) {
+    if (!s || typeof s !== "object") continue;
+    const r = s as Record<string, unknown>;
+    if (typeof r.label !== "string" || !Array.isArray(r.data)) continue;
+    const data: PostizMetricSeries["data"] = [];
+    for (const d of r.data) {
+      if (!d || typeof d !== "object") continue;
+      const dr = d as Record<string, unknown>;
+      const total = Number(dr.total);
+      if (typeof dr.date !== "string" || !Number.isFinite(total)) continue;
+      data.push({ date: dr.date.slice(0, 10), total: Math.max(0, Math.round(total)) });
+    }
+    out.push({ label: r.label, data });
+  }
+  return out;
+}
+
+/** Daily metric series for one published post over the last `days` days. */
+export async function getPostizPostAnalytics(postId: string, days: number): Promise<PostizMetricSeries[]> {
+  if (!postId.trim()) throw new PostizConfigError("Post id is required.");
+  const d = Math.min(Math.max(Math.round(days), 1), 90);
+  const body = await postizFetch(`/analytics/post/${encodeURIComponent(postId)}?date=${d}`);
+  return parseAnalytics(body);
 }

@@ -10,31 +10,61 @@ research → content → publishing → ranking → site-fix.
 
 ## 1. Recommended architecture
 
-Single VPS + Docker Compose. The repo already ships `docker-compose.yml` (Postgres 16, Redis 7, app
-with `prisma migrate deploy` on boot), so the deploy is an ops task, not a code task.
+Single VPS + Docker Compose. The repo already ships `docker-compose.yml` (Postgres 16 with
+pgvector, Redis 7, MinIO, a one-shot `migrate` service, the app and scheduled backups), so the
+deploy is an ops task, not a code task.
 
 ```
 Internet → Caddy (auto-HTTPS reverse proxy) → app:3000 (Next.js standalone)
-                                              → db:5432 (Postgres, named volume)
+                                              → db:5432 (pgvector/pgvector:pg16, named volume)
+                                              → minio:9000 (uploaded files, named volume)
                                               → redis:6379 (named volume)
 ```
 
 - **VPS:** 2 vCPU / 4 GB RAM minimum (Hetzner, DigitalOcean, or equivalent). Ubuntu 24.04.
 - **Domain:** `marketr.launchabl.com` (or similar) → A record to the VPS. Caddy handles TLS.
-- **Cron:** host-level cron `curl` hitting the two scheduled endpoints with `CRON_SECRET` bearer.
-- **Backups:** nightly `pg_dump` to object storage + the `marketr-data` volume snapshotted.
+- **Cron:** the in-app cron runner (Phase 6, `lib/cron/runner.ts`) — on by default in the production server/compose (`CRON_RUNNER=internal`), needs only `CRON_SECRET`. Set `CRON_RUNNER=external` to drive the routes from a host crontab instead (§3.8).
+- **Backups:** the compose `backup` service (daily `pg_dump`, retention, optional S3/MinIO upload; see `docs/ops/BACKUP-RESTORE.md`) + the `marketr-minio`, `marketr-data`, `marketr-run-artifacts` and `marketr-corpus` volumes snapshotted.
 
-### 1a. Gap to fix before deploy (small code change, spec'd here)
+### 1a. Day-one defaults (Phase 6): database image, file storage, rate limits
 
-`docker-compose.yml` currently has **no volume for `.data/`** — site working copies (M7),
-fix-agent snapshots (M10), report PDFs + brand-kit logos (M12), and programmatic-SEO
-sitemaps (M17, `.data/sitemaps`, unless `SITEMAP_STORAGE_DIR` points elsewhere) live on the
-container's writable layer. They survive restarts but are lost on `compose down` / rebuild. Before deploy:
+A fresh `docker compose up -d` works with no extra steps beyond the §1b secrets. CI checks this on
+every push (`compose` job: `docker compose config`, then `db` + `migrate` must exit 0, the
+extensions and the app role must exist, and `minio-init` must create the bucket).
 
-1. Add a named volume: `marketr-data:/app/.data` on the `app` service.
-2. Set `SITE_STORAGE_DIR=/app/.data/sites`, `FIX_SNAPSHOT_DIR=/app/.data/fix-snapshots`,
-   `REPORT_STORAGE_DIR=/app/.data/reports`, and `SITEMAP_STORAGE_DIR=/app/.data/sitemaps` in `.env`.
-3. Rebuild and confirm a site working copy survives `docker compose down && docker compose up -d`.
+- **Database image: `pgvector/pgvector:pg16`.** The memory and substrate migrations run
+  `CREATE EXTENSION vector` (and `pg_trgm`, `pgcrypto`); plain `postgres:16-alpine` has no pgvector,
+  so a fresh install used to fail at that migration. `pgvector/pgvector:pg16` is the official
+  `postgres:16` (Debian) image plus pgvector, with the contrib extensions; CI uses the same image.
+  *Upgrading a volume created by `postgres:16-alpine`:* the data directory is compatible (same
+  major version), but Alpine (musl) and Debian (glibc) sort text differently, so run
+  `docker compose exec db psql -U marketr -d marketr -c 'REINDEX DATABASE marketr'` once after the
+  switch (or dump and restore with `docs/ops/BACKUP-RESTORE.md`).
+- **Uploaded files go to the bundled MinIO by default** (`MARKETR_STORAGE=s3` in compose). The
+  one-shot `minio-init` service creates the bucket (`MARKETR_S3_BUCKET`, default `marketr-files`)
+  before the app starts; the bytes live in the `marketr-minio` volume. To use AWS S3, R2 or another
+  S3-compatible store instead, set `MARKETR_S3_ENDPOINT`, `MARKETR_S3_REGION`, `MARKETR_S3_BUCKET`,
+  `MARKETR_S3_ACCESS_KEY` and `MARKETR_S3_SECRET_KEY` in `.env` (create the bucket yourself).
+  `MARKETR_STORAGE=local` keeps files on the `marketr-data` volume instead (one app container only).
+  *MinIO image:* MinIO stopped publishing pullable images (`minio/minio` and
+  `quay.io/minio/minio` refuse anonymous pulls), so compose uses Chainguard's MinIO build
+  (`chainguard/minio:latest-dev`, pinned by digest; override with `MINIO_IMAGE`). It runs as uid
+  65532. A `marketr-minio` volume written by an older root-run MinIO needs
+  `docker compose run --rm --user 0 --entrypoint chown minio -R 65532:65532 /data` once.
+  *Moving existing local files into the bucket:* the storage keys are the same UUIDs in both
+  backends, so copy `/app/.data/workspace-files/*` into the bucket as-is (for example with `mc cp`).
+- **Everything else on disk has a named volume.** `marketr-data` → `/app/.data` (report and brief
+  PDFs, brand logos, site working copies, fix-agent snapshots, sitemaps, the scheduler fallback
+  store, local-mode files), `marketr-run-artifacts` → `/app/.run-artifacts` (agent run recordings),
+  `marketr-corpus` → `/app/data` (the knowledge corpus). The `*_STORAGE_DIR` variables keep their
+  defaults under `/app/.data`; no `.env` changes are needed.
+- **Rate limits and the login lockout are shared in Postgres** (`RATE_LIMIT_STORE=postgres`, the
+  default whenever `DATABASE_URL` is set): one global `rate_limit_buckets` table, so the limits hold
+  when several app containers run. If the database errors or takes over a second, API rate limits
+  fall back to the per-process in-memory limiter, and the login lockout falls back to the in-memory
+  lockout (it never fails open). `RATE_LIMIT_STORE=memory` restores the per-process behaviour.
+  Clear a lockout with
+  `docker compose exec db psql -U marketr -d marketr -c "DELETE FROM rate_limit_buckets WHERE key LIKE 'login:%'"`.
 
 ### 1b. Database role, required secrets, and bound ports (Phase 1 hardening)
 
@@ -104,8 +134,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
 3. **Code:** `git clone` the vault repo to `/opt/marketr` (local-only remote — this stays private;
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
-5. **Data volume fix:** apply §1a, set the §1b secrets, then `docker compose up -d --build`.
-6. **Migrations:** watch the `migrate` service logs — `npx prisma migrate deploy` must apply all migrations cleanly
+5. **Start:** set the §1b secrets, then `docker compose up -d --build` (§1a covers what the defaults do).
+6. **Migrations:** watch the `migrate` service logs — `scripts/db/migrate.sh` (`prisma migrate deploy`) must apply all migrations cleanly
    and the app role must be created (§1b)
    (`..._init` → `..._studio_domains`). The M15 (`..._backlinks_internal_links`), M16
    (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19
@@ -115,7 +145,34 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
-8. **Cron (host crontab):**
+8. **Cron.** Every scheduled sweep is listed, with its cadence, in `lib/cron/jobs.ts`
+   (the single source of truth; a unit test fails when a cron route has no entry).
+   - **Default — in-app runner (`CRON_RUNNER=internal`):** the app server runs the table
+     itself. Only `CRON_SECRET` is needed (`openssl rand -hex 32`); without it the runner
+     logs one warning and stays off. Every replica ticks every 15 s, but a Postgres
+     advisory lock (`pg_try_advisory_xact_lock`, held for the claim only) lets exactly one
+     replica claim each due slot; claims are rows in `cron_runs`, so a restart or failover
+     never re-fires a slot and a job never overlaps itself. Each run POSTs to
+     `http://127.0.0.1:$PORT/<route>` with the `CRON_SECRET` bearer (override the origin
+     with `CRON_RUNNER_ORIGIN` if the server doesn't listen on loopback), with a start
+     jitter (≤5 s for every-minute jobs, ≤30 s otherwise) and a per-job timeout (10 or 30
+     min). Results (ok / failed / timed out, HTTP status, duration, error excerpt) are kept
+     7 days in `cron_runs` and shown to platform operators on Settings → Providers →
+     Scheduled jobs. Times are UTC. Off by default under `next dev` (set
+     `CRON_RUNNER=internal` to try it), never during `next build` or tests.
+   - **External scheduler (`CRON_RUNNER=external`):** keep the host crontab below (or a
+     Kubernetes CronJob / PaaS cron — serverless hosts have no long-lived process and must
+     use this). Don't run both: the routes are idempotent, but daily sweeps would run twice.
+   - Cadences picked in Phase 6 for routes that had none documented (reasons in
+     `lib/cron/jobs.ts`): `* * * * *` `/api/cron/workflows` and `/api/scheduler/tick`;
+     `*/5` `/api/cron/messaging`, `/api/cron/nurture`; `*/10` `/api/cron/connector-refresh`,
+     `/api/calls/reminders/run` (bearer `REMINDERS_CRON_SECRET`, skipped when unset);
+     `*/15` `/api/cron/actions`, `/api/cron/contextdev-monitors`; daily `0 2`
+     `/api/cron/learning-consolidate`, `15 4` `/api/cron/connector-intro-expiry`, `30 4`
+     `/api/cron/connector-paths`, `45 4` `/api/cron/dataset-health`, `0 6`
+     `/api/cron/funding-followups`, `15 6` `/api/cron/legal-deadlines`.
+
+   **Host crontab (only with `CRON_RUNNER=external`):**
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
    - `30 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/fix-agent`
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reports`
@@ -123,6 +180,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/alerts`
    - `0 8 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/visibility-score` (milestone 14: daily composite score + visibility_delta alerts)
    - `5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-pull` (Phase 10 M1: hourly GSC Search Analytics pull — last 3h of HOURLY_ALL per GSC-bound project into gsc_snapshot; feeds the delta engine + M2 radar)
+   - `20 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ops-reorder` (Phase 10 ops-core: min/max reorder rules draft purchase orders — drafts only, one per breach)
+   - `*/10 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ops-helpdesk-sla` (Phase 10 ops-core: helpdesk SLA breaches — recorded once per ticket, assignee + editors notified)
    - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-inspection` (Phase 10 M1: URL Inspection queue drain — priority-ordered, fair-share across projects, 2,000 QPD/site hard wall; never sweeps)
    - `0 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/decay` (milestone 14: weekly content-decay detection)
    - `30 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/radar` (milestone 14: weekly competitor radar)
@@ -138,9 +197,12 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ads` (milestone 21: every-5-minutes sweep for queued/in-flight Higgsfield ad jobs; submits jobs that never got a provider id, polls due ones on a 30s cadence (40-attempt cap), records actual cost and spend; provider failures audit-log + fire an M13 alert)
    - `0 2 1 * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/storage-metering` (Phase C gaps: monthly storage over-quota ledger charge — per whole GB over quota on the month-end snapshot, rounded up, 1 credit/GB-month; idempotent per workspace per month)
    - `0 3 1 * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/overage-invoicing` (overage invoicing: monthly Stripe invoices for accrued overage on auto-overage workspaces — completed UTC months only, $5.00 minimum (smaller amounts carry forward), replay-safe per workspace per month; no-op when Stripe is unconfigured)
+   - `* * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/webhooks` (Phase 4a: outbound webhook queue — signed POSTs to workspace endpoints, retries on a 1m/4m/16m… backoff for ~2 days, then dead-letter; bounded to 200 attempts per call)
+   - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/social-engagement` (Phase 4b: social loop — scheduled posts Postiz reports published → published (+ `social_post.published` webhook) or failed; then daily engagement per post (hourly per post, last 30 days) into `social_post_metrics`, which feeds Attribution and the analytics home)
    - `0 3 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/recording-retention` (Phase 16 slice 8: daily retention sweep — drops videos older than 30 days unless pinned, keeps traces; idempotent per recording)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
-10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
+10. **Backups:** the compose `backup` service runs `scripts/ops/backup.sh --loop` (daily `pg_dump`, 14-day local retention, optional S3/MinIO upload via `BACKUP_S3_*`). Restore procedure and the recorded drill: `docs/ops/BACKUP-RESTORE.md`.
+11. **Health:** `GET /api/health` (readiness: DB + migrations, 503 when not ready) and `GET /api/health/live` (liveness, no I/O). The compose `app` healthcheck uses the former; point uptime monitors at it too.
 
 ## 4. Live verification checklist (the whole loop, for real)
 
@@ -155,12 +217,12 @@ Run in order; each step must pass before the next.
 - [ ] **Sites builder:** AI-generate a landing page, preview, save, open in IDE.
 - [ ] **WordPress (real app password):** connect, edit a draft post, publish the landing page to WP.
 - [ ] **Webflow (real token):** connect, create a CMS item, publish site.
-- [ ] **Hosting (real tokens):** deploy the landing page to Vercel *or* Cloudflare Pages, visit the live URL.
+- [ ] **Hosting (real tokens):** deploy the landing page to Vercel, Cloudflare Pages *or* Netlify, visit the live URL; deploy again, then roll back to the first deploy (approve it in Actions) and confirm the URL serves it.
 - [ ] **Fix agent (real working copy):** run audit on a test site, approve 2–3 safe fixes, run the scheduled applier, confirm fixes + audit entries, test one-click revert.
 - [ ] **RBAC:** invite a second user as `viewer` — confirm read-only; promote to `editor` — confirm no member management; demote/remove.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
 - [ ] **Newsletter (live Resend, BYO key):** add a workspace Resend key, add a sending domain, copy the SPF/DKIM/DMARC records into DNS, verify the domain, import a 3-address CSV list, build a template from a starter, send a test email, then send a real broadcast to the test list; confirm the unsubscribe link works, the webhook flips a bounced address, and the audit log + alert fire on a forced failure.
-- [ ] **Cron:** trigger both cron endpoints manually with `CRON_SECRET`, confirm 200s and expected side effects.
+- [ ] **Cron:** with the in-app runner on, confirm the startup log line `in-app cron runner started` and, after a few minutes, `ok` rows on Settings → Providers → Scheduled jobs (platform operator). With `CRON_RUNNER=external`, trigger the cron endpoints manually with `CRON_SECRET` and confirm 200s and expected side effects.
 - [ ] **Studio (Porkbun domains, sandbox only):** with sandbox/dry-run keys, save
   keys, search availability, view TLD pricing, save a registrant, preview a
   purchase, confirm it with the terms checkbox — confirm the domain row lands
@@ -218,13 +280,65 @@ Run in order; each step must pass before the next.
   the setup wizard shows the exact records and a "Verify now" button.
 - Scheduled broadcasts need the host cron entry `*/5 * * * * … /api/cron/newsletter` (see §3.8).
 
+## 4d. Agent worker and code sandbox (Phase 8)
+
+- **Worker.** `docker compose up` starts a `worker` service (`scripts/worker.mts`)
+  that claims `agent_jobs` (`SKIP LOCKED`, leases + heartbeats, a dead run is
+  requeued and resumes from its saved transcript). The app runs with
+  `AGENT_WORKER=external`: a chat turn still running after
+  `AGENT_INLINE_BUDGET_SECONDS` (45) is handed to the worker; build-mode turns
+  go straight there. Without compose, `AGENT_WORKER=internal` runs the worker
+  loop inside the app process; `off` keeps every turn inline. Budgets:
+  `AGENT_MAX_STEPS` (40), `AGENT_MAX_RUN_MINUTES` (30),
+  `AGENT_MAX_RUN_COST_MICRO_USD` ($10). All in `.env.example`.
+- **Code sandbox.** Off by default (no provider → the code tools say why, never
+  fake). Pick one:
+  - Hosted microVMs (recommended for shared/production hosts):
+    `SANDBOX_PROVIDER=e2b` + `E2B_API_KEY`, or `SANDBOX_PROVIDER=daytona` +
+    `DAYTONA_API_KEY`. Nothing else to mount.
+  - Docker on a dedicated host:
+    `docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d`
+    (mounts the Docker socket — root-equivalent — into app and worker; see the
+    file's header). Set `DOCKER_GID` to the socket's group id.
+- **GitHub.** Agents push only to `shapes/<run-id>` branches and open PRs after
+  an approval. Uses a GitHub site's personal access token, or a GitHub App when
+  `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` are set.
+- **Live checks (unverified in CI — no Docker daemon or keys there):** Docker
+  container create / archive PUT / previews; the E2B and Daytona adapters; real
+  GitHub branch → push → PR; the Claude loop with native tools, caching and
+  compaction.
+
+## 4e. Sites: agent drafts, Netlify, rollback and live smoke tests (Phase 9)
+
+- **Agents edit sites in the sandbox.** `site_checkout` copies a site's working
+  copy (Sites → IDE files) into the run's code sandbox (needs a sandbox
+  provider, §4d); `site_publish_draft` saves the result as a draft revision.
+  Nothing goes live until a person clicks **Apply** under Sites → Agent drafts
+  (the previous files are kept as a backup revision — **Restore** reverts).
+  Deploy / publish afterwards as usual.
+- **Netlify** joins Vercel and Cloudflare Pages under Sites → Hosting (personal
+  access token, optional site id; file-digest deploys). Tokens are per
+  connection, encrypted at rest — no env var.
+- **One-click rollback.** Deployment history → **Roll back** requests a Tier-2
+  approval (Actions / the "needs you" inbox); once approved, **Run rollback**
+  calls the provider (Vercel instant rollback, Cloudflare Pages rollback,
+  Netlify restore deploy) and records a rollback row.
+- **Live smoke tests (opt-in).** `npx tsx scripts/live/run-all.mts` runs
+  `scripts/live/{github,wordpress,webflow,vercel,cloudflare,netlify,anthropic}.mts`
+  through the app's own adapters. Each SKIPS unless its `LIVE_*` keys are set
+  (listed in `.env.example`); deploy + rollback checks also need
+  `LIVE_DEPLOY_WRITE=1` and create deployments in scratch projects. In GitHub:
+  add the `LIVE_*` repository secrets, then run **Actions → live-smoke → Run
+  workflow** (`.github/workflows/live-smoke.yml`, `workflow_dispatch` only —
+  never on push or PR). `LIVE_ONLY=netlify,anthropic` limits a run.
+
 ## 5. Test targets (safe, non-production)
 
 - SFTP: a disposable directory on a Launchabl staging host (NOT a client site).
 - GitHub: a new scratch repo (e.g. `launchabl/marketr-smoke`), deleted after.
 - WordPress: a staging WP install with an application password.
 - Webflow: a test workspace + API token.
-- Vercel/Cloudflare: tokens scoped to test projects; tear down deployments after.
+- Vercel/Cloudflare/Netlify: tokens scoped to test projects; tear down deployments after.
 
 ## 6. Rollback
 

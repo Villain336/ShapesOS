@@ -32,6 +32,31 @@ describe("validateAllocationRule", () => {
     );
     assert.equal(validateAllocationRule({ method: "hourly" as never }).ok, false);
   });
+
+  // Phase 4a follow-up: Number("") is 0, so a blank percent used to save as
+  // a 0% allocation. Blank / null / whitespace is "missing" → invalid.
+  it("treats an empty-string, whitespace or null percent as missing, never 0", () => {
+    for (const percent of ["", "   ", null, undefined, true, [], {}]) {
+      const r = validateAllocationRule({ method: "flat_percent", percent });
+      assert.equal(r.ok, false, `percent ${JSON.stringify(percent)} must be rejected`);
+      assert.match(r.errors.join(" "), /percent: required/);
+    }
+  });
+
+  it("still accepts an explicit 0 and numeric strings", () => {
+    assert.equal(validateAllocationRule({ method: "flat_percent", percent: 0 }).normalized?.percent, 0);
+    assert.equal(validateAllocationRule({ method: "flat_percent", percent: "0" }).normalized?.percent, 0);
+    assert.equal(validateAllocationRule({ method: "flat_percent", percent: " 12.5 " }).normalized?.percent, 12.5);
+  });
+
+  it("blank square footage is missing, not 0", () => {
+    const r = validateAllocationRule({ method: "square_footage", officeSqft: "", totalSqft: "1200" });
+    assert.equal(r.ok, false);
+    assert.match(r.errors.join(" "), /officeSqft/);
+    const ok = validateAllocationRule({ method: "flat_percent", percent: 20, officeSqft: "", totalSqft: "" });
+    assert.equal(ok.normalized?.officeSqft, null);
+    assert.equal(ok.normalized?.totalSqft, null);
+  });
 });
 
 describe("validateExpense", () => {

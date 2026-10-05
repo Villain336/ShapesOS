@@ -15,7 +15,9 @@
 //         with a fresh nonce (also put on the REQUEST headers, where Next's
 //         renderer reads it and stamps it on its own <script> tags — see
 //         node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md);
-//       /api/*                               → API_CONTENT_SECURITY_POLICY.
+//       /api/*                               → API_CONTENT_SECURITY_POLICY;
+//       user file bytes outside /api (the data-room viewer's ?dl= stream)
+//                                            → USER_FILE_VIEW_CSP (sandboxed).
 //
 // Page policy (script-src) — strict CSP:
 //   'nonce-…' 'strict-dynamic': only scripts Next rendered with the nonce run,
@@ -117,12 +119,68 @@ export const API_CONTENT_SECURITY_POLICY = [
   "sandbox allow-forms allow-popups allow-popups-to-escape-sandbox",
 ].join("; ");
 
-/** Which policy a request path gets (see header comment). */
+/**
+ * CSP for user file bytes served OUTSIDE /api — today the public data-room
+ * viewer's file stream (/r/funding/<token>?dl=1, loaded in the viewer page's
+ * iframe). Same stance as the project-download "sandbox" policy: a
+ * sandboxed (opaque-origin, scriptless, plugin-less, no forms) document that
+ * can show an image or media from itself and may only be framed by our own
+ * pages. Sent by proxy.ts (a route's own CSP header would be dropped in
+ * favour of the proxy's) AND by the route, so both always agree.
+ */
+export const USER_FILE_VIEW_CSP = [
+  "sandbox",
+  "default-src 'none'",
+  "img-src 'self' data:",
+  "media-src 'self'",
+  "style-src 'unsafe-inline'",
+  "frame-ancestors 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+
+/**
+ * Phase 8: CSP for a sandbox preview (/api/agent-runs/<runId>/preview/…,
+ * lib/sandbox/preview-proxy.ts) — a dev server an agent built, so it must
+ * run its own scripts, but it is untrusted: `sandbox` WITHOUT
+ * allow-same-origin makes it an opaque origin (no access to the app's
+ * cookies or storage; its requests to the app are cross-site, so the Lax
+ * session cookie is not sent), no top-level navigation, no popups, and it
+ * may only be framed by our own pages.
+ */
+export const SANDBOX_PREVIEW_CSP = [
+  "sandbox allow-scripts allow-forms allow-modals allow-downloads",
+  "default-src 'self' data: blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self'",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
+/** Phase 8: is this a sandbox preview path (see SANDBOX_PREVIEW_CSP)? */
+export function isSandboxPreviewPath(pathname: string): boolean {
+  return /^\/api\/agent-runs\/[^/]+\/preview\/\d+(\/|$)/.test(pathname);
+}
+
+/** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
+export function isUserFileRequest(pathname: string, search: URLSearchParams | string = ""): boolean {
+  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+  return /^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl");
+}
+
+/** Which policy a request gets (see header comment). */
 export function contentSecurityPolicyFor(
   pathname: string,
-  opts: { nonce: string; dev?: boolean },
+  opts: { nonce: string; dev?: boolean; search?: URLSearchParams | string },
 ): string {
+  if (isSandboxPreviewPath(pathname)) return SANDBOX_PREVIEW_CSP;
   if (pathname === "/api" || pathname.startsWith("/api/")) return API_CONTENT_SECURITY_POLICY;
+  if (isUserFileRequest(pathname, opts.search ?? "")) return USER_FILE_VIEW_CSP;
   return buildContentSecurityPolicy(opts);
 }
 

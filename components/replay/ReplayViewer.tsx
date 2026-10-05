@@ -93,9 +93,9 @@ export function ReplayViewer({
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-200 bg-white p-8 text-center">
-        <MonitorPlay className="mx-auto h-8 w-8 text-stone-300" />
-        <p className="mt-3 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
+        <MonitorPlay className="mx-auto h-8 w-8 text-subtle" />
+        <p className="mt-3 text-[13px] text-muted">
           No recordings yet. Recordings appear here once someone views this
           share link.
         </p>
@@ -106,14 +106,14 @@ export function ReplayViewer({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="replay-session" className="text-[13px] font-medium text-stone-700">
+        <label htmlFor="replay-session" className="text-[13px] font-medium text-ink">
           Session
         </label>
         <select
           id="replay-session"
           value={selected ?? ""}
           onChange={(e) => setSelected(e.target.value)}
-          className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-800"
+          className="h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
         >
           {sessions.map((s) => (
             <option key={s.id} value={s.id}>
@@ -125,23 +125,24 @@ export function ReplayViewer({
       </div>
 
       {state.kind === "loading" && (
-        <div className="rounded-xl border border-stone-200 bg-white p-8 text-center text-sm text-stone-500">
+        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline text-sm text-muted">
           Loading recording…
         </div>
       )}
       {state.kind === "error" && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[13px] text-red-700">
+        <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint p-4 text-[13px] text-failed-text">
+          <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
           {state.message}
         </div>
       )}
       {state.kind === "empty" && (
-        <div className="rounded-xl border border-stone-200 bg-white p-8 text-center text-[13px] text-stone-500">
+        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline text-[13px] text-muted">
           This session captured no events.
         </div>
       )}
       <div
         ref={mountRef}
-        className="min-h-[320px] overflow-hidden rounded-xl border border-stone-200 bg-white"
+        className="min-h-[320px] overflow-hidden rounded-lg bg-paper shadow-hairline"
       />
     </div>
   );

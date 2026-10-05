@@ -89,7 +89,11 @@ const good = serializeHealth(
   { id: "c2", connectorKey: "google-search-console", status: "active", meta: {} },
   { status: "unknown", lastCheckAt: new Date(), lastSuccessAt: null, lastError: "mock_adapter", quotaUsed: null, quotaLimit: null },
 );
-ok("mock adapter payload is unknown + not liveCheck", good.status === "unknown" && good.liveCheck === false);
+// Phase 4b: GSC is live-wired, so its payload reports a live check; an
+// `unknown` row stays unknown (never upgraded to green by serialization).
+ok("live-wired adapter payload stays unknown + liveCheck", good.status === "unknown" && good.liveCheck === true);
+const custom = serializeHealth({ id: "c4", connectorKey: "custom-acme", status: "active", meta: {} }, null);
+ok("no health row → unknown, never green", custom.status === "unknown");
 ok("quota numbers pass through", hostile.quota?.used === 12.5 && hostile.quota?.limit === 100);
 const badQuota = serializeHealth(
   { id: "c3", connectorKey: "resend", status: "active", meta: { quota: { used: "lots", limit: null } } },
@@ -111,7 +115,18 @@ const keyOf: Record<string, string> = {
   "google-ads": "google-ads", "google-drive": "google-drive",
   "google-search-console": "google-search-console", "meta-ads": "meta-ads",
   notion: "notion", resend: "resend", webflow: "webflow", wordpress: "wordpress",
+  gmail: "gmail", "google-calendar": "google-calendar",
+  "google-business-profile": "google-business-profile",
+  // Phase 11 wave A (conncore) + wave B (devtools, bizsync).
+  outlook: "outlook", "outlook-calendar": "outlook-calendar", slack: "slack",
+  hubspot: "hubspot", linear: "linear", jira: "jira", airtable: "airtable",
+  supabase: "supabase", netlify: "netlify", shopify: "shopify",
+  quickbooks: "quickbooks", xero: "xero",
+  // Phase 14 (connectors).
+  gusto: "gusto",
 };
+// Shared helpers that live beside the adapters but are not connectors.
+const sharedNativeModules = new Set(["accounting"]);
 const expectedMock = new Set([...mockFromHeaders].map((f) => keyOf[f]).filter(Boolean));
 ok(
   "MOCK_ONLY set matches adapter MOCK-ONLY headers",
@@ -119,7 +134,25 @@ ok(
     [...expectedMock].every((k) => MOCK_ONLY_ADAPTER_KEYS.has(k)),
   `headers={${[...expectedMock]}} set={${[...MOCK_ONLY_ADAPTER_KEYS]}}`,
 );
-ok("exactly 6 mock-only adapters (GSC, GA4, Drive, Notion, Meta Ads, Google Ads)", MOCK_ONLY_ADAPTER_KEYS.size === 6);
+// Phase 4b wired GSC, GA4, Drive, Notion, Meta Ads and Google Ads live.
+ok("exactly 0 mock-only adapters (Phase 4b live wiring)", MOCK_ONLY_ADAPTER_KEYS.size === 0);
+ok("every native adapter file is mapped to a registry key", readdirSync(nativeDir).filter((f) => f.endsWith(".ts")).map((f) => f.replace(/\.ts$/, "")).filter((f) => !sharedNativeModules.has(f)).every((f) => keyOf[f]));
+// The six formerly mock-only adapters expose a live health check (one cheap,
+// fixed provider endpoint) used only by the manual check route.
+for (const f of ["ga4", "google-search-console", "google-drive", "notion", "meta-ads", "google-ads", "google-business-profile"]) {
+  const body = readFileSync(join(nativeDir, `${f}.ts`), "utf8");
+  ok(`${f}: header documents LIVE WIRING`, /LIVE WIRING/.test(body) && !/not yet implemented/i.test(body));
+  ok(`${f}: has healthCheck()`, /async healthCheck\(/.test(body));
+  ok(`${f}: falls back to labeled mock mode without a credential`, /mockInvoke\(/.test(body) && /mockOk\(/.test(body));
+}
+ok(
+  "scheduled runHealthChecks passes no liveCheck (manual route only)",
+  /checkConnection\(c\.id, \{ fetchImpl: opts\.fetchImpl \}\)/.test(healthSrc),
+);
+ok(
+  "manual check route opts into the live check",
+  /checkConnection\(id, \{ liveCheck: probeConnection \}\)/.test(src("app/api/connections/[id]/check/route.ts")),
+);
 ok(
   "checker source never references safeFetch/probe/test_connection",
   !/safeFetch|test_connection|\.test\(\)/.test(healthSrc),

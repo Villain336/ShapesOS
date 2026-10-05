@@ -7,8 +7,13 @@
 //   - per-account across IPs: an attacker rotating IPs against one account
 //     trips this (5 failures / 1h → 15-minute lockout, doubling).
 //
-// In-memory and single-instance by design (documented); front with a shared
-// rate limiter (Redis etc.) if you run replicas. Bounded maps (oldest UNLOCKED
+// Phase 6: the *Async variants (what auth.ts and the MFA paths call) keep the
+// lockout in the shared Postgres table (lib/api/rate-limit-store.ts,
+// RATE_LIMIT_STORE) so it holds across replicas. The in-memory maps below are
+// ALWAYS written too and are the fallback: if the shared store errors or
+// times out, the in-memory lockout decides. The lockout never fails open.
+// The sync functions are the in-memory lockout alone (per process; scripts,
+// tests, RATE_LIMIT_STORE=memory). Bounded maps (oldest UNLOCKED
 // entry evicted past 10k keys) so the tracker itself can't be used as a memory
 // exhaustion vector — and flooding it with junk emails can't evict (= reset)
 // a locked account. When every tracked key is locked the map grows past the
@@ -19,12 +24,21 @@
 // recorded) pushed the owner's lockout out to years — a permanent admin DoS.
 //
 // Break-glass (also documented in .env.example):
-//   - Restarting the app clears every lockout (the state is in-memory).
+//   - Restarting the app clears the in-memory lockouts. With the shared store,
+//     clear a lockout with: DELETE FROM rate_limit_buckets WHERE key LIKE 'login:%';
 //   - LOGIN_BREAK_GLASS_IPS="203.0.113.7,…": sign-ins from these client IPs
 //     (resolved via TRUSTED_PROXY_HOPS, so not spoofable through
 //     X-Forwarded-For) skip the per-ACCOUNT lock, so the owner can get in
 //     while someone keeps re-locking the account from elsewhere. The per-IP
 //     dimension still applies to them.
+
+import {
+  maybeCleanup,
+  sharedCounterStore,
+  storeWarn,
+  withStoreTimeout,
+  type LockoutPolicy,
+} from "../api/rate-limit-store";
 
 export const LOGIN_IP_MAX_FAILURES = 20;
 export const LOGIN_ACCOUNT_MAX_FAILURES = 5;
@@ -114,11 +128,131 @@ export function recordLoginSuccess(ip: string | null, email: string): void {
  * (LOGIN_BREAK_GLASS_IPS) is exempt from the per-account lock only.
  */
 export function loginLockedOut(ip: string | null, email: string, now: number = Date.now()): boolean {
-  const ipRec = ipAttempts.get(ipKey(ip));
+  return lockedFrom(ipAttempts.get(ipKey(ip)), accountAttempts.get(accountKey(email)), ip, now);
+}
+
+/** The lock decision for one IP record + one account record (both stores). */
+function lockedFrom(
+  ipRec: AttemptState | undefined,
+  acctRec: AttemptState | undefined,
+  ip: string | null,
+  now: number,
+): boolean {
   if (ipRec && ipRec.lockedUntil > now) return true;
   if (ip && breakGlassIps().has(ip)) return false;
-  const acctRec = accountAttempts.get(accountKey(email));
   return !!acctRec && acctRec.lockedUntil > now;
+}
+
+/** Failures that still count: inside the window, or while the lock holds. */
+function liveFailures(rec: AttemptState | undefined, now: number): number {
+  return rec && (now - rec.firstAt <= LOGIN_WINDOW_MS || rec.lockedUntil > now) ? rec.failures : 0;
+}
+
+/**
+ * Phase 4a step-up: failures recorded in the current window for this IP and
+ * account (a locked or expired record counts as its live failures only while
+ * its window or lock is still running). lib/auth/captcha.ts asks for a
+ * CAPTCHA once either reaches LOGIN_CAPTCHA_AFTER_FAILURES.
+ */
+export function loginFailureCounts(
+  ip: string | null,
+  email: string,
+  now: number = Date.now(),
+): { ip: number; account: number } {
+  return {
+    ip: liveFailures(ipAttempts.get(ipKey(ip)), now),
+    account: liveFailures(accountAttempts.get(accountKey(email)), now),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Shared (multi-replica) lockout — Phase 6. Same two dimensions, thresholds
+// and doubling/capped backoff, kept in rate_limit_buckets under
+// "login:ip:<ip>" and "login:acct:<email-or-factor-key>".
+// ---------------------------------------------------------------------------
+
+const IP_POLICY: LockoutPolicy = {
+  maxFailures: LOGIN_IP_MAX_FAILURES,
+  windowMs: LOGIN_WINDOW_MS,
+  baseLockoutMs: LOGIN_BASE_LOCKOUT_MS,
+  maxLockoutMs: LOGIN_MAX_LOCKOUT_MS,
+};
+const ACCOUNT_POLICY: LockoutPolicy = { ...IP_POLICY, maxFailures: LOGIN_ACCOUNT_MAX_FAILURES };
+
+function sharedKeys(ip: string | null, email: string): { ip: string; account: string } {
+  return { ip: `login:ip:${ipKey(ip)}`, account: `login:acct:${accountKey(email)}` };
+}
+
+/** Record a failed login: in memory always (the fallback), and in the shared store. */
+export async function recordLoginFailureAsync(
+  ip: string | null,
+  email: string,
+  now: number = Date.now(),
+): Promise<void> {
+  recordLoginFailure(ip, email, now);
+  const store = sharedCounterStore();
+  if (!store) return;
+  const keys = sharedKeys(ip, email);
+  try {
+    await withStoreTimeout(
+      Promise.all([store.bumpLockout(keys.ip, IP_POLICY, now), store.bumpLockout(keys.account, ACCOUNT_POLICY, now)]),
+    );
+    maybeCleanup(store, now);
+  } catch (err) {
+    storeWarn("login failure", err);
+  }
+}
+
+/** A successful login clears both dimensions in both stores. */
+export async function recordLoginSuccessAsync(ip: string | null, email: string): Promise<void> {
+  recordLoginSuccess(ip, email);
+  const store = sharedCounterStore();
+  if (!store) return;
+  const keys = sharedKeys(ip, email);
+  try {
+    await withStoreTimeout(store.clear([keys.ip, keys.account]));
+  } catch (err) {
+    storeWarn("login success", err);
+  }
+}
+
+/**
+ * Locked out? The shared store decides when it answers; if it errors or
+ * times out, the in-memory lockout decides (NEVER fail open).
+ */
+export async function loginLockedOutAsync(
+  ip: string | null,
+  email: string,
+  now: number = Date.now(),
+): Promise<boolean> {
+  const store = sharedCounterStore();
+  if (!store) return loginLockedOut(ip, email, now);
+  const keys = sharedKeys(ip, email);
+  try {
+    const recs = await withStoreTimeout(store.readLockouts([keys.ip, keys.account]));
+    return lockedFrom(recs.get(keys.ip), recs.get(keys.account), ip, now);
+  } catch (err) {
+    storeWarn("login lockout check", err);
+    return loginLockedOut(ip, email, now);
+  }
+}
+
+/** Failure counts for the CAPTCHA step-up, shared store first, memory on failure. */
+export async function loginFailureCountsAsync(
+  ip: string | null,
+  email: string,
+  now: number = Date.now(),
+): Promise<{ ip: number; account: number }> {
+  const store = sharedCounterStore();
+  if (!store) return loginFailureCounts(ip, email, now);
+  const keys = sharedKeys(ip, email);
+  try {
+    const recs = await withStoreTimeout(store.readLockouts([keys.ip, keys.account]));
+    return { ip: liveFailures(recs.get(keys.ip), now), account: liveFailures(recs.get(keys.account), now) };
+  } catch (err) {
+    storeWarn("login failure counts", err);
+    return loginFailureCounts(ip, email, now);
+  }
 }
 
 /**

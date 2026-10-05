@@ -97,5 +97,16 @@ export async function getOrCreateWorkspace(
   // Phase 3: the plan follows DEPLOYMENT_MODE (hosted signups start the
   // 14-day trial; self-hosted keeps self_hosted) and the creation is audited.
   // The onboarding wizard lets the owner pick a real name.
-  return createWorkspaceForUser({ userId, name: defaultWorkspaceName(email), ifNoneExists: true });
+  // Phase 4a: a session that outlived a deleted account must not provision a
+  // fresh workspace (createWorkspaceForUser checks the sign-in time).
+  // Outside a request (scripts, tests) there is no session: no sign-in time,
+  // which only matters for an account that was deleted.
+  let authAt: number | null = null;
+  try {
+    const session = await auth();
+    if (session?.user?.id === userId) authAt = session.user.authAt ?? null;
+  } catch {
+    // no request scope
+  }
+  return createWorkspaceForUser({ userId, name: defaultWorkspaceName(email), ifNoneExists: true, authAt });
 }

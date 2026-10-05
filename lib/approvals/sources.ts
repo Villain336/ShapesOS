@@ -20,11 +20,15 @@ import type {
   InboxAction,
   InboxDb,
   InboxItem,
+  InboxLine,
   InboxRisk,
   InboxSourceKey,
   InboxViewer,
 } from "./types";
 import { INBOX_SOURCE_LABELS } from "./types";
+import { clip, factLines, humanize, money } from "./format";
+
+export { factLines, humanize };
 
 export interface SourceContext {
   db: InboxDb;
@@ -54,24 +58,6 @@ function iso(d: Date | null | undefined): string | null {
   return d ? d.toISOString() : null;
 }
 
-function clip(s: string | null | undefined, n = 140): string | null {
-  if (!s) return null;
-  const t = s.replace(/\s+/g, " ").trim();
-  if (!t) return null;
-  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
-}
-
-/** "outreach_send" → "Outreach send". */
-export function humanize(s: string): string {
-  const t = s.replace(/[_.:-]+/g, " ").replace(/\s+/g, " ").trim();
-  return t ? t[0]!.toUpperCase() + t.slice(1).toLowerCase() : s;
-}
-
-function money(cents: number | null | undefined): string | null {
-  if (typeof cents !== "number" || !Number.isFinite(cents)) return null;
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 const enc = encodeURIComponent;
 
 interface ItemInput {
@@ -89,6 +75,11 @@ interface ItemInput {
   blockedReason?: string | null;
   approve?: InboxAction | null;
   deny?: InboxAction | null;
+  agent?: string | null;
+  missionId?: string | null;
+  missionName?: string | null;
+  lines?: InboxLine[];
+  lineTotal?: number;
 }
 
 /** Normalize an item; inline actions are dropped when the viewer can't decide. */
@@ -110,6 +101,11 @@ export function makeItem(i: ItemInput): InboxItem {
     blockedReason: i.canDecide ? null : (i.blockedReason ?? "Your role can view this but not decide it."),
     approve: i.canDecide ? (i.approve ?? null) : null,
     deny: i.canDecide ? (i.deny ?? null) : null,
+    agent: i.agent ?? null,
+    missionId: i.missionId ?? null,
+    missionName: i.missionName ?? null,
+    lines: i.lines ?? [],
+    lineTotal: Math.max(i.lineTotal ?? 0, i.lines?.length ?? 0),
   };
 }
 
@@ -143,7 +139,7 @@ const mission: InboxSource = {
           createdBy: true,
           createdAt: true,
           expiresAt: true,
-          mission: { select: { template: true } },
+          mission: { select: { template: true, goal: true } },
         },
       }),
     );
@@ -151,6 +147,8 @@ const mission: InboxSource = {
     return rows.map((r) => {
       const amount = (r.bindingJson as Record<string, unknown> | null)?.amountCents;
       const amountLabel = typeof amount === "number" ? money(amount) : null;
+      const goalLabel = (r.mission?.goal as { label?: unknown } | null)?.label;
+      const facts = factLines(r.bindingJson);
       return makeItem({
         id: r.id,
         source: "mission",
@@ -166,6 +164,15 @@ const mission: InboxSource = {
         blockedReason: EDITOR_REASON,
         approve: post("/api/automation/decide", { approvalId: r.id, missionId: r.missionId, decision: "approved" }),
         deny: post("/api/automation/decide", { approvalId: r.id, missionId: r.missionId, decision: "denied" }),
+        missionId: r.missionId,
+        missionName:
+          typeof goalLabel === "string" && goalLabel.trim()
+            ? goalLabel.trim()
+            : r.mission?.template
+              ? humanize(r.mission.template.split(".").pop() ?? r.mission.template)
+              : null,
+        lines: facts.lines,
+        lineTotal: facts.total,
       });
     });
   },
@@ -306,6 +313,13 @@ const messaging: InboxSource = {
       const meta = MESSAGING_TYPES[r.kind] ?? { label: humanize(r.kind), href: "/dashboard/nurture?tab=approvals" };
       const channel = typeof payload.channel === "string" ? payload.channel.toUpperCase() : null;
       const body = typeof payload.body === "string" ? payload.body : null;
+      const to = ["to", "recipient", "leadName", "email", "phone"]
+        .map((k) => payload[k])
+        .find((v): v is string => typeof v === "string" && v.trim().length > 0);
+      const lines: InboxLine[] = [
+        ...(to ? [{ label: "To", detail: clip(to, 80) }] : []),
+        ...(channel ? [{ label: "Channel", detail: channel }] : []),
+      ];
       return makeItem({
         id: r.id,
         source: "messaging",
@@ -320,6 +334,7 @@ const messaging: InboxSource = {
         blockedReason: EDITOR_REASON,
         approve: post(`/api/messaging/approvals/${enc(r.id)}`, { decision: "approve" }),
         deny: post(`/api/messaging/approvals/${enc(r.id)}`, { decision: "reject" }),
+        lines,
       });
     });
   },
@@ -384,6 +399,7 @@ const scheduler: InboxSource = {
         source: "scheduler",
         typeLabel: `Scheduled run · ${humanize(r.trigger)}`,
         title: `Run ${r.skill?.name ?? "skill"}`,
+        agent: r.skill?.name ?? null,
         requestedBy: r.schedule?.createdBy ?? null,
         createdAt: r.startedAt,
         risk: "medium",
@@ -516,6 +532,7 @@ const intro: InboxSource = {
         title: `Ask ${r.personA?.name ?? "a contact"} to introduce ${r.personB?.name ?? "a target"}`,
         detail: followup ? r.pendingFollowupDraft : r.draftAskMessage,
         requestedBy: "agent:connector",
+        agent: "Connector",
         createdAt: followup ? r.updatedAt : r.createdAt,
         risk: r.mode === "funding" ? "high" : "medium",
         href: "/dashboard/connector",
@@ -544,6 +561,7 @@ const boardy: InboxSource = {
         title: r.draftedSubject || `Request an intro to ${r.targetName}`,
         detail: `Target: ${r.targetName}`,
         requestedBy: "agent:connector",
+        agent: "Connector",
         createdAt: r.createdAt,
         risk: r.mode === "funding" ? "high" : "medium",
         href: "/dashboard/connector",
@@ -768,6 +786,66 @@ const mail: InboxSource = {
   },
 };
 
+/**
+ * Social posts (Phase 4b) — RLS table; decided via /api/social/posts/[id]/decision.
+ * Editor+, and not your own submission while another approver exists.
+ */
+const social: InboxSource = {
+  key: "social",
+  viewRole: "viewer",
+  async load(ctx) {
+    const rows = await ctx.scoped((tx) =>
+      tx.socialPublication.findMany({
+        where: { workspaceId: ctx.viewer.workspaceId, status: "pending_approval" },
+        orderBy: { requestedAt: "desc" },
+        take: ctx.limit,
+        select: {
+          id: true,
+          content: true,
+          media: true,
+          channels: true,
+          publishMode: true,
+          scheduledFor: true,
+          requestedBy: true,
+          requestedAt: true,
+          createdAt: true,
+        },
+      }),
+    );
+    return rows.map((r) => {
+      const channels = Array.isArray(r.channels) ? (r.channels as Array<{ name?: unknown }>) : [];
+      const mediaCount = Array.isArray(r.media) ? r.media.length : 0;
+      const own = !!r.requestedBy && r.requestedBy === ctx.viewer.userId;
+      const blockedBySoD = own && ctx.viewer.hasOtherApprover;
+      const text = r.content.replace(/\s+/g, " ").trim();
+      const when =
+        r.publishMode === "schedule" && r.scheduledFor
+          ? `scheduled ${r.scheduledFor.toISOString().slice(0, 16).replace("T", " ")} UTC`
+          : "publishes on approval";
+      return makeItem({
+        id: r.id,
+        source: "social",
+        typeLabel: mediaCount ? "Social post · media" : "Social post",
+        title: text || `Media post (${mediaCount})`,
+        detail: [
+          channels.map((c) => (typeof c.name === "string" ? c.name : null)).filter(Boolean).join(", ") || null,
+          when,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        requestedBy: r.requestedBy,
+        createdAt: r.requestedAt ?? r.createdAt,
+        risk: "medium",
+        href: `/dashboard/social?post=${enc(r.id)}`,
+        canDecide: isEditor(ctx.viewer) && !blockedBySoD,
+        blockedReason: blockedBySoD ? "Someone else approves posts you submit." : EDITOR_REASON,
+        approve: post(`/api/social/posts/${enc(r.id)}/decision`, { decision: "approve" }),
+        deny: post(`/api/social/posts/${enc(r.id)}/decision`, { decision: "deny" }),
+      });
+    });
+  },
+};
+
 export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   mission,
   spend,
@@ -783,4 +861,5 @@ export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   integration,
   media,
   mail,
+  social,
 ];

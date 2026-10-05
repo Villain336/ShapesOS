@@ -361,7 +361,16 @@ function IconifySvgNode({
   );
 }
 
+/** Konva paints to a <canvas>, which can't resolve CSS variables, so the
+ *  editor chrome (snap guides, transformer) reads Agentic OS tokens at runtime. */
+function readToken(name: string): string {
+  if (typeof window === "undefined") return "";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
+  // Selection chrome follows the focus color (the system's one non-status blue).
+  const chrome = useMemo(() => ({ select: readToken("--aos-focus"), handle: readToken("--aos-paper") }), []);
   const document = useCanvasStore((s) => s.document);
   const activePageId = useCanvasStore((s) => s.activePageId);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -517,7 +526,7 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
           const empty = e.target === e.target.getStage() || e.target.name() === "page-bg";
           if (empty) clearSelection();
         }}
-        className="overflow-hidden rounded-[2px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
+        className="overflow-hidden rounded-[2px] bg-paper shadow-raised"
       >
         <Layer>
           <Rect
@@ -547,7 +556,7 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
           {guides.v !== null && (
             <Line
               points={[guides.v, 0, guides.v, page.height]}
-              stroke="#7c3aed"
+              stroke={chrome.select}
               strokeWidth={1 / zoom}
               dash={[6 / zoom, 4 / zoom]}
               listening={false}
@@ -556,7 +565,7 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
           {guides.h !== null && (
             <Line
               points={[0, guides.h, page.width, guides.h]}
-              stroke="#7c3aed"
+              stroke={chrome.select}
               strokeWidth={1 / zoom}
               dash={[6 / zoom, 4 / zoom]}
               listening={false}
@@ -575,9 +584,9 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
               "bottom-center",
               "bottom-right",
             ]}
-            anchorStroke="#7c3aed"
-            anchorFill="#ffffff"
-            borderStroke="#7c3aed"
+            anchorStroke={chrome.select}
+            anchorFill={chrome.handle}
+            borderStroke={chrome.select}
           />
         </Layer>
       </Stage>

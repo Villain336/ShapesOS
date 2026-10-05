@@ -40,16 +40,16 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
   const b = approval.binding;
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+          <p className="text-xs font-medium text-muted">
             Approval · {approval.type} · {approval.status}
           </p>
           <h1 className="aos-heading mt-1 text-ink">
             {b.platform} — {money(approval.maxSpendCents, approval.currency)} max
           </h1>
-          <p className="mt-1 font-mono text-[11px] text-subtle">
+          <p className="mt-1 font-mono text-[11px] text-muted">
             binding sha256: {approval.bindingHash}
           </p>
         </div>
@@ -70,11 +70,11 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
             <div className="flex justify-between gap-4"><dt className="text-muted">Cancel terms</dt><dd className="max-w-xs text-right text-ink">{b.cancelTerms}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted">Terms version</dt><dd className="font-mono text-xs text-ink">{b.operatorTermsVersion}</dd></div>
           </dl>
-          <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-subtle">Line items</h3>
+          <h3 className="mb-2 mt-4 text-xs font-semibold text-muted">Line items</h3>
           <div className="overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                   <th className="px-3 py-2 font-medium">Inventory</th>
                   <th className="px-3 py-2 font-medium">Pricing</th>
                   <th className="px-3 py-2 font-medium">Flight</th>
@@ -86,7 +86,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
                   <tr key={i} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">
                       {li.inventory}
-                      <span className="block font-mono text-[10px] font-normal text-subtle">
+                      <span className="block font-mono text-[10px] font-normal text-muted">
                         creatives {li.creativeHashes.map((h) => h.slice(0, 8)).join(", ")}
                       </span>
                     </td>
@@ -109,7 +109,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
               <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                    <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                       <th className="px-3 py-2 font-medium">Approver</th>
                       <th className="px-3 py-2 font-medium">Method</th>
                       <th className="px-3 py-2 font-medium">Decided</th>
@@ -138,7 +138,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
             <div className="max-h-80 overflow-y-auto rounded-lg border border-line">
               <table className="w-full text-left text-[13px]">
                 <thead className="sticky top-0">
-                  <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">Time</th>
                     <th className="px-3 py-2 font-medium">Action</th>
                     <th className="px-3 py-2 font-medium">Actor</th>
@@ -151,7 +151,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
                       <td className="px-3 py-2 font-mono text-[11px] text-muted">{e.ts.toISOString().slice(0, 19)}</td>
                       <td className="px-3 py-2 font-semibold text-ink">{e.action}</td>
                       <td className="px-3 py-2 text-[12px] text-muted">{e.actor}</td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-subtle">{e.eventHash.slice(0, 16)}…</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-muted">{e.eventHash.slice(0, 16)}…</td>
                     </tr>
                   ))}
                 </tbody>

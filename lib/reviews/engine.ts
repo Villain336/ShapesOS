@@ -364,6 +364,8 @@ export async function getRequestByToken(token: string) {
         select: {
           id: true,
           name: true,
+          // Phase 4a: white-label renders only on plans that include it.
+          plan: true,
           whiteLabelBrandColor: true,
           whiteLabelLogoUrl: true,
           whiteLabelCustomDomain: true,

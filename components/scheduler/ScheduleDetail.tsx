@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Notice, btnCls, cardCls, dangerBtnCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
 import { confirmAction } from "@/lib/ui/feedback";
+import TimezoneField from "./TimezoneField";
 
 interface RunRow {
   id: string;
@@ -24,6 +25,7 @@ interface ScheduleInfo {
   id: string;
   triggerType: string;
   cronExpr: string | null;
+  timezone: string;
   eventSource: string | null;
   eventConfig: Record<string, unknown> | null;
   approvalMode: string;
@@ -53,6 +55,7 @@ export default function ScheduleDetail({
   const [approvalMode, setApprovalMode] = useState(schedule.approvalMode);
   const [concurrencyLimit, setConcurrencyLimit] = useState(schedule.concurrencyLimit);
   const [cronExpr, setCronExpr] = useState(schedule.cronExpr ?? "");
+  const [timezone, setTimezone] = useState(schedule.timezone || "UTC");
   const [editing, setEditing] = useState(false);
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
@@ -143,13 +146,16 @@ export default function ScheduleDetail({
       <section className={cardCls}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-900">{schedule.skill.name}</h2>
-            <p className="mt-1 text-sm text-zinc-600">
-              {schedule.triggerType === "cron" ? `Cron · ${schedule.cronExpr}` : `Event · ${schedule.eventSource}`}
+            <h2 className="text-lg font-heading tracking-heading stretch-heading text-ink">{schedule.skill.name}</h2>
+            <p className="mt-1 text-sm text-muted">
+              {schedule.triggerType === "cron" ? `Cron · ${schedule.cronExpr} · ${schedule.timezone || "UTC"}` : `Event · ${schedule.eventSource}`}
               {" · "}
-              <span className={schedule.status === "active" ? "text-emerald-700" : "text-zinc-500"}>{schedule.status}</span>
+              <span className={`inline-flex items-center gap-1 ${schedule.status === "active" ? "font-semibold text-ink" : "text-muted"}`}>
+                {schedule.status === "paused" && <span className="aos-shape aos-shape--paused" aria-hidden />}
+                {schedule.status}
+              </span>
             </p>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-xs text-muted">
               Next run {schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : "—"}
               {schedule.lastRunAt ? ` · Last run ${new Date(schedule.lastRunAt).toLocaleString()}` : ""}
             </p>
@@ -166,7 +172,7 @@ export default function ScheduleDetail({
         </div>
 
         {canManage && (
-          <div className="mt-4 border-t border-zinc-200 pt-4">
+          <div className="mt-4 border-t border-line pt-4">
             {!editing ? (
               <button className={btnCls} onClick={() => setEditing(true)}>Edit settings</button>
             ) : (
@@ -187,14 +193,17 @@ export default function ScheduleDetail({
                   </label>
                 </div>
                 {schedule.triggerType === "cron" && (
-                  <label className={labelCls}>
-                    Cron expression (5 fields)
-                    <input className={`${inputCls} mt-1 w-64 font-mono`} value={cronExpr} onChange={(e) => setCronExpr(e.target.value)} />
-                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className={labelCls}>
+                      Cron expression (5 fields)
+                      <input className={`${inputCls} mt-1 w-64 font-mono`} value={cronExpr} onChange={(e) => setCronExpr(e.target.value)} />
+                    </label>
+                    <TimezoneField value={timezone} onChange={setTimezone} />
+                  </div>
                 )}
                 <div className="flex gap-2">
                   <button className={primaryBtnCls} disabled={busy !== null}
-                    onClick={() => patch({ approvalMode, concurrencyLimit, ...(schedule.triggerType === "cron" ? { cronExpr } : {}) }).then((ok) => ok && window.location.reload())}>
+                    onClick={() => patch({ approvalMode, concurrencyLimit, ...(schedule.triggerType === "cron" ? { cronExpr, timezone: timezone.trim() || "UTC" } : {}) }).then((ok) => ok && window.location.reload())}>
                     Save
                   </button>
                   <button className={btnCls} onClick={() => setEditing(false)}>Cancel</button>
@@ -206,21 +215,21 @@ export default function ScheduleDetail({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">Run history</h2>
+        <h2 className="text-sm font-semibold text-ink">Run history</h2>
         {runs.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No runs yet.</p>
+          <p className="mt-2 text-sm text-muted">No runs yet.</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {runs.map((run) => (
-              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm">
+              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm">
                 <span>
                   <Link
                     href={`/dashboard/projects/${projectId}/automations/schedules/runs/${run.id}`}
-                    className="font-medium text-zinc-900 hover:text-accent"
+                    className="font-medium text-ink hover:underline"
                   >
                     {new Date(run.startedAt).toLocaleString()}
                   </Link>
-                  <span className="text-zinc-500">
+                  <span className="text-muted">
                     {" · "}{run.trigger}{" · "}{run.status}
                     {run.wasMissed ? " · missed window" : ""}
                     {" · "}{run._count.subagents} subagents{" · "}{run.creditsUsed} credits

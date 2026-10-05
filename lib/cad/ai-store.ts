@@ -30,7 +30,7 @@ import {
   type ParsedDesignRequest,
 } from "./design-proposals";
 import { CadError, type VersionInput } from "./types";
-import { notifyApprovalNeeded } from "@/lib/notifications/producers";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export interface CadActor {
   kind: "human" | "agent";
@@ -308,6 +308,18 @@ export class PrismaCadAiStore extends PrismaCadStore {
         },
       }),
     ]);
+    // Phase 4a: best-effort "decided" notification to the requester (never
+    // throws — the decision is already committed).
+    await notifyApprovalDecided({
+      workspaceId,
+      source: "cad",
+      sourceId: proposalId,
+      title: proposal.requestedText.slice(0, 160),
+      decision: "approved",
+      decidedBy,
+      requestedBy: proposal.requestedBy,
+      href: "/dashboard/cad",
+    });
     return this.getProposal(workspaceId, proposalId);
   }
 
@@ -323,7 +335,7 @@ export class PrismaCadAiStore extends PrismaCadStore {
     if (proposal.status !== "draft") {
       throw new CadError("INVALID_TRANSITION", `Only a draft proposal can be rejected (current: ${proposal.status}).`);
     }
-    return this.prisma.cadDesignProposal.update({
+    const rejected = await this.prisma.cadDesignProposal.update({
       where: { id: proposalId },
       data: {
         status: "rejected",
@@ -332,6 +344,17 @@ export class PrismaCadAiStore extends PrismaCadStore {
         decisionNote: note?.trim().slice(0, 2000) || null,
       },
     });
+    await notifyApprovalDecided({
+      workspaceId,
+      source: "cad",
+      sourceId: proposalId,
+      title: proposal.requestedText.slice(0, 160),
+      decision: "denied",
+      decidedBy,
+      requestedBy: proposal.requestedBy,
+      href: "/dashboard/cad",
+    });
+    return rejected;
   }
 
   // ---------- Manufacturability ----------

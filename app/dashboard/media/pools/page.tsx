@@ -9,11 +9,12 @@ import { mediaStores, safetyTablesReady } from "@/lib/media/db";
 import { mediaRoleForWorkspaceRole } from "@/lib/media/safety";
 import { poolUtilization } from "@/lib/media/pools";
 
+// Pool status is not an agent state: neutral chips, told apart by label.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
-const chipSlate = `${chip} bg-canvas text-muted border-line`;
-const chipGreen = `${chip} bg-canvas text-muted border-line`;
-const chipRed = `${chip} bg-canvas text-muted border-line`;
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold leading-tight";
+const chipSlate = `${chip} text-muted`;
+const chipGreen = `${chip} text-ink`;
+const chipRed = `${chip} text-ink`;
 
 function poolStatusTone(status: string): string {
   return status === "active" ? chipGreen : status === "frozen" ? chipRed : chipSlate;
@@ -38,7 +39,7 @@ export default async function PoolsPage() {
   const pools = ready ? await mediaStores().pools.list(workspace.id).catch(() => []) : [];
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading text-ink">Budget pools</h1>
         <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
@@ -49,23 +50,23 @@ export default async function PoolsPage() {
         </p>
       </div>
       {pools.length === 0 ? (
-        <div className="rounded-lg border border-line bg-paper p-6 text-sm text-muted">
+        <div className="rounded-lg bg-paper p-6 text-sm text-muted shadow-hairline">
           No pools yet. Owners create pools via <code className="font-mono">POST /api/media/pools</code> —
           cap, period, platform allowlist, then attach the client&apos;s virtual card.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
-                <th className="px-3 py-2 font-medium">Pool</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Period</th>
-                <th className="px-3 py-2 font-medium">Platforms</th>
-                <th className="px-3 py-2 font-medium">Remaining</th>
-                <th className="px-3 py-2 font-medium">Encumbered</th>
-                <th className="px-3 py-2 font-medium">Utilization</th>
-                <th className="px-3 py-2 font-medium">Card</th>
+              <tr className="border-b border-line bg-canvas text-xs text-muted">
+                <th className="px-3 py-2 font-semibold">Pool</th>
+                <th className="px-3 py-2 font-semibold">Status</th>
+                <th className="px-3 py-2 font-semibold">Period</th>
+                <th className="px-3 py-2 font-semibold">Platforms</th>
+                <th className="px-3 py-2 font-semibold">Remaining</th>
+                <th className="px-3 py-2 font-semibold">Encumbered</th>
+                <th className="px-3 py-2 font-semibold">Utilization</th>
+                <th className="px-3 py-2 font-semibold">Card</th>
               </tr>
             </thead>
             <tbody>

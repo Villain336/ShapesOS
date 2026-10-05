@@ -98,8 +98,11 @@ export default function BillingHub({
   workspaceId,
   nav,
   trial,
+  includes,
 }: {
   workspaceId: string;
+  /** Phase 4a: the plan entitlements table (server-rendered). */
+  includes?: React.ReactNode;
   /** Phase 3: the grouped settings nav, so billing sits inside settings. */
   nav?: React.ReactNode;
   /** Phase 3: hosted trial state (null when not on the trial plan). */
@@ -393,6 +396,8 @@ export default function BillingHub({
           </section>
         </>
       )}
+
+      {includes}
 
       {/* Billing summary link for admins who land here directly */}
       <Link

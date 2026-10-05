@@ -54,31 +54,34 @@ function InviteBody() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
-      <h1 className="text-xl font-semibold text-zinc-900">Workspace invite</h1>
+      <h1 className="text-xl font-heading stretch-heading tracking-heading text-ink">Workspace invite</h1>
       {state === "working" || state === "idle" ? (
-        <p className="mt-3 text-sm text-zinc-500">Accepting your invite…</p>
+        <p className="mt-3 text-sm text-muted">Accepting your invite…</p>
       ) : state === "done" ? (
         <div className="mt-3">
-          <p className="text-sm text-emerald-700">
+          <p className="text-sm font-semibold text-ink">
             You&apos;re in{workspaceName ? ` — welcome to ${workspaceName}` : ""}!
           </p>
           <a
             href="/dashboard"
-            className="mt-4 inline-block rounded-md border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-night-hover"
           >
             Go to dashboard
           </a>
         </div>
       ) : (
         <div className="mt-3">
-          <p className="text-sm text-red-700">{message}</p>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p role="alert" className="flex items-start justify-center gap-2 text-sm text-failed-text">
+            <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
+            {message}
+          </p>
+          <p className="mt-2 text-xs text-muted">
             Invite links are single-use and expire after 7 days. Ask your admin
             for a fresh link.
           </p>
           <a
             href="/login"
-            className="mt-4 inline-block rounded-md border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-night-hover"
           >
             Back to sign-in
           </a>
@@ -90,7 +93,7 @@ function InviteBody() {
 
 export default function InvitePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-muted">Loading…</div>}>
       <InviteBody />
     </Suspense>
   );

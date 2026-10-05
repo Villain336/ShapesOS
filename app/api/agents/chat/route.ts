@@ -6,8 +6,10 @@
 // Auth/project-guard semantics match the JSON chat route
 // (app/api/chat/threads/[id]/messages): the thread must belong to the
 // caller, the project must be workspace-accessible, and the caller needs
-// the editor role. The turn itself runs through runAgentTurnWithCapture via
-// the adapter — the agent is not duplicated here.
+// the editor role. The turn itself runs through runTrackedAgentTurn via the
+// adapter — the agent is not duplicated here. Phase 8: the stream is LIVE —
+// text deltas and tool events are tailed from the run as they happen, and a
+// turn handed off to the agent worker keeps streaming until its run ends.
 
 import { accessibleWorkspaceWhere, getMembership, requireProjectRole, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
@@ -89,7 +91,8 @@ export async function POST(req: Request) {
     try {
       yield* events;
     } finally {
-      void maybeAutoTitle(thread.id, content).catch(() => undefined);
+      // Awaited so the client's re-read of the thread sees the new title.
+      await maybeAutoTitle(thread.id, content).catch(() => undefined);
     }
   })();
 

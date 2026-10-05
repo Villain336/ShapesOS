@@ -10,6 +10,7 @@ import { requireUser, getAccessibleWorkspaces, getOrCreateWorkspace, ACTIVE_WORK
 import { errorResponse } from "@/lib/api/errors";
 import { createWorkspaceForUser } from "@/lib/workspace/lifecycle";
 import { mayCreateWorkspace } from "@/lib/auth/signup";
+import { entitlementDenied, workspaceCreationDenial } from "@/lib/billing/entitlements-server";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +45,12 @@ export async function POST(req: NextRequest) {
     if (!(await mayCreateWorkspace(user.id))) {
       return Response.json({ error: "An invite is required to create a workspace here." }, { status: 403 });
     }
+    // Phase 4a: how many workspaces a person may own is a plan limit.
+    const denial = await workspaceCreationDenial(user.id);
+    if (denial) return entitlementDenied(denial);
     const body = (await req.json().catch(() => null)) as { name?: unknown } | null;
     if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
-    const workspace = await createWorkspaceForUser({ userId: user.id, name: body.name });
+    const workspace = await createWorkspaceForUser({ userId: user.id, name: body.name, authAt: user.authAt });
     const res = NextResponse.json(
       { workspace: { id: workspace.id, name: workspace.name, plan: workspace.plan } },
       { status: 201 },

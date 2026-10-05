@@ -1,20 +1,20 @@
-// Marketr — M21 Notion adapter.
+// ShapesOS — M21 Notion adapter.
 //
-// LIVE WIRING (not yet implemented): this adapter is MOCK-ONLY today. The
-// live pass must call the Notion API (2022-06-28 version):
-//   POST https://api.notion.com/v1/search
-//     → search_pages()
-//   GET  https://api.notion.com/v1/blocks/{blockId}/children?page_size=100
-//     → read_page() (recurse children; append plain_text)
-//   POST https://api.notion.com/v1/databases/{databaseId}/query
-//     → query_database()
-// Auth: OAuth2 Bearer access_token (public integration, capabilities
-// granted per page by the user); refresh via lib/vault/refresh.ts. Header
-// "Notion-Version: 2022-06-28" required. Docs:
-// https://developers.notion.com/reference/intro
+// LIVE WIRING (Phase 4b): with a vault credential this adapter calls the
+// Notion API with "Notion-Version: 2026-03-11" (lib/connectors/m21/live/notion.ts):
+//   POST https://api.notion.com/v1/search → search_pages() (cursor paging)
+//   GET  https://api.notion.com/v1/pages/{id} + /v1/blocks/{id}/children
+//     → read_page() (recurse one level; plain text, capped)
+//   GET  https://api.notion.com/v1/databases/{id} → data_sources[], then
+//   POST https://api.notion.com/v1/data_sources/{id}/query → query_database()
+//   GET  https://api.notion.com/v1/users/me → health check
+// Auth: Bearer access token from the public-integration OAuth flow (no
+// scopes; the user shares pages with the integration). Notion tokens do not
+// expire; a 401 tries the vault refresher once and otherwise needs re-auth.
+// 429 honours Retry-After. Docs: https://developers.notion.com/reference/intro
 //
-// MOCK MODE: deterministic demo workspace; every row flagged mock: true,
-// titles carry "(MOCK)". No network calls.
+// MOCK MODE (no credential): deterministic demo workspace; every row
+// flagged mock: true, titles carry "(MOCK)". No network calls.
 
 import type {
   ConnectorAdapter,
@@ -23,7 +23,16 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { strProp, mockOk, fail } from "../types";
+import { strProp, mockOk, liveOk, fail } from "../types";
+import { clampInt, liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
+import {
+  normalizeNotionId,
+  notionPing,
+  notionQueryDataSource,
+  notionReadPage,
+  notionResolveDataSource,
+  notionSearch,
+} from "../live/notion";
 
 const MOCK_PAGES = [
   { id: "mock-page-1", title: "Content Strategy 2026 (MOCK)", type: "page", lastEdited: "2026-09-19T08:00:00Z" },
@@ -41,6 +50,8 @@ export class NotionAdapter implements ConnectorAdapter {
   readonly displayName = "Notion";
   readonly authType = "oauth2" as const;
   readonly configSchema = { type: "object", properties: {} };
+
+  constructor(private readonly deps: LiveDeps = {}) {}
 
   listTools(): ConnectorToolDef[] {
     return [
@@ -70,7 +81,11 @@ export class NotionAdapter implements ConnectorAdapter {
         mutating: false,
         argsSchema: {
           type: "object",
-          properties: { databaseId: strProp("Notion database id.") },
+          properties: {
+            databaseId: strProp("Notion database id."),
+            dataSourceId: strProp("Notion data source id (optional; defaults to the database's first data source)."),
+            limit: strProp("Max rows (default 50)."),
+          },
           required: ["databaseId"],
         },
       },
@@ -80,9 +95,48 @@ export class NotionAdapter implements ConnectorAdapter {
   async invoke(
     tool: string,
     args: Record<string, unknown>,
-    _credential: DecryptedCredential | null,
-    _ctx: InvokeContext,
+    credential: DecryptedCredential | null,
+    ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return this.mockInvoke(tool, args);
+    try {
+      switch (tool) {
+        case "search_pages": {
+          const query = String(args.query ?? "").trim();
+          if (query.length > 200) {
+            throw new ConnectorApiError(this.displayName, "bad_request", `${this.displayName}: query must be at most 200 characters.`);
+          }
+          return liveOk(await notionSearch(auth, query, clampInt(args.limit, 25, 1, 100), this.deps));
+        }
+        case "read_page":
+          return liveOk(await notionReadPage(auth, normalizeNotionId(args.pageId, "pageId"), this.deps));
+        case "query_database": {
+          const databaseId = args.databaseId ? normalizeNotionId(args.databaseId, "databaseId") : undefined;
+          const dataSourceId = args.dataSourceId ? normalizeNotionId(args.dataSourceId, "dataSourceId") : undefined;
+          const ds = await notionResolveDataSource(auth, { databaseId, dataSourceId }, this.deps);
+          const rows = await notionQueryDataSource(auth, ds, clampInt(args.limit, 50, 1, 500), this.deps);
+          return liveOk({ databaseId: databaseId ?? null, dataSourceId: ds, rows });
+        }
+        default:
+          return fail(`Unknown tool "${tool}" for connector ${this.key}`);
+      }
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return { ok: false, error: "No access token stored.", errorCode: "not_connected" };
+    try {
+      return liveOk(await notionPing(auth, this.deps));
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  private mockInvoke(tool: string, args: Record<string, unknown>): InvokeResult {
     switch (tool) {
       case "search_pages": {
         const q = String(args.query).toLowerCase();

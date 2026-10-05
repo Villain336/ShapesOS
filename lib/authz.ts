@@ -16,6 +16,7 @@ import { prisma } from "./prisma";
 import { randomBytes } from "node:crypto";
 import type { WorkspaceMember, WorkspaceRole } from "@prisma/client";
 import { notifyInviteAccepted } from "./notifications/producers";
+import { currentSessionMfaState, policyDenies } from "./auth/mfa/policy";
 
 export const ROLE_RANK: Record<WorkspaceRole, number> = {
   viewer: 1,
@@ -44,18 +45,26 @@ export async function getMembership(
   userId: string,
   workspaceId: string,
 ): Promise<WorkspaceMember | null> {
-  const existing = await prisma.workspaceMember.findFirst({
+  const row = await prisma.workspaceMember.findFirst({
     where: { workspaceId, userId },
+    include: { workspace: { select: { requireTwoFactor: true } } },
   });
-  if (existing) return existing;
+  if (row) {
+    const { workspace, ...existing } = row as typeof row & { workspace?: { requireTwoFactor?: boolean } | null };
+    // Phase 4a: workspace "require 2FA" policy (lib/auth/mfa/policy.ts).
+    if (workspace?.requireTwoFactor && policyDenies(true, userId, await currentSessionMfaState())) return null;
+    return existing as WorkspaceMember;
+  }
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { ownerUserId: true },
+    select: { ownerUserId: true, requireTwoFactor: true },
   });
   if (workspace?.ownerUserId === userId) {
-    return prisma.workspaceMember.create({
+    const created = await prisma.workspaceMember.create({
       data: { workspaceId, userId, role: "owner" },
     });
+    if (workspace.requireTwoFactor && policyDenies(true, userId, await currentSessionMfaState())) return null;
+    return created;
   }
   return null;
 }

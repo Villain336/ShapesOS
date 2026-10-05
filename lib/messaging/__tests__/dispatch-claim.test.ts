@@ -163,3 +163,55 @@ describe("stale sending claims recover", () => {
     assert.equal(deliveriesFor(stale.id), 0);
   });
 });
+
+// Phase 4a follow-up: the daily cap used to be check-then-act (count, then
+// claim), so parallel sends could all see headroom and overshoot it. The
+// claim is now serialized per workspace-day and counts inside the same
+// transaction.
+describe("daily cap is atomic under concurrency", () => {
+  const WS_DAILY = `p4fix-msg-daily-${RUN}`;
+  const CAP = 3;
+
+  before(async () => {
+    await seed(WS_DAILY);
+    await updateMessagingSettings(WS_DAILY, { dailyCap: CAP });
+  });
+
+  it("parallel inline sends + overlapping sweeps never exceed the cap", async () => {
+    const approvals = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        prisma.approvalItem.create({ data: { workspaceId: WS_DAILY, kind: "sequence_send", payload: {}, status: "approved" } }),
+      ),
+    );
+    const queuedRows = await Promise.all(Array.from({ length: 6 }, () => queuedApproved(WS_DAILY)));
+    // 6 approved inline sends (queueMessage → claim → send) racing 3 sweeps
+    // over 6 more queued rows: 12 candidates, cap 3.
+    const results = await Promise.all([
+      ...approvals.map((a, i) =>
+        queueMessage({
+          workspaceId: WS_DAILY,
+          leadId: leads[WS_DAILY],
+          channel: "sms",
+          kind: "sequence",
+          body: `Parallel send ${i}`,
+          approvalId: a.id,
+        }),
+      ),
+      dispatchDue(WS_DAILY),
+      dispatchDue(WS_DAILY),
+      dispatchDue(WS_DAILY),
+    ]);
+    const inlineIds = results.slice(0, approvals.length).map((r) => (r as { id: string }).id);
+    const ids = [...queuedRows.map((r) => r.id), ...inlineIds];
+    const rows = await prisma.outboundMessage.findMany({ where: { id: { in: ids } } });
+    const sent = rows.filter((r) => r.status === "sent" || r.status === "delivered");
+    assert.equal(sent.length, CAP, `exactly the cap was sent (got ${sent.length})`);
+    assert.equal(ids.reduce((n, id) => n + deliveriesFor(id), 0), CAP, "provider reached exactly cap times");
+    const rest = rows.filter((r) => r.status !== "sent" && r.status !== "delivered");
+    assert.equal(rest.length, ids.length - CAP);
+    for (const r of rest) {
+      assert.equal(r.status, "suppressed");
+      assert.equal(r.suppressionReason, "cap");
+    }
+  });
+});

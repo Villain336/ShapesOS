@@ -871,6 +871,17 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
       );
     }
     try {
+      // A go-live is strictly later than any other record on this target,
+      // so it reads as live even within the same millisecond.
+      let liveAt = new Date();
+      if (input.makeLive) {
+        const prev = await this.db.datasetPublish.aggregate({
+          where: { datasetId: input.datasetId, target: input.target },
+          _max: { publishedAt: true },
+        });
+        const prevMs = prev._max.publishedAt?.getTime() ?? 0;
+        if (prevMs >= liveAt.getTime()) liveAt = new Date(prevMs + 1);
+      }
       // Idempotent on (datasetId, target, version): upsert returns the
       // existing row instead of duplicating it.
       const r = await this.db.datasetPublish.upsert({
@@ -881,7 +892,11 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
             version: input.version,
           },
         },
-        update: {},
+        // Rollback / roll-forward: re-publishing an older version makes it
+        // live again (the live record is the most recently published).
+        update: input.makeLive
+          ? { publishedAt: liveAt, artifactRef: input.artifactRef }
+          : {},
         create: {
           workspaceId: input.workspaceId,
           datasetId: input.datasetId,
@@ -890,6 +905,7 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
           versionId: input.versionId,
           chunkCount: input.chunkCount,
           artifactRef: input.artifactRef,
+          publishedAt: liveAt,
         },
       });
       return this.toDatasetPublish(r);
@@ -916,9 +932,11 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
     datasetId: string,
     target: PublishTarget,
   ): Promise<DatasetPublishRecord | null> {
+    // Live = most recently published (a rollback re-publishes an older
+    // version); ties fall back to the higher version.
     const r = await this.db.datasetPublish.findFirst({
       where: { datasetId, target },
-      orderBy: { version: "desc" },
+      orderBy: [{ publishedAt: "desc" }, { version: "desc" }],
     });
     return r ? this.toDatasetPublish(r) : null;
   }

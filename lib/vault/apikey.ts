@@ -29,11 +29,23 @@ export async function storeApiKey(
   opts: StoreApiKeyOpts = {},
 ): Promise<ConnectorConnection> {
   if (!apiKey.trim()) throw new Error("API key must not be empty");
+  return storeCredentialPayload(userId, workspaceId, connectorKey, label, { apiKey, ...(opts.extra ?? {}) }, opts);
+}
 
-  const payload: Record<string, unknown> = {
-    apiKey,
-    ...(opts.extra ?? {}),
-  };
+/**
+ * Phase 11 (devtools): store an arbitrary non-OAuth credential payload (e.g.
+ * the Netlify connector's { hostingConnectionId } reference to an existing
+ * hosting connection — the token itself stays in that connection). Same
+ * upsert + encryption as storeApiKey, which delegates here.
+ */
+export async function storeCredentialPayload(
+  userId: string,
+  workspaceId: string,
+  connectorKey: string,
+  label: string,
+  payload: Record<string, unknown>,
+  opts: Omit<StoreApiKeyOpts, "extra"> = {},
+): Promise<ConnectorConnection> {
   const encryptedBlob = secrets().encrypt(JSON.stringify(payload));
 
   let connection = await prisma.connectorConnection.findFirst({

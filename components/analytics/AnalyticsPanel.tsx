@@ -77,7 +77,7 @@ function Sparkline({ series }: { series: Bucket[] }) {
       <polyline
         points={pts}
         fill="none"
-        stroke="#000000"
+        stroke="var(--aos-ink)"
         strokeWidth="2"
         strokeLinejoin="round"
       />
@@ -87,7 +87,7 @@ function Sparkline({ series }: { series: Bucket[] }) {
           cx={i * step}
           cy={H - (b.y / max) * (H - 16) - 8}
           r="2.5"
-          fill="#000000"
+          fill="var(--aos-ink)"
         />
       ))}
     </svg>

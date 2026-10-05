@@ -218,12 +218,16 @@ export const orderPaymentFulfillment: WorkflowDef = {
     },
     {
       name: "record-charge",
-      describe: (r) => `Record ${money(r.amountCents ?? 0)} charge via Stripe for order ${r.orderId}`,
-      rollback: (r) => `Record ${money(r.amountCents ?? 0)} refund via Stripe for order ${r.orderId}`,
+      describe: (r) => `Record a ${money(r.amountCents ?? 0)} manual charge for order ${r.orderId} (no card is charged)`,
+      rollback: (r) => `Record a ${money(r.amountCents ?? 0)} manual refund for order ${r.orderId}`,
       money: true,
       // RECORDS ONLY (the ops invariant): the row is the system of record.
-      // A live Stripe PaymentIntent call would go here in production; the
-      // compensation below would then issue the real refund.
+      // Phase 10 (store): this step no longer pretends to be Stripe (it used
+      // to write a made-up providerRef "ch_<runId>"). It records a MANUAL
+      // charge — money taken offline — with no provider reference. Real card
+      // payments arrive only through the tenant's signed Stripe webhook
+      // (storefront checkout / invoice payment links, lib/ops/finance/stripe.ts),
+      // which records the real payment intent id.
       async execute(ctx) {
         const { tx, actor, resolved } = ctx;
         const charge = await (tx as unknown as {
@@ -234,9 +238,10 @@ export const orderPaymentFulfillment: WorkflowDef = {
             orderId: resolved.orderId,
             kind: "charge",
             amountCents: resolved.amountCents,
-            provider: "stripe",
-            providerRef: `ch_${ctx.runId.slice(-8)}`,
+            provider: "manual",
+            providerRef: null,
             status: "succeeded",
+            note: `Recorded by workflow run ${ctx.runId} (manual charge, no provider)`,
           },
         });
         return { detail: { paymentId: charge.id, amountCents: resolved.amountCents } };
@@ -252,9 +257,10 @@ export const orderPaymentFulfillment: WorkflowDef = {
             orderId: resolved.orderId,
             kind: "refund",
             amountCents: resolved.amountCents,
-            provider: "stripe",
-            providerRef: chargeId ? `re_${String(chargeId).slice(-8)}` : undefined,
+            provider: "manual",
+            providerRef: null,
             status: "succeeded",
+            note: `Compensation for workflow run ${ctx.runId}${chargeId ? ` (reverses payment ${String(chargeId)})` : ""} — manual refund, no provider`,
           },
         });
         return { detail: { refundId: refund.id, amountCents: resolved.amountCents } };

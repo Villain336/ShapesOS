@@ -5,6 +5,8 @@
 // usage" here, so it's reachable from every settings page.
 
 import {
+  BookOpen,
+  Webhook,
   Bell,
   Bot,
   Brain,
@@ -13,6 +15,7 @@ import {
   Building2,
   Cloud,
   CreditCard,
+  Fingerprint,
   FlaskConical,
   Gauge,
   Globe,
@@ -28,9 +31,11 @@ import {
   SlidersHorizontal,
   Siren,
   Terminal,
+  UserRound,
   Users,
   Wrench,
   type LucideIcon,
+  Shapes,
 } from "lucide-react";
 
 export interface SettingsPage {
@@ -68,8 +73,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     pages: [
       { href: "/dashboard/settings/members", label: "Members", description: "Invite teammates and control what they can do.", icon: Users },
       { href: "/dashboard/settings/clients", label: "Clients", description: "Agency clients: who sees their reports, and how often.", icon: Briefcase },
-      { href: "/dashboard/settings/security", label: "Security", description: "Authentication, SSO, and secret-storage posture.", icon: Lock },
+      { href: "/dashboard/settings/security", label: "Security", description: "Workspace sign-in policy, SCIM provisioning, SSO, and secret storage.", icon: Lock },
+      { href: "/dashboard/settings/account-security", label: "Your security", description: "Two-factor sign-in and passkeys for your own account.", icon: Fingerprint },
       { href: "/dashboard/settings/audit", label: "Audit log", description: "Every consequential action, who did it, and when.", icon: ScrollText },
+      { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
     ],
   },
   {
@@ -111,7 +118,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     icon: Terminal,
     pages: [
       { href: "/dashboard/settings/api-mcp", label: "API and MCP", description: "Expose this workspace to MCP clients with scoped keys.", icon: KeyRound },
+      // Phase 4a: API reference (OpenAPI) + outbound webhooks.
+      { href: "/dashboard/settings/developers", label: "API reference", description: "The public API and webhook events, from the OpenAPI spec.", icon: BookOpen },
+      { href: "/dashboard/settings/webhooks", label: "Webhooks", description: "Signed events to your own endpoints, with a delivery log.", icon: Webhook },
       { href: "/dashboard/settings/experiments", label: "Experiments", description: "Feature flags and growth experiments.", icon: FlaskConical },
+      // Phase 4d: the Agentic OS kit rendered from components/aos, every state.
+      { href: "/dashboard/settings/design", label: "Design kit", description: "Every Agentic OS component in every state, next to the kit renders.", icon: Shapes },
     ],
   },
 ];

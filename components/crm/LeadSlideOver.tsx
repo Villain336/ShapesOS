@@ -4,11 +4,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Star, SquareArrowOutUpRight, Pencil, Phone, Mail,
-  MessageSquareText, Calendar, NotebookPen, Flag,
+  MessageSquareText, MessagesSquare, Calendar, NotebookPen, Flag,
 } from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { LeadActions } from "./LeadActions";
+import { ConvertLeadStrip } from "@/components/ops/CrmAccounts";
 import { feedback } from "@/lib/ui/feedback";
 import { Avatar, MiniBars, ScoreBar, StageBadge, backdropCls, btnGhostSm, btnPrimarySm, errorBoxCls, inputCls, labelCls, sectionTitleCls, selectCls, slideoverCls } from "./ui";
 
@@ -216,6 +217,14 @@ export function LeadSlideOver({
               <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
             <a
+              href={`/dashboard/crm/inbox?lead=${encodeURIComponent(lead.id)}`}
+              className={btnGhostSm}
+              title="Open the conversation with this lead"
+            >
+              <MessagesSquare size={15} />
+              <span className="hidden sm:inline text-[12.5px]">Conversation</span>
+            </a>
+            <a
               href={`/dashboard/crm?lead=${lead.id}`}
               className={btnGhostSm}
               title="Open full view"
@@ -245,6 +254,8 @@ export function LeadSlideOver({
           }}
           registerEscape={registerEscape}
         />
+        {/* Phase 10 (ops-core): lead → contact / company / deal. */}
+        <ConvertLeadStrip leadId={lead.id} hasValue={lead.valueCents != null} onConverted={() => void load()} />
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (

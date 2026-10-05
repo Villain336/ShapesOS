@@ -10,6 +10,7 @@
 import { prisma } from "@/lib/prisma";
 import { createId } from "@/lib/media/ids";
 import { NotConfiguredError } from "@/lib/authority/fake";
+import { fakeProvidersAllowed } from "@/lib/env/secrets";
 import type { OutreachProspect, ProspectStatus } from "@prisma/client";
 
 export interface ProspectStore {
@@ -87,7 +88,11 @@ export function createFakeHunterAdapter(): HunterAdapter {
 /** Resolve the adapter: fake by default; a real key without an implemented
  *  adapter throws the honest NotConfiguredError. */
 export function resolveHunterAdapter(cfg: { apiKey?: string | null; fake?: boolean }): HunterAdapter {
-  if (cfg.fake === true || !cfg.apiKey) return createFakeHunterAdapter();
+  // Phase 11 (conncore): fixture mode is refused in production.
+  if ((cfg.fake === true || !cfg.apiKey) && fakeProvidersAllowed()) return createFakeHunterAdapter();
+  if (cfg.fake === true || !cfg.apiKey) {
+    throw new NotConfiguredError("Hunter.io", "Hunter.io is not connected — fixture prospects are never used in production.");
+  }
   throw new NotConfiguredError("Hunter.io", "the real Hunter.io adapter is not implemented in this build — unset HUNTER_API_KEY to use fixture mode.");
 }
 

@@ -13,8 +13,10 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  AppWindow,
   BookOpen,
   Bell,
+  Building2, // Phase 10 (ops-core): Operations
   Box,
   Briefcase,
   ChartColumn,
@@ -33,6 +35,7 @@ import {
   Mail,
   Megaphone,
   MessageSquare,
+  MessagesSquare,
   Mic,
   Network,
   Paintbrush,
@@ -91,7 +94,9 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "grow",
     title: "Grow",
     items: [
-      { href: "/dashboard/crm", label: "CRM", icon: Kanban, description: "Leads, pipeline, invoices", keywords: "contacts pipeline kanban leads deals" },
+      { href: "/dashboard/crm", label: "CRM", icon: Kanban, description: "Leads, contacts, deals, pipeline", keywords: "contacts companies accounts pipeline kanban leads deals" },
+      // Phase 4b: per-lead conversation inbox (SMS + email, inbound + outbound).
+      { href: "/dashboard/crm/inbox", label: "Inbox", icon: MessagesSquare, description: "Lead conversations: texts and email", keywords: "conversations messages sms email replies threads unread" },
       { href: "/dashboard/prospects", label: "Prospects", icon: UserSearch, description: "Prospect lists and enrichment", keywords: "prospecting enrichment lists outbound" },
       { href: "/dashboard/nurture", label: "Nurture", icon: Send, description: "Nurture sequences and broadcasts", keywords: "sequences drip email sms broadcasts" },
       { href: "/dashboard/projects", label: "SEO projects", icon: Search, description: "Sites, keywords, rankings, content", keywords: "seo keywords rankings content sites projects" },
@@ -104,7 +109,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw, description: "Reallocation, recycling, test lab", keywords: "reallocation recycling ctv dsp tests" },
       { href: "/dashboard/calls", label: "Calls", icon: Phone, description: "Call tracking and bookings", keywords: "phone tracking numbers bookings" },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },
-      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine, description: "Site traffic", keywords: "pageviews umami traffic" },
+      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine, description: "Traffic, social and revenue", keywords: "pageviews umami traffic ga4 search console engagement overview" },
       { href: "/dashboard/reports", label: "Reports", icon: ChartColumn, description: "Reports and exports", keywords: "analytics report pdf" },
     ],
   },
@@ -122,6 +127,8 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "operate",
     title: "Operate",
     items: [
+      // Phase 10 (ops-core): the operations apps' home (was tabs inside CRM).
+      { href: "/dashboard/ops", label: "Operations", icon: Building2, description: "Orders, invoices, inventory, projects, helpdesk, team", keywords: "ops erp orders payments promotions invoices inventory warehouses purchasing projects tasks timesheets helpdesk tickets team hr leave recruiting workflows" },
       { href: "/dashboard/office", label: "Office", icon: Briefcase, description: "Docs, sheets and decks", keywords: "documents spreadsheets slides" },
       { href: "/dashboard/files", label: "Files", icon: Folder, description: "Workspace files", keywords: "uploads storage" },
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine, description: "Signature envelopes", keywords: "signature contracts documenso" },
@@ -130,6 +137,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/funding", label: "Funding", icon: Handshake, description: "Raise, investors, data room", keywords: "vc investors raise data room" },
       { href: "/dashboard/connector", label: "Network", icon: Network, description: "People, companies, intros", keywords: "connector relationships intros contacts" },
       { href: "/dashboard/datasets", label: "Datasets", icon: Database, description: "Business knowledge datasets", keywords: "data ingest knowledge" },
+      // Phase 9 (apps): internal mini-apps built from a spec (lib/apps).
+      { href: "/dashboard/apps", label: "Apps", icon: AppWindow, description: "Internal mini-apps: lists, forms, boards", keywords: "mini apps internal tools builder forms kanban tracker custom" },
       { href: "/dashboard/wfh", label: "WFH mode", icon: Home, description: "Remote-work mode", keywords: "remote standups focus rituals expenses" },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell, description: "Alert history", keywords: "notifications incidents" },
     ],

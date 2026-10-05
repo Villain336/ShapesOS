@@ -13,6 +13,7 @@ import { parseStages } from "@/lib/crm/stages";
 import { scoreFor } from "@/lib/crm/stages";
 import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
 import { dedupKeyFor, recomputeScore, logActivity } from "@/lib/crm/dedup";
+import { emitLeadUpdated } from "@/lib/webhooks/emit";
 
 const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
 
@@ -178,6 +179,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const full = await prisma.lead.findUnique({ where: { id: lead.id } });
+  // Phase 4a: lead.updated webhook with the touched fields (never throws).
+  const changed = Object.keys(data).filter((k) => k !== "dedupKey");
+  if (changed.length > 0) await emitLeadUpdated(full ?? updated, changed);
   return Response.json({ lead: full ?? updated });
 }
 

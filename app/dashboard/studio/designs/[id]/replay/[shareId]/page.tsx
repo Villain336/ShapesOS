@@ -43,8 +43,8 @@ export default async function DashboardShareReplayPage({
   const active = share && (!share.expiresAt || share.expiresAt > new Date());
   if (!active || !share) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-[#FAFAF7] px-4">
-        <div className="rounded-lg border border-line bg-paper p-8 text-center">
+      <div className="flex min-h-[60vh] items-center justify-center bg-canvas px-4">
+        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
           <MonitorPlay className="mx-auto h-8 w-8 text-subtle" />
           <h1 className="aos-heading mt-3 text-ink">
             No replay available
@@ -62,7 +62,7 @@ export default async function DashboardShareReplayPage({
   const eventsBase = `/api/studio/designs/${encodeURIComponent(designId)}/shares/${encodeURIComponent(share.id)}/replay`;
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <Link
         href={`/dashboard/studio/designs/${encodeURIComponent(designId)}`}
         className="inline-flex w-fit items-center gap-1 text-[13px] text-muted hover:text-ink"

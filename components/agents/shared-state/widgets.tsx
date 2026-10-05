@@ -2,9 +2,9 @@
 //
 // Read the CoAgents shared state (useSharedState) and render the three
 // domains: mission progress, approval queue summary, content calendar rows.
-// House law: brand vars (never hardcoded primary), Lucide icons, dense
-// tables for lists (mirrors app/dashboard/studio/StudioApp.tsx patterns:
-// text-[13px] rows, badge columns, hover:bg-[var(--brand-50)]/40).
+// House law: Agentic OS (docs/design/DESIGN.md) — tokens only, Lucide icons,
+// dense tables for lists. Status shapes only on agent states (mission
+// status, an approval waiting on you); everything else is a text chip.
 //
 // Editing: only content-calendar rows are editable here (scheduledFor /
 // status). Edits call agent.setState (optimistic UI→agent); the backend
@@ -31,25 +31,50 @@ import type {
 } from "@/lib/agents/agui/shared-state";
 
 const panelCls =
-  "rounded-[10px] border border-stone-200 bg-white text-stone-900";
+  "rounded-md bg-paper text-ink shadow-hairline";
 const tabBase =
-  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-stone-500 hover:text-stone-800";
-const tabActive =
-  "border border-[var(--brand-600)] text-[var(--brand-700)] bg-[var(--brand-50)]/40";
+  "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold";
+const tabActive = "bg-ink text-paper";
+const tabInactive = "text-muted hover:bg-hover-paper hover:text-ink";
 const tableCls = "w-full text-left text-[13px]";
-const thCls = "px-3 py-2 font-medium text-stone-500 text-[11px] uppercase tracking-wide";
+const thCls = "px-3 py-2 text-xs font-semibold text-muted";
 const tdCls = "px-3 py-2 align-top";
-const rowCls = "border-t border-stone-100 hover:bg-[var(--brand-50)]/40";
+const rowCls = "border-t border-line hover:bg-hover-paper";
 
 function badgeCls(tone: "brand" | "stone" | "amber" | "green" | "red"): string {
+  // Tones collapse to neutral chips; meaning comes from the label (and, for
+  // agent states, the status shape — see StatusChip).
   const tones: Record<string, string> = {
-    brand: "bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20",
-    stone: "bg-stone-100 text-stone-600 border-stone-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    red: "bg-red-50 text-red-700 border-red-200",
+    brand: "text-ink",
+    stone: "text-muted",
+    amber: "text-ink",
+    green: "text-ink",
+    red: "text-failed-text",
   };
-  return `inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tones[tone]}`;
+  return `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold ${tones[tone]}`;
+}
+
+/** Agent-state shapes (DESIGN.md): only where the status is a run or a wait on the user. */
+const MISSION_SHAPE: Record<string, string> = {
+  active: "aos-shape aos-shape--running aos-is-live",
+  pending: "aos-shape aos-shape--queued",
+  scheduled: "aos-shape aos-shape--queued",
+  complete: "aos-shape aos-shape--done",
+  failed: "aos-shape aos-shape--failed",
+  paused: "aos-shape aos-shape--paused",
+};
+const APPROVAL_SHAPE: Record<string, string> = {
+  pending: "aos-shape aos-shape--needs aos-shape--edged",
+};
+
+function StatusChip({ status, kind }: { status: string; kind?: "mission" | "approval" }) {
+  const shape = kind === "mission" ? MISSION_SHAPE[status] : kind === "approval" ? APPROVAL_SHAPE[status] : undefined;
+  return (
+    <span className={badgeCls(statusTone(status))}>
+      {shape && <span className={`${shape} [--aos-shape-size:9px]`} aria-hidden="true" />}
+      {status}
+    </span>
+  );
 }
 
 function statusTone(status: string): "brand" | "stone" | "amber" | "green" | "red" {
@@ -97,8 +122,8 @@ function toDateTimeLocal(iso: string | null): string {
 function EmptyState({ label }: { label: string }) {
   return (
     <div className="px-4 py-8 text-center">
-      <CircleDashed size={18} className="mx-auto text-stone-300" />
-      <p className="mt-2 text-[12px] text-stone-500">{label}</p>
+      <CircleDashed size={18} className="mx-auto text-subtle" />
+      <p className="mt-2 text-[12px] text-muted">{label}</p>
     </div>
   );
 }
@@ -113,27 +138,27 @@ export function MissionProgressWidget({ mission }: { mission?: MissionSharedStat
   return (
     <div className="p-3">
       <div className="flex items-center gap-2">
-        <span className={badgeCls(statusTone(mission.status))}>{mission.status}</span>
-        <span className="text-[11px] text-stone-400">{mission.template}</span>
-        <span className="ml-auto text-[12px] font-semibold text-stone-700">{pct}%</span>
+        <StatusChip status={mission.status} kind="mission" />
+        <span className="text-[11px] text-muted">{mission.template}</span>
+        <span className="ml-auto text-[12px] font-semibold text-ink">{pct}%</span>
       </div>
-      <p className="mt-2 text-[13px] font-medium text-stone-800">{mission.goal}</p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
-        <div className="h-full rounded-full bg-[var(--brand-600)]" style={{ width: `${pct}%` }} />
+      <p className="mt-2 text-[13px] font-medium text-ink">{mission.goal}</p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
+        <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
       </div>
       {mission.checkpoints.length > 0 && (
         <ul className="mt-2 space-y-1">
           {mission.checkpoints.slice(-4).map((c, i) => (
-            <li key={i} className="flex items-center gap-1.5 text-[12px] text-stone-600">
-              <CheckCircle2 size={12} className="shrink-0 text-[var(--brand-600)]" />
+            <li key={i} className="flex items-center gap-1.5 text-[12px] text-muted">
+              <CheckCircle2 size={12} className="shrink-0 text-ink" />
               <span className="truncate">{c.label}</span>
-              {c.at && <span className="ml-auto shrink-0 text-[11px] text-stone-400">{fmtDateTime(c.at)}</span>}
+              {c.at && <span className="ml-auto shrink-0 text-[11px] text-muted">{fmtDateTime(c.at)}</span>}
             </li>
           ))}
         </ul>
       )}
       {mission.lastEvent && (
-        <p className="mt-2 text-[11px] text-stone-400">
+        <p className="mt-2 text-[11px] text-muted">
           Last: {mission.lastEvent.tool ?? mission.lastEvent.step ?? "event"} ·{" "}
           {fmtDateTime(mission.lastEvent.at)}
         </p>
@@ -152,12 +177,12 @@ export function ApprovalQueueWidget({ approvals }: { approvals?: ApprovalQueueSt
   }
   return (
     <div>
-      <div className="flex items-center gap-2 border-b border-stone-200 px-3 py-2">
-        <Inbox size={14} className="text-[var(--brand-600)]" />
-        <span className="text-[12px] font-semibold text-stone-700">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <Inbox size={14} className="text-ink" />
+        <span className="text-[12px] font-semibold text-ink">
           {approvals.pendingCount} pending
         </span>
-        <span className="ml-auto text-[11px] text-stone-400">
+        <span className="ml-auto text-[11px] text-muted">
           updated {fmtDateTime(approvals.updatedAt)}
         </span>
       </div>
@@ -176,11 +201,11 @@ export function ApprovalQueueWidget({ approvals }: { approvals?: ApprovalQueueSt
                 <td className={tdCls}>
                   <span className={badgeCls("stone")}>{item.kind.replace(/_/g, " ")}</span>
                 </td>
-                <td className={`${tdCls} max-w-[220px] truncate text-stone-800`} title={item.title}>
+                <td className={`${tdCls} max-w-[220px] truncate text-ink`} title={item.title}>
                   {item.title}
                 </td>
                 <td className={tdCls}>
-                  <span className={badgeCls(statusTone(item.status))}>{item.status}</span>
+                  <StatusChip status={item.status} kind="approval" />
                 </td>
               </tr>
             ))}
@@ -222,7 +247,7 @@ function CalendarRowEditor({
           setDraft(toDateTimeLocal(scheduledFor));
           setEditing(true);
         }}
-        className="text-[11px] font-medium text-[var(--brand-700)] hover:underline disabled:opacity-40"
+        className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-semibold text-ink hover:bg-hover-paper disabled:opacity-40"
       >
         Edit
       </button>
@@ -234,12 +259,12 @@ function CalendarRowEditor({
         type="datetime-local"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="rounded-md border border-stone-200 px-1.5 py-1 text-[12px]"
+        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[12px] text-ink focus:border-focus focus:outline-none"
       />
       <select
         value={draftStatus}
         onChange={(e) => setDraftStatus(e.target.value)}
-        className="rounded-md border border-stone-200 px-1.5 py-1 text-[12px]"
+        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[12px] text-ink focus:border-focus focus:outline-none"
       >
         {CALENDAR_STATUSES.map((s) => (
           <option key={s} value={s}>
@@ -255,14 +280,14 @@ function CalendarRowEditor({
             updateCalendarRow(rowId, { scheduledFor: iso, status: draftStatus });
             setEditing(false);
           }}
-          className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[11px] font-medium text-white hover:bg-[var(--brand-700)]"
+          className="inline-flex h-7 items-center rounded-full bg-ink px-3 text-[12px] font-semibold text-paper hover:bg-night-hover"
         >
           Save
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="rounded-md border border-stone-200 px-2 py-1 text-[11px] text-stone-500"
+          className="inline-flex h-7 items-center rounded-full bg-paper px-3 text-[12px] font-semibold text-ink shadow-outline hover:bg-hover-paper"
         >
           Cancel
         </button>
@@ -278,7 +303,7 @@ export function ContentCalendarWidget({ calendar }: { calendar?: ContentCalendar
   return (
     <div className="max-h-72 overflow-y-auto">
       <table className={tableCls}>
-        <thead className="sticky top-0 bg-white">
+        <thead className="sticky top-0 bg-paper">
           <tr>
             <th className={thCls}>Scheduled</th>
             <th className={thCls}>Post</th>
@@ -290,19 +315,19 @@ export function ContentCalendarWidget({ calendar }: { calendar?: ContentCalendar
         <tbody>
           {calendar.rows.map((row) => (
             <tr key={row.id} className={rowCls}>
-              <td className={`${tdCls} whitespace-nowrap text-stone-600`}>
+              <td className={`${tdCls} whitespace-nowrap text-muted`}>
                 {fmtDateTime(row.scheduledFor)}
               </td>
-              <td className={`${tdCls} max-w-[200px] truncate text-stone-800`} title={row.text}>
+              <td className={`${tdCls} max-w-[200px] truncate text-ink`} title={row.text}>
                 {row.text || "—"}
               </td>
               <td className={tdCls}>
-                <span className="text-[12px] text-stone-500">
+                <span className="text-[12px] text-muted">
                   {row.channels.length > 0 ? row.channels.join(", ") : "—"}
                 </span>
               </td>
               <td className={tdCls}>
-                <span className={badgeCls(statusTone(row.status))}>{row.status}</span>
+                <StatusChip status={row.status} />
               </td>
               <td className={tdCls}>
                 <CalendarRowEditor rowId={row.id} scheduledFor={row.scheduledFor} status={row.status} />
@@ -334,26 +359,27 @@ export function SharedStatePanel() {
 
   return (
     <div className={panelCls} data-testid="shared-state-panel">
-      <div className="flex items-center gap-1 border-b border-stone-200 px-2 py-1.5">
+      <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
         {tabs.map(({ id, label, Icon, count }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`${tabBase} ${tab === id ? tabActive : "border border-transparent"}`}
+            aria-pressed={tab === id}
+            className={`${tabBase} ${tab === id ? tabActive : tabInactive}`}
           >
             <Icon size={13} />
             {label}
             {count !== undefined && count > 0 && (
-              <span className="rounded-full bg-[var(--brand-600)] px-1.5 text-[10px] font-semibold text-white">
+              <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-paper text-ink" : "bg-ink text-paper"}`}>
                 {count}
               </span>
             )}
           </button>
         ))}
-        <span className="ml-auto flex items-center gap-1 pr-1 text-[10px] text-stone-400" title="Shared state sync status">
-          <RefreshCw size={10} className={isReady ? "text-[var(--brand-600)]" : ""} />
-          {isReady ? "synced" : "connecting"}
+        <span className="ml-auto flex items-center gap-1 pr-1 text-[11px] text-muted" title="Shared state sync status">
+          <RefreshCw size={10} className={isReady ? "text-ink" : ""} />
+          {isReady ? "Synced" : "Connecting"}
         </span>
       </div>
       {tab === "mission" && <MissionProgressWidget mission={state.mission} />}
@@ -377,20 +403,21 @@ export function SharedStateDock() {
   return (
     <div className="fixed bottom-4 left-4 z-40" data-testid="shared-state-dock">
       {open && (
-        <div className="mb-2 w-[380px] max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-2 w-[380px] max-w-[calc(100vw-2rem)] rounded-md shadow-raised">
           <SharedStatePanel />
         </div>
       )}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-[12px] font-medium text-stone-700 shadow-md hover:border-[var(--brand-600)]"
+        aria-expanded={open}
+        className="flex h-9 items-center gap-2 rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-raised hover:shadow-outline"
       >
-        <span className={`h-2 w-2 rounded-full ${isReady ? "bg-[var(--brand-600)]" : "bg-stone-300"}`} />
+        <span className={`h-2 w-2 rounded-full ${isReady ? "bg-ink" : "bg-line-strong"}`} />
         Agent state
-        {missionPct !== null && <span className="text-stone-400">{missionPct}%</span>}
+        {missionPct !== null && <span className="text-muted">{missionPct}%</span>}
         {pending > 0 && (
-          <span className="flex items-center gap-1 rounded-full bg-[var(--brand-50)] px-1.5 text-[11px] font-semibold text-[var(--brand-700)]">
+          <span className="flex items-center gap-1 rounded-full bg-canvas px-1.5 text-[11px] font-semibold text-ink" title="Approvals waiting on you">
             <Inbox size={11} />
             {pending}
           </span>

@@ -45,11 +45,11 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ i
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-muted hover:text-ink">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Programmatic SEO</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="mt-1 text-xl font-heading tracking-heading stretch-heading text-ink">Programmatic SEO</h1>
+        <p className="mt-1 text-sm text-muted">
           Templates × datasets → hundreds of pages. Preview first, then generate, review, and publish.
           Quality gates run server-side on approve and publish.
         </p>

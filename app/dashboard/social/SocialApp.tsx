@@ -1,265 +1,307 @@
-// Marketr — social publishing workspace (Phase 12, Postiz sidecar).
-// Schedule and publish posts across ~30 channels via the self-hosted
-// Postiz sidecar (AGPL-3.0, raw REST only — never its SDK). Platform OAuth
-// tokens live inside Postiz; Marketr only holds the sidecar URL + API key.
-
+// ShapesOS — Social workspace (Phase 4b: the social loop).
+// Posts are ShapesOS records (text + images/video + UTM-tagged link) that
+// publish through the Postiz sidecar after approval; engagement comes back
+// per post per day and feeds Attribution. Tabs: Posts (dense table),
+// Calendar (month grid with media thumbnails), Channels. ?post=<id> opens a
+// post (Studio "Send to social" and the approval inbox link here).
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays, ChevronLeft, ChevronRight, Link2, ListChecks, Loader2, Plus, RefreshCw, Search, Settings2 } from "lucide-react";
+import { platformLabel } from "@/lib/social/platforms";
+import { toast, toastError } from "@/lib/ui/feedback";
 import { OpenInSheetsButton } from "@/components/office/OpenInSheetsButton";
+import { Composer } from "./Composer";
 import {
-  CalendarClock,
-  CheckCircle2,
-  ExternalLink,
-  ImagePlus,
-  Link2,
-  Plus,
-  Search,
-  Send,
-  Share2,
-  Trash2,
-  X,
-} from "lucide-react";
-import { confirmAction } from "@/lib/ui/feedback";
-import { closeOnEscape } from "@/lib/ui/keyboard";
+  api,
+  btnPrimary,
+  btnQuiet,
+  btnSecondary,
+  cardCls,
+  fmtDateTime,
+  fmtInt,
+  inputCls,
+  postWhen,
+  StatusChip,
+  Tag,
+  tdCls,
+  tdNum,
+  thCls,
+  thNum,
+  Thumb,
+  type Channel,
+  type Post,
+  type PostStatus,
+  type ProviderMode,
+} from "./ui";
 
-interface PostizChannel {
-  id: string;
-  identifier: string;
-  name: string | null;
-  picture: string | null;
-  connectedAt: string | null;
+type Tab = "posts" | "calendar" | "channels";
+
+interface Loaded {
+  mode: ProviderMode;
+  channels: Channel[];
+  maxUploadBytes: number;
+  posts: Post[];
 }
 
-interface PostizPost {
-  id: string;
-  type: string;
-  date: string | null;
-  content: string | null;
-  channels: string[];
-  createdAt: string | null;
+const DEFAULT_UPLOAD_BYTES = Math.floor(9.5 * 1024 * 1024);
+
+/** Channels (+ provider mode) and posts; errors become toasts and empty data. */
+async function fetchAll(): Promise<Loaded> {
+  const [ch, ps] = await Promise.all([
+    api<{ mode: ProviderMode; channels: Channel[]; maxUploadBytes: number }>("/api/social/channels").catch((e: unknown) => {
+      toastError(e instanceof Error ? e.message : "Channels didn't load.");
+      return { mode: "none" as const, channels: [], maxUploadBytes: DEFAULT_UPLOAD_BYTES };
+    }),
+    api<{ posts: Post[] }>("/api/social/posts").catch((e: unknown) => {
+      toastError(e instanceof Error ? e.message : "Posts didn't load.");
+      return { posts: [] as Post[] };
+    }),
+  ]);
+  return { ...ch, posts: ps.posts };
 }
 
-type Tab = "scheduled" | "channels";
+const STATUS_FILTERS: Array<{ id: "" | PostStatus; label: string }> = [
+  { id: "", label: "All statuses" },
+  { id: "draft", label: "Drafts" },
+  { id: "pending_approval", label: "Needs approval" },
+  { id: "scheduled", label: "Scheduled" },
+  { id: "published", label: "Published" },
+  { id: "failed", label: "Failed" },
+  { id: "cancelled", label: "Cancelled" },
+];
 
-async function api<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts?.headers ?? {}) } });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `Request failed (${res.status})`);
-  return data as T;
-}
-
-const inputCls =
-  "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
-const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50";
-const btnSecondary =
-  "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
-
-function Chip({ tone, children }: { tone: string; children: ReactNode }) {
-  const tones: Record<string, string> = {
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    violet: "bg-brand-50 text-brand-700 border-violet-200",
-    stone: "bg-stone-100 text-stone-600 border-stone-200",
-    blue: "bg-sky-50 text-sky-700 border-sky-200",
-  };
-  return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[11px] font-medium leading-4 ${tones[tone] ?? tones.stone}`}>
-      {children}
-    </span>
-  );
-}
-
-const TYPE_TONE: Record<string, string> = { now: "green", schedule: "amber", draft: "stone" };
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "—";
-  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-export function SocialApp() {
-  const [tab, setTab] = useState<Tab>("scheduled");
-  const [connected, setConnected] = useState<boolean | null>(null);
-  const [posts, setPosts] = useState<PostizPost[]>([]);
-  const [channels, setChannels] = useState<PostizChannel[]>([]);
-  const [q, setQ] = useState("");
+export function SocialApp({ canEdit }: { canEdit: boolean }) {
+  const router = useRouter();
+  const search = useSearchParams();
+  const [tab, setTab] = useState<Tab>("posts");
+  const [mode, setMode] = useState<ProviderMode | null>(null);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [maxUploadBytes, setMaxUploadBytes] = useState(DEFAULT_UPLOAD_BYTES);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"" | PostStatus>("");
+  const [open, setOpen] = useState<{ post: Post | null } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const st = await api<{ configured: boolean }>("/api/integrations/postiz/status");
-      setConnected(st.configured);
-      if (!st.configured) {
-        setLoading(false);
-        return;
-      }
-      const [p, c] = await Promise.all([
-        api<{ posts: PostizPost[] }>("/api/integrations/postiz/posts"),
-        api<{ channels: PostizChannel[] }>("/api/integrations/postiz/channels"),
-      ]);
-      setPosts(p.posts);
-      setChannels(c.channels);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
-    } finally {
-      setLoading(false);
-    }
+  const apply = useCallback((d: Loaded) => {
+    setMode(d.mode);
+    setChannels(d.channels);
+    setMaxUploadBytes(d.maxUploadBytes);
+    setPosts(d.posts);
+    setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  /** Reload after an action (event-driven). */
+  const load = useCallback(async () => {
+    apply(await fetchAll());
+  }, [apply]);
 
-  const deletePost = async (id: string) => {
-    if (!await confirmAction("Delete this post from the Postiz queue?")) return;
-    setBusy(id);
-    setError(null);
+  // Initial load; a deep link (?post=<id>) opens that post once the list is in.
+  const deepLink = search.get("post");
+  useEffect(() => {
+    let live = true;
+    void fetchAll().then(async (d) => {
+      if (!live) return;
+      apply(d);
+      if (!deepLink) return;
+      const hit = d.posts.find((p) => p.id === deepLink);
+      const one = hit ? { post: hit } : await api<{ post: Post }>(`/api/social/posts/${encodeURIComponent(deepLink)}`).catch(() => null);
+      if (live && one) setOpen({ post: one.post });
+    });
+    return () => {
+      live = false;
+    };
+  }, [apply, deepLink]);
+
+  const closeComposer = () => {
+    setOpen(null);
+    if (deepLink) router.replace("/dashboard/social");
+  };
+
+  const sync = async () => {
+    setSyncing(true);
     try {
-      await api(`/api/integrations/postiz/posts/${encodeURIComponent(id)}`, { method: "DELETE" });
-      setPosts((prev) => prev.filter((p) => p.id !== id));
+      const r = await api<{ refresh: { published: number; failed: number }; ingest: { rows: number } }>("/api/social/sync", { method: "POST" });
+      toast({
+        title: "Synced",
+        description: `${r.refresh.published} newly published, ${r.refresh.failed} failed, ${r.ingest.rows} engagement rows updated.`,
+      });
+      await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Delete failed");
+      toastError(e instanceof Error ? e.message : "Sync failed.");
     } finally {
-      setBusy(null);
+      setSyncing(false);
     }
   };
 
-  if (connected === false) {
-    return (
-      <div className="rounded-[10px] border border-stone-200 bg-white p-8 text-center">
-        <Share2 size={28} className="mx-auto text-stone-300" />
-        <h3 className="mt-2 text-[15px] font-bold text-stone-900">Connect Postiz to schedule social posts</h3>
-        <p className="mx-auto mt-1 max-w-md text-[13px] text-stone-500">
-          Postiz is a self-hosted publishing sidecar (AGPL-3.0) covering ~30 social channels behind one API.
-          Set <span className="font-mono">POSTIZ_URL</span> and <span className="font-mono">POSTIZ_API_KEY</span> in
-          Settings → Providers, then connect your channels inside the Postiz UI — ShapesOS never sees platform tokens.
-        </p>
-        <a href="/dashboard/settings/providers" className={`${btnSecondary} mt-3 inline-flex items-center`}>
-          <ExternalLink size={14} /> Open Settings → Providers
-        </a>
-      </div>
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return posts.filter(
+      (p) =>
+        (!status || p.status === status || (status === "scheduled" && p.status === "approved")) &&
+        (!needle || p.content.toLowerCase().includes(needle) || (p.utmCampaign ?? "").toLowerCase().includes(needle)),
     );
-  }
+  }, [posts, q, status]);
 
-  const filtered = posts.filter((p) =>
-    !q.trim() || (p.content ?? "").toLowerCase().includes(q.trim().toLowerCase()),
-  );
-
-  const tabs: Array<{ id: Tab; label: string; Icon: typeof Search }> = [
-    { id: "scheduled", label: "Scheduled & sent", Icon: CalendarClock },
-    { id: "channels", label: "Channels", Icon: Link2 },
+  const pending = posts.filter((p) => p.status === "pending_approval").length;
+  const tabs: Array<{ id: Tab; label: string; Icon: typeof Search; count?: number }> = [
+    { id: "posts", label: "Posts", Icon: ListChecks, count: pending || undefined },
+    { id: "calendar", label: "Calendar", Icon: CalendarDays },
+    { id: "channels", label: "Channels", Icon: Link2, count: channels.length || undefined },
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200">
-        <div className="flex gap-1">
-          {tabs.map(({ id, label, Icon }) => (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {mode === "mock" ? (
+        <p className="rounded-md bg-paper px-3 py-2 text-[13px] text-muted shadow-hairline">
+          Sample mode: Postiz isn&apos;t connected, so channels are sample channels, publishing is simulated and engagement is sample
+          data. Set POSTIZ_URL and POSTIZ_API_KEY to publish for real.
+        </p>
+      ) : null}
+      {mode === "none" ? (
+        <div className={`${cardCls} flex flex-wrap items-center justify-between gap-3 p-4`}>
+          <div>
+            <p className="text-[15px] font-semibold text-ink">Connect Postiz to publish</p>
+            <p className="text-[13px] text-muted">
+              You can draft posts now. Set POSTIZ_URL and POSTIZ_API_KEY in Settings → Providers, then connect channels inside Postiz.
+            </p>
+          </div>
+          <a href="/dashboard/settings/providers" className={btnSecondary}>
+            <Settings2 className="h-4 w-4" /> Open providers
+          </a>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line">
+        <div className="flex gap-1" role="tablist" aria-label="Social views">
+          {tabs.map(({ id, label, Icon, count }) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
-                tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] font-semibold ${
+                tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
-              <Icon size={15} />
+              <Icon className="h-4 w-4" />
               {label}
-              {id === "channels" && channels.length ? (
-                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-brand-50 text-brand-700" : "bg-zinc-100 text-zinc-600"}`}>
-                  {channels.length}
-                </span>
-              ) : null}
+              {count ? <span className="rounded-full bg-control px-1.5 text-[12px] font-semibold text-ink">{count}</span> : null}
             </button>
           ))}
         </div>
-        <button className={btnPrimary} onClick={() => setComposeOpen(true)}>
-          <Plus size={14} /> Compose
-        </button>
+        <div className="flex gap-2 pb-2">
+          {canEdit && mode && mode !== "none" ? (
+            <button type="button" className={btnSecondary} onClick={() => void sync()} disabled={syncing}>
+              {syncing ? <Loader2 className="h-4 w-4 aos-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {syncing ? "Syncing" : "Sync"}
+            </button>
+          ) : null}
+          {canEdit ? (
+            <button type="button" className={btnPrimary} onClick={() => setOpen({ post: null })}>
+              <Plus className="h-4 w-4" /> New post
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {error ? (
-        <p className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{error}</p>
-      ) : null}
-
-      {tab === "scheduled" ? (
-        <div className="rounded-[10px] border border-stone-200 bg-white">
-          <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-3 py-2">
+      {tab === "posts" ? (
+        <section className={cardCls}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+            <select aria-label="Status" className={`${inputCls} !w-auto`} value={status} onChange={(e) => setStatus(e.target.value as "" | PostStatus)}>
+              {STATUS_FILTERS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                className={`${inputCls} pl-8`}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search posts…"
-              />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+              <input aria-label="Search posts" className={`${inputCls} !w-64 pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text or campaign" />
             </div>
-            <span className="ml-auto text-[12px] text-stone-500">{filtered.length} posts</span>
-            {filtered.length > 0 && (
+            <span className="ml-auto text-[13px] text-muted">{filtered.length} posts</span>
+            {filtered.length > 0 ? (
               <OpenInSheetsButton
                 title="Content calendar"
-                headers={["Scheduled for", "Post", "Channels", "Type", "Created"]}
+                headers={["When", "Post", "Channels", "Status", "Campaign", "Impressions", "Clicks"]}
                 rows={filtered.map((p) => [
-                  p.date ?? "—",
-                  p.content ?? "—",
-                  p.channels.join(", ") || "—",
-                  p.type,
-                  p.createdAt ?? "—",
+                  postWhen(p),
+                  p.content,
+                  p.channels.map((c) => platformLabel(c.identifier)).join(", "),
+                  p.status,
+                  p.utmCampaign ?? "",
+                  String(p.metrics?.impressions ?? ""),
+                  String(p.metrics?.clicks ?? ""),
                 ])}
                 sourceRef="social:calendar"
                 sheetName="Calendar"
                 className={btnSecondary}
               />
-            )}
+            ) : null}
           </div>
           {loading ? (
-            <div className="p-6 text-[13px] text-stone-500">Loading posts…</div>
+            <p className="p-6 text-[13px] text-muted">Loading posts…</p>
           ) : filtered.length === 0 ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-[13px] font-medium text-stone-600">No posts yet</p>
-              <p className="mt-1 text-[12px] text-stone-400">Compose one — it schedules through the Postiz sidecar.</p>
+              <p className="text-[15px] font-semibold text-ink">{posts.length ? "No posts match these filters" : "No posts yet"}</p>
+              <p className="mt-1 text-[13px] text-muted">
+                {posts.length ? "Clear the filters to see everything." : "Write one with New post, or send a design from Studio."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-[13px]">
+              <table className="w-full min-w-[880px] text-left">
                 <thead>
-                  <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                    <th className="px-3 py-2 font-medium">Post</th>
-                    <th className="px-3 py-2 font-medium">Channels</th>
-                    <th className="px-3 py-2 font-medium">Type</th>
-                    <th className="px-3 py-2 font-medium">Scheduled for</th>
-                    <th className="px-3 py-2 font-medium text-right">Actions</th>
+                  <tr className="border-b border-line">
+                    <th className={thCls}>Post</th>
+                    <th className={thCls}>Channels</th>
+                    <th className={thCls}>Status</th>
+                    <th className={thCls}>When</th>
+                    <th className={thNum}>Impressions</th>
+                    <th className={thNum}>Engagements</th>
+                    <th className={thNum}>Clicks</th>
+                    <th className={thCls}>
+                      <span className="sr-only">Open</span>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody>
                   {filtered.map((p) => (
-                    <tr key={p.id} className="hover:bg-brand-50/40">
-                      <td className="max-w-[380px] px-3 py-2">
-                        <div className="truncate text-stone-900">{p.content ?? "—"}</div>
-                        <div className="text-[11px] text-stone-400">created {fmtDate(p.createdAt)}</div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {p.channels.length ? p.channels.map((c) => <Chip key={c} tone="blue">{c}</Chip>) : <span className="text-[12px] text-stone-400">—</span>}
+                    <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className={`${tdCls} max-w-[360px]`}>
+                        <div className="flex items-start gap-2">
+                          {p.media[0] ? <Thumb media={p.media[0]} /> : null}
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">{p.content.trim() || (p.media.length ? `Media post (${p.media.length})` : "Untitled post")}</div>
+                            <div className="flex flex-wrap gap-x-2 text-[12px] text-muted">
+                              {p.media.length ? <span>{p.media.length} media</span> : null}
+                              {p.utmCampaign ? <span className="font-mono">{p.utmCampaign}</span> : null}
+                              {p.source === "studio" ? <span>From Studio</span> : null}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2"><Chip tone={TYPE_TONE[p.type] ?? "stone"}>{p.type}</Chip></td>
-                      <td className="whitespace-nowrap px-3 py-2 text-[12px] text-stone-500">{fmtDate(p.date)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                          disabled={busy === p.id}
-                          onClick={() => deletePost(p.id)}
-                          title="Delete post"
-                        >
-                          <Trash2 size={14} />
+                      <td className={tdCls}>
+                        <div className="flex flex-wrap gap-1">
+                          {p.channels.length ? p.channels.map((c) => <Tag key={c.id}>{platformLabel(c.identifier)}</Tag>) : <span className="text-muted">—</span>}
+                        </div>
+                      </td>
+                      <td className={tdCls}>
+                        <StatusChip status={p.status} scheduledFor={p.scheduledFor} />
+                      </td>
+                      <td className={`${tdCls} whitespace-nowrap text-muted`}>{fmtDateTime(postWhen(p))}</td>
+                      <td className={tdNum}>{p.metrics ? fmtInt(p.metrics.impressions) : "—"}</td>
+                      <td className={tdNum}>{p.metrics ? fmtInt(p.metrics.likes + p.metrics.comments + p.metrics.shares) : "—"}</td>
+                      <td className={tdNum}>
+                        {p.metrics ? fmtInt(p.metrics.clicks) : "—"}
+                        {p.metrics?.mock ? <span className="ml-1 text-[11px] text-muted">sample</span> : null}
+                      </td>
+                      <td className={`${tdCls} text-right`}>
+                        <button type="button" className={btnQuiet} onClick={() => setOpen({ post: p })}>
+                          {p.status === "pending_approval" && canEdit ? "Review" : canEdit && (p.status === "draft" || p.status === "failed") ? "Edit" : "Open"}
                         </button>
                       </td>
                     </tr>
@@ -268,190 +310,174 @@ export function SocialApp() {
               </table>
             </div>
           )}
-        </div>
+        </section>
+      ) : tab === "calendar" ? (
+        <CalendarView posts={posts} onOpen={(p) => setOpen({ post: p })} />
       ) : (
-        <div className="rounded-[10px] border border-stone-200 bg-white">
-          <div className="border-b border-stone-200 px-3 py-2">
-            <span className="text-[13px] font-semibold text-stone-800">Connected channels</span>
-            <p className="mt-0.5 text-[12px] text-stone-500">
-              Channels connect inside the Postiz UI (its own OAuth flow). ShapesOS only reads them back for scheduling.
-            </p>
+        <section className={cardCls}>
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-[15px] font-semibold text-ink">Connected channels</h2>
+            <p className="text-[13px] text-muted">Channels connect inside Postiz (its own OAuth). ShapesOS reads them back to publish.</p>
           </div>
-          {loading ? (
-            <div className="p-6 text-[13px] text-stone-500">Loading channels…</div>
-          ) : channels.length === 0 ? (
-            <div className="px-4 py-10 text-center">
-              <p className="text-[13px] font-medium text-stone-600">No channels connected yet</p>
-              <p className="mx-auto mt-1 max-w-sm text-[12px] text-stone-400">
-                Open your Postiz instance, go to Channels, and connect your X, LinkedIn, Instagram, TikTok, and other
-                accounts there. They will appear here for scheduling.
-              </p>
-            </div>
+          {channels.length === 0 ? (
+            <p className="px-4 py-8 text-center text-[13px] text-muted">
+              {mode === "none" ? "Connect Postiz first." : "No channels yet. Connect X, LinkedIn, Instagram and others in Postiz."}
+            </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-[13px]">
+              <table className="w-full min-w-[560px] text-left">
                 <thead>
-                  <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                    <th className="px-3 py-2 font-medium">Channel</th>
-                    <th className="px-3 py-2 font-medium">Platform</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Connected</th>
+                  <tr className="border-b border-line">
+                    <th className={thCls}>Channel</th>
+                    <th className={thCls}>Platform</th>
+                    <th className={thCls}>Provider id</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody>
                   {channels.map((c) => (
-                    <tr key={c.id} className="hover:bg-brand-50/40">
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          {c.picture ? (
-                            <img src={c.picture} alt="" className="h-6 w-6 rounded-full object-cover" />
-                          ) : (
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                              <Share2 size={12} />
-                            </span>
-                          )}
-                          <span className="font-medium text-stone-900">{c.name ?? c.identifier}</span>
-                        </div>
+                    <tr key={c.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className={`${tdCls} font-medium`}>{c.name}</td>
+                      <td className={tdCls}>
+                        <Tag>{platformLabel(c.identifier)}</Tag>
                       </td>
-                      <td className="px-3 py-2"><Chip tone="blue">{c.identifier}</Chip></td>
-                      <td className="px-3 py-2"><Chip tone="green">connected</Chip></td>
-                      <td className="whitespace-nowrap px-3 py-2 text-[12px] text-stone-500">{fmtDate(c.connectedAt)}</td>
+                      <td className={`${tdCls} font-mono text-[12px] text-muted`}>{c.id}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {composeOpen ? (
-        <ComposeModal channels={channels} onClose={() => setComposeOpen(false)} onDone={() => { setComposeOpen(false); load(); }} />
+      {open ? (
+        <Composer
+          key={open.post?.id ?? "new"}
+          post={open.post}
+          channels={channels}
+          mode={mode ?? "none"}
+          maxUploadBytes={maxUploadBytes}
+          canEdit={canEdit}
+          onClose={closeComposer}
+          onSaved={(p) => {
+            closeComposer();
+            void load();
+            if (p && (p.status === "draft" || p.status === "failed")) setOpen({ post: p });
+          }}
+        />
       ) : null}
     </div>
   );
 }
 
-function ComposeModal({
-  channels,
-  onClose,
-  onDone,
-}: {
-  channels: PostizChannel[];
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [content, setContent] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [mode, setMode] = useState<"now" | "schedule" | "draft">("schedule");
-  const [when, setWhen] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// ---------------------------------------------------------------------------
+// Calendar: month grid, posts on their publish/schedule/created day
+// ---------------------------------------------------------------------------
 
-  const toggle = (id: string) =>
-    setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+function CalendarView({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) => void }) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const first = new Date(year, month, 1);
+  const startOffset = (first.getDay() + 6) % 7; // Monday first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<Date | null> = [
+    ...Array.from({ length: startOffset }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ];
+  while (cells.length % 7) cells.push(null);
 
-  const save = async () => {
-    if (mode === "now" && !await confirmAction(`Publish now to ${picked.size} channel${picked.size === 1 ? "" : "s"}? This posts publicly.`)) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const platformTypes: Record<string, string> = {};
-      for (const c of channels) if (picked.has(c.id) && c.identifier) platformTypes[c.id] = c.identifier;
-      await api("/api/integrations/postiz/posts", {
-        method: "POST",
-        body: JSON.stringify({
-          type: mode,
-          content,
-          channelIds: [...picked],
-          platformTypes,
-          ...(mode === "schedule" && when ? { date: new Date(when).toISOString() } : {}),
-        }),
-      });
-      onDone();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Schedule failed");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const valid = content.trim().length > 0 && picked.size > 0 && (mode !== "schedule" || when.trim().length > 0);
+  const byDay = new Map<string, Post[]>();
+  for (const p of posts) {
+    if (p.status === "cancelled") continue;
+    const d = new Date(postWhen(p));
+    if (d.getFullYear() !== year || d.getMonth() !== month) continue;
+    const k = String(d.getDate());
+    byDay.set(k, [...(byDay.get(k) ?? []), p].sort((a, b) => postWhen(a).localeCompare(postWhen(b))));
+  }
+  const today = new Date();
+  const label = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
-      <div className="w-full max-w-3xl rounded-xl border border-stone-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-stone-900">Compose post</h3>
-          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="Close"><X size={16} /></button>
+    <section className={cardCls}>
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <div className="flex items-center gap-1">
+          <button type="button" className={btnQuiet} aria-label="Previous month" onClick={() => setCursor(new Date(year, month - 1, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button type="button" className={btnQuiet} aria-label="Next month" onClick={() => setCursor(new Date(year, month + 1, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <h2 className="ml-1 text-[15px] font-semibold text-ink">{label}</h2>
         </div>
-        <div className="space-y-3 p-4">
-          <textarea
-            className={`${inputCls} min-h-[120px]`}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="What should the post say?"
-            maxLength={10_000}
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-[12px] font-medium text-stone-600">Channels ({picked.size} selected)</p>
-            <p className="text-[11px] text-stone-400">{content.length}/10000</p>
-          </div>
-          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-stone-200 p-2">
-            {channels.length === 0 ? (
-              <p className="p-1 text-[12px] text-stone-400">
-                No channels connected yet — connect them in the Postiz UI first.
-              </p>
-            ) : channels.map((c) => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-stone-50">
-                <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} className="accent-brand-600" />
-                <span className="text-[13px] text-stone-800">{c.name ?? c.identifier}</span>
-                <span className="ml-auto"><Chip tone="blue">{c.identifier}</Chip></span>
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-1">
-              {(["now", "schedule", "draft"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`rounded-md border px-2.5 py-1.5 text-[13px] font-medium ${
-                    mode === m ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  {m === "now" ? "Publish now" : m === "schedule" ? "Schedule" : "Save draft"}
-                </button>
-              ))}
+        <button type="button" className={btnQuiet} onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}>
+          Today
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[760px] grid-cols-7">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <div key={d} className="border-b border-line px-2 py-1.5 text-xs font-semibold text-muted">
+              {d}
             </div>
-            {mode === "schedule" ? (
-              <input
-                type="datetime-local"
-                className={`${inputCls} !w-auto`}
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-              />
-            ) : null}
-          </div>
-          {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
-          <div className="flex items-center justify-between border-t border-stone-200 pt-3">
-            <p className="flex items-center gap-1 text-[12px] text-stone-500">
-              {mode === "now" ? <Send size={12} /> : mode === "schedule" ? <CalendarClock size={12} /> : <CheckCircle2 size={12} />}
-              {mode === "now"
-                ? "Publishes publicly the moment you confirm."
-                : mode === "schedule"
-                  ? "Postiz publishes at the scheduled time (needs Temporal running in Postiz)."
-                  : "Saved as a draft in Postiz, not published."}
-            </p>
-            <div className="flex gap-2">
-              <button className={btnSecondary} onClick={onClose}>Cancel</button>
-              <button className={btnPrimary} disabled={saving || !valid} onClick={save}>
-                <ImagePlus size={14} /> {saving ? "Saving…" : mode === "now" ? "Publish" : mode === "schedule" ? "Schedule" : "Save draft"}
-              </button>
-            </div>
-          </div>
+          ))}
+          {cells.map((d, i) => {
+            const items = d ? byDay.get(String(d.getDate())) ?? [] : [];
+            const isToday = d && d.toDateString() === today.toDateString();
+            return (
+              <div key={i} className={`min-h-[112px] border-b border-r border-line p-1.5 ${d ? "" : "bg-canvas"}`}>
+                {d ? (
+                  <div className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? "bg-ink text-paper" : "text-ink"}`}>
+                    {d.getDate()}
+                  </div>
+                ) : null}
+                <div className="flex flex-col gap-1">
+                  {items.slice(0, 3).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => onOpen(p)}
+                      className="flex w-full items-center gap-1.5 rounded-sm bg-paper p-1 text-left shadow-hairline hover:bg-hover-paper"
+                    >
+                      {p.media[0] ? <Thumb media={p.media[0]} size={24} /> : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12px] font-medium text-ink">{p.content.trim() || "Media post"}</span>
+                        <span className="flex items-center gap-1 text-[11px] text-muted">
+                          {new Date(postWhen(p)).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                          <StatusDot status={p.status} />
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                  {items.length > 3 ? <span className="px-1 text-[11px] text-muted">+{items.length - 3} more</span> : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
+    </section>
   );
+}
+
+/** Calendar marker. Status shapes are reserved for agent states
+ *  (DESIGN.md): only "needs approval" keeps the needs-you triangle; a failed
+ *  post reads "Failed" in failed-text; the rest are screen-reader text. */
+function StatusDot({ status }: { status: PostStatus }) {
+  const label = status.replace(/_/g, " ");
+  if (status === "pending_approval") {
+    return (
+      <span
+        className="aos-shape aos-shape--needs aos-shape--edged"
+        style={{ ["--aos-shape-size" as string]: "8px" }}
+        role="img"
+        aria-label={label}
+      />
+    );
+  }
+  if (status === "failed") return <span className="text-[10px] font-semibold text-failed-text">Failed</span>;
+  return <span className="sr-only">{label}</span>;
 }

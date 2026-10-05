@@ -102,11 +102,9 @@ export async function sendInviteEmail(
   }
   const { subject, text, html } = renderInviteEmail({ ...mail, inviteUrl: url });
   try {
-    const from = channel === "smtp" ? (env.SMTP_FROM ?? "").trim() : (env.INVITE_MAIL_FROM ?? "").trim();
-    const msg = { from, to: mail.to, subject, text, html };
+    const msg = { from: mailFromAddress(channel, env), to: mail.to, subject, text, html };
     if (deps.deliver) await deps.deliver(channel, msg);
-    else if (channel === "smtp") await deliverSmtp(msg);
-    else await createResendPort((env.RESEND_API_KEY ?? "").trim()).sendEmail(msg);
+    else await deliverMail(channel, msg, env);
     return { sent: true, channel };
   } catch (err) {
     // Code/name only: provider error text can echo the message body (and so the token).
@@ -114,6 +112,25 @@ export async function sendInviteEmail(
     console.error(`[invite-mail] ${channel} delivery failed (${String(code).slice(0, 60)})`);
     return { sent: false, reason: "send_failed", message: "The invite email didn't go out. Copy the invite link and send it yourself." };
   }
+}
+
+/** The From address for a channel (SMTP_FROM, or INVITE_MAIL_FROM for Resend). */
+export function mailFromAddress(channel: InviteMailChannel, env: NodeJS.ProcessEnv = process.env): string {
+  return channel === "smtp" ? (env.SMTP_FROM ?? "").trim() : (env.INVITE_MAIL_FROM ?? "").trim();
+}
+
+/**
+ * Send one message over the deployment's mail channel (shared with the
+ * Phase 6 sign-in emails, lib/auth/email/mail.ts). Throws on failure; callers
+ * log the error code only, never the message (it carries a link).
+ */
+export async function deliverMail(
+  channel: InviteMailChannel,
+  msg: { from: string; to: string; subject: string; text: string; html: string },
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  if (channel === "smtp") await deliverSmtp(msg);
+  else await createResendPort((env.RESEND_API_KEY ?? "").trim()).sendEmail(msg);
 }
 
 async function deliverSmtp(msg: { from: string; to: string; subject: string; text: string; html: string }) {

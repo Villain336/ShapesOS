@@ -10,7 +10,9 @@ import {
   cronMatches,
   cronMatchesInZone,
   nextFutureRunAfter,
+  nextFutureRunAfterInZone,
   nextRunAfter,
+  nextRunAfterInZone,
   parseCron,
 } from "../cron";
 import { runSchedulerTick } from "../tick";
@@ -113,6 +115,82 @@ describe("cronMatchesInZone", () => {
   });
 });
 
+// ── per-schedule timezone (Phase 4a follow-up: schedules ran in UTC) ─────────
+
+describe("nextRunAfterInZone", () => {
+  const NY = "America/New_York";
+  const iso = (d: Date) => d.toISOString();
+
+  it("reads the cron as wall-clock time in the schedule's zone", () => {
+    const s = parseCron("0 9 * * 1");
+    // Mon 2026-10-05 09:00 EDT = 13:00Z (UTC would have said 09:00Z).
+    assert.equal(iso(nextRunAfterInZone(s, new Date("2026-10-03T00:00:00Z"), NY)), "2026-10-05T13:00:00.000Z");
+    // Kolkata is +05:30 with no DST: Mon 09:00 IST = 03:30Z.
+    assert.equal(iso(nextRunAfterInZone(s, new Date("2026-10-03T00:00:00Z"), "Asia/Kolkata")), "2026-10-05T03:30:00.000Z");
+    // Local day boundary: Sunday 23:00 UTC is already Monday in Tokyo.
+    assert.equal(iso(nextRunAfterInZone(parseCron("30 8 * * 1"), new Date("2026-10-04T20:00:00Z"), "Asia/Tokyo")), "2026-10-04T23:30:00.000Z");
+  });
+
+  it("keeps local time across the fall-back transition and fires once in the repeated hour", () => {
+    // 2026-11-01: New York falls back 02:00 EDT → 01:00 EST.
+    const daily9 = parseCron("0 9 * * *");
+    assert.equal(iso(nextRunAfterInZone(daily9, new Date("2026-10-31T13:00:00Z"), NY)), "2026-11-01T14:00:00.000Z");
+    const daily130 = parseCron("30 1 * * *");
+    const first = nextRunAfterInZone(daily130, new Date("2026-11-01T00:00:00Z"), NY);
+    assert.equal(iso(first), "2026-11-01T05:30:00.000Z", "earlier 01:30 (EDT)");
+    assert.equal(iso(nextRunAfterInZone(daily130, first, NY)), "2026-11-02T06:30:00.000Z", "not again at 01:30 EST");
+  });
+
+  it("a wall time skipped by spring-forward fires shifted forward, not never", () => {
+    // 2026-03-08: New York springs forward 02:00 → 03:00; 02:30 doesn't exist.
+    const s = parseCron("30 2 * * *");
+    assert.equal(iso(nextRunAfterInZone(s, new Date("2026-03-08T05:00:00Z"), NY)), "2026-03-08T07:30:00.000Z");
+    assert.equal(iso(nextRunAfterInZone(s, new Date("2026-03-08T07:30:00Z"), NY)), "2026-03-09T06:30:00.000Z");
+  });
+
+  it("UTC (the default) is exactly the old behaviour", () => {
+    for (const expr of ["0 9 * * 1", "*/5 * * * *", "0 0 29 2 *", "15 3 1,15 * *"]) {
+      const s = parseCron(expr);
+      const from = new Date("2026-10-03T10:04:59Z");
+      assert.equal(iso(nextRunAfterInZone(s, from, "UTC")), iso(nextRunAfter(s, from)));
+    }
+    const s = parseCron("0 * * * *");
+    assert.equal(
+      iso(nextFutureRunAfterInZone(s, new Date("2026-01-01T00:00:00Z"), new Date("2026-10-03T12:00:10Z"), NY)),
+      "2026-10-03T13:00:00.000Z",
+    );
+  });
+
+  it("agrees with cronMatchesInZone minute by minute (no slot skipped or invented)", () => {
+    const zones = [NY, "Europe/London", "Asia/Kolkata", "Australia/Lord_Howe", "Pacific/Chatham"];
+    const exprs = ["0 9 * * 1-5", "*/7 * * * *", "45 23 * * 0", "0 0 1 * *", "30 6,18 * * *"];
+    // A DST-free window (late May–June) so every wall time is exact.
+    const from = new Date("2026-05-20T00:00:00Z");
+    for (const tz of zones) {
+      for (const expr of exprs) {
+        const s = parseCron(expr);
+        let cursor = from;
+        for (let k = 0; k < 4; k++) {
+          const next = nextRunAfterInZone(s, cursor, tz);
+          assert.equal(cronMatchesInZone(s, next, tz), true, `${expr} @ ${tz}: ${iso(next)} must match`);
+          // Brute force: no matching minute strictly between cursor and next.
+          for (let t = Math.floor(cursor.getTime() / 60_000) * 60_000 + 60_000; t < next.getTime(); t += 60_000) {
+            if (cronMatchesInZone(s, new Date(t), tz)) assert.fail(`${expr} @ ${tz}: skipped ${new Date(t).toISOString()}`);
+          }
+          cursor = next;
+        }
+      }
+    }
+  });
+
+  it("stays fast for an every-minute schedule and a leap-day schedule", () => {
+    const t0 = Date.now();
+    for (let i = 0; i < 200; i++) nextRunAfterInZone(parseCron("* * * * *"), new Date("2026-10-03T12:00:00Z"), NY);
+    assert.equal(iso(nextRunAfterInZone(parseCron("0 0 29 2 *"), new Date("2026-10-03T00:00:00Z"), NY)), "2028-02-29T05:00:00.000Z");
+    assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0}ms`);
+  });
+});
+
 // ── tick containment (fake db) ────────────────────────────────────────────
 
 interface Row {
@@ -123,6 +201,7 @@ interface Row {
   triggerType: "cron";
   cronExpr: string | null;
   nextRunAt: Date | null;
+  timezone?: string;
 }
 
 function fakeDb(rows: Row[]) {
@@ -188,5 +267,18 @@ describe("runSchedulerTick containment", () => {
     assert.equal(rows[1].status, "active");
     assert.equal(rows[1].nextRunAt?.toISOString(), "2028-02-29T00:01:00.000Z");
     assert.ok(audits.some((a) => a.action === "scheduler_run_failed" && a.workspaceId === "w2"));
+  });
+
+  it("advances a schedule in its own timezone; a corrupt stored zone is parked", async () => {
+    const t = new Date("2026-10-05T13:00:20Z"); // Mon 09:00 EDT
+    const rows: Row[] = [
+      { id: "ny-weekly", workspaceId: "w1", projectId: null, status: "active", triggerType: "cron", cronExpr: "0 9 * * 1", nextRunAt: new Date("2026-10-05T13:00:00Z"), timezone: "America/New_York" },
+      { id: "bad-zone", workspaceId: "w2", projectId: null, status: "active", triggerType: "cron", cronExpr: "0 9 * * 1", nextRunAt: new Date("2026-10-05T13:00:00Z"), timezone: "Mars/Olympus" },
+    ];
+    const { db } = fakeDb(rows);
+    const r = await runSchedulerTick(db, t, { fire: async () => ({ fired: true }) as never });
+    assert.equal(r.fired, 1);
+    assert.equal(rows[0].nextRunAt?.toISOString(), "2026-10-12T13:00:00.000Z", "next Monday 09:00 EDT");
+    assert.equal(rows[1].status, "paused");
   });
 });

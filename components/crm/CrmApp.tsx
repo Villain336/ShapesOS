@@ -2,7 +2,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, FolderKanban, UserRound, Workflow, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ArrowUpRight, Contact, Building2, Handshake, type LucideIcon } from "lucide-react";
+import { CompaniesView, ContactsView, DealsView } from "@/components/ops/CrmAccounts";
+import Link from "next/link";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -11,16 +13,15 @@ import { KanbanBoard } from "./KanbanBoard";
 import { LeadSlideOver } from "./LeadSlideOver";
 import { ForecastView } from "./ForecastView";
 import { FormsTab } from "./FormsTab";
-import { InvoicesTab } from "./InvoicesTab";
-import { InventoryTab } from "./InventoryTab";
-import { PurchaseOrdersTab } from "./PurchaseOrdersTab";
-import { ProjectsTab } from "./ProjectsTab";
-import { TeamTab } from "./TeamTab";
-import { WorkflowsTab } from "./WorkflowsTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
 import { EmptyState, btnGhostSm, chipCls, tabCls } from "./ui";
 
-type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects" | "team" | "workflows";
+// Phase 10 (ops-core): invoicing, inventory, purchase orders, projects, team
+// and workflows moved to /dashboard/ops (the components are reused there
+// unchanged); old ?tab= links redirect server-side (app/dashboard/crm/page.tsx).
+// Contacts, companies and deals are the Phase 10 CRM accounts (OpsContact /
+// OpsCompany / OpsDeal); leads stay the capture records.
+type Tab = "leads" | "pipeline" | "contacts" | "companies" | "deals" | "forecast" | "forms";
 
 interface Summary {
   count: number;
@@ -31,19 +32,11 @@ interface Summary {
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "leads", label: "Leads", icon: Users },
   { id: "pipeline", label: "Pipeline", icon: KanbanSquare },
+  { id: "contacts", label: "Contacts", icon: Contact },
+  { id: "companies", label: "Companies", icon: Building2 },
+  { id: "deals", label: "Deals", icon: Handshake },
   { id: "forecast", label: "Forecast", icon: TrendingUp },
   { id: "forms", label: "Forms", icon: ClipboardList },
-  // Phase 17 slice 2: Operations lives under the CRM (Tico-locked).
-  { id: "invoicing", label: "Invoicing", icon: ReceiptText },
-  // Phase 17 slice 3: inventory + purchase orders, same placement.
-  { id: "inventory", label: "Inventory", icon: Boxes },
-  { id: "purchase-orders", label: "Purchase orders", icon: Truck },
-  // Phase 17 slice 4: projects, same placement.
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  // Phase 17 slice 5: HR essentials — team directory + leave requests.
-  { id: "team", label: "Team", icon: UserRound },
-  // Phase 17 slice 6: operations workflows with compensation/rollback.
-  { id: "workflows", label: "Workflows", icon: Workflow },
 ];
 
 export function CrmApp() {
@@ -120,8 +113,12 @@ export function CrmApp() {
   useEffect(() => {
     loadPipelines(true).then((list) => {
       // Deep link: ?lead=<id>
-      const m = new URLSearchParams(window.location.search).get("lead");
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("lead");
       if (m) setSelectedLeadId(m);
+      // Phase 4a (⌘K records): ?tab=<tab id>, e.g. tab=invoicing&invoice=<id>.
+      const t = params.get("tab");
+      if (t && TABS.some((x) => x.id === t)) setTab(t as Tab);
     });
   }, [loadPipelines]);
 
@@ -223,23 +220,23 @@ export function CrmApp() {
               {t.label}
             </button>
           ))}
+          <Link
+            href="/dashboard/ops"
+            className="ml-auto inline-flex items-center gap-1 px-1 py-2 text-[13px] font-semibold text-muted hover:text-ink"
+          >
+            Invoices, inventory and projects moved to Operations <ArrowUpRight size={14} />
+          </Link>
         </nav>
       </div>
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {tab === "invoicing" ? (
-          <InvoicesTab />
-        ) : tab === "inventory" ? (
-          <InventoryTab />
-        ) : tab === "purchase-orders" ? (
-          <PurchaseOrdersTab />
-        ) : tab === "projects" ? (
-          <ProjectsTab />
-        ) : tab === "team" ? (
-          <TeamTab />
-        ) : tab === "workflows" ? (
-          <WorkflowsTab />
+        {tab === "contacts" ? (
+          <ContactsView />
+        ) : tab === "companies" ? (
+          <CompaniesView />
+        ) : tab === "deals" && pipeline ? (
+          <DealsView key={pipeline.id} pipeline={pipeline} />
         ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"

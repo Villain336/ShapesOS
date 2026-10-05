@@ -10,6 +10,7 @@ import {
   MAX_TOASTS,
   parseConfirmMessage,
   runUndoable,
+  toastVariantFor,
   type Clock,
 } from "../feedback";
 
@@ -204,6 +205,7 @@ describe("runUndoable", () => {
     assert.equal(t.title, "Alert dismissed");
     assert.equal(t.action?.label, "Undo");
     assert.equal(t.action?.doneLabel, "Undone");
+    assert.equal(t.variant, "undo", "a bare Undo toast is the one-line variant");
     await t.action!.onClick();
     assert.deepEqual(log, ["run", "undo", "refresh"]);
   });
@@ -222,5 +224,23 @@ describe("runUndoable", () => {
     await store.getState().toasts[0]!.action!.onClick();
     const last = store.getState().toasts.at(-1)!;
     assert.equal(last.status, "failed");
+  });
+});
+
+describe("toast variants", () => {
+  it("Undo with nothing else is the compact one-line toast", () => {
+    const noop = () => {};
+    assert.equal(toastVariantFor({ action: { label: "Undo", onClick: noop } }), "undo");
+    assert.equal(toastVariantFor({ action: { label: "Undo", onClick: noop }, description: "More" }), "default");
+    assert.equal(toastVariantFor({ action: { label: "Open file", onClick: noop } }), "default");
+    assert.equal(toastVariantFor({ variant: "undo" }), "undo");
+  });
+
+  it("keeps progress on the record", () => {
+    const store = new FeedbackStore(fakeClock().clock, null);
+    store.toast({ title: "Researcher is reading sources", status: "running", progress: { done: 7, total: 12 } });
+    const t = store.getState().toasts[0]!;
+    assert.deepEqual(t.progress, { done: 7, total: 12 });
+    assert.equal(t.variant, "default");
   });
 });

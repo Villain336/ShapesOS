@@ -5,7 +5,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Notice, btnCls, cardCls, dangerBtnCls, type NoticeState } from "@/components/settings/ui";
+import { Notice, type NoticeState } from "@/components/settings/ui";
+import { btnSmallDanger as dangerBtnCls, btnSmallSecondary as btnCls, cardCls } from "@/components/workspace/aos";
+
+// DESIGN.md action fills: Run/Resume change state to running (blue),
+// Approve to done (green). Small (36px) pills to sit beside the secondaries.
+const runBtnCls =
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running-pressed disabled:pointer-events-none disabled:bg-disabled disabled:text-disabled-fg";
+const approveBtnCls =
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:pointer-events-none disabled:bg-disabled disabled:text-disabled-fg";
 import { confirmAction } from "@/lib/ui/feedback";
 
 interface SkillRef {
@@ -19,6 +27,7 @@ interface ScheduleRow {
   projectId: string | null;
   triggerType: string;
   cronExpr: string | null;
+  timezone?: string;
   eventSource: string | null;
   approvalMode: string;
   concurrencyLimit: number;
@@ -37,7 +46,7 @@ interface PendingRun {
 }
 
 function triggerLabel(s: ScheduleRow): string {
-  if (s.triggerType === "cron") return `Cron · ${s.cronExpr ?? "—"}`;
+  if (s.triggerType === "cron") return `Cron · ${s.cronExpr ?? "—"} · ${s.timezone || "UTC"}`;
   return `Event · ${s.eventSource ?? "—"}`;
 }
 
@@ -155,27 +164,30 @@ export default function ScheduleList({
     loadPending();
   }
 
-  if (loading) return <p className="text-sm text-zinc-500">Loading schedules…</p>;
+  if (loading) return <p className="text-sm text-muted">Loading schedules…</p>;
 
   return (
     <div className="flex flex-col gap-6">
       <Notice notice={notice} />
 
       {canApprove && pending.length > 0 && (
-        <section className={`${cardCls} border-amber-200 bg-amber-50/40`}>
-          <h2 className="text-sm font-semibold text-zinc-900">Waiting for approval ({pending.length})</h2>
-          <p className="mt-1 text-xs text-zinc-600">
+        <section className="rounded-lg bg-needs-tint p-5 shadow-hairline">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span aria-hidden className="aos-shape aos-shape--needs aos-shape--edged" />
+            Waiting for approval ({pending.length})
+          </h2>
+          <p className="mt-1 text-xs text-muted">
             Supervised runs execute nothing until you approve them.
           </p>
           <ul className="mt-3 flex flex-col gap-2">
             {pending.map((run) => (
-              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm">
+              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-paper px-3 py-2 text-sm shadow-hairline">
                 <span>
                   <span className="font-medium">{run.skill.name}</span>
-                  <span className="text-zinc-500"> · {run.trigger} · proposed {new Date(run.startedAt).toLocaleString()}</span>
+                  <span className="text-muted"> · {run.trigger} · proposed {new Date(run.startedAt).toLocaleString()}</span>
                 </span>
                 <span className="flex gap-2">
-                  <button className={btnCls} disabled={busy === run.id} onClick={() => decideRun(run.id, true)}>
+                  <button className={approveBtnCls} disabled={busy === run.id} onClick={() => decideRun(run.id, true)}>
                     Approve
                   </button>
                   <button className={dangerBtnCls} disabled={busy === run.id} onClick={() => decideRun(run.id, false)}>
@@ -190,15 +202,15 @@ export default function ScheduleList({
 
       {schedules.length === 0 ? (
         <div className={`${cardCls} text-center`}>
-          <p className="font-display text-xl">No schedules yet</p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600">
+          <p className="aos-subheading">No schedules yet</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Schedules run a skill on a cron timetable or when a workspace event fires —
             rank drops, new backlinks, connector errors, decay flags, or published content.
           </p>
           {canManage && (
             <Link
               href={`/dashboard/projects/${projectId}/automations/schedules/new`}
-              className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+              className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-[22px] text-base font-semibold text-white aos-press"
             >
               Create your first schedule
             </Link>
@@ -213,22 +225,21 @@ export default function ScheduleList({
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/dashboard/projects/${projectId}/automations/schedules/${s.id}`}
-                      className="font-medium text-zinc-900 hover:text-accent"
+                      className="font-medium text-ink hover:text-focus hover:underline"
                     >
                       {s.skill.name}
                     </Link>
                     <span
-                      className={`rounded-full border px-2 py-0.5 text-xs ${
-                        s.status === "active"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-zinc-200 bg-zinc-100 text-zinc-600"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        s.status === "active" ? "bg-ink text-white" : "bg-canvas text-muted"
                       }`}
                     >
+                      {s.status === "paused" && <span aria-hidden className="aos-shape aos-shape--paused" />}
                       {s.status}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-zinc-600">{triggerLabel(s)}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
+                  <p className="mt-1 text-sm text-muted">{triggerLabel(s)}</p>
+                  <p className="mt-0.5 text-xs text-muted">
                     {approvalLabel(s.approvalMode)} · next run{" "}
                     {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : "—"}
                     {s.lastRunAt ? ` · last run ${new Date(s.lastRunAt).toLocaleString()}` : ""}
@@ -237,14 +248,14 @@ export default function ScheduleList({
                 {canManage && (
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className={btnCls}
+                      className={runBtnCls}
                       disabled={busy !== null}
                       onClick={() => triggerNow(s.id)}
                     >
                       Run now
                     </button>
                     <button
-                      className={btnCls}
+                      className={s.status === "active" ? btnCls : runBtnCls}
                       disabled={busy !== null}
                       onClick={() => mutate(s.id, "PATCH", { status: s.status === "active" ? "paused" : "active" })}
                     >

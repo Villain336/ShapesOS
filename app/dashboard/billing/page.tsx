@@ -10,6 +10,8 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { trialView } from "@/lib/billing/trial";
 import BillingHub from "@/components/settings/BillingHub";
 import SettingsNav from "@/components/settings/SettingsNav";
+import { PlanIncludes } from "@/components/billing/PlanIncludes";
+import { planDisplayName } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -20,5 +22,12 @@ export default async function BillingPage() {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
 
-  return <BillingHub workspaceId={workspace.id} nav={<SettingsNav />} trial={trialView(workspace)} />;
+  return (
+    <BillingHub
+      workspaceId={workspace.id}
+      nav={<SettingsNav />}
+      trial={trialView(workspace)}
+      includes={<PlanIncludes plan={workspace.plan} planName={planDisplayName(workspace.plan)} />}
+    />
+  );
 }

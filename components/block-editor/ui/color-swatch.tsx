@@ -14,7 +14,9 @@ const getCheckColor = (hex: string): string => {
   const g = Number.parseInt(value.slice(2, 4), 16) / 255;
   const b = Number.parseInt(value.slice(4, 6), 16) / 255;
   const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return luminance > 0.5 ? "#18181b" : "#ffffff";
+  // The swatch itself is the user's chosen color (data); the check mark on it
+  // uses the system ink/paper tokens for contrast.
+  return luminance > 0.5 ? "var(--aos-ink)" : "var(--aos-paper)";
 };
 
 const ColorSwatch = React.forwardRef<HTMLButtonElement, ColorSwatchProps>(

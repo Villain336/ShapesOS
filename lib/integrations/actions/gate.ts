@@ -68,6 +68,14 @@ export interface ProposeInput {
   proposedBy: string;
   plainSummary?: string;
   ttlMs?: number;
+  /**
+   * Phase 14 (approvals): store the approval already APPROVED by this
+   * automation rule (the reason names it; it lands in the audit trail and
+   * decisionReason). Passed only by lib/ops/gate.ts requestOpsApproval for
+   * its automatable (no-money) slugs. Ignored for a high tier — destructive
+   * actions always wait for a person.
+   */
+  autoApprovedReason?: string;
 }
 
 /**
@@ -123,6 +131,13 @@ export async function proposeAction(input: ProposeInput) {
   const redacted = redactArgs(input.args);
   const summary = input.plainSummary ?? summarizeAction(input.appKey, input.toolName, redacted);
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? APPROVAL_TTL_MS));
+  const autoReason = input.autoApprovedReason?.trim() && classified.tier !== "high" ? input.autoApprovedReason.trim().slice(0, 500) : null;
+  const proposed: AuditEvent = {
+    at: nowIso(),
+    actor: input.proposedBy,
+    event: "proposed",
+    detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
+  };
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.create({
       data: {
@@ -132,21 +147,23 @@ export async function proposeAction(input: ProposeInput) {
         riskTier: classified.tier,
         proposedArgs: toJson(redacted),
         plainSummary: summary,
-        status: "pending",
+        status: autoReason ? "approved" : "pending",
         expiresAt,
-        auditTrail: toJson(trail([], {
-          at: nowIso(),
-          actor: input.proposedBy,
-          event: "proposed",
-          detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
-        })),
+        // Phase 14: an automation rule approved it — no person decided.
+        ...(autoReason ? { decidedBy: "automation", decidedAt: new Date(), decisionReason: autoReason } : {}),
+        auditTrail: toJson(
+          autoReason
+            ? [proposed, { at: nowIso(), actor: "automation", event: "approved", detail: autoReason }]
+            : [proposed],
+        ),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true, expiresAt: true },
     }),
   );
   // Phase 3 (J): gated actions land in the "needs you" inbox — tell the
-  // approvers (best-effort, after the write committed).
-  if (!classified.autoExecutable) {
+  // approvers (best-effort, after the write committed). Phase 14: an
+  // approval a rule already approved needs nobody.
+  if (!classified.autoExecutable && !autoReason) {
     await notifyApprovalNeeded({
       workspaceId: input.workspaceId,
       source: "integration",
@@ -386,6 +403,38 @@ export async function expireStaleApprovals(workspaceId?: string) {
   return total;
 }
 
+/**
+ * Phase 5: expire the still-pending approvals a stopped agent run raised.
+ * Only `pending` rows move (an approval a human already decided is left
+ * alone); each gets an "expired" audit entry naming the stop. Returns the
+ * count expired.
+ */
+export async function expireApprovalsForStoppedRun(
+  workspaceId: string,
+  approvalIds: readonly string[],
+  stoppedBy: string,
+): Promise<number> {
+  if (approvalIds.length === 0) return 0;
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const rows = await tx.composioActionApproval.findMany({
+      where: { workspaceId, id: { in: [...approvalIds] }, status: "pending" },
+      select: { id: true, auditTrail: true },
+    });
+    for (const row of rows) {
+      await tx.composioActionApproval.updateMany({
+        where: { id: row.id, workspaceId, status: "pending" },
+        data: {
+          status: "expired",
+          auditTrail: toJson(
+            trail(row.auditTrail, { at: nowIso(), actor: stoppedBy, event: "expired", detail: "the agent run that asked was stopped" }),
+          ),
+        },
+      });
+    }
+    return rows.length;
+  });
+}
+
 export interface ExecuteApprovedInput {
   workspaceId: string;
   approvalId: string;
@@ -412,6 +461,13 @@ export interface ExecuteApprovedInput {
  *  - failed execution reverts to "approved" (retry allowed) with an audit
  *    event; the failure is still logged.
  */
+/** appKeys whose approvals run from their own surface, never via Composio. */
+const INTERNAL_APPROVAL_HOMES: Record<string, string> = {
+  hosting: "run this rollback from the site's deployment list (Sites → Hosting).",
+  ops: "this operations action runs from where it was proposed (Ops, or the agent that asked).",
+  apps: "run this mini-app action again from the app (or the agent that asked).",
+};
+
 export async function executeApproved(input: ExecuteApprovedInput) {
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.findFirst({
@@ -419,6 +475,13 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (!approval) throw new NotFoundError("Approval not found");
+  // Phase 9: approvals raised by ShapesOS's own gates share this table but
+  // are not Composio tools — they run where they were proposed. Refuse
+  // BEFORE the claim so the approval stays usable there.
+  const internal = INTERNAL_APPROVAL_HOMES[approval.appKey];
+  if (internal) {
+    throw new ConflictError(`Cannot execute here: ${internal}`);
+  }
   if (approval.status === "executed") {
     throw new ConflictError("Cannot execute: approval already executed (replay blocked)");
   }

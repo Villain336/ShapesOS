@@ -18,7 +18,7 @@
 import type { Prisma, Workspace, WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMembership, roleAtLeast } from "@/lib/authz";
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/api/errors";
 import { deploymentMode, initialPlanFor } from "@/lib/billing/trial";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
 
@@ -55,7 +55,7 @@ export function deleteConfirmationMatches(typed: unknown, workspaceName: string)
 }
 
 /** Subscription states that still bill (or will retry billing) the workspace. */
-const LIVE_SUBSCRIPTION = new Set(["active", "trialing", "past_due", "unpaid", "incomplete"]);
+export const LIVE_SUBSCRIPTION = new Set(["active", "trialing", "past_due", "unpaid", "incomplete"]);
 
 /**
  * Why this delete is refused, or null when it may go ahead. Checked in
@@ -104,6 +104,21 @@ export async function hasHadTrial(userId: string, tx: Tx | typeof prisma = prism
 // ── Create ───────────────────────────────────────────────────────────────────
 
 /**
+ * True when the account was deleted (GDPR) at or after the session's sign-in
+ * — i.e. the caller is a session that outlived its account. Sessions without
+ * a sign-in time (minted before Phase 4a) count as older.
+ */
+export async function deletedBeforeSignIn(
+  db: Pick<Prisma.TransactionClient, "userSecurity">,
+  userId: string,
+  authAt: number | null | undefined,
+): Promise<boolean> {
+  const row = await db.userSecurity.findUnique({ where: { userId }, select: { accountDeletedAt: true } });
+  if (!row?.accountDeletedAt) return false;
+  return !(typeof authAt === "number" && authAt * 1000 > row.accountDeletedAt.getTime());
+}
+
+/**
  * Create a workspace owned by `userId` (with its `owner` membership row).
  * Serialized per user (advisory lock) so two concurrent signups can't both
  * claim the one free trial. The new workspace starts the onboarding wizard.
@@ -118,12 +133,21 @@ export async function createWorkspaceForUser(opts: {
    * they already have one (two first page loads racing each other).
    */
   ifNoneExists?: boolean;
+  /**
+   * Unix seconds the caller's session signed in (session.user.authAt). A
+   * deleted account's older sessions must not provision a fresh workspace;
+   * signing in again afterwards starts over.
+   */
+  authAt?: number | null;
 }): Promise<Workspace> {
   const name = normalizeWorkspaceName(opts.name);
   const now = opts.now ?? new Date();
   const mode = deploymentMode(opts.env);
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`workspace-create:${opts.userId}`}))`;
+    if (await deletedBeforeSignIn(tx, opts.userId, opts.authAt)) {
+      throw new UnauthorizedError("This account was deleted. Sign in again to start over.");
+    }
     if (opts.ifNoneExists) {
       const existing = await tx.workspace.findFirst({
         where: { OR: [{ ownerUserId: opts.userId }, { members: { some: { userId: opts.userId } } }] },
@@ -258,29 +282,61 @@ export async function deleteWorkspace(opts: {
     throw new BadRequestError(denial.message);
   }
 
+  await purgeWorkspace({
+    workspaceId: ws.id,
+    workspaceName: ws.name,
+    actorUserId: opts.userId,
+    detail: { plan: ws.plan, role: me.role },
+  });
+  return { deletedId: ws.id, name: ws.name };
+}
+
+/**
+ * Tables with a workspace_id that deliberately survive the workspace's
+ * deletion. Every other such table has a foreign key to workspaces with ON
+ * DELETE CASCADE (migration 20261005100000_phase4a_workspace_orphan_fks);
+ * lib/workspace/__tests__/workspace-orphans-db.test.ts derives the table list
+ * from the catalog and fails on a new table that has neither.
+ */
+export const KEEP_ON_WORKSPACE_DELETE: readonly string[] = [
+  // The audit record of the deletion itself (who, when, which plan).
+  "workspace_lifecycle_events",
+];
+
+/**
+ * The delete itself, once every rule has passed: lock the row, clear the
+ * ON DELETE RESTRICT children, delete the workspace (everything else
+ * cascades) and record it in the lifecycle trail. Shared by deleteWorkspace
+ * and account deletion (lib/account/delete.ts), which checks its own rules.
+ */
+export async function purgeWorkspace(opts: {
+  workspaceId: string;
+  workspaceName: string;
+  actorUserId: string;
+  detail: Prisma.InputJsonObject;
+}): Promise<void> {
   await prisma.$transaction(
     async (tx) => {
       // Lock the row so a concurrent rename/delete can't interleave.
       const locked = await tx.$queryRaw<{ id: string }[]>`
-        SELECT "id" FROM "workspaces" WHERE "id" = ${ws.id} FOR UPDATE`;
+        SELECT "id" FROM "workspaces" WHERE "id" = ${opts.workspaceId} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundError("Workspace not found.");
       // Tenant GUC for the RLS-protected tables cleared explicitly below.
-      await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${ws.id}, true)`;
+      await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${opts.workspaceId}, true)`;
       for (const step of RESTRICT_CHILD_CLEANUP) {
-        await tx.$executeRawUnsafe(step.sql, ws.id);
+        await tx.$executeRawUnsafe(step.sql, opts.workspaceId);
       }
-      await tx.workspace.delete({ where: { id: ws.id } });
+      await tx.workspace.delete({ where: { id: opts.workspaceId } });
       await lifecycleEvent(tx, {
-        workspaceId: ws.id,
-        workspaceName: ws.name,
-        actorUserId: opts.userId,
+        workspaceId: opts.workspaceId,
+        workspaceName: opts.workspaceName,
+        actorUserId: opts.actorUserId,
         action: "deleted",
-        detail: { plan: ws.plan, role: me.role },
+        detail: opts.detail,
       });
     },
     { maxWait: 10_000, timeout: 120_000 },
   );
-  return { deletedId: ws.id, name: ws.name };
 }
 
 /**
@@ -289,7 +345,7 @@ export async function deleteWorkspace(opts: {
  * install that never billed it doesn't exist: that (and only that) reads as
  * "no subscription". Any other failure refuses the delete.
  */
-async function readSubscription(
+export async function readSubscription(
   workspaceId: string,
 ): Promise<{ status: string; cancelAtPeriodEnd: boolean } | null> {
   try {
