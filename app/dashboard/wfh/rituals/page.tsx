@@ -12,7 +12,7 @@ import RitualsPanel from "./_components/RitualsPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH team rituals — Marketr",
+  title: "WFH team rituals — ShapesOS",
   description: "Opt-in team rituals with cadence, participation, and retirement surfacing.",
 };
 

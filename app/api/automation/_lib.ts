@@ -1,6 +1,6 @@
 // Marketr — /api/automation shared guard (not a route: no HTTP exports).
 //
-// Phase 9 M6 (SPEC-PHASE9.md §P9E). Session → workspace; reads need viewer,
+// Phase 9 M6 (docs/specs/SPEC-PHASE9.md §P9E). Session → workspace; reads need viewer,
 // mutations need editor. Mirrors app/api/substrate/_lib.ts conventions:
 // every DB access goes through withWorkspaceScope() (tenant GUC via
 // SET LOCAL — fail-closed RLS) AND `where: { workspaceId }` as defense in

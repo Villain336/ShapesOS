@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
     buy: { id: buy.id, workspaceId: buy.workspaceId, name: buy.name, vendor: buy.vendor },
     input,
     budget,
-    workspaceName: workspace?.name ?? "Marketr",
+    workspaceName: workspace?.name ?? "ShapesOS",
     generatedBy: gate.userId,
   });
   await store.setBrief(buy.id, gate.workspaceId, brief.pdfUrl);

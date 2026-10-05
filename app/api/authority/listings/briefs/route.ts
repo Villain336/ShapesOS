@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       brief: { id: brief.id, checklistStatus: briefChecklistStatus(entries), createdAt: brief.createdAt },
       gaps,
       directories: entries,
-      honest: "Manual submission: Marketr pre-fills the NAP payloads and tracks completion — a human submits each directory.",
+      honest: "Manual submission: ShapesOS pre-fills the NAP payloads and tracks completion — a human submits each directory.",
     });
   } catch (err) {
     return safetyError(err);

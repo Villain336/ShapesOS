@@ -39,7 +39,7 @@ export const CLOUDINARY_FREE_TIER_CREDITS = 25;
  */
 export const CLOUDINARY_QUOTA_NOTE =
   "Uploads go to your own Cloudinary account (free tier: 25 credits/month). " +
-  "Quota is metered by Cloudinary on your dashboard; Marketr records per-workspace upload counts for awareness only.";
+  "Quota is metered by Cloudinary on your dashboard; ShapesOS records per-workspace upload counts for awareness only.";
 
 /** Honest unconfigured-key message. Names the env vars; never their values. */
 export const NOT_CONFIGURED_MESSAGE =

@@ -9,6 +9,7 @@ import { useCanvasStore } from "@/lib/design/store";
 import { ALL_TEMPLATES } from "@/lib/design/templates";
 import type { DesignTemplate } from "@/lib/design/types";
 import { btnGhost, inputCls, panelSectionLabel, panelTitle } from "../ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const CATEGORIES = ["all", "social", "ads", "web", "print"] as const;
 
@@ -53,8 +54,8 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
     );
   }, [query, cat]);
 
-  const applyTemplate = (t: DesignTemplate) => {
-    const ok = window.confirm(
+  const applyTemplate = async (t: DesignTemplate) => {
+    const ok = await confirmAction(
       `Replace the entire document with the "${t.name}" template (${t.width} × ${t.height})? This cannot be undone.`
     );
     if (!ok) return;

@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: mission engine types + pure helpers (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: mission engine types + pure helpers (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // PURE module — no prisma, no @/ alias imports, no I/O. Safe to import from
 // tsx-run tests (lib/missions/__tests__). Mirrors the M1 pattern where the

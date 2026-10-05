@@ -102,7 +102,7 @@ export default function GeneralForm({
     <Card>
       <CardHeader
         title="Brand & domains"
-        description="Brand context is injected into Marketr's prompt for this project"
+        description="Brand context is injected into ShapesOS's prompt for this project"
         actions={
           !brandInherited ? (
             <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[11.5px] font-medium text-accent-ink">
@@ -118,7 +118,7 @@ export default function GeneralForm({
       <CardBody className="flex flex-col gap-4">
         <Field
           label="Brand context"
-          hint="Voice, audience, positioning — Marketr reads this before every answer for this project."
+          hint="Voice, audience, positioning — ShapesOS reads this before every answer for this project."
           htmlFor="brand-context"
         >
           <Textarea

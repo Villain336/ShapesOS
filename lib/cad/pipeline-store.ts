@@ -16,14 +16,24 @@
 //
 // Tenant-scoping: every read filters on workspaceId, like the parent store.
 
+import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaCadStore } from "./prisma-store";
+import {
+  deriveBomFromBytes,
+  stepDeriveUnavailable,
+  validateDeriveOptions,
+  type DeriveOptionsInput,
+} from "./bom-derive";
+import { csvRow } from "@/lib/csv";
 import { requireCadHuman, type CadActor } from "./ai-store";
 import { writeFile } from "@/lib/filesystem/service";
 import { normalizeLogicalPath } from "@/lib/filesystem/paths";
 import { CadError } from "./types";
 import {
+  bomCsvRows,
   buildExportManifest,
+  compareBomRollups,
   compareCostEstimates,
   computeBomRollup,
   computeCostEstimate,
@@ -33,12 +43,44 @@ import {
   validateRateCardInput,
   validateRateCardRates,
   type BomLineInput,
+  type BomRollup,
   type CostBreakdown,
   type ExportManifest,
   type ExportProcess,
   type RateCardInput,
   type RateCardRates,
 } from "./prototype";
+
+type BomLineRow = {
+  id: string;
+  partName: string;
+  qty: number;
+  unitName: string;
+  materialSpec: string | null;
+  supplier: string | null;
+  unitCostUsd: number | null;
+  source: string;
+  volumeMm3: number | null;
+  massG: number | null;
+};
+
+/** Stored BOM lines → rollup (cost + mass totals, unknowns flagged). */
+export function rollupOf(lines: BomLineRow[]): BomRollup {
+  return computeBomRollup(
+    lines.map((l) => ({
+      id: l.id,
+      partName: l.partName,
+      qty: l.qty,
+      unitName: l.unitName,
+      materialSpec: l.materialSpec,
+      supplier: l.supplier,
+      unitCostUsd: l.unitCostUsd,
+      source: l.source,
+      volumeMm3: l.volumeMm3,
+      massG: l.massG,
+    })),
+  );
+}
 
 export class PrismaCadPipelineStore extends PrismaCadStore {
   private async requireModelRow(workspaceId: string, modelId: string) {
@@ -206,19 +248,167 @@ export class PrismaCadPipelineStore extends PrismaCadStore {
 
   async getBomVersion(workspaceId: string, id: string) {
     const bom = await this.requireBomVersion(workspaceId, id);
-    const rollup = computeBomRollup(
-      bom.lines.map((l) => ({
-        id: l.id,
-        partName: l.partName,
-        qty: l.qty,
-        unitName: l.unitName,
-        materialSpec: l.materialSpec,
-        supplier: l.supplier,
-        unitCostUsd: l.unitCostUsd,
-        source: l.source,
-      })),
+    return { bom, rollup: rollupOf(bom.lines) };
+  }
+
+  // ---------- Derived BOM (Phase 4b) ----------
+
+  /**
+   * Derive a new BOM version from a model version's real mesh geometry
+   * (lib/cad/bom-derive.ts) and pin it to that version. The stored bytes are
+   * re-hashed against the version's checksum first, so the derivation always
+   * cites the exact file it measured. STEP / unreadable files throw
+   * DERIVE_UNAVAILABLE and nothing is written.
+   */
+  async deriveBomFromGeometry(
+    workspaceId: string,
+    actor: string,
+    modelId: string,
+    modelVersionId: string,
+    optionsInput: DeriveOptionsInput,
+  ) {
+    const options = validateDeriveOptions(optionsInput);
+    const model = await this.requireModelRow(workspaceId, modelId);
+    const version = await this.requireVersionRow(workspaceId, modelId, modelVersionId);
+    if (version.format === "step") throw stepDeriveUnavailable();
+    const { bytes } = await this.getVersionFile(workspaceId, modelId, modelVersionId);
+    const checksum = createHash("sha256").update(bytes).digest("hex");
+    if (checksum !== version.checksum) {
+      throw new CadError(
+        "FILE_INTEGRITY",
+        "The stored file no longer matches this version's checksum — refusing to derive a BOM from it.",
+      );
+    }
+    const derived = deriveBomFromBytes(bytes, version.format as "stl" | "obj", model.name, options);
+    const derivation = {
+      ...derived.derivation,
+      sourceVersionId: version.id,
+      sourceVersionNumber: version.versionNumber,
+      sourceFileName: version.fileName,
+      sourceChecksum: version.checksum,
+      format: version.format,
+      derivedAt: new Date().toISOString(),
+    };
+
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const max = await tx.cadBomVersion.aggregate({
+            where: { modelId: model.id, workspaceId },
+            _max: { bomNumber: true },
+          });
+          const bom = await tx.cadBomVersion.create({
+            data: {
+              workspaceId,
+              modelId: model.id,
+              modelVersionId: version.id,
+              bomNumber: (max._max.bomNumber ?? 0) + 1,
+              notes: options.notes,
+              origin: "derived",
+              derivation: derivation as unknown as Prisma.InputJsonValue,
+              createdBy: actor,
+            },
+          });
+          await tx.cadBomLine.createMany({
+            data: derived.lines.map((l, i) => ({
+              workspaceId,
+              bomVersionId: bom.id,
+              partName: l.partName,
+              qty: l.qty,
+              unitName: l.unitName,
+              materialSpec: l.materialSpec,
+              unitCostUsd: l.unitCostUsd,
+              source: l.source,
+              sortOrder: i,
+              volumeMm3: l.volumeMm3,
+              massG: l.massG,
+              measurement: l.measurement as unknown as Prisma.InputJsonValue,
+            })),
+          });
+          const full = await tx.cadBomVersion.findUniqueOrThrow({
+            where: { id: bom.id },
+            include: { lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+          });
+          return { bom: full, rollup: rollupOf(full.lines), derivation };
+        });
+      } catch (e) {
+        // Two derivations racing for the same bomNumber: retry once.
+        if (attempt === 0 && (e as { code?: string })?.code === "P2002") continue;
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * Rollups across revisions: every BOM of a model with its totals, oldest
+   * model version first, each carrying the change vs the previous BOM.
+   */
+  async getBomHistory(workspaceId: string, modelId: string) {
+    await this.requireModelRow(workspaceId, modelId);
+    const boms = await this.prisma.cadBomVersion.findMany({
+      where: { workspaceId, modelId },
+      include: {
+        modelVersion: { select: { id: true, versionNumber: true } },
+        lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
+    });
+    boms.sort(
+      (a, b) => a.modelVersion.versionNumber - b.modelVersion.versionNumber || a.bomNumber - b.bomNumber,
     );
-    return { bom, rollup };
+    let prev: BomRollup | null = null;
+    return boms.map((b) => {
+      const rollup = rollupOf(b.lines);
+      const entry = {
+        bomId: b.id,
+        bomNumber: b.bomNumber,
+        origin: b.origin,
+        modelVersionId: b.modelVersion.id,
+        versionNumber: b.modelVersion.versionNumber,
+        createdAt: b.createdAt,
+        lineCount: rollup.lineCount,
+        totalUsd: rollup.totalUsd,
+        linesMissingCost: rollup.linesMissingCost,
+        totalMassG: rollup.totalMassG,
+        linesMissingMass: rollup.linesMissingMass,
+        vsPrevious: prev ? compareBomRollups(prev, rollup).totals : null,
+      };
+      prev = rollup;
+      return entry;
+    });
+  }
+
+  /** Part-level diff between two BOMs of this workspace. */
+  async compareBomVersions(workspaceId: string, fromId: string, toId: string) {
+    const [from, to] = await Promise.all([
+      this.requireBomVersion(workspaceId, fromId),
+      this.requireBomVersion(workspaceId, toId),
+    ]);
+    return {
+      from: { id: from.id, bomNumber: from.bomNumber, modelId: from.modelId, modelVersionId: from.modelVersionId },
+      to: { id: to.id, bomNumber: to.bomNumber, modelId: to.modelId, modelVersionId: to.modelVersionId },
+      comparison: compareBomRollups(rollupOf(from.lines), rollupOf(to.lines)),
+    };
+  }
+
+  /** CSV export of one BOM (formula-injection-safe via lib/csv.ts). */
+  async exportBomCsv(workspaceId: string, id: string) {
+    const bom = await this.requireBomVersion(workspaceId, id);
+    const [model, version] = await Promise.all([
+      this.prisma.cadModel.findFirst({ where: { id: bom.modelId, workspaceId }, select: { name: true } }),
+      this.prisma.cadModelVersion.findFirst({
+        where: { id: bom.modelVersionId, workspaceId },
+        select: { versionNumber: true },
+      }),
+    ]);
+    const rows = bomCsvRows(rollupOf(bom.lines));
+    const csv = rows.map((r) => csvRow(r)).join("\r\n") + "\r\n";
+    const slug =
+      (model?.name ?? "model")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "model";
+    return { filename: `bom-${slug}-v${version?.versionNumber ?? 0}-${bom.bomNumber}.csv`, csv, bom };
   }
 
   async addBomLine(workspaceId: string, actor: string, bomVersionId: string, input: BomLineInput) {
@@ -251,10 +441,22 @@ export class PrismaCadPipelineStore extends PrismaCadStore {
   }
 
   async updateBomLine(workspaceId: string, lineId: string, patch: Partial<BomLineInput>) {
-    await this.requireBomLine(workspaceId, lineId);
+    const existing = await this.requireBomLine(workspaceId, lineId);
     // source is immutable: a line's provenance never changes after creation.
     if (patch.source !== undefined) {
       throw new CadError("BOM_SOURCE_IMMUTABLE", "A BOM line's source cannot be changed after creation.");
+    }
+    // A derived line's quantity is the body count measured in the mesh;
+    // editing it would make the line claim a measurement it no longer has.
+    if (
+      existing.source.startsWith("derived:") &&
+      patch.qty != null &&
+      Number(patch.qty) !== existing.qty
+    ) {
+      throw new CadError(
+        "DERIVED_QTY_IMMUTABLE",
+        "This quantity was counted from the model's geometry. Add a manual line for extra units instead.",
+      );
     }
     const data: {
       partName?: string;

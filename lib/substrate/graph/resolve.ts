@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: cascading entity resolution (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: cascading entity resolution (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // Pipeline: deterministic rules (email/phone/domain/sku exact match) →
 // pg_trgm blocking for fuzzy candidates → human review queue below the

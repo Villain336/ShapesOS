@@ -45,16 +45,16 @@
 | Files | SHIPPED-THIN | `app/api/files/` ×2 routes (297 LOC); `components/FileManager.tsx` |
 | Media | SHIPPED-THIN | `app/api/media/` ×34 routes (2636 LOC: buys, dooh, io-briefs, kill-rules, reconciliation…); `app/dashboard/media` ×9 pages |
 | Authority | SHIPPED-THIN | `app/api/authority/` ×53 routes (3271 LOC: aeo, listings, outreach, pr, reviews, webhooks); `app/dashboard/authority` ×8 pages |
-| Attribution | SHIPPED-THIN | `app/api/attribution/` ×13 routes (touches, bundles, spend, timeline, summary); `THREAT-MODEL-ATTRIBUTION.md` |
+| Attribution | SHIPPED-THIN | `app/api/attribution/` ×13 routes (touches, bundles, spend, timeline, summary); `docs/security/THREAT-MODEL-ATTRIBUTION.md` |
 | Alerts | SHIPPED-THIN | `app/api/alerts/` + `alert-rules` + `alert-channels`; `components/AlertManager.tsx` |
 
 ## Phase 10 — expert constitution, trace dataset, GrowthOS
 
 | Feature | Status | Evidence |
 |---|---|---|
-| Expert constitution | SHIPPED+TESTED | `EXPERT-CONSTITUTION.md` (repo root); `lib/expert/constitution.ts` + `__tests__/constitution.test.ts`; consumed by `lib/chat/agent.ts` and `lib/orchestrator/executors/planner.ts` |
+| Expert constitution | SHIPPED+TESTED | `docs/specs/EXPERT-CONSTITUTION.md`; `lib/expert/constitution.ts` + `__tests__/constitution.test.ts`; consumed by `lib/chat/agent.ts` and `lib/orchestrator/executors/planner.ts` |
 | Trace dataset | SHIPPED+TESTED (evals) | `training/traces/` 7 × `.jsonl` (measured: `traces-constitution-pilot.jsonl` = 200 lines, `traces-r10-pilot.jsonl` = 300 lines); `training/cards/` 7 pilot cards; `training/evals/`; `TRACE-DATASET-PLAN.md`, `TRAINING-ROADMAP.md`; gen scripts (`gen_r09_pilot.py`, `r10-generator.py`) |
-| GrowthOS direction | DIRECTION-DOCUMENTED, partially embodied | Described in `docs/MASTER-PLAN.md` L192–238 and `SPEC-PHASE9.md`; no standalone GrowthOS module — embodied in orchestrator + command bar + substrate |
+| GrowthOS direction | DIRECTION-DOCUMENTED, partially embodied | Described in `docs/MASTER-PLAN.md` L192–238 and `docs/specs/SPEC-PHASE9.md`; no standalone GrowthOS module — embodied in orchestrator + command bar + substrate |
 
 ## Phase 11 — Canvas editor + 7 features + 10 integrations
 

@@ -26,12 +26,13 @@ export type ContentDetailItem = {
 };
 
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 const btnPrimary =
-  "rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
+  "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
 const btnGhost =
-  "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
+  "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
+const noteCls = "rounded-md bg-paper px-4 py-3 text-sm text-ink shadow-hairline";
 
 export default function ContentDetail({
   projectId,
@@ -225,7 +226,8 @@ export default function ContentDetail({
 
   if (!brief) {
     return (
-      <p className="text-sm text-red-600">
+      <p role="alert" className="flex items-start gap-2 text-sm text-failed-text">
+        <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
         This content item has no brief data.
       </p>
     );
@@ -237,7 +239,7 @@ export default function ContentDetail({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {statusPill(status)}
-          <h2 className="text-xl font-bold tracking-tight">{brief.keyword}</h2>
+          <h2 className="text-xl font-heading stretch-heading tracking-heading text-ink">{brief.keyword}</h2>
         </div>
         <div className="flex gap-2">
           {status === "brief" && !body && (
@@ -266,26 +268,26 @@ export default function ContentDetail({
 
       {/* Phase 12 (embeds): Ghost publish status. */}
       {ghost.postId && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-2.5 text-sm">
-          <span className="font-medium text-zinc-700">Ghost</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-paper px-4 py-2.5 text-sm shadow-hairline">
+          <span className="font-medium text-ink">Ghost</span>
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
               ghost.status === "published"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
+                ? "bg-ink text-paper"
+                : "bg-canvas text-ink"
             }`}
           >
             {ghost.status === "published" ? "Published" : "Draft"}
           </span>
           {ghost.stale && (
-            <span className="text-xs text-zinc-500">(last known — Ghost unreachable)</span>
+            <span className="text-xs text-muted">(last known — Ghost unreachable)</span>
           )}
           {ghost.url && (
             <a
               href={ghost.url}
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-medium text-violet-700 hover:text-violet-800"
+              className="text-xs font-semibold text-ink underline hover:text-focus"
             >
               Open in Ghost ↗
             </a>
@@ -294,13 +296,7 @@ export default function ContentDetail({
       )}
 
       {/* SERP provider banner */}
-      <div
-        className={`rounded-xl border px-4 py-3 text-sm ${
-          brief.mock
-            ? "border-amber-200 bg-amber-50/40 text-amber-700"
-            : "border-emerald-200 bg-emerald-50/40 text-emerald-700"
-        }`}
-      >
+      <div className={noteCls}>
         {brief.mock ? (
           <>
             Brief built from <strong>mock SERP data</strong> — add{" "}
@@ -315,13 +311,7 @@ export default function ContentDetail({
 
       {/* LLM provider banner */}
       {llmInfo && (
-        <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            llmInfo.isLive
-              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
-              : "border-amber-200 bg-amber-50/40 text-amber-700"
-          }`}
-        >
+        <div className={noteCls}>
           {llmInfo.isLive ? (
             <>
               Draft generated by <span className="font-mono">{llmInfo.model ?? llmInfo.name}</span>.
@@ -338,44 +328,49 @@ export default function ContentDetail({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {notice && <p className="text-sm text-emerald-600">{notice}</p>}
+      {error && (
+        <p role="alert" className="flex items-start gap-2 text-sm text-failed-text">
+          <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      )}
+      {notice && <p className="text-sm text-ink">{notice}</p>}
 
       {/* Brief */}
-      <section className="rounded-xl border border-zinc-200 bg-white/60 p-5">
-        <h3 className="mb-4 text-sm font-medium uppercase tracking-widest text-zinc-500">
+      <section className="rounded-lg bg-paper p-5 shadow-hairline">
+        <h3 className="mb-4 text-sm font-semibold text-ink">
           Brief
         </h3>
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
-            <dt className="text-xs uppercase tracking-widest text-zinc-500">Intent</dt>
+            <dt className="text-xs font-semibold text-muted">Intent</dt>
             <dd className="mt-1">
-              <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500">
+              <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-ink">
                 {brief.intent}
               </span>
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-widest text-zinc-500">Target length</dt>
-            <dd className="mt-1 text-sm text-zinc-800">
+            <dt className="text-xs font-semibold text-muted">Target length</dt>
+            <dd className="mt-1 text-sm text-ink">
               ~{brief.targetWordCount.toLocaleString()} words
-              <span className="text-zinc-500"> (heuristic from SERP depth)</span>
+              <span className="text-muted"> (heuristic from SERP depth)</span>
             </dd>
           </div>
         </dl>
 
         <div className="mt-4">
-          <dt className="text-xs uppercase tracking-widest text-zinc-500">Outline</dt>
-          <dd className="mt-2 rounded-lg bg-zinc-50/60 p-4">
-            <p className="text-base font-bold text-zinc-900"># {brief.h1}</p>
+          <dt className="text-xs font-semibold text-muted">Outline</dt>
+          <dd className="mt-2 rounded-md bg-canvas p-4">
+            <p className="text-base font-bold text-ink"># {brief.h1}</p>
             <ul className="mt-2 flex flex-col gap-1">
               {brief.h2s.map((h) => (
-                <li key={h} className="text-sm text-zinc-500">
+                <li key={h} className="text-sm text-muted">
                   ## {h}
                 </li>
               ))}
               {brief.h2s.length === 0 && (
-                <li className="text-sm text-zinc-500">No H2s extracted.</li>
+                <li className="text-sm text-muted">No H2s extracted.</li>
               )}
             </ul>
           </dd>
@@ -383,13 +378,13 @@ export default function ContentDetail({
 
         {brief.paa.length > 0 && (
           <div className="mt-4">
-            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+            <dt className="text-xs font-semibold text-muted">
               Answer these reader questions
             </dt>
             <dd className="mt-2 flex flex-col gap-1.5">
               {brief.paa.map((q) => (
-                <p key={q} className="text-sm text-zinc-500">
-                  <span className="text-zinc-500">?</span> {q}
+                <p key={q} className="text-sm text-muted">
+                  <span className="text-muted">?</span> {q}
                 </p>
               ))}
             </dd>
@@ -398,14 +393,14 @@ export default function ContentDetail({
 
         {brief.entities.length > 0 && (
           <div className="mt-4">
-            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+            <dt className="text-xs font-semibold text-muted">
               Entities / topics to cover
             </dt>
             <dd className="mt-2 flex flex-wrap gap-1.5">
               {brief.entities.map((e) => (
                 <span
                   key={e}
-                  className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500"
+                  className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-ink"
                 >
                   {e}
                 </span>
@@ -416,13 +411,13 @@ export default function ContentDetail({
 
         {brief.sources.length > 0 && (
           <div className="mt-4">
-            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+            <dt className="text-xs font-semibold text-muted">
               Sources (top {brief.sources.length} SERP results)
             </dt>
             <dd className="mt-2 flex flex-col gap-1">
               {brief.sources.map((s) => (
-                <p key={s.url} className="truncate text-xs text-zinc-500">
-                  <span className="text-zinc-500">{s.domain}</span> — {s.title}
+                <p key={s.url} className="truncate text-xs text-muted">
+                  <span className="text-muted">{s.domain}</span> — {s.title}
                 </p>
               ))}
             </dd>
@@ -434,7 +429,7 @@ export default function ContentDetail({
       <section className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+            <h3 className="text-sm font-semibold text-ink">
               Editor
             </h3>
             <button onClick={onSave} disabled={busy === "save"} className={btnPrimary}>
@@ -452,52 +447,53 @@ export default function ContentDetail({
             rows={28}
             className={`w-full font-mono text-sm leading-relaxed ${inputCls}`}
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted">
             {(displayed?.wordCount ?? 0).toLocaleString()} words · target ~
             {brief.targetWordCount.toLocaleString()}
           </p>
         </div>
 
-        <aside className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5">
-          <h3 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+        <aside className="flex flex-col gap-3 rounded-lg bg-paper p-5 shadow-hairline">
+          <h3 className="text-sm font-semibold text-ink">
             SEO score
           </h3>
-          <p className="text-4xl font-bold tracking-tight text-zinc-900">
+          <p className="text-3xl font-extrabold stretch-display tracking-display text-ink">
             {displayed ? Math.round(displayed.score) : "—"}
-            <span className="text-lg text-zinc-500">/100</span>
+            <span className="text-lg text-muted">/100</span>
           </p>
           <ul className="flex flex-col gap-2">
             {displayed?.checks.map((c) => (
               <li key={c.id} className="flex items-start gap-2 text-sm">
                 <span
                   className={`mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                    // A content check is not an agent state: monochrome by weight.
                     c.passed
-                      ? "bg-emerald-400"
+                      ? "bg-ink"
                       : c.points > 0
-                        ? "bg-amber-400"
-                        : "bg-zinc-200"
+                        ? "bg-muted"
+                        : "bg-line-strong"
                   }`}
                 />
                 <span>
-                  <span className="text-zinc-500">{c.label}</span>
-                  <span className="text-zinc-500">
+                  <span className="text-muted">{c.label}</span>
+                  <span className="text-muted">
                     {" "}
                     · {c.points}/{c.max}
                   </span>
                   <br />
-                  <span className="text-xs text-zinc-500">{c.detail}</span>
+                  <span className="text-xs text-muted">{c.detail}</span>
                 </span>
               </li>
             )) ?? (
-              <li className="text-sm text-zinc-500">Write to see the live score.</li>
+              <li className="text-sm text-muted">Write to see the live score.</li>
             )}
           </ul>
           {displayed && displayed.internalLinkSuggestions.length > 0 && (
-            <div className="rounded-lg bg-zinc-50/60 p-3">
-              <p className="text-xs uppercase tracking-widest text-zinc-500">
+            <div className="rounded-md bg-canvas p-3">
+              <p className="text-xs font-semibold text-muted">
                 Link these keywords
               </p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-muted">
                 {displayed.internalLinkSuggestions.join(", ")}
               </p>
             </div>

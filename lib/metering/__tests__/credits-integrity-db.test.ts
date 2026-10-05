@@ -14,7 +14,8 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPlanChange, applyTopUp, meter } from "../service";
 import { includedCreditsForPlan } from "../credits";
-import { checkAndReserve, setDailyCap, todayKey } from "@/lib/knowledge/contextdev/budget-store";
+import { checkAndReserve, getDailyBudget, setDailyCap, todayKey } from "@/lib/knowledge/contextdev/budget-store";
+import { DEFAULT_DAILY_CAP_CREDITS } from "@/lib/knowledge/contextdev/budgets";
 
 // usage_events is append-only (a trigger refuses DELETE, T5), so metered
 // workspaces can't be cascade-deleted: ids are unique per run instead.
@@ -150,5 +151,54 @@ describe("Context.dev daily budget reserve is atomic", () => {
       where: { workspaceId_day: { workspaceId: WS_CD, day: todayKey() } },
     });
     assert.equal(row?.creditsUsed, 105);
+  });
+
+  // Phase 4a follow-up: a configured cap used to reset to the default (100)
+  // on every new UTC day. A new day now starts from the latest earlier cap.
+  it("a configured cap carries forward to later days (even across gaps)", async () => {
+    await prisma.contextDevBudget.deleteMany({ where: { workspaceId: WS_CD } });
+    const threeDaysAgo = todayKey(new Date(Date.now() - 3 * 86_400_000));
+    const weekAgo = todayKey(new Date(Date.now() - 7 * 86_400_000));
+    await prisma.contextDevBudget.createMany({
+      data: [
+        { workspaceId: WS_CD, day: weekAgo, creditsUsed: 0, capCredits: 40 },
+        { workspaceId: WS_CD, day: threeDaysAgo, creditsUsed: 300, capCredits: 400 },
+      ],
+    });
+    assert.equal((await getDailyBudget(WS_CD)).capCredits, 400, "a missing row reads the carried cap");
+    // Two reserves of 150 (300) only fit because 400 carried forward, not 100.
+    const rs = await Promise.all(Array.from({ length: 3 }, () => checkAndReserve(WS_CD, 150)));
+    assert.equal(rs.filter((r) => r.decision === "allow").length, 2);
+    const row = await prisma.contextDevBudget.findUnique({
+      where: { workspaceId_day: { workspaceId: WS_CD, day: todayKey() } },
+    });
+    assert.equal(row?.capCredits, 400, "today's row was seeded with the carried cap");
+    assert.equal(row?.creditsUsed, 300, "usage itself does not carry over");
+  });
+
+  it("a workspace with no history starts at the default cap", async () => {
+    await prisma.contextDevBudget.deleteMany({ where: { workspaceId: WS_CD } });
+    assert.equal((await getDailyBudget(WS_CD)).capCredits, DEFAULT_DAILY_CAP_CREDITS);
+  });
+});
+
+describe("first charge race on a new workspace", () => {
+  // Regression (Phase 4c CI): lockBalance/lockSpendCap created the row with
+  // create + catch P2002 and retried, but a unique violation aborts the
+  // Postgres transaction, so every loser failed "current transaction is
+  // aborted". The rows are now created with ON CONFLICT DO NOTHING.
+  it("concurrent first meter() calls all succeed and charge exactly once each", async () => {
+    const ws = `p4c-meter-first-${RUN}`;
+    await createWorkspace(ws, "starter");
+    try {
+      const results = await Promise.all(Array.from({ length: 8 }, () => charge(ws, 1)));
+      assert.deepEqual(results.map((r) => r.ok), Array(8).fill(true));
+      const { bal, cap } = await state(ws);
+      assert.equal(bal?.usedCredits, 8);
+      assert.equal(cap?.capCredits, includedCreditsForPlan("starter"));
+      assert.equal(cap?.blockAtCap, true);
+    } finally {
+      await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${ws}`;
+    }
   });
 });

@@ -21,9 +21,10 @@ import { useRouter } from "next/navigation";
 import { Globe, ImagePlus, Loader2, Palette, Trash2 } from "lucide-react";
 import { previewBrandTheme, sanitizeBrandHex, DEFAULT_BRAND_PRIMARY } from "@/lib/brand-theme";
 import { Check } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
-const cardCls = "rounded-xl border border-line bg-paper p-5";
+const cardCls = "rounded-lg bg-paper p-5 shadow-hairline";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-40";
 const btnPrimary =
@@ -124,7 +125,7 @@ export default function WhiteLabelSettings({
 
   async function removeLogo() {
     if (!canEdit || uploading) return;
-    if (!window.confirm("Remove the white-label logo? Public pages will show the default badge again.")) return;
+    if (!await confirmAction("Remove the white-label logo? Public pages will show the default badge again.")) return;
     setUploading(true);
     setNotice(null);
     try {
@@ -157,7 +158,7 @@ export default function WhiteLabelSettings({
       setNotice({
         kind: "ok",
         message: next
-          ? "Custom domain saved. Marketr does not manage DNS — point the domain at your Marketr host before using it."
+          ? "Custom domain saved. ShapesOS does not manage DNS — point the domain at your ShapesOS host before using it."
           : "Custom domain cleared.",
       });
     } catch (e) {
@@ -171,7 +172,7 @@ export default function WhiteLabelSettings({
     if (!canEdit || saving) return;
     const clean = sanitizeBrandHex(color);
     if (!clean) {
-      setNotice({ kind: "error", message: "Enter a hex color like #7c3aed, or clear the color." });
+      setNotice({ kind: "error", message: "Enter a hex color like #1f6feb, or clear the color." });
       return;
     }
     setSaving(true);
@@ -211,7 +212,7 @@ export default function WhiteLabelSettings({
       setColor("");
       setNotice({
         kind: "info",
-        message: "Brand color cleared — public pages fall back to the default violet. The brand kit keeps its own saved color.",
+        message: "Brand color cleared — public pages fall back to the default black. The brand kit keeps its own saved color.",
       });
       router.refresh();
       previewBrandTheme(null);
@@ -245,7 +246,7 @@ export default function WhiteLabelSettings({
           Shown on public review pages instead of the default star badge.
         </p>
         <div className="mt-3 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-line bg-paper">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-md bg-paper shadow-hairline">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt="Workspace logo" className="h-full w-full object-contain" onError={cacheBust} />
@@ -330,8 +331,8 @@ export default function WhiteLabelSettings({
           ) : (
             <>No custom domain set.</>
           )}{" "}
-          Marketr does not manage DNS or SSL for custom domains — point your domain&apos;s DNS at your Marketr host
-          (CNAME/A record + certificate) before using it. Public links keep working on the Marketr URL either way.
+          ShapesOS does not manage DNS or SSL for custom domains — point your domain&apos;s DNS at your ShapesOS host
+          (CNAME/A record + certificate) before using it. Public links keep working on the ShapesOS URL either way.
         </p>
       </section>
 
@@ -386,17 +387,19 @@ export default function WhiteLabelSettings({
             </div>
           )}
         </div>
-        {/* Live preview strip — built on the brand utilities, re-tints with the picker. */}
-        <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-3">
-          <p className="text-xs font-medium text-stone-500">Live preview</p>
+        {/* Live preview strip — built on the brand utilities, re-tints with the picker.
+            The brand-* classes are intentional: this previews the tenant's saved
+            brand color (user data), not a system accent. */}
+        <div className="mt-4 rounded-md bg-canvas p-3">
+          <p className="text-xs font-semibold text-muted">Live preview</p>
           <div className="mt-2 flex items-center gap-3">
-            <span className="rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white">
+            <span className="inline-flex h-control-sm items-center rounded-full bg-brand-600 px-4 text-[13px] font-semibold text-paper">
               Primary button
             </span>
-            <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
+            <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
               Accent chip
             </span>
-            <span className="font-mono text-xs text-stone-500">
+            <span className="font-mono text-xs text-muted">
               {previewHex ?? DEFAULT_BRAND_PRIMARY}
               {colorIsDefault ? " (default)" : ""}
             </span>
@@ -406,7 +409,7 @@ export default function WhiteLabelSettings({
           {savedColor ? (
             <>Saved as <span className="font-mono font-medium text-muted">{savedColor}</span> — the dashboard theme follows the brand kit this saves into.</>
           ) : (
-            <>No brand color set — the default violet is used.</>
+            <>No brand color set — the default black is used.</>
           )}{" "}
           Hover and tint shades derive automatically from this one color.
         </p>

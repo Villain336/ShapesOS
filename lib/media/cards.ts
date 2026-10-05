@@ -1,6 +1,6 @@
 // Marketr — Phase 5 S2: virtual-card provider abstraction.
 //
-// The money-layer backstop (dual enforcement, SPEC-PHASE5.md §2 S2): a
+// The money-layer backstop (dual enforcement, docs/specs/SPEC-PHASE5.md §2 S2): a
 // virtual card per pool, issued on the CLIENT's own Brex/Ramp account with
 // limit = pool cap. Card declines survive Marketr software bugs — this is
 // the layer that kills the €7,937/day failure class (Apr 2026: no
@@ -18,6 +18,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { SafetyViolationError } from "./safety";
+import { fakeOrRefuse } from "@/lib/env/secrets";
 
 export type CardProviderName = "fake" | "brex" | "ramp";
 export type VirtualCardStatus = "active" | "suspended" | "closed";
@@ -69,7 +70,7 @@ export class ProviderNotConfiguredError extends CardProviderError {
 function assertClientAccount(ref: string): void {
   if (!ref || !ref.trim()) {
     throw new CardProviderError(
-      "A client-owned Brex/Ramp account ref is required — Marketr never issues cards on agency accounts.",
+      "A client-owned Brex/Ramp account ref is required — ShapesOS never issues cards on agency accounts.",
     );
   }
 }
@@ -241,7 +242,8 @@ export function cardProviderFor(name: CardProviderName, env: NodeJS.ProcessEnv =
       return new RampCardAdapter({ mode });
     case "fake":
     default:
-      return new FakeCardProvider();
+      // Phase 11 (conncore): fake virtual cards are refused in production.
+      return fakeOrRefuse("virtual card", () => new FakeCardProvider(), env);
   }
 }
 

@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: Growth Mission templates (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: Growth Mission templates (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // Code data, not DB rows. One template per common goal for each of the 5
 // LOCKED business types (§8 decision): home-services, local-services, saas,

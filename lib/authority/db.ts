@@ -15,6 +15,7 @@ import {
 import {
   type AuthorityAuditEvent, type AuthorityAuditInput, type AuthorityAuditStore,
 } from "./audit";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 /** True when the Phase 6 authority tables exist (migrated). */
 export async function authorityTablesReady(): Promise<boolean> {
@@ -95,6 +96,14 @@ export const authorityApprovals = {
     const updated = await prisma.authorityApproval.update({ where: { id }, data: { status: "pending" } });
     const a = toApproval(updated);
     await logApprovalEvent(a, actor, "submitted");
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    await notifyApprovalNeeded({
+      workspaceId,
+      source: "authority",
+      sourceId: a.id,
+      title: a.type.replace(/_/g, " "),
+      requestedBy: a.createdBy,
+    });
     return a;
   },
   async approve(id: string, workspaceId: string, approver: string, secret: string): Promise<AuthorityApproval> {
@@ -116,6 +125,15 @@ export const authorityApprovals = {
     });
     a = toApproval(updated);
     await logApprovalEvent(a, approver, "approved", { twoPerson: a.twoPersonRequired });
+    await notifyApprovalDecided({
+      workspaceId,
+      source: "authority",
+      sourceId: a.id,
+      title: a.type.replace(/_/g, " "),
+      decision: "approved",
+      decidedBy: approver,
+      requestedBy: a.createdBy,
+    });
     return a;
   },
   async reject(id: string, workspaceId: string, approver: string): Promise<AuthorityApproval> {
@@ -124,6 +142,15 @@ export const authorityApprovals = {
     const updated = await prisma.authorityApproval.update({ where: { id }, data: { status: "approval_rejected", decidedAt: new Date() } });
     const a = toApproval(updated);
     await logApprovalEvent(a, approver, "approval_rejected");
+    await notifyApprovalDecided({
+      workspaceId,
+      source: "authority",
+      sourceId: a.id,
+      title: a.type.replace(/_/g, " "),
+      decision: "denied",
+      decidedBy: approver,
+      requestedBy: a.createdBy,
+    });
     return a;
   },
   async revoke(id: string, workspaceId: string, actor: string): Promise<AuthorityApproval> {

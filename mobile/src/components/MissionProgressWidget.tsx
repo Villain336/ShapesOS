@@ -9,6 +9,7 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { CheckCircle2, Circle, Rocket } from "lucide-react-native";
+import { color } from "../theme";
 
 export interface MissionProgress {
   id: string;
@@ -23,13 +24,13 @@ export interface MissionProgress {
 }
 
 const STATUS_STYLE: Record<string, { bg: object; text: object }> = {
-  running: { bg: { backgroundColor: "#f5f3ff" }, text: { color: "#7c3aed" } },
-  paused: { bg: { backgroundColor: "#fffbeb" }, text: { color: "#92400e" } },
-  complete: { bg: { backgroundColor: "#f0fdf4" }, text: { color: "#15803d" } },
+  running: { bg: { backgroundColor: color.runningTint }, text: { color: color.running } },
+  paused: { bg: { backgroundColor: color.canvas }, text: { color: color.ink } },
+  complete: { bg: { backgroundColor: color.canvas }, text: { color: color.done } },
 };
 
 function statusStyle(status: string) {
-  return STATUS_STYLE[status] ?? { bg: { backgroundColor: "#f5f5f4" }, text: { color: "#57534e" } };
+  return STATUS_STYLE[status] ?? { bg: { backgroundColor: color.canvas }, text: { color: color.muted } };
 }
 
 export function MissionProgressWidget({ mission }: { mission: MissionProgress }) {
@@ -38,7 +39,7 @@ export function MissionProgressWidget({ mission }: { mission: MissionProgress })
   return (
     <View style={styles.card} testID="mission-progress-widget">
       <View style={styles.headerRow}>
-        <Rocket size={14} color="#7c3aed" />
+        <Rocket size={14} color={color.ink} />
         <Text style={styles.template} numberOfLines={1}>
           {mission.template}
         </Text>
@@ -57,7 +58,7 @@ export function MissionProgressWidget({ mission }: { mission: MissionProgress })
         <View style={styles.checkpoints}>
           {mission.checkpoints.slice(0, 5).map((c, i) => (
             <View key={`${i}-${c}`} style={styles.checkpointRow}>
-              <CheckCircle2 size={13} color="#16a34a" />
+              <CheckCircle2 size={13} color={color.done} />
               <Text style={styles.checkpointText} numberOfLines={1}>
                 {c}
               </Text>
@@ -66,7 +67,7 @@ export function MissionProgressWidget({ mission }: { mission: MissionProgress })
         </View>
       ) : (
         <View style={styles.checkpointRow}>
-          <Circle size={13} color="#a8a29e" />
+          <Circle size={13} color={color.subtle} />
           <Text style={styles.muted}>No checkpoints yet</Text>
         </View>
       )}
@@ -81,23 +82,23 @@ export function MissionProgressWidget({ mission }: { mission: MissionProgress })
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: color.paper,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e7e5e4",
+    borderColor: color.line,
     padding: 14,
     marginVertical: 6,
   },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  template: { fontSize: 13, fontWeight: "700", color: "#1c1917", flex: 1 },
+  template: { fontSize: 13, fontWeight: "700", color: color.ink, flex: 1 },
   statusBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
-  goal: { fontSize: 14, color: "#44403c", marginBottom: 8 },
-  barTrack: { height: 8, borderRadius: 999, backgroundColor: "#f5f5f4", overflow: "hidden" },
-  barFill: { height: 8, borderRadius: 999, backgroundColor: "#7c3aed" },
-  pct: { fontSize: 12, color: "#78716c", marginTop: 4, marginBottom: 8 },
+  goal: { fontSize: 14, color: color.muted, marginBottom: 8 },
+  barTrack: { height: 8, borderRadius: 999, backgroundColor: color.canvas, overflow: "hidden" },
+  barFill: { height: 8, borderRadius: 999, backgroundColor: color.running },
+  pct: { fontSize: 12, color: color.muted, marginTop: 4, marginBottom: 8 },
   checkpoints: { gap: 4, marginBottom: 6 },
   checkpointRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  checkpointText: { fontSize: 13, color: "#44403c", flex: 1 },
-  muted: { fontSize: 12, color: "#a8a29e" },
+  checkpointText: { fontSize: 13, color: color.muted, flex: 1 },
+  muted: { fontSize: 12, color: color.subtle },
 });

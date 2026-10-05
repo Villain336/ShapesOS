@@ -4,7 +4,8 @@
 // every missed window, never a stampede.)
 
 import type { PrismaClient, ScheduledSkill } from "@prisma/client";
-import { parseCron, nextFutureRunAfter, CronParseError } from "./cron";
+import { parseCron, nextFutureRunAfterInZone, CronParseError } from "./cron";
+import { isValidTimeZone } from "@/lib/time/zoned";
 import { CATCH_UP_GRACE_MS } from "./guard";
 import { fireSchedule, type FireOptions } from "./service";
 import { schedulerAudit } from "./audit";
@@ -81,8 +82,15 @@ async function tickOne(
   const previousNext = schedule.nextRunAt ?? now;
   const wasMissed = previousNext.getTime() < now.getTime() - CATCH_UP_GRACE_MS;
   // Advance to the next FUTURE slot from the last scheduled time (catch-up
-  // policy: fire once, mark missed, jump forward).
-  const advanced = nextFutureRunAfter(parsed, previousNext, now);
+  // policy: fire once, mark missed, jump forward), read as wall-clock time in
+  // the schedule's own IANA zone (default UTC). Writes validate the zone; a
+  // corrupt stored one fails every tick the same way, so it parks (pauses)
+  // the schedule like a corrupt cron expression.
+  const timezone = schedule.timezone || "UTC";
+  if (!isValidTimeZone(timezone)) {
+    throw new CronParseError(`unknown schedule timezone "${String(timezone).slice(0, 64)}"`);
+  }
+  const advanced = nextFutureRunAfterInZone(parsed, previousNext, now, timezone);
 
   // Atomic claim: a concurrent tick that already advanced this row has
   // changed nextRunAt (or paused it), so count === 0 here means "lost the

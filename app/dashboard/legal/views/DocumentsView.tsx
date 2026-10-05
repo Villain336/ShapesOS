@@ -37,6 +37,7 @@ import {
   type LegalDocumentType,
   type LegalExpirySource,
 } from "@/lib/legal/documents";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface DocumentVersionView {
   id: string;
@@ -507,6 +508,13 @@ export function DocumentsView({
   }
 
   async function remove(id: string) {
+    const ok = await confirmAction({
+      title: "Delete this document?",
+      description: "It is removed from the legal workspace.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyKey(id);
     try {
       const res = await fetch(`/api/legal/documents/${encodeURIComponent(id)}`, {

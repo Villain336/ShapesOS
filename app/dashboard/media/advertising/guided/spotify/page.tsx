@@ -39,7 +39,7 @@ import CsvImportForm from "./_components/CsvImportForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Spotify guided setup — Marketr",
+  title: "Spotify guided setup — ShapesOS",
   description: "Guided Spotify setup: Ads Manager checklist, budget planner, creative specs, and CSV spend import.",
 };
 
@@ -85,9 +85,9 @@ export default async function SpotifyGuidedPage() {
         <div className="text-sm leading-relaxed text-muted">
           <p className="font-semibold text-ink">Guided, not connected.</p>
           <p className="mt-0.5">
-            Spotify advertising is managed entirely in Spotify Ads Manager. Marketr has no API connection here:
+            Spotify advertising is managed entirely in Spotify Ads Manager. ShapesOS has no API connection here:
             it cannot create accounts, launch campaigns, or read performance data. You set up and launch in Ads
-            Manager, register what you launched below, and import daily spend via CSV — Marketr tracks everything
+            Manager, register what you launched below, and import daily spend via CSV — ShapesOS tracks everything
             you import. Programmatic alternative: Spotify audio inventory can also be bought programmatically
             through the StackAdapt connector in the Advertising hub.
           </p>

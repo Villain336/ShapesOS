@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Check, Pencil, Pin, PinOff, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 // ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
 const inputCls =
   "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
@@ -242,6 +243,13 @@ export default function KnowledgeTab({
   }
 
   async function remove(e: KnowledgeEntry) {
+    const ok = await confirmAction({
+      title: "Delete this knowledge entry?",
+      description: "Agents stop using it in their answers.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/intelligence/knowledge/${e.id}?${ws}`, {

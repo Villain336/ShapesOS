@@ -76,7 +76,7 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
     title: "Sites",
     links: [
       { href: "ide", label: "Site IDE", description: "Edit and deploy your site", icon: CodeXml },
-      { href: "sites", label: "Sites & landing pages", description: "Pages hosted by Marketr", icon: Globe },
+      { href: "sites", label: "Sites & landing pages", description: "Pages hosted by ShapesOS", icon: Globe },
       { href: "programmatic", label: "Programmatic SEO", description: "Template-driven pages at scale", icon: Layers },
       { href: "local", label: "Local SEO", description: "Grid rankings and reviews", icon: MapPin },
       { href: "internal-links", label: "Internal links", description: "Suggested links between your pages", icon: Network },

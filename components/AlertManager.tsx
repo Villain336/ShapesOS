@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { BellRing, Radio } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface AlertChannel {
   id: string;
@@ -546,7 +547,7 @@ export default function AlertManager({
   }
 
   async function deleteChannel(c: AlertChannel) {
-    if (!confirm(`Delete channel "${c.name}"? Rules using it will lose that channel.`)) return;
+    if (!await confirmAction(`Delete channel "${c.name}"? Rules using it will lose that channel.`)) return;
     setBusy(c.id);
     try {
       const res = await fetch(`/api/alert-channels/${c.id}`, { method: "DELETE" });
@@ -582,7 +583,7 @@ export default function AlertManager({
   }
 
   async function deleteRule(r: AlertRule) {
-    if (!confirm(`Delete rule "${r.name}"?`)) return;
+    if (!await confirmAction(`Delete rule "${r.name}"?`)) return;
     setBusy(r.id);
     try {
       const res = await fetch(`/api/alert-rules/${r.id}`, { method: "DELETE" });

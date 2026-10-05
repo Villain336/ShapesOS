@@ -481,7 +481,7 @@ export const TEMPLATES: DesignTemplate[] = [
         {
           eyebrow: "GROWTH, ON AUTOPILOT",
           headline: "Your marketing, on autopilot",
-          sub: "Swipe up to see how Marketr turns attention into revenue.",
+          sub: "Swipe up to see how ShapesOS turns attention into revenue.",
           cta: "Learn more",
           brand: BRAND,
         },
@@ -503,8 +503,8 @@ export const TEMPLATES: DesignTemplate[] = [
         {
           eyebrow: "THE GROWTHOS LOOP",
           headline: "Ship it. Measure it. Scale it.",
-          sub: "Marketr turns every launch into a learning loop that compounds.",
-          cta: "Get Marketr",
+          sub: "ShapesOS turns every launch into a learning loop that compounds.",
+          cta: "Get ShapesOS",
           brand: BRAND,
         },
         { eyebrow: 18, headline: 64, sub: 24, cta: 20 },

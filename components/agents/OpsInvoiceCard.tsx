@@ -3,8 +3,9 @@
 // data from the ops API. Presentational only — no writes, no approval
 // actions (sends happen through the Actions queue after human approval).
 //
-// House pattern: --brand-600/700/50 vars, never hardcoded primaries; Lucide
-// icons only; dense table styling like the invoices UI.
+// Agentic OS (docs/design/DESIGN.md): tokens only, Lucide icons only, dense
+// table styling like the invoices UI. Invoice status is a business record, not
+// an agent state, so its badge stays neutral (no status colors).
 
 "use client";
 
@@ -33,11 +34,11 @@ interface InvoiceRow {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: "bg-stone-100 text-stone-700 border-stone-200",
-  sent: "bg-sky-50 text-sky-800 border-sky-200",
-  paid: "bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20",
-  overdue: "bg-amber-50 text-amber-800 border-amber-200",
-  cancelled: "bg-stone-100 text-stone-500 border-stone-200",
+  draft: "bg-canvas text-ink",
+  sent: "bg-paper text-ink shadow-control",
+  paid: "bg-ink text-white",
+  overdue: "bg-paper text-ink shadow-outline",
+  cancelled: "bg-canvas text-muted",
 };
 
 function fmtCents(cents: number): string {
@@ -88,7 +89,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
 
   if (error && !invoice) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white p-4 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
           <span>{error}</span>
@@ -99,7 +100,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
 
   if (!invoice) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white p-4 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading invoice…</span>
@@ -111,17 +112,17 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
   const subtotal = invoice.lineItems.reduce((s, l) => s + l.qty * l.priceCents, 0);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-2.5">
+    <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+      <div className="flex items-center justify-between border-b border-line bg-canvas px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-[var(--brand-600)]" />
-          <span className="text-sm font-semibold text-stone-900">
+          <FileText className="h-4 w-4 text-ink" />
+          <span className="text-sm font-semibold text-ink">
             Invoice {invoice.id.slice(0, 8)}…
           </span>
-          {customerName && <span className="text-[13px] text-stone-500">{customerName}</span>}
+          {customerName && <span className="text-[13px] text-muted">{customerName}</span>}
         </div>
         <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
             STATUS_BADGE[invoice.status] ?? STATUS_BADGE.draft
           }`}
         >
@@ -130,7 +131,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
       </div>
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="text-left text-stone-500">
+          <tr className="text-left text-muted">
             <th className="px-4 py-2 font-medium">Item</th>
             <th className="px-2 py-2 text-right font-medium">Qty</th>
             <th className="px-2 py-2 text-right font-medium">Price</th>
@@ -139,31 +140,31 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
         </thead>
         <tbody>
           {invoice.lineItems.map((l, i) => (
-            <tr key={i} className="border-t border-stone-100 hover:bg-[var(--brand-50)]/40">
-              <td className="px-4 py-2 text-stone-900">{l.description}</td>
-              <td className="px-2 py-2 text-right tabular-nums text-stone-600">{l.qty}</td>
-              <td className="px-2 py-2 text-right tabular-nums text-stone-600">{fmtCents(l.priceCents)}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-stone-900">{fmtCents(l.qty * l.priceCents)}</td>
+            <tr key={i} className="border-t border-line hover:bg-hover-paper">
+              <td className="px-4 py-2 text-ink">{l.description}</td>
+              <td className="px-2 py-2 text-right tabular-nums text-muted">{l.qty}</td>
+              <td className="px-2 py-2 text-right tabular-nums text-muted">{fmtCents(l.priceCents)}</td>
+              <td className="px-4 py-2 text-right tabular-nums text-ink">{fmtCents(l.qty * l.priceCents)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t border-stone-200">
-            <td colSpan={3} className="px-4 py-1.5 text-right text-stone-500">Subtotal</td>
-            <td className="px-4 py-1.5 text-right tabular-nums text-stone-900">{fmtCents(subtotal)}</td>
+          <tr className="border-t border-line">
+            <td colSpan={3} className="px-4 py-1.5 text-right text-muted">Subtotal</td>
+            <td className="px-4 py-1.5 text-right tabular-nums text-ink">{fmtCents(subtotal)}</td>
           </tr>
           <tr>
-            <td colSpan={3} className="px-4 py-1.5 text-right text-stone-500">Tax</td>
-            <td className="px-4 py-1.5 text-right tabular-nums text-stone-900">{fmtCents(invoice.taxCents)}</td>
+            <td colSpan={3} className="px-4 py-1.5 text-right text-muted">Tax</td>
+            <td className="px-4 py-1.5 text-right tabular-nums text-ink">{fmtCents(invoice.taxCents)}</td>
           </tr>
           <tr>
-            <td colSpan={3} className="px-4 py-2 text-right font-semibold text-stone-900">Total</td>
-            <td className="px-4 py-2 text-right font-semibold tabular-nums text-stone-900">{fmtCents(invoice.totalCents)}</td>
+            <td colSpan={3} className="px-4 py-2 text-right font-semibold text-ink">Total</td>
+            <td className="px-4 py-2 text-right font-semibold tabular-nums text-ink">{fmtCents(invoice.totalCents)}</td>
           </tr>
         </tfoot>
       </table>
       {invoice.dueAt && (
-        <div className="border-t border-stone-200 px-4 py-2 text-[12px] text-stone-500">
+        <div className="border-t border-line px-4 py-2 text-[12px] text-muted">
           Due {new Date(invoice.dueAt).toLocaleDateString()}
         </div>
       )}

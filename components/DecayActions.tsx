@@ -28,7 +28,7 @@ export default function DecayActions({ projectId, findingId }: { projectId: stri
   }
 
   if (done) {
-    return <p className="text-sm text-emerald-600">✓ Handled — finding closed.</p>;
+    return <p className="text-sm font-semibold text-ink">✓ Handled — finding closed.</p>;
   }
 
   return (
@@ -37,19 +37,24 @@ export default function DecayActions({ projectId, findingId }: { projectId: stri
         <button
           onClick={() => act("create_brief")}
           disabled={busy !== null}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy === "create_brief" ? "Creating…" : "Create refresh brief →"}
         </button>
         <button
           onClick={() => act("dismiss")}
           disabled={busy !== null}
-          className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+          className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy === "dismiss" ? "Dismissing…" : "Dismiss"}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="flex items-start gap-1.5 text-xs text-failed-text">
+          <span className="aos-shape aos-shape--failed mt-0.5 shrink-0 [--aos-shape-size:8px]" aria-hidden="true" />
+          {error}
+        </p>
+      )}
     </div>
   );
 }

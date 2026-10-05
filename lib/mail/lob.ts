@@ -178,7 +178,7 @@ export class LobProvider implements MailProvider {
     piece: SendPieceInput,
     opts: { testMode: boolean; creative?: LobSendOptions },
   ): Promise<SendPieceResult> {
-    const creative = opts.creative ?? { front: "<html><body>Marketr mail piece</body></html>", back: "<html><body></body></html>" };
+    const creative = opts.creative ?? { front: "<html><body>ShapesOS mail piece</body></html>", back: "<html><body></body></html>" };
     const to = {
       name: piece.address.name,
       address_line1: piece.address.line1,

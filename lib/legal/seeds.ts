@@ -65,7 +65,7 @@ export const OBLIGATION_TEMPLATES: SeedObligationTemplate[] = [
       "General liability coverage protects against common third-party claims. " +
       "A licensed insurance partner can quote coverage for your industry. " +
       "Licensed partner model: they hold the licenses, we provide the " +
-      "software — Marketr lists the need only and never binds coverage.",
+      "software — ShapesOS lists the need only and never binds coverage.",
     sourceRef: "Licensed insurance partner (verify before acting)",
     renewalCadence: "Annual policy term (typical)",
     needsReview: true,
@@ -149,7 +149,7 @@ export const OBLIGATION_TEMPLATES: SeedObligationTemplate[] = [
       "North Carolina generally requires workers' compensation coverage for " +
       "businesses with three or more employees. A licensed insurance partner " +
       "can confirm your requirement and place coverage. Licensed partner model: " +
-      "they hold the licenses, we provide the software — Marketr never binds coverage.",
+      "they hold the licenses, we provide the software — ShapesOS never binds coverage.",
     sourceRef:
       "NC Industrial Commission / licensed insurance partner (verify before acting)",
     renewalCadence: "Annual policy term (typical)",

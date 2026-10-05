@@ -11,9 +11,9 @@ const ROOT = join(import.meta.dirname, "..");
 
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", ".turbo", "dist", "build", ".pgdata"]);
 // The scanner's own pattern strings would self-match — exclude it.
-// SPEC-PHASE10.md documents the CSE shutdown ban itself (the §2 🚫 list);
+// docs/specs/SPEC-PHASE10.md documents the CSE shutdown ban itself (the §2 🚫 list);
 // it is the prohibition's documentation, not a code/config dependency.
-const SKIP_FILES = new Set(["scripts/sweep-cse-deps.mts", "SPEC-PHASE10.md"]);
+const SKIP_FILES = new Set(["scripts/sweep-cse-deps.mts", "docs/specs/SPEC-PHASE10.md"]);
 const SKIP_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".mp4", ".pdf", ".zip"]);
 
 const PATTERNS: Array<{ name: string; re: RegExp }> = [

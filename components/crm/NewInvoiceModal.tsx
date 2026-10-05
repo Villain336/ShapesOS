@@ -32,13 +32,16 @@ function toCents(dollars: string): number | null {
 export function NewInvoiceModal({
   onClose,
   onCreated,
+  initialCustomer,
 }: {
   onClose: () => void;
   onCreated: () => void;
+  /** Preselects the customer (e.g. "Create invoice" from a lead). */
+  initialCustomer?: LeadHit;
 }) {
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerHits, setCustomerHits] = useState<LeadHit[]>([]);
-  const [customer, setCustomer] = useState<LeadHit | null>(null);
+  const [customer, setCustomer] = useState<LeadHit | null>(initialCustomer ?? null);
   const [searching, setSearching] = useState(false);
   const [showHits, setShowHits] = useState(false);
   const [items, setItems] = useState<LineItem[]>([{ description: "", qty: "1", price: "" }]);
@@ -135,7 +138,7 @@ export function NewInvoiceModal({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
+      <div className={backdropCls} onClick={onClose} aria-hidden />
       <div className={modalWrapCls}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>

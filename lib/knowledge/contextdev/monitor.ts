@@ -1,7 +1,7 @@
 // Marketr — Wave 2 context.dev slice 4: change-monitor engine.
 //
-// A Monitor watches a URL on a cadence. runDueMonitors() (invoked by the
-// scheduler track on its own cron — this module owns no timer loop):
+// A Monitor watches a URL on a cadence. runDueMonitors() (invoked by
+// POST /api/cron/contextdev-monitors — this module owns no timer loop):
 //   1. Finds active monitors whose cadence has elapsed since lastCheckedAt.
 //   2. Budget-gates the scrape BEFORE the vendor is hit (1 credit/page).
 //   3. Scrapes the URL to markdown, hashes it, compares to lastSeenHash.
@@ -301,15 +301,17 @@ export async function runMonitorCheck(
 
 /**
  * Cron entry point: run every active monitor whose cadence has elapsed.
- * Owns no timer loop — the scheduler track invokes this on its own cron.
+ * Owns no timer loop — POST /api/cron/contextdev-monitors calls it (every 15
+ * minutes from the in-app cron runner, lib/cron/jobs.ts). `workspaceId`
+ * limits the sweep to one workspace (a signed-in "run now").
  */
 export async function runDueMonitors(
-  opts: { now?: Date; fetchImpl?: typeof fetch; limit?: number } = {},
+  opts: { now?: Date; fetchImpl?: typeof fetch; limit?: number; workspaceId?: string } = {},
 ): Promise<MonitorRunResult[]> {
   const now = opts.now ?? new Date();
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 500);
   const candidates = await prisma.monitor.findMany({
-    where: { status: "active" },
+    where: { status: "active", ...(opts.workspaceId ? { workspaceId: opts.workspaceId } : {}) },
     orderBy: { lastCheckedAt: "asc" },
     take: limit,
   });

@@ -10,7 +10,7 @@ import { campaignTablesReady } from "@/app/api/substrate/_lib";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "New campaign — Marketr",
+  title: "New campaign — ShapesOS",
   description: "Create a growth campaign object.",
 };
 

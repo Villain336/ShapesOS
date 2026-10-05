@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: graph nodes API (SPEC-PHASE8.md §5).
+// Marketr — Phase 8 G1: graph nodes API (docs/specs/SPEC-PHASE8.md §5).
 // GET /api/substrate/graph/nodes?type=&q=&workspaceId=
 
 import type { NextRequest } from "next/server";

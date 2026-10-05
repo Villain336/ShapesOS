@@ -1,6 +1,6 @@
 // Marketr — R1 ReviewReplyState polling loop.
 //
-// SPEC-PHASE6.md §2/R1, §3/F2, §9 invariants 1 & 6.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2, §9 invariants 1 & 6.
 // Since April 2026 every GBP reply is pre-publication moderated:
 // PENDING → APPROVED/REJECTED. A REJECTED reply is silently blocked, so the
 // agent polls reply state — never assumes the submit succeeded.

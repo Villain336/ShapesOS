@@ -42,10 +42,10 @@ const SEAT_REGISTRY: Record<SeatDsp, Omit<SeatGuidance, "status">> = {
       "Confirm your TTD seat or partner agreement is active",
       "Generate OpenTTD API credentials in the TTD UI",
       "Store them in the Secure Vault (Settings → Flywheel → DSP seats) — never in chat or code",
-      "Status flips to connected; campaigns become pausable through Marketr",
+      "Status flips to connected; campaigns become pausable through ShapesOS",
     ],
     docsUrl: "https://partner.thetradedesk.com/",
-    custodyNote: "Your TTD contract and billing stay with your agency — Marketr never holds or fronts spend.",
+    custodyNote: "Your TTD contract and billing stay with your agency — ShapesOS never holds or fronts spend.",
   },
   dv360: {
     dsp: "dv360",
@@ -62,7 +62,7 @@ const SEAT_REGISTRY: Record<SeatDsp, Omit<SeatGuidance, "status">> = {
       "Status flips to connected; kill-switches become real pause calls",
     ],
     docsUrl: "https://developers.google.com/display-video/api",
-    custodyNote: "Your Google/DV360 billing stays with your agency — Marketr never holds or fronts spend.",
+    custodyNote: "Your Google/DV360 billing stays with your agency — ShapesOS never holds or fronts spend.",
   },
   amazon: {
     dsp: "amazon",
@@ -78,7 +78,7 @@ const SEAT_REGISTRY: Record<SeatDsp, Omit<SeatGuidance, "status">> = {
       "Status flips to connected",
     ],
     docsUrl: "https://advertising.amazon.com/API/docs",
-    custodyNote: "Your Amazon billing stays with your agency — Marketr never holds or fronts spend.",
+    custodyNote: "Your Amazon billing stays with your agency — ShapesOS never holds or fronts spend.",
   },
   basis: {
     dsp: "basis",
@@ -94,7 +94,7 @@ const SEAT_REGISTRY: Record<SeatDsp, Omit<SeatGuidance, "status">> = {
       "Status flips to connected",
     ],
     docsUrl: "https://www.basis.net/",
-    custodyNote: "Your Basis contract and billing stay with your agency — Marketr never holds or fronts spend.",
+    custodyNote: "Your Basis contract and billing stay with your agency — ShapesOS never holds or fronts spend.",
   },
 };
 

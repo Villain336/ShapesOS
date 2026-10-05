@@ -6,6 +6,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { entitlementDenied, EntitlementError, projectsUsed, requireWithinLimit } from "@/lib/billing/entitlements-server";
 
 export async function GET() {
   const user = await requireUser();
@@ -47,6 +48,13 @@ export async function POST(req: NextRequest) {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   // Milestone 11: project creation is editor+ (viewers are read-only).
   if (!(await requireWorkspaceRole(user.id, workspace.id, "editor"))) return forbidden();
+  // Phase 4a: projects are a plan limit.
+  try {
+    await requireWithinLimit(workspace.id, "projects", await projectsUsed(workspace.id));
+  } catch (err) {
+    if (err instanceof EntitlementError) return entitlementDenied(err);
+    throw err;
+  }
   const project = await prisma.project.create({
     data: {
       workspaceId: workspace.id,

@@ -1,6 +1,6 @@
 // Marketr — R1 review agent: shared types.
 //
-// SPEC-PHASE6.md §2/R1, §3/F2, §9 invariants 1 & 6.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2, §9 invariants 1 & 6.
 // Pure type definitions shared by the review pipeline modules and their
 // memory-store twins. No imports — safe to load anywhere.
 

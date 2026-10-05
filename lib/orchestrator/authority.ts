@@ -1,5 +1,5 @@
 // Marketr — Phase 9 M1: Delegation of Authority (DoA) tier evaluator
-// (SPEC-PHASE9.md §P9E, §3.4).
+// (docs/specs/SPEC-PHASE9.md §P9E, §3.4).
 //
 // PURE function — no LLM, no prompts, no I/O. Evaluated per action AT
 // EXECUTION TIME by the approval executor (lib/authority/executor.ts), never
@@ -10,7 +10,10 @@
 //   1 — Small actions: amount <= threshold AND kind in the small-action
 //       allowlist AND the user enabled the automation toggle.
 //   2 — Significant: everything else (external audience, publish, spend
-//       above threshold). Requires explicit human approval, every time.
+//       above threshold). Requires explicit human approval — unless (Phase 14,
+//       owner decision 2026-10-05) a per-agent automation rule says "auto"
+//       (lib/automation/policy.ts decideAutoApproval; amounts over the
+//       threshold still ask).
 //   3 — Never: hard deny list (move money, sign contracts, delete data).
 //       UN-OVERRIDABLE — no setting, toggle, or prompt text can widen it.
 //       The action's NATURE decides, not its label: adversarial phrasing in
@@ -58,6 +61,11 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   "update_listing",
   "send_internal_note",
   "refresh_owned_page",
+  // Phase 13 (twincore): internal site operations on the digital twin —
+  // booking a truck onto a free dock and giving a forklift a task. No money,
+  // no external audience; reversible (cancel the booking, free the forklift).
+  "book_dock",
+  "assign_equipment",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the
@@ -176,13 +184,73 @@ export function normalizeForTier(text: string): string {
   return s;
 }
 
+/**
+ * Phase 10 (finance): exact kinds that move money or the books without a
+ * Tier-3 verb in their name — recording a customer payment and posting /
+ * reversing journal entries. Never automated, whatever a rule says.
+ */
+// Phase 11 (bizsync): + posting the books to QuickBooks / Xero.
+// Phase 12 (mfgpos): + completing a manufacturing order (stock + costing to
+// the books) and closing a till session (the takings to the books).
+// Phase 12 (people): + approving and posting payroll.
+// Phase 14 (connectors): + sending a pay run to the payroll provider (Gusto
+// pays people from what is sent). The words "send payroll" match no money
+// pattern, so it is listed here explicitly.
+export const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
+  "record payment",
+  "post journal entry",
+  "reverse journal entry",
+  "pay vendor bill",
+  "post to accounting",
+  "complete manufacturing order",
+  "close pos session",
+  "approve pay run",
+  "post pay run",
+  // Phase 14 (approvals): auto-approve now reaches Tier 2, so money kinds
+  // whose names carry no Tier-3 verb are pinned here — they must never
+  // become auto-approvable. Sending an invoice and marking it paid are the
+  // ops money gates (OPS_INVOICE_SEND / _MARK_PAID); a campaign budget sets
+  // how much is spent; "money connector write" is the default action of an
+  // unmapped write on an accounting / payroll connector (lib/agents/grants.ts).
+  "send invoice",
+  "mark invoice paid",
+  "update campaign budget",
+  "money connector write",
+  "send payroll to provider",
+]);
+
+/**
+ * Phase 14 (approvals): drafting a purchase order moves no money (sending it
+ * is OPS_PO_SEND, gated). For that one exact kind the phrase "purchase
+ * order(s)" — and only that phrase — is ignored by the money scan; every
+ * other word (and every other kind) is scanned as before, so "purchase
+ * order sent", "buy media" or a draft PO whose text says "purchase the
+ * stock" still evaluate Tier 3.
+ */
+const TIER3_PHRASE_EXEMPTIONS: ReadonlyMap<string, RegExp> = new Map([
+  ["draft purchase order", /\bpurchase orders?\b/g],
+]);
+
 function isTier3(kind: string, description: string): boolean {
-  const hay = `${normalizeForTier(kind)} ${normalizeForTier(description)}`.trim();
+  const kindNorm = normalizeForTier(kind);
+  if (TIER3_EXACT_KINDS.has(kindNorm)) return true;
+  let hay = `${kindNorm} ${normalizeForTier(description)}`.trim();
+  const exempt = TIER3_PHRASE_EXEMPTIONS.get(kindNorm);
+  if (exempt) hay = hay.replace(exempt, " ").replace(/\s+/g, " ").trim();
   if (!hay) return false;
   return TIER3_PATTERNS.some((re) => re.test(hay));
 }
 
+/**
+ * Exact kinds that are Tier 0 although their verb isn't an observation:
+ * Phase 8 edits to files inside an isolated code sandbox — local to it,
+ * checkpointed and restorable, nothing leaves the sandbox. (Commands in the
+ * sandbox, run_sandbox_command, stay Tier 2.)
+ */
+const TIER0_EXACT_KINDS: ReadonlySet<string> = new Set(["edit sandbox files"]);
+
 function isTier0Kind(kind: string): boolean {
+  if (TIER0_EXACT_KINDS.has(normalizeForTier(kind))) return true;
   const k = normalizeForTier(kind).split(" ")[0] ?? "";
   return TIER0_KIND_PREFIXES.some((p) => k === p || k.startsWith(p));
 }

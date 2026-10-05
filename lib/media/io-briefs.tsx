@@ -322,7 +322,7 @@ export function buildIoBriefDocument(d: IoBriefDocInput): ReactElement {
               />
             </View>
             <PdfText variant="xs" color="#71717a">
-              The REP keeps the signature — Marketr plans and briefs. Capture the signed IO and
+              The REP keeps the signature — ShapesOS plans and briefs. Capture the signed IO and
               proof-of-run in the signature tracker.
             </PdfText>
           </View>
@@ -379,7 +379,7 @@ export function buildIoBriefDocument(d: IoBriefDocInput): ReactElement {
             <PdfDivider />
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
               <SpanText style={{ fontSize: 9, color: "#71717a" }}>
-                Generated {d.generatedAt} · {d.workspaceName} · Marketr IO-brief concierge
+                Generated {d.generatedAt} · {d.workspaceName} · ShapesOS IO-brief concierge
               </SpanText>
               <PageNumber format="Page {page} of {total}" align="right" />
             </View>

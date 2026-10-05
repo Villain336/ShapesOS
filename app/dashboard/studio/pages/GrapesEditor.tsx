@@ -62,7 +62,7 @@ function buildDocument(editor: Editor, isEmail: boolean): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marketr page</title>
+<title>ShapesOS page</title>
 <style>${css}</style>
 </head>
 <body>

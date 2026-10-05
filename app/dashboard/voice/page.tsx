@@ -5,7 +5,7 @@ import { AgentsApp } from "./AgentsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Voice Agents — Marketr",
+  title: "Voice Agents — ShapesOS",
   description: "LiveKit lead follow-up agents: consent-gated, disclosure-first, kill-switched.",
 };
 

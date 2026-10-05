@@ -43,7 +43,7 @@ type DashboardData = {
 };
 
 const th =
-  "px-3 py-2 text-left text-xs font-medium uppercase tracking-widest text-zinc-500";
+  "px-3 py-2 text-left text-xs font-semibold text-muted";
 const td = "px-3 py-2 text-sm";
 
 const ALERT_LABEL: Record<string, string> = {
@@ -65,8 +65,9 @@ function Delta({ row }: { row: KeywordRow }) {
   if (prev == null || curr == null) return null;
   const d = prev - curr; // positive = moved up
   if (d === 0)
-    return <span className="ml-1 text-xs text-zinc-500">=</span>;
-  const cls = d > 0 ? "text-emerald-600" : "text-red-600";
+    return <span className="ml-1 text-xs text-muted">=</span>;
+  // Rank movement is data, not an agent state: the arrow carries direction.
+  const cls = d > 0 ? "text-ink" : "text-muted";
   const arrow = d > 0 ? "▲" : "▼";
   return (
     <span className={`ml-1 text-xs ${cls}`}>
@@ -170,10 +171,10 @@ export default function RankingsDashboard({
     <div className="flex flex-col gap-6">
       {provider && (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
+          className={`rounded-lg px-4 py-3 text-sm ${
             provider.isLive
-              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
-              : "border-amber-200 bg-amber-50/40 text-amber-700"
+              ? "bg-paper text-muted shadow-hairline"
+              : "bg-paper text-ink shadow-hairline"
           }`}
         >
           {provider.isLive ? (
@@ -194,17 +195,17 @@ export default function RankingsDashboard({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-6">
           <div>
-            <div className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+            <div className="text-xs font-semibold text-muted">
               Visibility score
             </div>
-            <div className="mt-1 text-4xl font-bold tracking-tight">
+            <div className="aos-display mt-1">
               {data ? data.visibilityScore : "—"}
-              <span className="text-lg text-zinc-500">/100</span>
+              <span className="text-lg text-muted">/100</span>
             </div>
           </div>
-          <div className="text-sm text-zinc-500">
+          <div className="text-sm text-muted">
             <div>
-              <strong className="text-zinc-800">{data?.trackedCount ?? 0}</strong>{" "}
+              <strong className="text-ink">{data?.trackedCount ?? 0}</strong>{" "}
               tracked keywords
             </div>
             <div className="mt-1">
@@ -217,24 +218,24 @@ export default function RankingsDashboard({
         <button
           onClick={runCheck}
           disabled={checking || tracked.length === 0}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-fg"
         >
           {checking ? "Checking…" : "Run rank check"}
         </button>
       </div>
       {tracked.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           Nothing is tracked yet — flip the toggle on keywords below, then run
           a check.
         </p>
       )}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg bg-failed-tint px-4 py-3 text-sm text-failed-text">
           {error}
         </div>
       )}
       {checkMsg && (
-        <div className="rounded-xl border border-zinc-200 bg-white/60 px-4 py-3 text-sm text-zinc-500">
+        <div className="rounded-lg bg-paper px-4 py-3 text-sm text-muted shadow-hairline">
           {checkMsg}
         </div>
       )}
@@ -242,31 +243,31 @@ export default function RankingsDashboard({
       {/* Movement alerts */}
       {data && data.alerts.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
+          <h2 className="mb-3 text-sm font-semibold text-muted">
             Movement alerts
           </h2>
           <ul className="flex flex-col gap-2">
             {data.alerts.map((a, i) => (
               <li
                 key={`${a.keywordId}-${a.kind}-${a.checkedAt}-${i}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-zinc-200 bg-white/60 px-4 py-2.5 text-sm"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-paper shadow-hairline px-4 py-2.5 text-sm"
               >
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     a.kind === "entered_top_10" ||
                     a.kind === "big_gain" ||
                     a.kind === "newly_ranking"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-red-50 text-red-700"
+                      ? "bg-ink text-white"
+                      : "bg-paper text-ink shadow-control"
                   }`}
                 >
                   {ALERT_LABEL[a.kind] ?? a.kind}
                 </span>
                 <span className="font-medium">{a.phrase}</span>
-                <span className="text-zinc-500">
+                <span className="text-muted">
                   {fmtPos(a.from)} → {fmtPos(a.to)}
                 </span>
-                <span className="ml-auto text-xs text-zinc-500">
+                <span className="ml-auto text-xs text-muted">
                   {new Date(a.checkedAt).toLocaleString()}
                 </span>
               </li>
@@ -278,12 +279,12 @@ export default function RankingsDashboard({
       {/* Positions table */}
       {tracked.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
+          <h2 className="mb-3 text-sm font-semibold text-muted">
             Tracked positions
           </h2>
-          <div className="overflow-x-auto rounded-xl border border-zinc-200">
+          <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
             <table className="w-full border-collapse">
-              <thead className="bg-zinc-100/80">
+              <thead className="bg-canvas">
                 <tr>
                   <th className={th}>Keyword</th>
                   <th className={th}>Position</th>
@@ -294,7 +295,7 @@ export default function RankingsDashboard({
               </thead>
               <tbody>
                 {tracked.map((k) => (
-                  <tr key={k.id} className="border-t border-zinc-200/60">
+                  <tr key={k.id} className="border-t border-line">
                     <td className={td}>
                       <span className="font-medium">{k.phrase}</span>
                     </td>
@@ -307,11 +308,11 @@ export default function RankingsDashboard({
                     <td className={td}>
                       {k.latest ? (
                         k.latest.aiOverviewPresent ? (
-                          <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs text-violet-700">
+                          <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold text-ink">
                             Present
                           </span>
                         ) : (
-                          <span className="text-xs text-zinc-500">Absent</span>
+                          <span className="text-xs text-muted">Absent</span>
                         )
                       ) : (
                         "—"
@@ -322,7 +323,7 @@ export default function RankingsDashboard({
                     </td>
                     <td className={`${td} max-w-64 truncate`}>
                       {k.latest?.url ? (
-                        <span className="font-mono text-xs text-zinc-500">
+                        <span className="font-mono text-xs text-muted">
                           {k.latest.url.replace(/^https?:\/\//, "")}
                         </span>
                       ) : (
@@ -334,7 +335,7 @@ export default function RankingsDashboard({
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-muted">
             {domain} matched by apex domain or subdomain. "—" means not found in
             the checked depth.
           </p>
@@ -343,11 +344,11 @@ export default function RankingsDashboard({
 
       {/* Track toggles */}
       <div>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
+        <h2 className="mb-3 text-sm font-semibold text-muted">
           Saved keywords — track for ranking
         </h2>
         {(data?.keywords ?? []).length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+          <p className="rounded-lg border border-dashed border-control p-8 text-center text-sm text-muted">
             No saved keywords yet. Run keyword research or the gap analysis and
             save keywords to a list first.
           </p>
@@ -356,11 +357,11 @@ export default function RankingsDashboard({
             {(data?.keywords ?? []).map((k) => (
               <li
                 key={k.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white/60 px-4 py-2.5"
+                className="flex items-center justify-between gap-4 rounded-lg bg-paper shadow-hairline px-4 py-2.5"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{k.phrase}</div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs text-muted">
                     {k.list ?? "Saved keywords"}
                     {k.latest?.position != null &&
                       ` · ${fmtPos(k.latest.position)}`}
@@ -369,10 +370,10 @@ export default function RankingsDashboard({
                 <button
                   onClick={() => toggleTracked(k)}
                   disabled={toggling.has(k.id)}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                     k.tracked
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "border border-zinc-200 text-zinc-500 hover:border-zinc-400"
+                      ? "bg-ink text-white"
+                      : "bg-paper text-ink shadow-control hover:shadow-outline"
                   } disabled:opacity-40`}
                 >
                   {toggling.has(k.id)

@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: connector framework config (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: connector framework config (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // Three tiers, honest labels:
 //   Tier W (webhook/push): hubspot, shopify, meta ads, salesforce CDC

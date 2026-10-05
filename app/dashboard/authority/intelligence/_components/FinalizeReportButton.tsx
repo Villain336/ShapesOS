@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCheck, Loader2 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export function FinalizeReportButton({ reportId }: { reportId: string }) {
   const router = useRouter();
@@ -14,7 +15,12 @@ export function FinalizeReportButton({ reportId }: { reportId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   async function finalize() {
-    if (!window.confirm("Mark this report ready? It becomes the client's 90-day operating baseline.")) return;
+    const ok = await confirmAction({
+      title: "Mark this report ready?",
+      description: "It becomes the client's 90-day operating baseline.",
+      confirmLabel: "Mark ready",
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

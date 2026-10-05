@@ -6,10 +6,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check } from "lucide-react";
+import { Field } from "@/components/aos/Controls";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
-const labelCls = "mb-1 block text-xs font-medium text-muted";
+const labelCls = "block text-md font-semibold text-ink";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
@@ -124,16 +125,14 @@ export default function DefaultsForm({ workspaceId }: { workspaceId: string }) {
           own settings without affecting the rest of the workspace.
         </p>
         <div className="mt-4 flex max-w-xl flex-col gap-3">
-          <label className={labelCls}>
-            Default model
-            <input
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="e.g. gpt-4o-mini"
-              className={`${inputCls} mt-1 w-full font-mono text-xs`}
-            />
-          </label>
+          <Field
+            label="Default model"
+            type="text"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="e.g. gpt-4o-mini"
+            inputClassName="aos-mono text-sm"
+          />
           <label className={labelCls}>
             Default approval mode
             <select
@@ -141,7 +140,7 @@ export default function DefaultsForm({ workspaceId }: { workspaceId: string }) {
               onChange={(e) =>
                 setApprovalMode(e.target.value as (typeof APPROVAL_MODES)[number])
               }
-              className={`${inputCls} mt-1 w-full`}
+              className={`${inputCls} mt-2 w-full`}
             >
               {APPROVAL_MODES.map((m) => (
                 <option key={m} value={m}>
@@ -154,20 +153,15 @@ export default function DefaultsForm({ workspaceId }: { workspaceId: string }) {
               schedule · manual: nothing runs without explicit approval.
             </span>
           </label>
-          <label className={labelCls}>
-            Agent tool allow-list (comma-separated namespaces)
-            <input
-              type="text"
-              value={allowList}
-              onChange={(e) => setAllowList(e.target.value)}
-              placeholder="seo, content, connectors"
-              className={`${inputCls} mt-1 w-full font-mono text-xs`}
-            />
-            <span className="mt-1 block text-xs text-subtle">
-              Which tool namespaces the Marketr agent may use. Leave empty to
-              allow all.
-            </span>
-          </label>
+          <Field
+            label="Agent tool allow-list"
+            type="text"
+            value={allowList}
+            onChange={(e) => setAllowList(e.target.value)}
+            placeholder="seo, content, connectors"
+            inputClassName="aos-mono text-sm"
+            helper="Comma-separated tool namespaces the ShapesOS agent may use. Leave empty to allow all."
+          />
         </div>
         <div className="mt-4">
           <button onClick={save} disabled={busy} className={btnPrimary}>

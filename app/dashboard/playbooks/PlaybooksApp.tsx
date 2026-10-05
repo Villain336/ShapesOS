@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 type Source = "learned" | "community" | "seed";
 
@@ -60,7 +61,7 @@ function ErrorBox({ message }: { message: string }) {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="relative w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay"
         onClick={(e) => e.stopPropagation()}

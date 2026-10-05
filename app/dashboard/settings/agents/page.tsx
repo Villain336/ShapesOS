@@ -25,8 +25,8 @@ import { PERSONAS, type PersonaId } from "@/lib/expert/personas";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Agents — Settings — Marketr",
-  description: "What Marketr's agents have learned about this workspace — lessons, preferences, personas.",
+  title: "Agents — Settings — ShapesOS",
+  description: "What ShapesOS's agents have learned about this workspace — lessons, preferences, personas.",
 };
 
 export interface LessonRow {
@@ -158,7 +158,7 @@ export default async function AgentsSettingsPage({
         <div>
           <h1 className="aos-heading">Agents</h1>
           <p className="mt-0.5 text-sm text-muted">
-            {workspace.name} — what Marketr&apos;s agents have learned, how they should work, and who they are.
+            {workspace.name} — what ShapesOS&apos;s agents have learned, how they should work, and who they are.
           </p>
         </div>
         <SettingsNav />

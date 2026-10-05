@@ -207,6 +207,54 @@ describe("expiry is enforced at action time", () => {
     assert.equal(await events(ws, id, "ask_sent_to_side_a"), 0);
   });
 
+  // Phase 4a follow-up: decline/withdraw used to skip the expiry check, so a
+  // lapsed proposal could end as declined/withdrawn instead of expired.
+  it("an expired proposal cannot be declined by the tenant (409 intro_expired, flipped to expired)", async () => {
+    const { ws, id } = await proposed({ ageDays: 15 });
+    await assert.rejects(
+      store.declineByTenant(ws, id, { declinedBy: TENANT, reason: "not now" }),
+      (e: ConnectorError) => e.code === "intro_expired" && introErrorResponse(e).status === 409,
+    );
+    const row = await prisma.connectorIntroduction.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.status, "expired");
+    assert.equal(row.declinedAt, null);
+    assert.equal(await events(ws, id, "tenant_declined"), 0);
+    assert.equal(await events(ws, id, "expired"), 1);
+  });
+
+  it("an expired approved proposal cannot be declined by side A", async () => {
+    const { ws, id } = await proposed({ approved: true, ageDays: 60 });
+    await assert.rejects(store.declineSideA(ws, id, HUMAN_A), (e: ConnectorError) => e.code === "intro_expired");
+    const row = await prisma.connectorIntroduction.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.status, "expired");
+    assert.equal(await events(ws, id, "side_a_declined"), 0);
+  });
+
+  it("an expired proposal cannot be withdrawn; it ends expired", async () => {
+    const { ws, id } = await proposed({ ageDays: 15 });
+    await assert.rejects(
+      store.withdrawIntroduction(ws, id, { withdrawnBy: TENANT }),
+      (e: ConnectorError) => e.code === "intro_expired",
+    );
+    const row = await prisma.connectorIntroduction.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.status, "expired");
+    assert.equal(await events(ws, id, "withdrawn"), 0);
+  });
+
+  it("decline and withdraw inside the window (and withdraw after acceptance) still work", async () => {
+    const a = await proposed({ ageDays: 13 });
+    assert.equal((await store.declineByTenant(a.ws, a.id, { declinedBy: TENANT })).status, "declined");
+    const b = await proposed({ approved: true, ageDays: 13 });
+    assert.equal((await store.declineSideA(b.ws, b.id, HUMAN_A)).status, "declined");
+    const c = await proposed({ ageDays: 13 });
+    assert.equal((await store.withdrawIntroduction(c.ws, c.id, { withdrawnBy: TENANT })).status, "withdrawn");
+    // Accepted states don't expire: an old accepted intro can still be withdrawn.
+    const d = await proposed({ approved: true });
+    await store.acceptSideA(d.ws, d.id, HUMAN_A, { sentVia: "gmail" });
+    await prisma.connectorIntroduction.update({ where: { id: d.id }, data: { createdAt: new Date(Date.now() - 60 * DAY) } });
+    assert.equal((await store.withdrawIntroduction(d.ws, d.id, { withdrawnBy: TENANT })).status, "withdrawn");
+  });
+
   it("a proposal inside its window still works", async () => {
     const { ws, id } = await proposed({ approved: true, ageDays: 13 });
     const v = await store.acceptSideA(ws, id, HUMAN_A, { sentVia: "gmail" });

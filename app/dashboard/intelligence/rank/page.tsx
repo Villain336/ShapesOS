@@ -12,7 +12,7 @@ import { RankClient } from "./RankClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Rank intelligence — Marketr",
+  title: "Rank intelligence — ShapesOS",
   description:
     "GSC-sourced rank truth for owned sites: query × page deltas, winners/losers, and visibility score from before/after windows.",
 };

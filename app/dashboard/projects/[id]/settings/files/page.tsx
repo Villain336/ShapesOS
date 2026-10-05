@@ -84,7 +84,7 @@ export default async function FilesSettingsPage({
       <Card>
         <CardHeader
           title="Project files"
-          description="Attached to this project — Marketr reads them on reference only, nothing is indexed"
+          description="Attached to this project — ShapesOS reads them on reference only, nothing is indexed"
         />
         <CardBody>
           <FilesClient

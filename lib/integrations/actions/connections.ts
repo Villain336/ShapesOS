@@ -117,7 +117,7 @@ export async function confirmConnection(opts: {
     return row;
   });
   // Phase 15 slice 1: seed/refresh the per-workspace tool catalog on connect
-  // finalize (fixture-backed until COMPOSIO_API_KEY is wired). Best-effort:
+  // finalize (live discovery with COMPOSIO_API_KEY, fixtures without). Best-effort:
   // a catalog miss must never break connection finalize.
   try {
     await refreshCatalogForConnection(opts.workspaceId, opts.appKey);

@@ -1,18 +1,30 @@
 // Marketr — AI chat thread API (redesign §3a).
 // GET    /api/chat/threads/[id] → { thread, messages }
+//   Phase 5: thread carries agentKey, the effective tool grant and the id of
+//   the run working right now (liveRunId), so the UI can offer Stop.
 // DELETE /api/chat/threads/[id] → { ok: true }
 // Threads are private to the user who created them; project access is viewer+.
 
 import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { computeGrant, isAgentKey } from "@/lib/agents/grants";
 
 export const dynamic = "force-dynamic";
 
 async function ownedThread(userId: string, threadId: string) {
   const thread = await prisma.aiChatThread.findFirst({
     where: { id: threadId, userId },
-    select: { id: true, title: true, projectId: true, createdAt: true, updatedAt: true },
+    select: {
+      id: true,
+      title: true,
+      projectId: true,
+      createdAt: true,
+      updatedAt: true,
+      agentKey: true,
+      allowedTools: true,
+      project: { select: { workspaceId: true } },
+    },
   });
   if (!thread) return null;
   const project = await prisma.project.findFirst({
@@ -36,10 +48,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     orderBy: { createdAt: "asc" },
     select: { id: true, role: true, content: true, toolCalls: true, createdAt: true },
   });
+  const agentKey = isAgentKey(thread.agentKey) ? thread.agentKey : "lead";
+  const { listLiveThreadRuns } = await import("@/lib/agents/runs/service");
+  const live = await listLiveThreadRuns(thread.project.workspaceId, thread.id).catch(() => []);
   return Response.json({
     thread: {
       id: thread.id,
       title: thread.title,
+      agentKey,
+      allowedTools: computeGrant({ agentKey, requested: thread.allowedTools }).groups,
+      liveRunId: live.find((r) => !r.parentRunId)?.id ?? null,
       createdAt: thread.createdAt.toISOString(),
       updatedAt: thread.updatedAt.toISOString(),
     },

@@ -26,7 +26,10 @@ import {
   AlertTriangle,
   X,
   CheckCircle2,
+  Wand2,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
+import { BomHistoryPanel, DeriveBomForm, DerivationNotes, fmtMass, fmtVolumeCm3, type DerivationView } from "./BomDerivePanel";
 
 interface VersionLite {
   id: string;
@@ -51,6 +54,9 @@ interface BomVersion {
   modelVersionId: string;
   notes: string | null;
   createdAt: string;
+  /** Phase 4b: "manual" | "derived". */
+  origin?: string;
+  derivation?: DerivationView | null;
   modelVersion: { id: string; versionNumber: number; format: string };
   _count: { lines: number };
 }
@@ -66,12 +72,17 @@ interface BomRollupLine {
   lineTotalUsd: number;
   missingCost: boolean;
   source: string;
+  volumeMm3: number | null;
+  massG: number | null;
+  lineMassG: number | null;
 }
 
 interface BomRollup {
   lineCount: number;
   totalUsd: number;
   linesMissingCost: number;
+  totalMassG: number | null;
+  linesMissingMass: number;
   lines: BomRollupLine[];
 }
 
@@ -309,6 +320,8 @@ function BomSection({
   const [supplier, setSupplier] = useState("");
   const [unitCost, setUnitCost] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deriving, setDeriving] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
 
   const selected = boms.find((b) => b.id === (selectedId ?? boms[0]?.id)) ?? null;
 
@@ -395,6 +408,12 @@ function BomSection({
 
   async function deleteLine(lineId: string) {
     if (!selected) return;
+    const ok = await confirmAction({
+      title: "Delete this BOM line?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api(`/api/cad/bom-lines/${lineId}`, { method: "DELETE" });
@@ -413,10 +432,31 @@ function BomSection({
         <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
           <FileText className="h-4 w-4" aria-hidden /> Bill of materials
         </h3>
-        <button type="button" className={btnGhost} onClick={() => setCreating((c) => !c)}>
-          <Plus className="h-4 w-4" aria-hidden /> New BOM for this version
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={btnGhost} disabled={!version} onClick={() => setDeriving((d) => !d)}>
+            <Wand2 className="h-4 w-4" aria-hidden /> Derive from geometry
+          </button>
+          <button type="button" className={btnGhost} onClick={() => setCreating((c) => !c)}>
+            <Plus className="h-4 w-4" aria-hidden /> New BOM for this version
+          </button>
+        </div>
       </div>
+
+      {deriving && version && (
+        <DeriveBomForm
+          modelId={modelId}
+          versionId={version.id}
+          versionNumber={version.versionNumber}
+          format={version.format}
+          onClose={() => setDeriving(false)}
+          onDerived={(bomId) => {
+            setDeriving(false);
+            setSelectedId(bomId);
+            setHistoryKey((k) => k + 1);
+            onChanged();
+          }}
+        />
+      )}
 
       {creating && (
         <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-line bg-canvas p-3">
@@ -440,8 +480,8 @@ function BomSection({
 
       {boms.length === 0 ? (
         <p className="text-sm text-muted">
-          No BOM yet for v{version?.versionNumber}. Create one to start the part list — every
-          line is tenant-entered; v1 derives nothing automatically.
+          No BOM yet for v{version?.versionNumber}. Derive one from the model&apos;s geometry (parts,
+          quantities, volume and mass), or create an empty one and enter the lines by hand.
         </p>
       ) : (
         <>
@@ -456,7 +496,9 @@ function BomSection({
                 }`}
               >
                 BOM #{b.bomNumber}
-                <span className="text-xs font-normal opacity-70">{b._count.lines} lines</span>
+                <span className="text-xs font-normal opacity-70">
+                  {b._count.lines} lines{b.origin === "derived" ? " · derived" : ""}
+                </span>
               </button>
             ))}
           </div>
@@ -471,6 +513,8 @@ function BomSection({
                       <th className="py-2 pr-3">Qty</th>
                       <th className="py-2 pr-3">Material / spec</th>
                       <th className="py-2 pr-3">Supplier</th>
+                      <th className="py-2 pr-3 text-right">Volume / unit</th>
+                      <th className="py-2 pr-3 text-right">Mass / unit</th>
                       <th className="py-2 pr-3 text-right">Unit cost</th>
                       <th className="py-2 pr-3 text-right">Line total</th>
                       <th className="py-2 pr-3">Source</th>
@@ -486,6 +530,8 @@ function BomSection({
                         </td>
                         <td className="py-2 pr-3 text-muted">{l.materialSpec ?? "—"}</td>
                         <td className="py-2 pr-3 text-muted">{l.supplier ?? "—"}</td>
+                        <td className="py-2 pr-3 text-right text-muted">{fmtVolumeCm3(l.volumeMm3)}</td>
+                        <td className="py-2 pr-3 text-right text-muted">{fmtMass(l.massG)}</td>
                         <td className="py-2 pr-3 text-right text-muted">
                           {l.unitCostUsd == null ? <span className="italic">unknown</span> : money(l.unitCostUsd)}
                         </td>
@@ -505,6 +551,8 @@ function BomSection({
                               setPartName(l.partName);
                               setQty(String(l.qty));
                               setUnitName(l.unitName);
+                              setMaterialSpec(l.materialSpec ?? "");
+                              setSupplier(l.supplier ?? "");
                               setUnitCost(l.unitCostUsd == null ? "" : String(l.unitCostUsd));
                             }}
                           >
@@ -533,8 +581,27 @@ function BomSection({
                     </span>
                   )}
                 </span>
-                <span className="font-semibold text-ink">BOM total: {money(detail.rollup.totalUsd)}</span>
+                <span className="flex items-center gap-3">
+                  {detail.rollup.totalMassG != null && (
+                    <span className="text-muted">
+                      Mass: <strong className="text-ink">{fmtMass(detail.rollup.totalMassG)}</strong>
+                      {detail.rollup.linesMissingMass > 0 && (
+                        <span className="italic"> ({detail.rollup.linesMissingMass} line(s) without mass)</span>
+                      )}
+                    </span>
+                  )}
+                  <span className="font-semibold text-ink">BOM total: {money(detail.rollup.totalUsd)}</span>
+                  <a
+                    href={`/api/cad/bom/${detail.bom.id}/export`}
+                    className="flex h-9 items-center gap-2 rounded-full border border-line bg-paper px-3 text-sm font-semibold text-ink hover:bg-canvas"
+                  >
+                    <Download className="h-4 w-4" aria-hidden /> Export CSV
+                  </a>
+                </span>
               </div>
+              {detail.bom.origin === "derived" && detail.bom.derivation && (
+                <DerivationNotes derivation={detail.bom.derivation} />
+              )}
 
               <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-6">
                 <input className={inputCls} value={partName} onChange={(e) => setPartName(e.target.value)} placeholder="Part name *" aria-label="Part name" />
@@ -571,6 +638,7 @@ function BomSection({
           )}
         </>
       )}
+      <BomHistoryPanel modelId={modelId} refreshKey={historyKey + boms.length} />
       {error && <p className="mt-2 text-sm text-ink">{error}</p>}
     </section>
   );
@@ -1138,6 +1206,12 @@ function RateCardSection({ rateCards, onChanged }: { rateCards: RateCard[]; onCh
   }
 
   async function remove(id: string) {
+    const ok = await confirmAction({
+      title: "Delete this rate card?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

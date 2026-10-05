@@ -10,12 +10,23 @@ import { CadApp } from "./views/CadApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "CAD — Marketr",
+  title: "CAD — ShapesOS",
   description:
     "CAD project and model registry: upload and inspect 3D models in the browser, version history with visual diffs, and expiring share links for collaborators.",
 };
 
-export default async function CadPage() {
+
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+function one(v: string | string[] | undefined): string | null {
+  const s = Array.isArray(v) ? v[0] : v;
+  return typeof s === "string" && s.length <= 64 ? s : null;
+}
+
+export default async function CadPage({ searchParams }: { searchParams: SearchParams }) {
+  // Deep link (record search): ?project=…&model=…&tab=…
+  const sp = await searchParams;
+  const deepLink = { project: one(sp.project), model: one(sp.model), tab: one(sp.tab) };
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -32,7 +43,7 @@ export default async function CadPage() {
           share expiring links with collaborators.
         </p>
       </div>
-      <CadApp />
+      <CadApp deepLink={deepLink} />
     </div>
   );
 }

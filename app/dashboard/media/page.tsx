@@ -25,7 +25,7 @@ function poolStatusTone(status: string): string {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Media — Marketr",
+  title: "Media — ShapesOS",
   description: "Media buying command center: budget pools, approvals, kill switches.",
 };
 
@@ -57,7 +57,7 @@ export default async function MediaPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading text-ink">Media</h1>
@@ -72,7 +72,7 @@ export default async function MediaPage() {
       </div>
 
       {!ready && (
-        <div className="aos-shape aos-shape--needs aos-shape--edged rounded-lg border border-needs bg-needs-tint p-4 text-sm text-ink">
+        <div className="rounded-lg bg-needs-tint p-4 text-sm text-ink shadow-hairline">
           <p className="flex items-start gap-2 font-semibold"><TriangleAlert size={16} className="mt-0.5 shrink-0" />Media safety tables are not provisioned yet</p>
           <p className="mt-1 text-[13px]">Merge <code className="font-mono">prisma/fragments/phase5-safety.prisma</code> and migrate. This page renders in read-only preview until then.</p>
         </div>
@@ -101,13 +101,13 @@ export default async function MediaPage() {
           </div>
           {pools.length === 0 ? (
             <p className="text-sm text-muted">
-              No pools yet. A pool is a cap with a ledger — Marketr never holds client money.
+              No pools yet. A pool is a cap with a ledger — ShapesOS never holds client money.
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">Pool</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Remaining</th>
@@ -160,7 +160,7 @@ export default async function MediaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">Platform · type</th>
                     <th className="px-3 py-2 font-medium">Max spend</th>
                     <th className="px-3 py-2 font-medium">Binding</th>
@@ -175,7 +175,7 @@ export default async function MediaPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2 font-semibold text-ink">{money(a.maxSpendCents, a.currency)}</td>
-                      <td className="px-3 py-2 font-mono text-[11px] text-subtle">binding {a.bindingHash.slice(0, 16)}…</td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-muted">binding {a.bindingHash.slice(0, 16)}…</td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,7 +222,7 @@ export default async function MediaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">Platform</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Actual spend</th>

@@ -30,7 +30,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Business Graph — Marketr",
+  title: "Business Graph — ShapesOS",
   description: "Per-client knowledge graph: entities, relationships, provenance, freshness.",
 };
 

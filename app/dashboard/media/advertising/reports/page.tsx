@@ -25,7 +25,7 @@ import AdsTabs from "../_components/AdsTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Ad reports — Marketr",
+  title: "Ad reports — ShapesOS",
   description: "Unified cross-platform ad reporting: spend, ROAS, and lineage.",
 };
 

@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export function ApproveButton({ id, draftReply }: { id: string; draftReply: string | null }) {
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,7 @@ export function PostButton({ id }: { id: string }) {
   const [result, setResult] = useState<string | null>(null);
 
   async function act() {
-    if (!window.confirm("Post this reply to Google Business Profile? It enters pre-publication moderation.")) return;
+    if (!await confirmAction("Post this reply to Google Business Profile? It enters pre-publication moderation.")) return;
     setBusy(true);
     setResult(null);
     try {

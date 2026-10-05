@@ -9,7 +9,7 @@ import { RecyclingApp } from "./RecyclingApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Creative Recycling — Marketr",
+  title: "Creative Recycling — ShapesOS",
   description: "Winning creative propagates across channels — briefs, lineage, and human-gated variant approval.",
 };
 

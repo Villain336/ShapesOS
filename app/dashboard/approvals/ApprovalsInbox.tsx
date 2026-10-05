@@ -1,264 +1,342 @@
-// Marketr — approvals inbox (Phase 9 M6).
-// Dense table of pending approvals across all missions for this workspace,
-// with large touch-target Approve/Deny buttons (min 44px, usable at 390px).
-// Decides via POST /api/automation/decide — the same contract as M4's
-// POST /api/missions/:id/approvals/:approvalId/decide ({ decision }).
+// ShapesOS — unified "needs you" inbox (Phase 3 J; Agentic OS 4d).
+//
+// Every pending request from GET /api/approvals/inbox as a kit approval
+// card (agent-blocks.png): yellow "Needs your approval" header with the
+// agent that asked, the request, what it covers, then the queue's own
+// decision path —
+//   inline Deny / Edit / Approve when the queue's API takes a plain POST and
+//   the viewer's role may decide (the queue's route re-checks every rule:
+//   role, separation of duties, two-person approvals, expiry);
+//   Review on the queue's own screen otherwise (codes, channels, edits);
+//   the reason + Open when the viewer's role can't decide.
+// Mission requests hang under the lead agent → the sub-agent waiting on
+// them; a needs-you banner sums it up; results come back as toasts.
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Inbox, Loader2, RefreshCw, Search } from "lucide-react";
+import { refreshNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
+import { AgentTree, ApprovalCard, Banner, FilterPill, aosButton } from "@/components/aos";
 import {
-  Check,
-  CheckCircle2,
-  Inbox,
-  Loader2,
-  RefreshCw,
-  X,
-} from "lucide-react";
+  INBOX_SOURCE_LABELS,
+  ageLabel,
+  type InboxAction,
+  type InboxItem,
+  type InboxResult,
+  type InboxSourceKey,
+} from "@/lib/approvals/types";
+import {
+  approvalAgent,
+  approvalBody,
+  approvalMode,
+  approvalQuestion,
+  approvalsBanner,
+  approveLabelFor,
+  decisionToast,
+  editLabelFor,
+  groupApprovals,
+  type MissionAgentIndex,
+} from "@/lib/aos/approvals";
+import { toast, toastError } from "@/lib/ui/feedback";
 
-type Tier = 0 | 1 | 2 | 3;
+type SourceFilter = InboxSourceKey | "all";
 
-interface PendingApproval {
-  id: string;
-  missionId: string | null;
-  missionTemplate: string | null;
-  action: string;
-  tier: number;
-  amountCents: number | null;
-  payloadSummary: string;
-  bindingHash: string;
-  createdBy: string;
-  createdAt: string;
-  expiresAt: string;
+async function runAction(action: InboxAction): Promise<void> {
+  const res = await fetch(action.url, {
+    method: action.method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(action.body ?? {}),
+  });
+  if (!res.ok) {
+    let message = `Request failed (${res.status}).`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* keep the status message */
+    }
+    throw new Error(message);
+  }
 }
 
-// Tiers are categories, not agent states — always a neutral chip.
-function TierBadge({ tier }: { tier: number }) {
-  const t = (tier === 0 || tier === 1 || tier === 2 || tier === 3 ? tier : 2) as Tier;
-  const labels: Record<Tier, string> = {
-    0: "Tier 0",
-    1: "Tier 1",
-    2: "Tier 2",
-    3: "Tier 3",
-  };
+function cardId(item: InboxItem): string {
+  return `approval-${item.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function ageText(iso: string): string {
+  const a = ageLabel(iso);
+  return a === "just now" || a === "—" ? a : `${a} ago`;
+}
+
+const RISK_TEXT = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
+
+function CardFor({
+  item,
+  missionAgents,
+  busy,
+  onDecide,
+}: {
+  item: InboxItem;
+  missionAgents: MissionAgentIndex;
+  busy: "approve" | "deny" | null;
+  onDecide: (item: InboxItem, which: "approve" | "deny") => void;
+}) {
+  const mode = approvalMode(item);
   return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
-      {labels[t]}
-    </span>
+    <ApprovalCard
+      id={cardId(item)}
+      agent={approvalAgent(item, missionAgents)}
+      title={approvalQuestion(item)}
+      meta={
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span className="font-semibold text-ink">{item.typeLabel}</span>
+          <span aria-hidden>·</span>
+          <span title={new Date(item.createdAt).toLocaleString()}>{ageText(item.createdAt)}</span>
+          <span aria-hidden>·</span>
+          <span className={item.risk === "high" ? "font-semibold text-ink" : undefined}>{RISK_TEXT[item.risk]}</span>
+        </span>
+      }
+      body={approvalBody(item, missionAgents)}
+      items={item.lines.map((l, i) => ({ key: `${i}:${l.label}`, label: l.label, detail: l.detail ?? undefined }))}
+      totalItems={item.lineTotal}
+      showAllHref={item.href}
+      mode={mode}
+      approveLabel={approveLabelFor(item)}
+      editLabel={editLabelFor(item)}
+      editHref={mode === "decide" ? item.href : undefined}
+      reviewHref={item.href}
+      blockedReason={item.blockedReason}
+      openHref={item.href}
+      busy={busy}
+      onApprove={() => onDecide(item, "approve")}
+      onDeny={() => onDecide(item, "deny")}
+    />
   );
 }
 
-function ageOf(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "—";
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  return `${d}d`;
-}
-
-function fmtAmount(cents: number | null): string {
-  if (cents === null) return "—";
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-const btnApprove =
-  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
-
-const btnDeny =
-  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
-
-export default function ApprovalsInbox() {
-  const [approvals, setApprovals] = useState<PendingApproval[] | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function ApprovalsInbox({
+  initialSource = "all",
+  missionAgents = {},
+}: {
+  initialSource?: SourceFilter;
+  missionAgents?: MissionAgentIndex;
+}) {
+  const [data, setData] = useState<InboxResult | null>(null);
+  const [source, setSource] = useState<SourceFilter>(initialSource);
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState<{ key: string; which: "approve" | "deny" } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    setError(null);
+    setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch("/api/automation/pending");
+      const res = await fetch("/api/approvals/inbox", { cache: "no-store" });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Failed to load approvals.");
-      setApprovals(body.approvals as PendingApproval[]);
+      if (!res.ok) throw new Error(body.error ?? "Couldn't load approvals.");
+      setData(body as InboxResult);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load approvals.");
+      setLoadError(e instanceof Error ? e.message : "Couldn't load approvals.");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  async function decide(approval: PendingApproval, decision: "approved" | "denied") {
-    setBusyId(approval.id);
-    setError(null);
+  const items = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (data?.items ?? []).filter((i) => {
+      if (source !== "all" && i.source !== source) return false;
+      if (onlyMine && !i.canDecide) return false;
+      if (!q) return true;
+      return [i.title, i.detail, i.typeLabel, i.requester, i.missionName]
+        .filter(Boolean)
+        .some((s) => (s as string).toLowerCase().includes(q));
+    });
+  }, [data, source, onlyMine, query]);
+
+  const sourceOptions = useMemo(
+    () => (data?.sources ?? []).filter((s) => s.total > 0 || s.source === source),
+    [data, source],
+  );
+
+  const grouped = useMemo(() => groupApprovals(items, missionAgents), [items, missionAgents]);
+  const banner = useMemo(() => approvalsBanner(data?.items ?? [], missionAgents), [data, missionAgents]);
+  const firstMine = useMemo(() => (data?.items ?? []).find((i) => i.canDecide) ?? null, [data]);
+
+  async function decide(item: InboxItem, which: "approve" | "deny") {
+    const action = which === "approve" ? item.approve : item.deny;
+    if (!action) return;
+    setBusy({ key: item.key, which });
     try {
-      const res = await fetch("/api/automation/decide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          approvalId: approval.id,
-          missionId: approval.missionId,
-          decision,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Decision failed.");
-      setApprovals((prev) => (prev ?? []).filter((a) => a.id !== approval.id));
+      await runAction(action);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.filter((i) => i.key !== item.key),
+              total: prev.total - 1,
+              actionable: prev.actionable - (item.canDecide ? 1 : 0),
+            }
+          : prev,
+      );
+      toast({ ...decisionToast(item, which), status: "done" });
+      refreshNeedsYouCount();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Decision failed.");
+      toastError(which === "approve" ? "Couldn't approve" : "Couldn't deny", e instanceof Error ? e.message : "Decision failed.");
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   }
 
-  if (approvals === null) {
+  if (data === null && !loadError) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Loader2 size={16} className="aos-spin" />
-        Loading pending approvals…
+      <div className="flex items-center gap-2 text-md text-muted">
+        <Loader2 size={16} className="aos-spin" aria-hidden />
+        Loading approvals…
       </div>
     );
   }
 
+  const card = (item: InboxItem) => (
+    <CardFor
+      key={item.key}
+      item={item}
+      missionAgents={missionAgents}
+      busy={busy?.key === item.key ? busy.which : null}
+      onDecide={(i, w) => void decide(i, w)}
+    />
+  );
+
+  const filtered = source !== "all" || onlyMine || query.trim().length > 0;
+
   return (
-    <div className="flex flex-col gap-3">
-      {approvals.length > 0 && (
-        <div
-          role="status"
-          className="flex items-center gap-2.5 rounded-lg bg-needs px-4 py-3 text-ink"
-        >
-          <span
-            className="aos-shape aos-shape--needs [--aos-shape-size:14px]"
-            style={{ color: "inherit" }}
-            aria-hidden
-          />
-          <p className="text-sm font-semibold">
-            {approvals.length} approval{approvals.length === 1 ? "" : "s"} waiting on your
-            sign-off — newest first.
-          </p>
-          <button
-            onClick={load}
-            className="ml-auto inline-flex h-chip shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col gap-5">
+      {banner ? (
+        <Banner
+          status="needs"
+          title={banner.title}
+          description={banner.description}
+          action={firstMine ? { label: "Start with the newest", href: `#${cardId(firstMine)}` } : null}
+        />
+      ) : null}
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
-        >
-          <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
-          {error}
-          <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
-            <X size={14} />
-          </button>
+      {/* Filters: queue pills, scope toggle, search, refresh. */}
+      <div className="flex flex-col gap-3">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter by queue">
+          <FilterPill selected={source === "all"} count={data?.total ?? 0} onClick={() => setSource("all")}>
+            All
+          </FilterPill>
+          {sourceOptions.map((s) => (
+            <FilterPill key={s.source} selected={source === s.source} count={s.total} onClick={() => setSource(s.source)}>
+              {s.label}
+            </FilterPill>
+          ))}
         </div>
-      )}
-
-      {approvals.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
-          <CheckCircle2 size={28} className="text-subtle" />
-          <div className="text-sm font-semibold text-ink">All caught up</div>
-          <div className="max-w-[320px] text-sm text-muted">
-            No pending approvals. When a mission needs your sign-off, it will appear here.
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterPill selected={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
+            Only what I can decide
+          </FilterPill>
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-subtle" aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search requests"
+              aria-label="Search approvals"
+              className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper pr-3 pl-9 text-md text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
+            />
           </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className={aosButton({ variant: "secondary", size: "sm", className: "ml-auto" })}
+          >
+            <RefreshCw size={14} className={loading ? "aos-spin" : undefined} aria-hidden />
+            {loading ? "Refreshing" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {loadError ? (
+        <p role="alert" className="flex items-center gap-2 text-md text-failed-text">
+          <span className="size-2.5 shrink-0 bg-failed" aria-hidden />
+          {loadError} Refresh to try again.
+        </p>
+      ) : null}
+
+      {items.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
+          <Inbox size={28} className="text-subtle" aria-hidden />
+          <h2 className="aos-subheading">{data && data.total > 0 && filtered ? "No requests match these filters" : "Nothing needs you"}</h2>
+          <p className="max-w-[44ch] text-md text-muted">
+            {data && data.total > 0 && filtered
+              ? "Clear the search or pick another queue to see the rest."
+              : "When an agent or a teammate needs a sign-off, it shows up here. Agents keep working on everything else."}
+          </p>
+          {data && data.total > 0 && filtered ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSource("all");
+                setOnlyMine(false);
+                setQuery("");
+              }}
+              className={aosButton({ variant: "secondary", size: "sm" })}
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-          <table className="min-w-[760px] w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs font-semibold text-muted">
-                <th className="px-3 py-2 font-semibold">Mission</th>
-                <th className="px-3 py-2 font-semibold">Action</th>
-                <th className="px-3 py-2 font-semibold">Tier</th>
-                <th className="px-3 py-2 font-semibold">Amount</th>
-                <th className="px-3 py-2 font-semibold">Age</th>
-                <th className="px-3 py-2 font-semibold">Payload</th>
-                <th className="px-3 py-2 text-right font-semibold">Decision</th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvals.map((a) => {
-                const busy = busyId === a.id;
-                return (
-                  <tr
-                    key={a.id}
-                    className="border-b border-line last:border-0 hover:bg-hover-paper"
-                  >
-                    <td className="max-w-[160px] px-3 py-2.5 align-top">
-                      <div className="truncate font-medium text-ink" title={a.missionTemplate ?? "No mission"}>
-                        {a.missionTemplate ?? (
-                          <span className="inline-flex items-center gap-1 text-subtle">
-                            <Inbox size={12} />
-                            No mission
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-mono text-xs text-subtle">{a.id.slice(0, 12)}…</div>
-                    </td>
-                    <td className="max-w-[180px] px-3 py-2.5 align-top">
-                      <div className="truncate font-mono text-[12px] text-ink" title={a.action}>
-                        {a.action}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <TierBadge tier={a.tier} />
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top font-medium text-ink">
-                      {fmtAmount(a.amountCents)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
-                      {ageOf(a.createdAt)}
-                    </td>
-                    <td className="max-w-[220px] px-3 py-2.5 align-top">
-                      <div className="truncate text-xs text-muted" title={a.payloadSummary || a.bindingHash}>
-                        {a.payloadSummary || (
-                          <span className="font-mono text-[11px]">{a.bindingHash.slice(0, 16)}…</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => decide(a, "approved")}
-                          disabled={busy}
-                          aria-label={`Approve ${a.action}`}
-                          className={btnApprove}
-                        >
-                          {busy ? <Loader2 size={15} className="aos-spin" /> : <Check size={15} />}
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => decide(a, "denied")}
-                          disabled={busy}
-                          aria-label={`Deny ${a.action}`}
-                          className={btnDeny}
-                        >
-                          <X size={15} />
-                          Deny
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {grouped.lead ? (
+            <section aria-labelledby="from-missions-h" className="flex flex-col gap-3">
+              <h2 id="from-missions-h" className="aos-subheading">
+                From your agents
+              </h2>
+              <div className="rounded-lg bg-paper p-3 shadow-hairline sm:p-4">
+                <AgentTree
+                  lead={grouped.lead}
+                  branches={grouped.groups.map((g) => g.node)}
+                  renderBranchContent={(node) => {
+                    const group = grouped.groups.find((g) => g.node.key === node.key);
+                    return group ? <div className="grid gap-4 xl:grid-cols-2">{group.items.map(card)}</div> : null;
+                  }}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {grouped.other.length > 0 ? (
+            <section aria-labelledby="other-requests-h" className="flex flex-col gap-3">
+              <h2 id="other-requests-h" className="aos-subheading">
+                {grouped.lead ? "From your apps and team" : "Requests"}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{grouped.other.map(card)}</div>
+            </section>
+          ) : null}
+        </>
       )}
 
-      <p className="text-xs text-muted">
-        Approving binds the exact payload the mission proposed — the executor re-verifies it at
-        execution time and halts on any mismatch. Every decision is written to the hash-chained
-        approval event trail.
+      {data && data.errors.length > 0 ? (
+        <p className="rounded-md bg-paper px-4 py-3 text-sm text-muted shadow-hairline">
+          Couldn&apos;t load {data.errors.map((e) => INBOX_SOURCE_LABELS[e.source]).join(", ")}. The rest of the inbox is up
+          to date. Refresh to try again.
+        </p>
+      ) : null}
+
+      <p className="text-sm text-muted">
+        Approve and Deny call each queue&apos;s own approval API, which re-checks your role, expiry and separation of duties.
+        Review opens the queue&apos;s own screen for decisions that need more context (one-time codes, send channels, edits).
       </p>
     </div>
   );

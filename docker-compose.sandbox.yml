@@ -1,0 +1,50 @@
+# ShapesOS — Phase 8 opt-in: Docker code sandboxes for the agents.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+#
+# The default stack mounts NO Docker socket, so the agents' code tools
+# (read/write/edit files, bash, tests, git) are off and say why on
+# Settings → Providers. This override turns them on with the Docker provider.
+#
+# SECURITY: the Docker socket is root-equivalent on the host. Anything that
+# can talk to it can start a privileged container. Both the worker (runs the
+# tools) and the app (Stop destroys a run's sandbox; checkpoint restore and
+# previews reach it) need it, so only use this on a host dedicated to
+# ShapesOS. On shared or production hosts prefer a hosted microVM provider
+# instead — set SANDBOX_PROVIDER=e2b + E2B_API_KEY, or
+# SANDBOX_PROVIDER=daytona + DAYTONA_API_KEY, in .env: no socket, no override.
+#
+# Not verified against a live Docker daemon in CI (see DEPLOY.md §4d).
+
+x-sandbox-env: &sandbox-env
+  SANDBOX_PROVIDER: docker
+  DOCKER_HOST: unix:///var/run/docker.sock
+  # Previews: the egress/preview gateway publishes on the Docker host; the
+  # app reaches it through the host gateway. Bind to the bridge gateway
+  # address (often 172.17.0.1 — check `docker network inspect bridge`), never
+  # 0.0.0.0 on a public host.
+  SANDBOX_PREVIEW_BIND: ${SANDBOX_PREVIEW_BIND:-172.17.0.1}
+  SANDBOX_PREVIEW_HOST: ${SANDBOX_PREVIEW_HOST:-host.docker.internal}
+
+services:
+  app:
+    environment: *sandbox-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # The images run as a non-root user: give it the socket's group
+    # (`stat -c %g /var/run/docker.sock` on the host).
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  worker:
+    environment: *sandbox-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # The images run as a non-root user: give it the socket's group
+    # (`stat -c %g /var/run/docker.sock` on the host).
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

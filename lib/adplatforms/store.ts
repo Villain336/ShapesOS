@@ -15,6 +15,7 @@ import type {
   SpendProposalStatus,
   SpendProposalStore,
 } from "./gate";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 function toProposal(row: {
   id: string;
@@ -84,6 +85,15 @@ export function prismaProposalStore(): SpendProposalStore {
           expiresAt: input.expiresAt,
         },
       });
+      // Phase 3 (J): best-effort "needs you" notification (never throws).
+      await notifyApprovalNeeded({
+        workspaceId: row.workspaceId,
+        source: "spend",
+        sourceId: row.id,
+        title: `${row.action.replace(/_/g, " ")} ${row.targetType}`,
+        href: "/dashboard/media/advertising/proposals?status=pending",
+        requestedBy: row.proposedBy,
+      });
       return toProposal(row);
     },
     // spend_proposals has no RLS: every read and write carries workspaceId.
@@ -102,6 +112,18 @@ export function prismaProposalStore(): SpendProposalStore {
       });
       const row = count === 1 ? await prisma.spendProposal.findFirst({ where: { id, workspaceId } }) : null;
       if (!row) throw new AdsGateError("PROPOSAL_NOT_FOUND", `Proposal ${id} not found`);
+      if (decidedBy && (status === "approved" || status === "rejected")) {
+        await notifyApprovalDecided({
+          workspaceId,
+          source: "spend",
+          sourceId: row.id,
+          title: `${row.action.replace(/_/g, " ")} ${row.targetType}`,
+          decision: status === "approved" ? "approved" : "denied",
+          decidedBy,
+          requestedBy: row.proposedBy,
+          href: "/dashboard/media/advertising/proposals",
+        });
+      }
       return toProposal(row);
     },
   };

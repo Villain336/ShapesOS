@@ -21,9 +21,11 @@ export function QrNode({ el, common }: NodeProps) {
   const size = Math.max(48, el.size);
 
   if (matrix.size === 0) {
+    // Konva paints to a <canvas> (and into exported PNG/PDF), which can't
+    // resolve CSS variables — literal values mirror --aos-line / --aos-text-subtle.
     return (
       <Group {...(common as object)}>
-        <Rect width={size} height={size} fill={el.background} stroke="#e7e5e4" />
+        <Rect width={size} height={size} fill={el.background} stroke="#E2E2DF" />
         <KText
           x={8}
           y={size / 2 - 8}
@@ -32,7 +34,7 @@ export function QrNode({ el, common }: NodeProps) {
           text="QR unavailable"
           fontSize={12}
           fontFamily="Inter"
-          fill="#a8a29e"
+          fill="#76766F"
         />
       </Group>
     );

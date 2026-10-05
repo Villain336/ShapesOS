@@ -1,6 +1,6 @@
 // Marketr — Phase 10 M2: official-source ingestion.
 //
-// SOURCES (SPEC-PHASE10.md §2 — clean list):
+// SOURCES (docs/specs/SPEC-PHASE10.md §2 — clean list):
 //   1. Google Search Status Dashboard — https://status.search.google.com/incidents.json
 //      (machine-readable JSON of every confirmed ranking incident; verified live
 //      2026-09-26 from this build box). Only the 10 most recent rows are served,

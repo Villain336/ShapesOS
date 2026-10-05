@@ -12,7 +12,7 @@ import { PublicCadViewer } from "./PublicCadViewer";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
-  return { title: "Shared CAD model — Marketr" };
+  return { title: "Shared CAD model — ShapesOS" };
 }
 
 export default async function PublicCadPage({ params }: { params: Promise<{ token: string }> }) {

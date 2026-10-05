@@ -376,8 +376,8 @@ export async function ingestSynthesisPlaybook(
   const attributionTitle = def.targetTitle ?? def.title;
   const provenance: ChunkProvenance = {
     sourceId: `1s-${def.sourceId}`,
-    sourceTitle: `Marketr Tier 1S synthesis from ${attributionTitle}`,
-    author: "Marketr (original synthesis)",
+    sourceTitle: `ShapesOS Tier 1S synthesis from ${attributionTitle}`,
+    author: "ShapesOS (original synthesis)",
     license: "CC-BY-4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
     sourceUrl: "",

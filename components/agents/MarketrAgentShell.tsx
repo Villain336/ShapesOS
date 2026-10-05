@@ -27,9 +27,9 @@ export const MARKETR_AGENT_ID = "marketr-agent";
 
 /** react-ui chat labels (header title, input placeholder, initial message). */
 const CHAT_LABELS = {
-  title: "Marketr Agent",
-  placeholder: "Ask the Marketr agent…",
-  initial: "How can the Marketr agent help?",
+  title: "ShapesOS Agent",
+  placeholder: "Ask the ShapesOS agent…",
+  initial: "How can the ShapesOS agent help?",
 };
 
 export interface MarketrAgentShellProps {
@@ -66,7 +66,7 @@ export function MarketrAgentShell({
             threadRef.current = await ensureChatThread(projectId);
           }
           const tid = threadRef.current;
-          if (!tid) throw new Error("Marketr agent: no chat thread available for this workspace");
+          if (!tid) throw new Error("ShapesOS agent: no chat thread available for this workspace");
           let messages: unknown[] | undefined;
           let state: Record<string, unknown> | undefined;
           try {

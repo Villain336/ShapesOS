@@ -774,7 +774,7 @@ function PixabayTab() {
           ) : (
             <p className="text-[12px] leading-snug text-muted">
               Search 6M+ free photos, illustrations, vectors, and videos. Placed
-              assets are downloaded and served by Marketr (no permanent
+              assets are downloaded and served by ShapesOS (no permanent
               Pixabay hotlinking, per their API terms).
             </p>
           )}

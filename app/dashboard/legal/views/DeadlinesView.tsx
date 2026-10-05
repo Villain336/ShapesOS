@@ -32,6 +32,7 @@ import {
   type DeadlineRecurrence,
   type EscalationTier,
 } from "@/lib/legal/deadlines";
+import { confirmAction, runUndoable, toastError } from "@/lib/ui/feedback";
 
 export interface DeadlineView {
   id: string;
@@ -225,7 +226,42 @@ export function DeadlinesView({
     }
   }
 
+  // Dismiss is soft (status → dismissed; Reopen sets it back to open), so it
+  // runs immediately and offers Undo instead of asking first.
+  async function dismissDeadline(id: string) {
+    const setStatus = async (status: "dismissed" | "open") => {
+      const res = await fetch(`/api/legal/deadlines/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    };
+    setBusyId(id);
+    try {
+      await runUndoable({
+        title: "Deadline dismissed",
+        run: () => setStatus("dismissed"),
+        undo: () => setStatus("open"),
+        onUndone: onChanged,
+      });
+      setEditingId(null);
+      onChanged();
+    } catch {
+      toastError("Couldn't dismiss the deadline", "Try again in a moment.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function deleteDeadline(id: string) {
+    const ok = await confirmAction({
+      title: "Delete this deadline?",
+      description: "It is removed from the calendar. Use Reopen instead if it still applies.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/legal/deadlines/${encodeURIComponent(id)}`, {
@@ -319,7 +355,7 @@ export function DeadlinesView({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => void patchDeadline(d.id, { status: "dismissed" })}
+                      onClick={() => void dismissDeadline(d.id)}
                       className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted disabled:opacity-50"
                     >
                       <EyeOff size={14} />

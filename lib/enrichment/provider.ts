@@ -27,6 +27,7 @@
 
 import { createHash } from "node:crypto";
 import { HttpError, ServiceUnavailableError } from "@/lib/api/errors";
+import { fakeOrRefuse } from "@/lib/env/secrets";
 
 export interface EnrichmentCompany {
   name?: string;
@@ -412,11 +413,13 @@ export function getEnrichmentProviders(
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (names.length === 0) return [new FakeEnrichmentProvider()];
+  // Phase 11 (conncore): the fixture provider is refused in production
+  // ("enrichment is not connected"), like the messaging fakes.
+  if (names.length === 0) return [fakeOrRefuse("enrichment", () => new FakeEnrichmentProvider(), env)];
   return names.map((n): EnrichmentProvider => {
     switch (n as EnrichmentProviderName) {
       case "fake":
-        return new FakeEnrichmentProvider();
+        return fakeOrRefuse("enrichment", () => new FakeEnrichmentProvider(), env);
       case "apollo":
         return new ApolloProvider(env);
       case "hunter":

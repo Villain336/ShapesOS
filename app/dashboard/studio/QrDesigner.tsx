@@ -73,6 +73,8 @@ const EXAMPLES = [
 export function QrDesignerTab() {
   const [targetUrl, setTargetUrl] = useState("https://example.com/board-47");
   const [stylePrompt, setStylePrompt] = useState(EXAMPLES[0]);
+  // QR module/background colors are user data baked into the generated image
+  // (color-picker values), so they stay literal hex.
   const [foreground, setForeground] = useState("#7C3AED");
   const [background, setBackground] = useState("#FFFFFF");
   const [shapeMask, setShapeMask] = useState<"square" | "round">("round");
@@ -172,14 +174,14 @@ export function QrDesignerTab() {
           <div>
             <label className="mb-1 block text-[12px] font-semibold text-muted">Foreground</label>
             <div className="flex items-center gap-2">
-              <input type="color" value={foreground} onChange={(e) => setForeground(e.target.value)} className="h-9 w-10 cursor-pointer rounded border border-line bg-paper" />
+              <input type="color" value={foreground} onChange={(e) => setForeground(e.target.value)} className="h-9 w-10 cursor-pointer rounded-key border border-line bg-paper" />
               <span className="font-mono text-[11px] text-subtle">{foreground}</span>
             </div>
           </div>
           <div>
             <label className="mb-1 block text-[12px] font-semibold text-muted">Background</label>
             <div className="flex items-center gap-2">
-              <input type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="h-9 w-10 cursor-pointer rounded border border-line bg-paper" />
+              <input type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="h-9 w-10 cursor-pointer rounded-key border border-line bg-paper" />
               <span className="font-mono text-[11px] text-subtle">{background}</span>
             </div>
           </div>

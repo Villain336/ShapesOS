@@ -49,7 +49,7 @@ export const SPOTIFY_GUIDED_STEPS: SpotifyGuidedStep[] = [
     id: "ad-account",
     title: "Create an ad account under Ad Studio",
     detail:
-      "You can have multiple ad accounts under one Ad Studio account. From the left-hand navigation go to Manage ad accounts → +Ad accounts and create one per client or brand. Note the ad account ID — you'll link it in Marketr below.",
+      "You can have multiple ad accounts under one Ad Studio account. From the left-hand navigation go to Manage ad accounts → +Ad accounts and create one per client or brand. Note the ad account ID — you'll link it in ShapesOS below.",
     link: { label: "Getting started with Ad Studio", href: "https://ads.spotify.com/en-NL/help-center/getting-started-with-ad-studio/" },
   },
   {
@@ -63,7 +63,7 @@ export const SPOTIFY_GUIDED_STEPS: SpotifyGuidedStep[] = [
     id: "billing",
     title: "Set up billing on the advertiser's own card",
     detail:
-      "Add the advertiser's payment method in the Ad Studio account settings (Admin role required). Marketr never holds or moves ad money — spend is always billed to the advertiser's own card.",
+      "Add the advertiser's payment method in the Ad Studio account settings (Admin role required). ShapesOS never holds or moves ad money — spend is always billed to the advertiser's own card.",
   },
   {
     id: "launch-in-ads-manager",
@@ -74,9 +74,9 @@ export const SPOTIFY_GUIDED_STEPS: SpotifyGuidedStep[] = [
   },
   {
     id: "register-and-import",
-    title: "Register the campaign and import spend in Marketr",
+    title: "Register the campaign and import spend in ShapesOS",
     detail:
-      "Marketr has no API view into your Spotify campaigns, so register each launched campaign below with its Spotify campaign ID, then import daily spend via CSV — Marketr tracks everything you import.",
+      "ShapesOS has no API view into your Spotify campaigns, so register each launched campaign below with its Spotify campaign ID, then import daily spend via CSV — ShapesOS tracks everything you import.",
   },
 ];
 

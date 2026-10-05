@@ -11,7 +11,7 @@ import { DifficultyClient } from "./DifficultyClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Difficulty — Marketr",
+  title: "Difficulty — ShapesOS",
   description:
     "The owned keyword-difficulty model: estimates with uncertainty bands, input provenance, and the eval bar that gates vendor replacement.",
 };

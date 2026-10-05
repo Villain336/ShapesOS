@@ -11,7 +11,7 @@ import { authorityGuard, safetyError } from "@/app/api/authority/_lib";
 import { authorityApprovals, authorityAudit, authorityTablesReady } from "@/lib/authority/db";
 import { getQueueItem, approvalForQueueItem } from "@/lib/authority/reviews/service";
 import { assertPostable } from "@/lib/authority/reviews/queue";
-import { gbpClientForRoutes } from "@/lib/authority/reviews/gbpClient";
+import { gbpClientForWorkspace } from "@/lib/authority/reviews/gbpClient";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +61,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     const executed = await authorityApprovals.execute(approval.id, gate.workspaceId, payload);
 
     const replyText = payload.replyText as string;
-    const gbp = gbpClientForRoutes();
+    const gbp = await gbpClientForWorkspace(gate.workspaceId);
     await gbp.updateReply(item.locationRef, item.reviewId, replyText);
 
     const updated = await prisma.reviewQueue.update({

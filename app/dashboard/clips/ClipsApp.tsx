@@ -31,6 +31,7 @@ import {
   type ClipJob,
   type ClipSource,
 } from "./api";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Small atoms (AOS local) ───
 
@@ -75,7 +76,7 @@ function Switch({
         }`}
       >
         <span
-          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-all ${
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-paper transition-all ${
             checked ? "left-[21px]" : "left-[3px]"
           }`}
         />
@@ -85,6 +86,8 @@ function Switch({
   );
 }
 
+// Legit data values: caption text/highlight colors are burned into the rendered
+// clip (and edited via the color pickers below), so they stay literal hex.
 const EMPTY_STYLE: CaptionStyle = {
   font: "Inter",
   size: 44,
@@ -142,7 +145,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
       <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-paper shadow-overlay">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[15px] font-semibold text-ink">New source</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -187,7 +190,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
 
           {mode === "upload" ? (
             <label className="block cursor-pointer rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition hover:border-ink/50">
-              <UploadCloud size={20} className="mx-auto text-subtle" />
+              <UploadCloud size={20} className="mx-auto text-muted" />
               <div className="mt-1.5 text-[13px] font-medium text-ink">
                 {file ? file.name : "Choose a video file"}
               </div>
@@ -267,7 +270,7 @@ function GenerateDialog({
       <div className="w-full max-w-sm overflow-hidden rounded-lg bg-paper shadow-overlay">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[15px] font-semibold text-ink">Generate clips</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -344,7 +347,7 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
+            <tr className="border-b border-line text-[11px] text-muted">
               <th className="px-3 py-2 font-medium">Title</th>
               <th className="px-3 py-2 font-medium">Origin</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -384,7 +387,7 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
             ))}
             {sources.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-muted">
                   No sources yet — add the first one with “New source”.
                 </td>
               </tr>
@@ -522,7 +525,7 @@ function CaptionEditor({
               type="color"
               value={style.textColor ?? "#ffffff"}
               onChange={(e) => set({ textColor: e.target.value })}
-              className="h-8 w-10 cursor-pointer rounded border border-line bg-paper p-0.5"
+              className="h-8 w-10 cursor-pointer rounded-key border border-control bg-paper p-0.5"
             />
             <input
               value={style.textColor ?? "#ffffff"}
@@ -539,7 +542,7 @@ function CaptionEditor({
               type="color"
               value={style.highlightColor ?? "#7c3aed"}
               onChange={(e) => set({ highlightColor: e.target.value })}
-              className="h-8 w-10 cursor-pointer rounded border border-line bg-paper p-0.5"
+              className="h-8 w-10 cursor-pointer rounded-key border border-control bg-paper p-0.5"
             />
             <input
               value={style.highlightColor ?? "#7c3aed"}
@@ -557,7 +560,7 @@ function CaptionEditor({
 
       <div>
         <div className="mb-1 text-[12px] font-medium text-muted">Preview (9:16)</div>
-        <div className={`flex aspect-[9/16] h-56 justify-center rounded-lg bg-stone-900 ${positionCls} px-6`}>
+        <div className={`flex aspect-[9/16] h-56 justify-center rounded-lg bg-ink ${positionCls} px-6`}>
           <p
             className="text-center font-bold leading-snug"
             style={{
@@ -568,7 +571,7 @@ function CaptionEditor({
           >
             {words.map((w, i) =>
               i < hlCount ? (
-                <span key={i} style={{ backgroundColor: style.highlightColor ?? "#7c3aed" }} className="rounded px-1">
+                <span key={i} style={{ backgroundColor: style.highlightColor ?? "#7c3aed" }} className="rounded-key px-1">
                   {w}{" "}
                 </span>
               ) : (
@@ -692,7 +695,7 @@ function ClipDrawer({
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
         <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
@@ -705,7 +708,7 @@ function ClipDrawer({
               <Chip>render: {c.renderStatus}</Chip>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -719,12 +722,12 @@ function ClipDrawer({
           )}
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">Hook</div>
+            <div className="mb-1.5 text-[12px] font-medium text-muted">Hook</div>
             <p className="text-[13.5px] font-medium leading-snug text-ink">“{hook}”</p>
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">Why it scored</div>
+            <div className="mb-1.5 text-[12px] font-medium text-muted">Why it scored</div>
             {(c.scoreReasons ?? []).length > 0 ? (
               <ul className="space-y-1.5">
                 {(c.scoreReasons ?? []).map((r, i) => (
@@ -745,7 +748,7 @@ function ClipDrawer({
           </section>
 
           <section>
-            <div className="mb-2 text-[12px] font-medium tracking-wide text-muted">Caption style</div>
+            <div className="mb-2 text-[12px] font-medium text-muted">Caption style</div>
             <CaptionEditor style={style} onChange={setStyle} previewText={hook === "—" ? "" : hook} />
             <button onClick={saveStyle} className={`${btnGhost} mt-2.5`} disabled={!!busy}>
               {busy === "style" ? <Loader2 size={14} className="aos-spin" /> : <CheckCircle2 size={14} />}
@@ -754,7 +757,7 @@ function ClipDrawer({
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">
+            <div className="mb-1.5 text-[12px] font-medium text-muted">
               Captions ({(c.captions?.segments ?? []).length} segments)
             </div>
             <textarea
@@ -771,7 +774,7 @@ function ClipDrawer({
           </section>
 
           <section className="border-t border-line pt-4">
-            <div className="mb-2 text-[12px] font-medium tracking-wide text-muted">Actions</div>
+            <div className="mb-2 text-[12px] font-medium text-muted">Actions</div>
             <div className="flex flex-wrap gap-2">
               {canApprove && (
                 <button onClick={() => run("approve", () => patchClip({ action: "approve" }))} className={btnPrimary} disabled={!!busy}>
@@ -968,7 +971,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
+            <tr className="border-b border-line text-[11px] text-muted">
               <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Time range</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -982,6 +985,8 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
               <tr
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => setSelectedId(c.id))}
                 className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${selectedId === c.id ? "bg-canvas" : ""}`}
               >
                 <td className="px-3 py-2">
@@ -1002,7 +1007,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                   <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSelectedId(c.id)}
-                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
+                      className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink"
                       title="Edit captions"
                       aria-label="Edit captions"
                     >
@@ -1010,7 +1015,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => void approve(c)}
-                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink disabled:opacity-40"
+                      className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                       title={c.status === "draft" ? "Approve" : "Already approved"}
                       aria-label="Approve"
                       disabled={busyId === c.id || c.status !== "draft"}
@@ -1019,7 +1024,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => void render(c)}
-                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink disabled:opacity-40"
+                      className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                       title={(c.status === "draft" || c.status === "approved") && c.renderStatus !== "processing" ? "Render" : "Render (draft/approved clips only)"}
                       aria-label="Render"
                       disabled={busyId === c.id || !((c.status === "draft" || c.status === "approved") && c.renderStatus !== "processing")}
@@ -1028,7 +1033,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => setSelectedId(c.id)}
-                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
+                      className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink"
                       title="Queue to Postiz (draft) — pick channels in the drawer"
                       aria-label="Queue to Postiz"
                     >
@@ -1040,7 +1045,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-muted">
                   {clips.length === 0
                     ? "No clips yet — generate some from a source."
                     : "No clips match your filters."}
@@ -1130,7 +1135,7 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
         >
           <RefreshCw size={14} className={loading ? "aos-spin" : ""} /> Refresh
         </button>
-        <span className="text-[12px] text-subtle">
+        <span className="text-[12px] text-muted">
           “Clip this 2-hour webinar into 10 shorts” runs as one generate job — watch it here.
         </span>
       </div>
@@ -1138,7 +1143,7 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
+            <tr className="border-b border-line text-[11px] text-muted">
               <th className="px-3 py-2 font-medium">Kind</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Progress</th>
@@ -1175,7 +1180,7 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
             ))}
             {jobs.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-muted">
                   No jobs yet — generate clips from a source to start one.
                 </td>
               </tr>

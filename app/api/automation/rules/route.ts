@@ -1,4 +1,4 @@
-// Marketr — GET/PUT /api/automation/rules (Phase 9 M6, SPEC-PHASE9.md §P9E).
+// Marketr — GET/PUT /api/automation/rules (Phase 9 M6, docs/specs/SPEC-PHASE9.md §P9E).
 //
 // GET → { rules } (seeds the 3 sensible defaults on first read).
 // PUT → { rules: [...] } full-replace CRUD: every rule is validated

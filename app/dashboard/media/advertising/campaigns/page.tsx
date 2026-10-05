@@ -14,7 +14,7 @@ import AdsTabs from "../_components/AdsTabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Campaigns — Marketr",
+  title: "Campaigns — ShapesOS",
   description: "Unified campaigns across all ad platforms.",
 };
 

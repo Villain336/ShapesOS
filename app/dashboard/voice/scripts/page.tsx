@@ -6,7 +6,7 @@ import { ScriptsApp } from "./ScriptsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Call Scripts — Marketr",
+  title: "Call Scripts — ShapesOS",
   description: "Legal-review surface for call scripts: draft → review → approve.",
 };
 

@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: human-gated ER decisions (SPEC-PHASE8.md B4).
+// Marketr — Phase 8 G1: human-gated ER decisions (docs/specs/SPEC-PHASE8.md B4).
 //
 // Approve → the absorbed node gets mergedIntoId + a SAME_AS provenance edge
 // back to its source records (auditable, reversible). Reject → a NOT_SAME

@@ -1,8 +1,14 @@
 // Marketr — Phase 14: Composio hosted action layer (HTTP boundary).
 //
 // Composio v3 REST (base https://backend.composio.dev/api/v3, header
-// x-api-key). Endpoints used (verified 2026-09-28):
-//   GET  /tools?toolkit_slug=&search=   — tool catalog
+// x-api-key). Endpoints used (verified 2026-09-28; toolkits + paging
+// re-checked against docs.composio.dev 2026-10-04 — v3 stays supported
+// next to v3.1, same list shapes):
+//   GET  /toolkits?limit=&cursor=       — toolkit directory (Phase 6 live
+//                                          discovery; { items, next_cursor })
+//   GET  /tools?toolkit_slug=&search=   — tool catalog ({ items, next_cursor };
+//                                          toolkit_versions=latest matches
+//                                          execute's version "latest")
 //   GET  /tools/:slug                   — tool schema
 //   POST /tools/execute/:slug           — execute {connected_account_id,
 //                                          user_id?, version, arguments}
@@ -101,6 +107,29 @@ export interface ComposioToolSummary {
   toolkit?: { slug: string; name?: string };
 }
 
+/** One page of a Composio list endpoint ({ items, next_cursor }). */
+export interface ComposioPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface ComposioToolItem extends ComposioToolSummary {
+  is_deprecated?: boolean;
+  tags?: string[];
+}
+
+export interface ComposioToolkitSummary {
+  slug: string;
+  name?: string;
+  meta?: {
+    description?: string;
+    tools_count?: number;
+    /** Composio returns objects ({ id, name }); tolerate plain strings. */
+    categories?: Array<string | { id?: string; name?: string; slug?: string }>;
+  };
+  deprecated?: unknown;
+}
+
 export interface ComposioExecuteResult {
   successful: boolean;
   data: unknown;
@@ -137,6 +166,41 @@ export async function listComposioTools(
     `/tools${q.toString() ? `?${q}` : ""}`,
   )) as { items?: ComposioToolSummary[]; tools?: ComposioToolSummary[] };
   return data.items ?? data.tools ?? [];
+}
+
+function pageOf<T>(data: { items?: T[]; next_cursor?: string | null } | null): ComposioPage<T> {
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    nextCursor: typeof data?.next_cursor === "string" && data.next_cursor ? data.next_cursor : null,
+  };
+}
+
+/** One page of GET /toolkits (Phase 6 live discovery). */
+export async function listComposioToolkitsPage(
+  opts: { cursor?: string | null; limit?: number },
+  http: ComposioHttp = createComposioHttp(),
+): Promise<ComposioPage<ComposioToolkitSummary>> {
+  const q = new URLSearchParams();
+  q.set("limit", String(opts.limit ?? 1000));
+  if (opts.cursor) q.set("cursor", opts.cursor);
+  return pageOf(
+    await http.request<{ items?: ComposioToolkitSummary[]; next_cursor?: string | null }>(`/toolkits?${q}`),
+  );
+}
+
+/** One page of GET /tools for a toolkit, latest tool versions, no deprecated tools. */
+export async function listComposioToolsPage(
+  opts: { toolkitSlug: string; cursor?: string | null; limit?: number },
+  http: ComposioHttp = createComposioHttp(),
+): Promise<ComposioPage<ComposioToolItem>> {
+  const q = new URLSearchParams();
+  q.set("toolkit_slug", opts.toolkitSlug);
+  q.set("toolkit_versions", "latest");
+  q.set("limit", String(opts.limit ?? 1000));
+  if (opts.cursor) q.set("cursor", opts.cursor);
+  return pageOf(
+    await http.request<{ items?: ComposioToolItem[]; next_cursor?: string | null }>(`/tools?${q}`),
+  );
 }
 
 export async function getComposioTool(

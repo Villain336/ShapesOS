@@ -333,8 +333,8 @@ describe("registry (v9: 352 sources — 40 shippable + 312 learn-only)", () => {
 
 const S1S_PROV: ChunkProvenance = {
   sourceId: "1s-hubspot-academy",
-  sourceTitle: "Marketr Tier 1S synthesis from HubSpot Academy",
-  author: "Marketr (original synthesis)",
+  sourceTitle: "ShapesOS Tier 1S synthesis from HubSpot Academy",
+  author: "ShapesOS (original synthesis)",
   license: "CC-BY-4.0",
   licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
   sourceUrl: "",
@@ -378,7 +378,7 @@ describe("Tier 1S provenance", () => {
     );
   });
 
-  it("1S chunks are accepted by the main asset (Marketr-original expression, CC-BY-4.0)", () => {
+  it("1S chunks are accepted by the main asset (ShapesOS-original expression, CC-BY-4.0)", () => {
     tmpCorpus();
     clearAsset("main");
     const c = makeChunk("inbound flywheel: attract, engage, delight", [1, 0], S1S_PROV);
@@ -397,7 +397,7 @@ describe("1S gate (assertSynthesisAllowed)", () => {
   const goodDef: SynthesisPlaybookDef = {
     sourceId: "hubspot-academy",
     title: "HubSpot Academy",
-    author: "Marketr (original synthesis)",
+    author: "ShapesOS (original synthesis)",
     file: "inbound-marketing-playbook.md",
     synthesizedFrom: ["HubSpot Academy"],
   };
@@ -471,7 +471,7 @@ describe("ingestSynthesisPlaybook (local 1S ingest, no network)", () => {
       sourceId: "hubspot-academy",
       title: "HubSpot Academy",
       targetTitle: "HubSpot Academy",
-      author: "Marketr (original synthesis)",
+      author: "ShapesOS (original synthesis)",
       file: "inbound-marketing-playbook.md",
       synthesizedFrom: ["HubSpot Academy"],
     };
@@ -488,7 +488,7 @@ describe("ingestSynthesisPlaybook (local 1S ingest, no network)", () => {
     assert.ok(stored.length >= chunks.length);
     for (const c of stored) {
       assert.equal(c.provenance.tier, "1S");
-      assert.equal(c.provenance.sourceTitle, "Marketr Tier 1S synthesis from HubSpot Academy");
+      assert.equal(c.provenance.sourceTitle, "ShapesOS Tier 1S synthesis from HubSpot Academy");
       assert.equal(c.provenance.original, true);
       assert.deepEqual(c.provenance.synthesizedFrom, ["HubSpot Academy"]);
     }
@@ -505,7 +505,7 @@ describe("ingestSynthesisPlaybook (local 1S ingest, no network)", () => {
     const def: SynthesisPlaybookDef = {
       sourceId: "hubspot-academy",
       title: "HubSpot Academy",
-      author: "Marketr (original synthesis)",
+      author: "ShapesOS (original synthesis)",
       file: "missing.md",
       synthesizedFrom: ["HubSpot Academy"],
     };
@@ -543,7 +543,7 @@ describe("v9 1S wave: synthesisDepth + ncFlaggedSource provenance", () => {
       sourceId: "v9-nc-test",
       title: "NC Test Source",
       targetTitle: "NC Test Source",
-      author: "Marketr (original synthesis)",
+      author: "ShapesOS (original synthesis)",
       file: "v9-nc-test-playbook.md",
       synthesizedFrom: ["NC Test Source"],
     };
@@ -575,7 +575,7 @@ describe("v9 1S wave: synthesisDepth + ncFlaggedSource provenance", () => {
     const def: SynthesisPlaybookDef = {
       sourceId: "v9-plain-test",
       title: "Plain Test Source",
-      author: "Marketr (original synthesis)",
+      author: "ShapesOS (original synthesis)",
       file: "v9-plain-test-playbook.md",
       synthesizedFrom: ["Plain Test Source"],
     };

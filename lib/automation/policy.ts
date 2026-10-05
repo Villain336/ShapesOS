@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M6: data-driven automation policy (SPEC-PHASE9.md §P9E).
+// Marketr — Phase 9 M6: data-driven automation policy (docs/specs/SPEC-PHASE9.md §P9E).
 //
 // Closes M1 gap #4: the Tier-1 allowlist / automation toggles are no longer
 // code-only. `resolveAutomation(workspaceId, action)` reads the
@@ -7,22 +7,30 @@
 // behavior; when no row exists it falls back to code defaults
 // (TIER1_KINDS from lib/orchestrator/authority.ts).
 //
-// Safety posture (unchanged from M1):
+// Safety posture:
 //  - Tier 3 is evaluated FIRST inside evaluateTier — the "auto" behavior
 //    from a settings row can never widen the hard deny list. The action's
 //    NATURE decides, not the row. PUT rejects behavior=auto for Tier 3
 //    kinds (400), and evaluateTier's hard deny still wins even if a row
 //    somehow says auto (asserted in lib/automation/__tests__/policy.test.ts).
-//  - Tier 1 never fires without an explicit opt-in: the default behavior
-//    for every action is "ask" (Tier 1 kinds included); "auto" requires the
-//    user to flip the toggle in automation settings.
+//  - Phase 14 (owner decision 2026-10-05): a rule set to "auto" lets ANY
+//    Tier 0, 1 or 2 action run without asking. Money and irreversible
+//    actions (Tier 3), destructive tools and NEVER_AUTO_ACTIONS never do;
+//    an action carrying an amount over the threshold (or in an unknown
+//    currency) still asks.
+//  - Nothing fires without an explicit opt-in: the default behavior for
+//    every action is "ask", except the explicit DEFAULT_BEHAVIORS below
+//    (slack_reply = auto keeps the Slack app's existing behaviour).
 //  - Unknown action shape → Tier 2 (fail closed, per authority.ts).
 
 import { withWorkspaceScope } from "../substrate/graph/rls";
+import { KNOWN_ACTION_DEFS, actionGroup, type ActionGroup } from "./actions";
 import {
   DEFAULT_SMALL_ACTION_THRESHOLD_CENTS,
   TIER1_KINDS,
+  amountInDefaultCents,
   evaluateTier,
+  normalizeForTier,
   type TierSettings,
 } from "../orchestrator/authority";
 
@@ -36,7 +44,57 @@ export type AutomationBehaviorName = "auto" | "ask" | "never";
  */
 export const WORKSPACE_DEFAULT_ACTION = "*";
 
+/** Phase 5: the agent key of a rule that applies to every agent. */
+export const ALL_AGENTS = "*";
+
+/**
+ * Phase 14: code defaults that are not "ask" (a missing row = this). Every
+ * other action asks by default; Tier 3 defaults to "never".
+ *   slack_reply       — auto: the Slack app has always answered in the
+ *                       thread that asked; Ask first holds each reply.
+ *   slack_placeholder — never (off): no "waiting for approval" note.
+ */
+export const DEFAULT_BEHAVIORS: Readonly<Record<string, AutomationBehaviorName>> = {
+  slack_reply: "auto",
+  slack_placeholder: "never",
+};
+
+/**
+ * Phase 14: Tier 0–2 actions that still can never run automatically, with
+ * the reason. browser_act clicks and submits on ANY web page — a checkout
+ * or a delete button there is money / irreversible, and the page (not the
+ * action name) decides that.
+ */
+export const NEVER_AUTO_ACTIONS: ReadonlyMap<string, string> = new Map([
+  ["browser_act", "acting in a browser can buy or delete things on any site, so it always asks"],
+]);
+
+/**
+ * Phase 14: money words beyond the DoA Tier-3 verbs, for tools ShapesOS did
+ * not write (custom MCP servers, Composio toolkits): a third-party
+ * "create_charge" or "send_invoice" carries no purchase/refund/transfer
+ * verb. When such a tool's name or description matches, its call is
+ * treated as money (Tier 3) — never auto-approved.
+ */
+export const EXTERNAL_TOOL_MONEY_RE =
+  /\b(charges?|payments?|pay|paid|invoices?|bills?|billing|subscriptions?|prices?|orders?|checkout|payroll|wire|bank|budgets?|bids?|coupons?|discounts?|credits?|debits?|balances?|funds?|money|cash|wallet|tax|taxes)\b/i;
+
+/**
+ * Phase 14: Composio toolkits that move money (payments, accounting,
+ * payroll, banking, commerce, ads) — a "composio:<toolkit>" rule for one can
+ * never be auto (fail closed: a match means always asks).
+ */
+export const COMPOSIO_MONEY_TOOLKIT_RE =
+  /(stripe|paypal|square|braintree|adyen|wise|plaid|brex|ramp|mercury|coinbase|chargebee|recurly|paddle|lemon_?squeezy|quickbooks|xero|freshbooks|zoho_?books|sage|netsuite|bill(_?com)?|gusto|adp|rippling|deel|payroll|bank|invoice|billing|payment|shopify|woocommerce|bigcommerce|ads|adwords)/i;
+
+/** Phase 14: actions that stand for tools ShapesOS did not write (custom MCP, Composio). */
+export function isExternalToolAction(action: string): boolean {
+  return action === "mcp_write" || action === "connector_write" || action.startsWith("composio:");
+}
+
 export interface AutomationRowLike {
+  /** Phase 5: "*" (every agent) or one agent's key. Missing = "*". */
+  agentKey?: string;
   action: string;
   behavior: AutomationBehaviorName;
   thresholdCents: number | null;
@@ -48,7 +106,10 @@ export interface ResolvedAutomation {
   behavior: AutomationBehaviorName;
   /** Effective threshold: per-action override → workspace default → $100. */
   thresholdCents: number;
-  source: "row" | "default";
+  /** "row" = the every-agent rule; "agent" = a rule for this one agent. */
+  source: "row" | "agent" | "default";
+  /** The agent the deciding rule belongs to ("*" = every agent). */
+  ruleAgentKey?: string;
 }
 
 /** Intrinsic tier of an action when the automation toggle is ON. Used to
@@ -72,26 +133,57 @@ function intrinsicTier(action: string): 0 | 1 | 2 | 3 {
 export function resolveAutomationFromRows(
   rows: AutomationRowLike[],
   action: string,
+  agentKey: string = ALL_AGENTS,
 ): ResolvedAutomation {
-  const byAction = new Map(rows.map((r) => [r.action, r]));
-  const row = byAction.get(action);
-  const defaultRow = byAction.get(WORKSPACE_DEFAULT_ACTION);
+  // Phase 5: the most specific rule wins — this agent's rule for the
+  // action, then the every-agent rule. The "*" action row (workspace
+  // threshold) is only ever read for its threshold.
+  const keyOf = (r: AutomationRowLike) => r.agentKey ?? ALL_AGENTS;
+  const everyAgent = new Map(rows.filter((r) => keyOf(r) === ALL_AGENTS).map((r) => [r.action, r]));
+  const agentRow =
+    agentKey !== ALL_AGENTS
+      ? rows.find((r) => keyOf(r) === agentKey && r.action === action)
+      : undefined;
+  const row = everyAgent.get(action);
+  const defaultRow = everyAgent.get(WORKSPACE_DEFAULT_ACTION);
 
   const thresholdCents =
+    agentRow?.thresholdCents ??
     row?.thresholdCents ??
     defaultRow?.thresholdCents ??
     DEFAULT_SMALL_ACTION_THRESHOLD_CENTS;
 
+  if (agentRow) {
+    return { action, behavior: agentRow.behavior, thresholdCents, source: "agent", ruleAgentKey: agentKey };
+  }
   if (row) {
-    return { action, behavior: row.behavior, thresholdCents, source: "row" };
+    return { action, behavior: row.behavior, thresholdCents, source: "row", ruleAgentKey: ALL_AGENTS };
   }
 
-  // No row → code defaults. Tier 3 kinds default to "never" (sticky);
-  // everything else defaults to "ask" — Tier 1 never fires without an
-  // explicit opt-in (M1 authority.ts contract).
-  const tier = intrinsicTier(action);
-  const behavior: AutomationBehaviorName = tier === 3 ? "never" : "ask";
-  return { action, behavior, thresholdCents, source: "default" };
+  return { action, behavior: defaultBehavior(action), thresholdCents, source: "default" };
+}
+
+/**
+ * The code default for an action with no row: Tier 3 → "never" (sticky);
+ * an explicit DEFAULT_BEHAVIORS entry; else "ask" — nothing fires without
+ * an explicit opt-in (M1 authority.ts contract).
+ */
+export function defaultBehavior(action: string): AutomationBehaviorName {
+  if (intrinsicTier(action) === 3) return "never";
+  const explicit = DEFAULT_BEHAVIORS[action];
+  if (explicit === "auto" && !autoAllowedFor(action)) return "ask";
+  return explicit ?? "ask";
+}
+
+/**
+ * May this action EVER be switched to auto? False for Tier 3 kinds (money,
+ * contracts, deletion) and NEVER_AUTO_ACTIONS. The settings UI locks the
+ * Auto-run choice where this is false and PUT rejects it.
+ */
+export function autoAllowedFor(action: string): boolean {
+  if (action === WORKSPACE_DEFAULT_ACTION) return false;
+  if (action.startsWith("composio:") && COMPOSIO_MONEY_TOOLKIT_RE.test(action.slice("composio:".length))) return false;
+  return intrinsicTier(action) !== 3 && !NEVER_AUTO_ACTIONS.has(action);
 }
 
 /**
@@ -139,6 +231,9 @@ export function validateBehaviorForAction(
     if (intrinsicTier(action) === 3) {
       return `behavior=auto is not allowed for Tier 3 actions (${action}). Tier 3 (money movement, contract signing, data deletion) is un-overridable — it can never run automatically.`;
     }
+    const never = NEVER_AUTO_ACTIONS.get(action);
+    if (never) return `behavior=auto is not allowed for ${action}: ${never}.`;
+    if (!autoAllowedFor(action)) return `behavior=auto is not allowed for ${action}: it moves money, so it always asks.`;
   }
   return null;
 }
@@ -150,7 +245,7 @@ export async function listAutomationRows(
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.automationSetting.findMany({
       where: { workspaceId },
-      select: { action: true, behavior: true, thresholdCents: true },
+      select: { agentKey: true, action: true, behavior: true, thresholdCents: true },
     }),
   );
 }
@@ -159,9 +254,108 @@ export async function listAutomationRows(
 export async function resolveAutomation(
   workspaceId: string,
   action: string,
+  agentKey: string = ALL_AGENTS,
 ): Promise<ResolvedAutomation> {
   const rows = await listAutomationRows(workspaceId);
-  return resolveAutomationFromRows(rows, action);
+  return resolveAutomationFromRows(rows, action, agentKey);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: auto-approve — may this agent run this action without asking?
+// ---------------------------------------------------------------------------
+
+export interface AutoApprovalInput {
+  agentKey: string;
+  /** The automation action the call stands for (ToolDef.action, connectorAction). */
+  action: string;
+  /** What the call does, scanned for Tier-3 wording (money, signing, deleting). */
+  description?: string;
+  /** Destructive tools never run without asking, whatever the rule says. */
+  destructive?: boolean;
+  amountCents?: number;
+  /** ISO currency of amountCents (default: the threshold currency, USD). */
+  currency?: string;
+}
+
+export interface AutoApprovalDecision {
+  auto: boolean;
+  tier: 0 | 1 | 2 | 3;
+  resolved: ResolvedAutomation;
+  /** Plain reason (shown in the run timeline / audit log). */
+  reason: string;
+  /**
+   * Phase 14: may the person be offered "do this without asking" for this
+   * call? True for every Tier 0–2 call that is not destructive and not in
+   * NEVER_AUTO_ACTIONS (judged on the action's intrinsic tier — with the
+   * toggle on — and its description). Never for Tier 3.
+   */
+  offerAuto: boolean;
+}
+
+/**
+ * decideAutoApproval — PURE. Runs without asking ONLY when all hold:
+ *   - a rule explicitly says "auto" for this agent (or every agent) — or the
+ *     action's explicit code default is auto (DEFAULT_BEHAVIORS),
+ *   - the call is not destructive and the action is not NEVER_AUTO,
+ *   - the DoA evaluator puts it at Tier 0, 1 or 2 (Phase 14) — Tier 3
+ *     (money, contracts, deletion; kind OR description) never,
+ *   - any amount it carries is at or under the threshold in a known currency.
+ * Every auto decision's reason names the rule (audit + run timeline).
+ */
+export function decideAutoApproval(
+  rows: AutomationRowLike[],
+  input: AutoApprovalInput,
+): AutoApprovalDecision {
+  const resolved = resolveAutomationFromRows(rows, input.action, input.agentKey);
+  const action = { kind: input.action, description: input.description, amountCents: input.amountCents, currency: input.currency };
+  const tier = evaluateTier(action, toTierSettings(resolved));
+  // The tier the action has by nature (toggle on): what the offer is judged on.
+  const intrinsic = evaluateTier(action, { ...toTierSettings(resolved), automationAllows: true });
+  const never = NEVER_AUTO_ACTIONS.get(input.action);
+  // Third-party tools: money words in the name / description count as Tier 3.
+  const externalMoney =
+    (isExternalToolAction(input.action) && EXTERNAL_TOOL_MONEY_RE.test(normalizeForTier(input.description ?? ""))) ||
+    (input.action.startsWith("composio:") && !autoAllowedFor(input.action));
+  const offerAuto = !input.destructive && !never && !externalMoney && tier !== 3 && intrinsic !== 3;
+  const who =
+    resolved.source === "default"
+      ? "the default"
+      : resolved.ruleAgentKey === ALL_AGENTS
+        ? "every agent"
+        : `agent ${resolved.ruleAgentKey}`;
+  const no = (reason: string): AutoApprovalDecision => ({ auto: false, tier, resolved, reason, offerAuto });
+  if (input.destructive) return no("destructive actions always ask");
+  if (tier === 3 || intrinsic === 3 || externalMoney) {
+    return { auto: false, tier: 3, resolved, reason: "Tier 3 actions (money and irreversible) can never run automatically", offerAuto: false };
+  }
+  if (never) return no(`${input.action}: ${never}`);
+  if (resolved.behavior !== "auto") return no(`no auto-approve rule for ${input.action}`);
+  if (input.amountCents !== undefined && input.amountCents !== null) {
+    const cents = amountInDefaultCents(input.amountCents, input.currency, toTierSettings(resolved));
+    if (cents === null) return no("the amount's currency is unknown, so it asks");
+    if (cents > resolved.thresholdCents) return no(`the amount is over the ${input.action} threshold, so it asks`);
+  }
+  const ruleName = resolved.source === "default" ? `the default for ${input.action}` : `the ${input.action} rule for ${who}`;
+  return { auto: true, tier, resolved, reason: `auto-approved by ${ruleName}`, offerAuto };
+}
+
+/**
+ * Phase 14: DB-backed tier settings for the mission executor
+ * (lib/authority/executor.ts deps.resolveTierSettings), agent-aware.
+ */
+export function automationTierSettingsFor(
+  workspaceId: string,
+  agentKey: string = ALL_AGENTS,
+): (action: { kind: string }) => Promise<TierSettings> {
+  return async (action) => toTierSettings(await resolveAutomation(workspaceId, action.kind, agentKey));
+}
+
+/** DB-backed decideAutoApproval. */
+export async function autoApprovalFor(
+  workspaceId: string,
+  input: AutoApprovalInput,
+): Promise<AutoApprovalDecision> {
+  return decideAutoApproval(await listAutomationRows(workspaceId), input);
 }
 
 /** DB-backed: the workspace's effective small-action threshold in cents. */
@@ -183,31 +377,35 @@ export interface KnownAction {
   label: string;
   description: string;
   tier: 0 | 1 | 2 | 3;
+  /** Phase 14: the settings section (Agents and content, Operations, Connectors, Slack). */
+  group: ActionGroup;
+  /** Phase 14: false = Auto-run is locked (Tier 3 or NEVER_AUTO_ACTIONS). */
+  autoAllowed: boolean;
+  /** Phase 14: why Auto-run is locked (shown on the row), when it is. */
+  lockReason?: string;
+  /** Phase 14: the behavior with no row (DEFAULT_BEHAVIORS, else ask / never). */
+  defaultBehavior: AutomationBehaviorName;
+  /** Phase 14: an on/off switch (on = auto, off = never). */
+  control?: "switch";
 }
 
-const KNOWN_ACTION_DEFS: Array<Omit<KnownAction, "tier">> = [
-  // Tier 1: low-blast-radius by nature (owned channels, internal notes).
-  { action: "publish_owned", label: "Publish to owned channels", description: "Publish drafted content to channels you own (site, blog)." },
-  { action: "post_owned_social", label: "Post to owned social", description: "Post to your own connected social accounts." },
-  { action: "schedule_owned_content", label: "Schedule owned content", description: "Queue content for your owned channels." },
-  { action: "update_listing", label: "Update listing", description: "Small edits to business listings (hours, photos)." },
-  { action: "send_internal_note", label: "Send internal note", description: "Notes to your own team, never external." },
-  { action: "refresh_owned_page", label: "Refresh owned page", description: "Re-crawl / refresh a page you own." },
-  // Tier 2: significant — external audience or above the threshold.
-  { action: "publish_external", label: "Publish externally", description: "Publish to audiences you don't own. Always asks." },
-  { action: "send_outreach_email", label: "Send outreach email", description: "Cold or campaign email to external recipients." },
-  { action: "schedule_social_external", label: "Schedule external social", description: "Schedule posts to public social audiences." },
-  { action: "update_campaign_budget", label: "Update campaign budget", description: "Change a campaign's budget (non-custodial pool)." },
-  // Tier 3: never — hard deny, un-overridable.
-  { action: "buy_media", label: "Buy media", description: "Spend money on ads. Never automated — autopilot never buys." },
-  { action: "sign_contract", label: "Sign contract", description: "Sign or execute any contract or agreement." },
-  { action: "delete_campaign_data", label: "Delete campaign data", description: "Delete or purge campaign data." },
-  { action: "issue_refund", label: "Issue refund", description: "Move money back to a customer." },
-];
-
 export const KNOWN_ACTIONS: KnownAction[] = KNOWN_ACTION_DEFS.map((d) => ({
-  ...d,
+  action: d.action,
+  label: d.label,
+  description: d.description,
   tier: intrinsicTier(d.action),
+  group: actionGroup(d.action),
+  autoAllowed: autoAllowedFor(d.action),
+  ...(autoAllowedFor(d.action) ? {} : { lockReason: lockReasonFor(d.action) }),
+  defaultBehavior: defaultBehavior(d.action),
+  ...(d.control ? { control: d.control } : {}),
 }));
+
+/** Phase 14: the plain reason Auto-run is locked for an action (UI copy). */
+export function lockReasonFor(action: string): string {
+  const never = NEVER_AUTO_ACTIONS.get(action);
+  if (never) return `${never[0]!.toUpperCase()}${never.slice(1)}.`;
+  return "Money and irreversible actions always ask.";
+}
 
 export { TIER1_KINDS, DEFAULT_SMALL_ACTION_THRESHOLD_CENTS };

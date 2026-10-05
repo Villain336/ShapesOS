@@ -14,7 +14,7 @@
 // semantics: decay_refresh = low, keyword_brief = medium,
 // programmatic_page = high (publishes a new page to the web).
 //
-// Brand: violet primary (#7c3aed / #6d28d9), matching the web's
+// Brand: Agentic OS tokens (src/theme.ts), black primary, matching the web's
 // --brand-600/--brand-700 defaults. Lucide icons only.
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -36,6 +36,7 @@ import {
   type GateItem,
   type GateItemKind,
 } from "../api/gate";
+import { color } from "../theme";
 
 export interface NativeApprovalCardProps {
   /** AutopilotItem id (the agent emits this; never agent-invented content). */
@@ -63,9 +64,9 @@ const KIND_LABEL: Record<GateItemKind, string> = {
 };
 
 const TIER_STYLE: Record<RiskTier, { badge: object; text: object; iconColor: string; Icon: typeof ShieldCheck }> = {
-  low: { badge: { backgroundColor: "#f5f5f4", borderColor: "#e7e5e4" }, text: { color: "#57534e" }, iconColor: "#57534e", Icon: ShieldCheck },
-  medium: { badge: { backgroundColor: "#fffbeb", borderColor: "#fde68a" }, text: { color: "#92400e" }, iconColor: "#92400e", Icon: AlertTriangle },
-  high: { badge: { backgroundColor: "#fff1f2", borderColor: "#fecdd3" }, text: { color: "#9f1239" }, iconColor: "#9f1239", Icon: ShieldAlert },
+  low: { badge: { backgroundColor: color.canvas, borderColor: color.line }, text: { color: color.muted }, iconColor: color.muted, Icon: ShieldCheck },
+  medium: { badge: { backgroundColor: color.paper, borderColor: color.control }, text: { color: color.ink }, iconColor: color.ink, Icon: AlertTriangle },
+  high: { badge: { backgroundColor: color.ink, borderColor: color.ink }, text: { color: color.paper }, iconColor: color.paper, Icon: ShieldAlert },
 };
 
 type CardPhase =
@@ -143,7 +144,7 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
   if (phase.kind === "loading") {
     return (
       <View style={styles.card} testID="approval-card-loading">
-        <ActivityIndicator color="#7c3aed" />
+        <ActivityIndicator color={color.ink} />
         <Text style={styles.muted}>Loading approval…</Text>
       </View>
     );
@@ -198,7 +199,7 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
               style={[styles.button, styles.primaryButton]}
               onPress={() => void saveEdit()}
             >
-              <Check size={16} color="#fff" />
+              <Check size={16} color={color.paper} />
               <Text style={styles.primaryButtonText}>Save edit</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.button, styles.ghostButton]} onPress={() => setPhase({ kind: "ready" })}>
@@ -208,7 +209,7 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
         </View>
       ) : phase.kind === "done" ? (
         <View style={styles.doneBlock}>
-          <Check size={16} color="#15803d" />
+          <Check size={16} color={color.done} />
           <Text style={styles.doneText}>{phase.message}</Text>
         </View>
       ) : (
@@ -225,9 +226,9 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
               disabled={phase.kind === "working"}
             >
               {phase.kind === "working" ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={color.paper} size="small" />
               ) : (
-                <Check size={16} color="#fff" />
+                <Check size={16} color={color.paper} />
               )}
               <Text style={styles.primaryButtonText}>Approve</Text>
             </TouchableOpacity>
@@ -236,11 +237,11 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
               onPress={() => void decide("denied")}
               disabled={phase.kind === "working"}
             >
-              <X size={16} color="#b91c1c" />
+              <X size={16} color={color.failedText} />
               <Text style={styles.dangerButtonText}>Deny</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.button, styles.ghostButton]} onPress={() => setPhase({ kind: "editing" })}>
-              <Pencil size={16} color="#44403c" />
+              <Pencil size={16} color={color.muted} />
               <Text style={styles.ghostButtonText}>Edit</Text>
             </TouchableOpacity>
           </View>
@@ -253,20 +254,20 @@ export function NativeApprovalCard({ itemId, projectId, gate, onResolved }: Nati
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: color.paper,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e7e5e4",
+    borderColor: color.line,
     padding: 14,
     marginVertical: 6,
-    shadowColor: "#000",
+    shadowColor: color.ink,
     shadowOpacity: 0.06,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  kindLabel: { fontSize: 12, fontWeight: "600", color: "#78716c", textTransform: "uppercase", letterSpacing: 0.5 },
+  kindLabel: { fontSize: 12, fontWeight: "600", color: color.muted },
   tierBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -277,26 +278,26 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   tierBadgeText: { fontSize: 11, fontWeight: "600" },
-  title: { fontSize: 16, fontWeight: "700", color: "#1c1917", marginBottom: 4 },
-  reviewNote: { fontSize: 13, color: "#57534e", fontStyle: "italic", marginBottom: 4 },
-  meta: { fontSize: 12, color: "#a8a29e", marginBottom: 8 },
-  draftPreview: { fontSize: 13, color: "#44403c", backgroundColor: "#fafaf9", borderRadius: 8, padding: 10, marginBottom: 10 },
+  title: { fontSize: 16, fontWeight: "700", color: color.ink, marginBottom: 4 },
+  reviewNote: { fontSize: 13, color: color.muted, fontStyle: "italic", marginBottom: 4 },
+  meta: { fontSize: 12, color: color.subtle, marginBottom: 8 },
+  draftPreview: { fontSize: 13, color: color.muted, backgroundColor: color.canvas, borderRadius: 8, padding: 10, marginBottom: 10 },
   buttonRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   button: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14, flex: 1 },
-  primaryButton: { backgroundColor: "#7c3aed" },
-  primaryButtonText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  dangerButton: { backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca" },
-  dangerButtonText: { color: "#b91c1c", fontWeight: "600", fontSize: 14 },
-  ghostButton: { backgroundColor: "#f5f5f4" },
-  ghostButtonText: { color: "#44403c", fontWeight: "600", fontSize: 14 },
-  doneBlock: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f0fdf4", borderRadius: 8, padding: 10 },
-  doneText: { fontSize: 13, color: "#15803d", flex: 1 },
+  primaryButton: { backgroundColor: color.ink },
+  primaryButtonText: { color: color.paper, fontWeight: "600", fontSize: 14 },
+  dangerButton: { backgroundColor: color.paper, borderWidth: 1.5, borderColor: color.failed },
+  dangerButtonText: { color: color.failedText, fontWeight: "600", fontSize: 14 },
+  ghostButton: { backgroundColor: color.canvas },
+  ghostButtonText: { color: color.muted, fontWeight: "600", fontSize: 14 },
+  doneBlock: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: color.canvas, borderRadius: 8, padding: 10 },
+  doneText: { fontSize: 13, color: color.done, flex: 1 },
   editBlock: { marginTop: 4 },
-  fieldLabel: { fontSize: 12, fontWeight: "600", color: "#57534e", marginBottom: 4, marginTop: 8 },
-  input: { borderWidth: 1, borderColor: "#e7e5e4", borderRadius: 8, padding: 10, fontSize: 14, color: "#1c1917", backgroundColor: "#fff" },
+  fieldLabel: { fontSize: 12, fontWeight: "600", color: color.muted, marginBottom: 4, marginTop: 8 },
+  input: { borderWidth: 1, borderColor: color.line, borderRadius: 8, padding: 10, fontSize: 14, color: color.ink, backgroundColor: color.paper },
   draftInput: { minHeight: 120, textAlignVertical: "top" },
-  muted: { fontSize: 13, color: "#a8a29e", marginTop: 6 },
-  errorTitle: { fontSize: 14, fontWeight: "700", color: "#b91c1c", marginBottom: 4 },
-  retryButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: "#f5f5f4", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 },
-  retryText: { color: "#44403c", fontWeight: "600", fontSize: 13 },
+  muted: { fontSize: 13, color: color.subtle, marginTop: 6 },
+  errorTitle: { fontSize: 14, fontWeight: "700", color: color.failedText, marginBottom: 4 },
+  retryButton: { marginTop: 10, alignSelf: "flex-start", backgroundColor: color.canvas, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 },
+  retryText: { color: color.muted, fontWeight: "600", fontSize: 13 },
 });

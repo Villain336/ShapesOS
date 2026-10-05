@@ -13,7 +13,7 @@ setup("sign in as E2E admin", async ({ page }) => {
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Marketr" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ShapesOS" })).toBeVisible();
 
   await page.getByPlaceholder("Email").fill(ADMIN_EMAIL);
   await page.getByPlaceholder("Password").fill(ADMIN_PASSWORD);

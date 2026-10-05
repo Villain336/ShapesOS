@@ -11,7 +11,7 @@ import { CtvApp } from "@/components/flywheel/CtvApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "CTV Buying Path — Marketr",
+  title: "CTV Buying Path — ShapesOS",
   description: "CTV/commercials buying path: creative validator, QR/pURL kit, concierge IO, Vibe adapter, probabilistic attribution.",
 };
 

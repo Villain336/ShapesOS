@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
+import { Switch } from "@/components/aos/Controls";
 
 interface AppDef {
   appKey: string;
@@ -727,7 +728,7 @@ export function ActionsClient({
             </tbody>
           </table>
           <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
-            OAuth runs on Composio&apos;s hosted flow — Marketr stores only the connection
+            OAuth runs on Composio&apos;s hosted flow — ShapesOS stores only the connection
             reference, never your app tokens.
           </div>
         </div>
@@ -795,22 +796,12 @@ export function ActionsClient({
                       {statusBadge(t.connected ? "connected" : "not connected")}
                     </td>
                     <td className="px-3 py-2.5">
-                      <button
-                        role="switch"
-                        aria-checked={t.enabled}
-                        aria-label={`${t.enabled ? "Disable" : "Enable"} ${t.label} toolkit`}
+                      <Switch
+                        checked={t.enabled}
+                        label={`${t.enabled ? "Disable" : "Enable"} ${t.label} toolkit`}
                         disabled={busy === `toggle-${t.toolkitSlug}`}
-                        onClick={() => toggleToolkit(t.toolkitSlug, !t.enabled)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-                          t.enabled ? "bg-ink" : "bg-disabled-fg"
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-paper shadow transition-transform ${
-                            t.enabled ? "translate-x-4" : "translate-x-0.5"
-                          }`}
-                        />
-                      </button>
+                        onChange={(v) => toggleToolkit(t.toolkitSlug, v)}
+                      />
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       {!t.connected ? (

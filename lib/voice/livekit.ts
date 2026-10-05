@@ -194,7 +194,7 @@ export function planLiveSession(
   const plan: SessionRoomPlan = {
     roomName: roomNameForSession(workspaceId, session.id),
     identity: `agent-${session.id}`,
-    participantName: "Marketr voice agent",
+    participantName: "ShapesOS voice agent",
   };
   return { cfg, plan };
 }

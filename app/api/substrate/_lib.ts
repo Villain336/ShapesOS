@@ -1,6 +1,6 @@
 // Marketr — /api/substrate shared guard (not a route: no HTTP exports).
 //
-// Phase 8 substrate namespace (SPEC-PHASE8.md §5). Session → workspace;
+// Phase 8 substrate namespace (docs/specs/SPEC-PHASE8.md §5). Session → workspace;
 // reads need viewer, mutations need editor. Mirrors
 // app/api/flywheel/_lib.ts conventions.
 

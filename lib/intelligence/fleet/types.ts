@@ -1,6 +1,6 @@
 // Marketr — Phase 10 M4: competitor change fleet — shared types.
 //
-// Boundary map (SPEC-PHASE10.md §2, enforced in tests):
+// Boundary map (docs/specs/SPEC-PHASE10.md §2, enforced in tests):
 //   ✅ competitor sitemaps (public), polite self-fetch of public pages
 //      (robots-respecting), Google Alerts as a consumer tool (docs only),
 //      licensed review APIs (GBP API owned listings, Yelp Fusion,

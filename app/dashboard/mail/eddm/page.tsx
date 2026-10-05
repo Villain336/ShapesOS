@@ -6,7 +6,7 @@ import { EddmApp } from "./EddmApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "EDDM Concierge — Marketr",
+  title: "EDDM Concierge — ShapesOS",
   description:
     "Every Door Direct Mail concierge: carrier routes, creative, cost estimate, drop scheduling, mailhouse handoff brief, status tracking.",
 };
@@ -22,7 +22,7 @@ export default async function EddmPage() {
         <p className="mt-1 text-sm text-muted">
           Every Door Direct Mail, planned end-to-end: carrier routes → creative → cost estimate →
           drop scheduling → mailhouse handoff brief → status tracking. There is no USPS EDDM API —
-          your mailhouse executes the drop; Marketr prepares everything they need.
+          your mailhouse executes the drop; ShapesOS prepares everything they need.
         </p>
       </div>
       <EddmApp />

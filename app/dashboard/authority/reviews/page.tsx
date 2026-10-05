@@ -26,7 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Reviews — Marketr",
+  title: "Reviews — ShapesOS",
   description: "Review-reply approval queue, moderation-state tracking, velocity, and listing upkeep.",
 };
 

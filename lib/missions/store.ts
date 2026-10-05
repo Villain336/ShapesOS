@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: mission store interface + memory twin (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: mission store interface + memory twin (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // Mirrors the M1 executor pattern: the engine depends on this interface;
 // batteries/tests use the memory twin, API routes use the Prisma twin

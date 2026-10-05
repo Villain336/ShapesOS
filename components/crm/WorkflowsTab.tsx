@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Play, Workflow, X } from "lucide-react";
 import { OpsApprovalCard, decideOpsApproval, type OpsPendingGate } from "./OpsApprovalCard";
 import { RunStatusChip, StepStatusChip, btnPrimary, errorBoxCls, inputCls, noteBoxCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 interface RunStep {
   name: string;
@@ -264,6 +265,8 @@ export function WorkflowsTab() {
                   <tr
                     key={run.id}
                     onClick={() => setSelectedId(run.id)}
+                    tabIndex={0}
+                    onKeyDown={activateOnKey(() => setSelectedId(run.id))}
                     className={trClickableCls}
                   >
                     <td className="font-semibold text-ink">{run.workflowName}</td>
@@ -294,7 +297,7 @@ export function WorkflowsTab() {
       {/* Detail slide-over */}
       {selected && (
         <div className="fixed inset-0 z-40 flex justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedId(null)} />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedId(null)} aria-hidden />
           <div className="relative flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div>

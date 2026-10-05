@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { panelTitle } from "../ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface Comment {
   id: string;
@@ -92,6 +93,12 @@ export function CommentsPanel({ designId }: { designId: string }) {
   };
 
   const deleteComment = async (c: Comment) => {
+    const ok = await confirmAction({
+      title: "Delete this comment?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`${base}/${c.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

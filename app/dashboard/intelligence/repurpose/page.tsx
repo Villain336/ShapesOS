@@ -13,7 +13,7 @@ import { REPURPOSE_FORMATS } from "@/lib/content/repurpose";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Repurpose — Marketr",
+  title: "Repurpose — ShapesOS",
   description:
     "Turn expert-corpus knowledge into derivative assets: content briefs, video scripts, social threads, newsletter sections.",
 };

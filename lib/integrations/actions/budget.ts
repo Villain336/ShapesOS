@@ -147,14 +147,14 @@ export async function getComposioBudgetWarning(input: {
     const warning =
       `Composio hosted budget ${budget.over ? "exceeded" : "past 80%"}: ` +
       `${budget.calls}/${budget.allowance} free-tier calls used this month. ` +
-      `Overage bills to Marketr's hosted Composio key.`;
+      `Overage bills to ShapesOS's hosted Composio key.`;
     void emitAlert({
       trigger: "composio_budget_warning",
       workspaceId: input.workspaceId,
       severity: budget.over ? "critical" : "warn",
       title: `Composio hosted budget ${budget.over ? "exceeded" : "past 80%"}`,
       body: `${budget.calls}/${budget.allowance} free-tier Composio calls used this month. ` +
-        `Overage bills to Marketr's hosted Composio key.`,
+        `Overage bills to ShapesOS's hosted Composio key.`,
       dedupKey: `composio-budget:${budget.periodStart.slice(0, 7)}`,
     }).catch((e) => console.error("[composio] budget alert failed", e instanceof Error ? e.message : e));
     return warning;

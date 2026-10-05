@@ -16,11 +16,13 @@ import {
   Flag,
   FlagOff,
   Equal,
+  Share2,
   type LucideIcon,
 } from "lucide-react";
 import { formatMoney } from "../crm/types";
 import { EmptyState } from "../crm/ui";
 import { BundlesSection } from "./BundlesSection";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type Model = "first_touch" | "last_touch" | "linear";
 
@@ -38,9 +40,20 @@ const RANGES = [
 ];
 
 interface ModelNums { customers: number; cacCents: number | null; revenueCents: number; roas: number | null }
+interface Engagement { impressions: number; likes: number; comments: number; shares: number; clicks: number; engagements: number }
 interface ChannelRow {
   channel: string; leads: number; spendCents: number; cplCents: number | null;
   perModel: Record<Model, ModelNums>;
+  /** Phase 4b: social_organic carries post engagement. */
+  engagement?: Engagement;
+}
+interface SocialPostRow extends Engagement {
+  id: string; title: string; platforms: string[]; campaign: string; publishedAt: string | null; mock: boolean;
+  leads: number; revenueCents: number; clickToLead: number | null;
+}
+interface SocialData {
+  engagement: Engagement; channelLeads: number; channelRevenueCents: number;
+  posts: SocialPostRow[]; mock: boolean; postsPublished: number;
 }
 interface CampaignRow extends ChannelRow { campaign: string | null }
 interface ContentRow {
@@ -100,6 +113,7 @@ export function AttributionApp() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [content, setContent] = useState<ContentRow[]>([]);
   const [spend, setSpend] = useState<SpendRow[]>([]);
+  const [social, setSocial] = useState<SocialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSpendForm, setShowSpendForm] = useState(false);
   const [spendDraft, setSpendDraft] = useState({
@@ -121,13 +135,15 @@ export function AttributionApp() {
       if (to) q.set("to", to);
       if (pipelineId) q.set("pipelineId", pipelineId);
       const qs = q.toString();
-      const [s, ch, cp, ct, sp] = await Promise.all([
+      const [s, ch, cp, ct, sp, so] = await Promise.all([
         fetch(`/api/attribution/summary?model=${model}&${qs}`).then((r) => r.json()),
         fetch(`/api/attribution/channels?${qs}`).then((r) => r.json()),
         fetch(`/api/attribution/campaigns?${qs}`).then((r) => r.json()),
         fetch(`/api/attribution/content?model=${model}&${qs}`).then((r) => r.json()),
         fetch(`/api/attribution/spend`).then((r) => r.json()),
+        fetch(`/api/attribution/social?model=${model}&${qs}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
+      setSocial(so as SocialData | null);
       setSummary(s);
       setChannels(ch.channels ?? []);
       setCampaigns(cp.campaigns ?? []);
@@ -174,7 +190,7 @@ export function AttributionApp() {
   };
 
   const deleteSpend = async (id: string) => {
-    if (!confirm("Delete this spend entry?")) return;
+    if (!await confirmAction("Delete this spend entry?")) return;
     const r = await fetch(`/api/attribution/spend/${id}`, { method: "DELETE" });
     if (r.ok) {
       setSpend((s) => s.filter((x) => x.id !== id));
@@ -197,7 +213,7 @@ export function AttributionApp() {
       <div className="border-b border-line bg-white px-5 pb-0 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="aos-heading">Revenue Attribution</h1>
+            <h1 className="aos-heading">Revenue attribution</h1>
           </div>
           <div className="flex items-center gap-2 pb-3">
             <select
@@ -300,7 +316,14 @@ export function AttributionApp() {
                         const m = c.perModel[model];
                         return (
                           <tr key={c.channel} className="border-b border-line last:border-0">
-                            <td className="px-3 py-2.5 text-[13px] font-medium text-ink">{channelLabel(c.channel)}</td>
+                            <td className="px-3 py-2.5 text-[13px] font-medium text-ink">
+                              {channelLabel(c.channel)}
+                              {c.engagement ? (
+                                <div className="text-[11.5px] font-normal text-subtle">
+                                  {c.engagement.impressions.toLocaleString("en-US")} impressions · {c.engagement.clicks.toLocaleString("en-US")} clicks
+                                </div>
+                              ) : null}
+                            </td>
                             <td className={tdNum}>{formatMoney(c.spendCents)}</td>
                             <td className={tdNum}>{c.leads}</td>
                             <td className={tdNum}>{c.cplCents == null ? "—" : formatMoney(c.cplCents)}</td>
@@ -314,6 +337,69 @@ export function AttributionApp() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </section>
+
+            {/* Social posts (Phase 4b): engagement joined to UTM-tagged leads */}
+            <section className={cardCls}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                  <Share2 size={16} className="text-ink" /> Social posts
+                </h2>
+                <span className="text-[11.5px] text-subtle">
+                  {social?.mock ? "Includes sample engagement (no Postiz credentials) · " : ""}Leads come from the posts&apos; UTM-tagged links
+                </span>
+              </div>
+              {!social || social.posts.length === 0 ? (
+                <EmptyState icon={Share2} title="No social engagement yet" hint="Publish a post from Social. Engagement syncs back hourly, and leads from its links land here." />
+              ) : (
+                <>
+                  <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+                    {[
+                      { label: "Impressions", value: social.engagement.impressions.toLocaleString("en-US") },
+                      { label: "Engagements", value: social.engagement.engagements.toLocaleString("en-US") },
+                      { label: "Link clicks", value: social.engagement.clicks.toLocaleString("en-US") },
+                      { label: "Social leads", value: String(social.channelLeads) },
+                      { label: "Social revenue", value: formatMoney(social.channelRevenueCents) },
+                    ].map((k) => (
+                      <div key={k.label} className="rounded-md bg-canvas px-3 py-2">
+                        <div className="text-[11px] font-semibold text-muted">{k.label}</div>
+                        <div className="text-[18px] font-semibold tabular-nums text-ink">{k.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[13px]">
+                      <thead><tr className="border-b border-line">
+                        <th className={thCls}>Post</th>
+                        <th className={thCls}>Campaign</th>
+                        <th className={thNum}>Impressions</th>
+                        <th className={thNum}>Engagements</th>
+                        <th className={thNum}>Clicks</th>
+                        <th className={thNum}>Leads</th>
+                        <th className={thNum}>Click → lead</th>
+                        <th className={thNum}>Revenue</th>
+                      </tr></thead>
+                      <tbody>
+                        {social.posts.slice(0, 25).map((p) => (
+                          <tr key={p.id} className="border-b border-line last:border-0">
+                            <td className="max-w-[320px] px-3 py-2.5 text-[13px] text-ink">
+                              <a href={`/dashboard/social?post=${encodeURIComponent(p.id)}`} className="block truncate font-medium hover:underline">{p.title}</a>
+                              <div className="text-[11.5px] text-subtle">{p.platforms.join(", ")}{p.mock ? " · sample" : ""}</div>
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-[12px] text-muted">{p.campaign}</td>
+                            <td className={tdNum}>{p.impressions.toLocaleString("en-US")}</td>
+                            <td className={tdNum}>{p.engagements.toLocaleString("en-US")}</td>
+                            <td className={tdNum}>{p.clicks.toLocaleString("en-US")}</td>
+                            <td className={tdNum}>{p.leads}</td>
+                            <td className={tdNum}>{p.clickToLead == null ? "—" : `${(p.clickToLead * 100).toFixed(1)}%`}</td>
+                            <td className={`${tdNum} font-semibold text-ink`}>{formatMoney(p.revenueCents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
 
@@ -363,7 +449,7 @@ export function AttributionApp() {
                 <LinkIcon size={16} className="text-ink" /> Revenue-influenced content
               </h2>
               {content.length === 0 ? (
-                <EmptyState icon={LinkIcon} title="No content touches yet" hint="Pass a contentId (a Marketr page) with a touch to see which pages influence revenue." />
+                <EmptyState icon={LinkIcon} title="No content touches yet" hint="Pass a contentId (a ShapesOS page) with a touch to see which pages influence revenue." />
               ) : (
                 <div className="flex flex-col divide-y divide-line">
                   {content.slice(0, 20).map((c) => (

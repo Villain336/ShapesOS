@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Download,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const UniverEmbed = dynamic(() => import("@/components/office/UniverEmbed"), {
   ssr: false,
@@ -156,7 +157,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
   }
 
   async function remove(id: string, title: string) {
-    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    if (!await confirmAction(`Delete "${title}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/office/docs/${id}`, { method: "DELETE" });
     if (!res.ok) {
       flash("err", "Delete failed.");
@@ -182,21 +183,41 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
           </button>
           <div className="flex items-center gap-2">
             {openDoc.kind === "sheet" ? (
-              <a
-                href={`/api/office/docs/${openDoc.id}/export?format=csv`}
-                className={btnSecondary}
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </a>
+              <>
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=csv`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </a>
+                {/* Phase 11 (seotools): Excel export, every tab */}
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=xlsx`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export Excel
+                </a>
+              </>
             ) : openDoc.kind === "doc" ? (
-              <a
-                href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
-                className={btnSecondary}
-              >
-                <Download className="h-4 w-4" />
-                Export PDF
-              </a>
+              <>
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </a>
+                {/* Phase 11 (seotools): Word export */}
+                <a
+                  href={`/api/office/docs/${openDoc.id}/export?format=docx`}
+                  className={btnSecondary}
+                >
+                  <Download className="h-4 w-4" />
+                  Export Word
+                </a>
+              </>
             ) : null}
             <span className={kindBadge}>
               <meta.icon className="h-3 w-3" /> {meta.label} · v{openDoc.version}
@@ -233,7 +254,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">
-          {docs.length} doc{docs.length === 1 ? "" : "s"} — snapshots stored by Marketr, never in a third-party cloud.
+          {docs.length} doc{docs.length === 1 ? "" : "s"} — snapshots stored by ShapesOS, never in a third-party cloud.
         </p>
         <div className="flex items-center gap-2">
           {(["sheet", "doc"] as const).map((kind) => (

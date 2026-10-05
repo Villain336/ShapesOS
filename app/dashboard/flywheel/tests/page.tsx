@@ -42,7 +42,7 @@ import { Plus } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Test Lab — Marketr",
+  title: "Test Lab — ShapesOS",
   description: "CRO/A-B experimentation: ideas, experiments, honesty dashboard.",
 };
 
