@@ -1,5 +1,8 @@
 // Marketr — workspace members manager (milestone 11: RBAC).
 // Client component: list members, invite by email, change roles, remove.
+// Phase 15.3 (pricing): past the plan's included seats the API answers 402
+// seat_confirmation_required; the admin sees the per-seat price here and
+// must press "Add member and seat" before anything is charged.
 
 "use client";
 
@@ -29,6 +32,27 @@ interface Member {
 
 const ROLES = ["owner", "admin", "editor", "viewer"] as const;
 
+/** Mirrors lib/billing/seats.ts SeatSummary (client-safe subset). */
+interface Seats {
+  included: number | null;
+  used: number;
+  extra: number;
+  approvedExtra: number;
+  perSeatCents: number | null;
+  interval: "month" | "year";
+  billable: boolean;
+  billableReason: string | null;
+}
+
+interface PendingSeat {
+  message: string;
+  newExtraSeats: number;
+  perSeatCents: number;
+  interval: "month" | "year";
+}
+
+const usd = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+
 export default function MembersManager({ myRole }: { myRole: string }) {
   // Mirrors the server rule (lib/authz.ts memberChangeError): nobody grants
   // above their own role, and only owners touch owner rows.
@@ -45,6 +69,9 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   const [inviteEmail, setInviteEmail] = useState(false);
   // Phase 4a: the plan's seat limit (null = unlimited).
   const [seatLimit, setSeatLimit] = useState<number | null>(null);
+  const [seats, setSeats] = useState<Seats | null>(null);
+  const [pendingSeat, setPendingSeat] = useState<PendingSeat | null>(null);
+  const [seatNote, setSeatNote] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<{ emailed: boolean; to: string; note?: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [resent, setResent] = useState<string | null>(null);
@@ -56,6 +83,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
       setMembers(j.members ?? []);
       setInviteEmail(j.inviteEmail === true);
       setSeatLimit(typeof j.seatLimit === "number" ? j.seatLimit : null);
+      setSeats(j.seats ?? null);
     }
   }, []);
 
@@ -63,21 +91,38 @@ export default function MembersManager({ myRole }: { myRole: string }) {
     load();
   }, [load]);
 
-  async function invite() {
+  async function invite(confirmSeatCharge = false) {
     setError(null);
     setInviteUrl(null);
     setInviteResult(null);
+    setSeatNote(null);
     setBusy(true);
     try {
       const r = await fetch("/api/workspace/members", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, ...(confirmSeatCharge ? { confirmSeatCharge: true } : {}) }),
       });
       const j = await r.json().catch(() => ({}));
+      if (r.status === 402 && j.code === "seat_confirmation_required" && j.seat) {
+        // Nothing was added or charged: ask the admin first.
+        setPendingSeat({
+          message: j.error,
+          newExtraSeats: j.seat.newExtraSeats,
+          perSeatCents: j.seat.perSeatCents,
+          interval: j.seat.interval,
+        });
+        return;
+      }
+      setPendingSeat(null);
       if (!r.ok) {
         setError(j.error ?? "Invite failed.");
         return;
+      }
+      if (j.seatSync && j.seatSync.ok === false) {
+        setSeatNote(
+          `The member was added, but the seat line didn't reach Stripe yet (${j.seatSync.error ?? "unknown error"}). Retry it in Billing → Seats.`,
+        );
       }
       if (j.inviteUrl) setInviteUrl(j.inviteUrl);
       setInviteResult({ emailed: j.emailed === true, to: email, note: j.emailNote });
@@ -150,6 +195,11 @@ export default function MembersManager({ myRole }: { myRole: string }) {
     await load();
   }
 
+  // A hard limit: trial, or a paid plan whose extra seats can't be billed here.
+  const hardLimitReached = seats
+    ? seats.included !== null && !seats.billable && seats.used >= seats.included
+    : seatLimit !== null && members.length >= seatLimit;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-line bg-paper p-5">
@@ -159,19 +209,34 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             ? "We email them a single-use invite link (valid 7 days). You can also copy the link and send it yourself."
             : "They join through a single-use invite link (valid 7 days). Email isn't set up on this deployment, so share the link with them directly."}{" "}
           Your role: <span className="font-mono">{myRole}</span>
-          {seatLimit !== null && (
+          {seats && seats.included !== null ? (
             <>
-              {" "}· Seats: {members.length} of {seatLimit} on your plan
+              {" "}· Seats: {seats.used} used, {seats.included} included
+              {seats.extra > 0 && seats.perSeatCents !== null
+                ? `, ${seats.extra} extra at ${usd(seats.perSeatCents)} / ${seats.interval}`
+                : ""}
             </>
+          ) : (
+            seatLimit !== null && (
+              <>
+                {" "}· Seats: {members.length} of {seatLimit} on your plan
+              </>
+            )
           )}
         </p>
-        {seatLimit !== null && members.length >= seatLimit && (
+        {hardLimitReached && (
           <p className="mt-2 text-xs text-muted">
-            Every seat on your plan is taken.{" "}
+            Every seat on your plan is taken.{seats?.billableReason ? ` ${seats.billableReason}` : ""}{" "}
             <a href="/dashboard/billing" className="font-semibold text-ink underline">
               Upgrade in Billing
             </a>{" "}
             to invite more people.
+          </p>
+        )}
+        {!hardLimitReached && seats?.billable && seats.included !== null && seats.used >= seats.included && seats.perSeatCents !== null && (
+          <p className="mt-2 text-xs text-muted">
+            Every included seat is in use. Each extra seat costs {usd(seats.perSeatCents)} per {seats.interval}; you&apos;ll
+            confirm the charge before anyone is added.
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
@@ -180,7 +245,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             required
             placeholder="teammate@company.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setPendingSeat(null);
+            }}
             className={`${inputCls} min-w-64 flex-1`}
           />
           <select
@@ -195,13 +263,35 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             ))}
           </select>
           <button
-            onClick={invite}
-            disabled={busy || !email || (seatLimit !== null && members.length >= seatLimit)}
+            onClick={() => invite(false)}
+            disabled={busy || !email || hardLimitReached || pendingSeat !== null}
             className={btnPrimary}
           >
             {busy ? "Inviting…" : "Invite"}
           </button>
         </div>
+        {pendingSeat && (
+          <div role="alertdialog" aria-labelledby="seat-confirm-title" className="mt-3 rounded-lg bg-paper p-4 shadow-hairline">
+            <p id="seat-confirm-title" className="text-sm font-semibold text-ink">
+              Add {pendingSeat.newExtraSeats === 1 ? "an extra seat" : `${pendingSeat.newExtraSeats} extra seats`} for{" "}
+              {usd(pendingSeat.perSeatCents * pendingSeat.newExtraSeats)} / {pendingSeat.interval}?
+            </p>
+            <p className="mt-1 text-sm text-muted">{pendingSeat.message}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={() => invite(true)} disabled={busy} className={btnPrimary}>
+                {busy ? "Adding…" : "Add member and seat"}
+              </button>
+              <button onClick={() => setPendingSeat(null)} disabled={busy} className={btnGhost}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {seatNote && (
+          <p role="status" className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
+            {seatNote}
+          </p>
+        )}
         {error && (
           <p role="alert" className="mt-2 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
             <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
