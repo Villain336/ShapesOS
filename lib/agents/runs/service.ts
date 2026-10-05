@@ -163,6 +163,8 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
     },
     dedupKey: `agent_run:${run.id}`,
   });
+  // Phase 8: the run's code sandbox goes with it (never throws).
+  await releaseSandboxesQuietly(workspaceId, [runId], `run ${status}`);
   if (status === "failed") {
     // Phase 3 (J): best-effort notification (never throws).
     await notifyAgentRunFailed({
@@ -191,6 +193,22 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
     tx.agentRunEvent.findMany({
       where: { runId, workspaceId },
       orderBy: { seq: "asc" },
+    }),
+  );
+}
+
+/**
+ * Phase 8: the run's events after a sequence number, in order (bounded) —
+ * how the AG-UI SSE route tails a run as it works, in this process or on a
+ * worker.
+ */
+export async function listAgentRunEventsAfter(workspaceId: string, runId: string, afterSeq: number, limit = 500) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: { runId, workspaceId, seq: { gt: afterSeq } },
+      orderBy: { seq: "asc" },
+      take: Math.min(Math.max(limit, 1), 2000),
+      select: { seq: true, type: true, summary: true, payload: true },
     }),
   );
 }
@@ -232,7 +250,7 @@ export async function requestAgentRunCancel(
   runId: string,
   userId: string,
 ): Promise<CancelRequestResult | null> {
-  return withWorkspaceScope(workspaceId, async (tx) => {
+  const res = await withWorkspaceScope(workspaceId, async (tx) => {
     const root = await tx.agentRun.findFirst({
       where: { id: runId, workspaceId },
       select: { id: true, status: true },
@@ -267,6 +285,26 @@ export async function requestAgentRunCancel(
     });
     return { runIds: live.map((r) => r.id), stopped: true };
   });
+  // Phase 8: Stop destroys the stopped runs' code sandboxes right away.
+  if (res?.stopped) await releaseSandboxesQuietly(workspaceId, res.runIds, "stopped", true);
+  return res;
+}
+
+/**
+ * Phase 8: destroy the code sandboxes these runs own (lib/sandbox) — on
+ * Stop always; at a normal end only when not bound to a chat thread (the
+ * thread's next turn reuses it; it ends on its idle timeout). Loaded
+ * lazily so the run service doesn't pull the providers in until needed;
+ * never throws — a run ends even when its provider is unreachable (the
+ * sandbox then idles out on its own).
+ */
+async function releaseSandboxesQuietly(workspaceId: string, runIds: readonly string[], reason: string, force = false): Promise<void> {
+  try {
+    const { releaseRunSandbox } = await import("@/lib/sandbox");
+    for (const id of runIds) await releaseRunSandbox(workspaceId, id, reason, { force });
+  } catch {
+    // best effort
+  }
 }
 
 /** Has anyone asked this run to stop? (cheap; called between steps). */

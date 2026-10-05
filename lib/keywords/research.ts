@@ -10,7 +10,7 @@
 import { prisma } from "@/lib/prisma";
 import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { checkCap, meter } from "@/lib/metering/service";
-import { dayBucket, seedHash } from "@/lib/metering/wiring";
+import { capDeniedMessage, dayBucket, seedHash } from "@/lib/metering/wiring";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import type { KeywordIdea, KeywordIntentLabel } from "@/lib/providers/types";
 import { resolveIdeaDifficulties } from "@/lib/intelligence/difficulty/service";
@@ -63,13 +63,6 @@ const INTENTS: KeywordIntentLabel[] = [
   "transactional",
   "unknown",
 ];
-
-function capDeniedMessage(used: number, capCredits: number): string {
-  return (
-    `Credit cap reached (${used.toLocaleString()} of ${capCredits.toLocaleString()} ` +
-    `credits used). Raise the cap or add credits in Settings → Usage.`
-  );
-}
 
 /** Un-metered core: validation, authz, cap pre-gate, research, clustering. No ledger write. */
 export async function researchKeywordsUnmetered(

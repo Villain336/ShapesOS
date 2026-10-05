@@ -13,11 +13,18 @@
 //
 // House pattern: Agentic OS (docs/design/DESIGN.md) — tokens only, Approve is a
 // done-green pill, Deny a failed-ring pill; Lucide icons only.
+//
+// Phase 14 (approvals): "Do this without asking" — the same toggle as the
+// chat's (setAutoApprove): it saves an every-agent automation rule for the
+// item kind's action (lib/seo/autopilot.ts AUTOPILOT_KIND_ACTION), and the
+// autopilot then approves new items of that kind as it generates them.
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { AlertTriangle, Check, Loader2, Pencil, ShieldAlert, X } from "lucide-react";
+import { putAutoApproveRule, useOptionalChat } from "@/components/chat/ChatContext";
+import { AUTOPILOT_KIND_ACTION } from "@/lib/automation/actions";
 
 export interface ApprovalCardProps {
   /** AutopilotItem id (the agent emits this; never agent-invented content). */
@@ -73,6 +80,25 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
   const [phase, setPhase] = useState<CardPhase>({ kind: "loading" });
   const [editTitle, setEditTitle] = useState("");
   const [editDraft, setEditDraft] = useState("");
+  // Phase 14: "Do this without asking" (reuses the chat's setAutoApprove).
+  const chat = useOptionalChat();
+  const autoId = useId();
+  const [autoOn, setAutoOn] = useState(false);
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
+  const toggleAuto = useCallback(
+    async (next: boolean) => {
+      if (!item) return;
+      setAutoBusy(true);
+      setAutoError(null);
+      const save = chat?.setAutoApprove ?? putAutoApproveRule;
+      const err = await save("*", AUTOPILOT_KIND_ACTION[item.kind], next);
+      setAutoBusy(false);
+      if (err) setAutoError(err);
+      else setAutoOn(next);
+    },
+    [chat, item],
+  );
 
   const load = useCallback(async () => {
     setPhase({ kind: "loading" });
@@ -251,6 +277,28 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden /> Edit
                 </button>
+              </div>
+              <div className="mt-3">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    id={autoId}
+                    type="checkbox"
+                    checked={autoOn}
+                    disabled={autoBusy}
+                    onChange={(e) => void toggleAuto(e.target.checked)}
+                    data-testid="approval-card-auto"
+                    className="size-[18px] shrink-0 cursor-pointer appearance-none rounded-key bg-paper shadow-[inset_0_0_0_1.5px_var(--aos-control)] checked:bg-ink checked:shadow-none"
+                  />
+                  <label htmlFor={autoId} className="text-[13px] text-ink">
+                    Do this without asking: approve new {KIND_LABEL[item.kind].toLowerCase()} items automatically
+                  </label>
+                </div>
+                <p className="mt-1 text-[12px] text-muted">
+                  {autoError ??
+                    (autoOn
+                      ? "Saved. New items of this kind are approved as they're made — approve this one above."
+                      : "Applies from the next run. Change it in Settings → Automation.")}
+                </p>
               </div>
             </>
           )}

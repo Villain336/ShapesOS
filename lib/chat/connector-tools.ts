@@ -9,8 +9,9 @@
 //   4. Declared-tool gating against load_skill-loaded skills
 //   5. Role gate (mutating → editor+, reads → viewer+)
 //   6. Confirmation gate (mutating tools behave like kind "publish"); a
-//      per-agent auto-approve rule may let Tier 0/1 writes (your own
-//      channels) run without asking — Tier 2/3 always ask (Phase 5)
+//      per-agent auto-approve rule may let Tier 0–2 writes run without
+//      asking (Phase 14; e.g. the write_slack switch) — Tier 3 and
+//      destructive (MCP destructiveHint) writes always ask
 //   7. invoke() with the server-side decrypted credential (never in args);
 //      live adapters get a vault-backed refresher for 401s (Phase 4b) and a
 //      successful live call is recorded as connector-health evidence.
@@ -24,6 +25,8 @@ import { auditEvent } from "@/lib/auditlog";
 import { loadLiveCredential } from "@/lib/connectors/m21/live/credentials";
 import { recordSuccessfulSync } from "@/lib/connectors/health";
 import { getAdapterForConnection } from "@/lib/connectors/m21";
+import { isBuiltinKey } from "@/lib/connectors/m21/registry";
+import { mcpToolAction, mcpToolGroup } from "@/lib/connectors/m21/mcp-policy";
 import type {
   ConnectorAdapter,
   ConnectorToolDef,
@@ -31,11 +34,12 @@ import type {
 import type { ToolContext } from "./tools";
 import { connectorAction, connectorGroup, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
 import { autoApprovalFor } from "@/lib/automation/policy";
+import type { ConnectorChatTool } from "@/lib/agents/loop-tools";
 
 export interface ConnectorToolOutcome {
   status: "executed" | "pending_confirmation" | "error" | "skipped_role" | "denied";
   resultSummary: string;
-  /** Phase 5: the action a per-agent auto-approve rule could cover (Tier 0/1). */
+  /** Phase 5: the action a per-agent auto-approve rule could cover (Phase 14: Tier 0–2). */
   autoAction?: string;
 }
 
@@ -93,6 +97,42 @@ async function listAdapterTools(adapter: ConnectorAdapter): Promise<ConnectorToo
   return adapter.listTools();
 }
 
+/** Phase 8: one bound connector's tools (or why they are unavailable). */
+interface SourceTools {
+  source: BoundDataSource;
+  tools: ConnectorToolDef[] | null;
+  error: string | null;
+}
+
+/** The tools of every enabled project data source inside the grant. */
+async function grantedSourceTools(projectId: string, grant?: readonly string[] | null): Promise<SourceTools[]> {
+  // Phase 5: connectors outside the task's grant are not listed at all.
+  // Phase 11 (conncore): a custom MCP server's tools each carry their own
+  // group (Connector.config.toolPolicies) — filtered per tool below.
+  const sources = (await boundDataSources(projectId)).filter(
+    (s) => !isBuiltinKey(s.connectorKey) || isGroupGranted(grant, connectorGroup(s.connectorKey)),
+  );
+  const out: SourceTools[] = [];
+  for (const s of sources) {
+    try {
+      const adapter = await getAdapterForConnection({
+        connectorKey: s.connectorKey,
+        connector: { mcpEndpoint: s.mcpEndpoint, config: s.connectorConfig },
+        connectionId: s.connectionId,
+      });
+      let tools = await listAdapterTools(adapter);
+      if (!isBuiltinKey(s.connectorKey)) {
+        tools = tools.filter((t) => isGroupGranted(grant, mcpToolGroup(s.connectorConfig, t.name)));
+        if (tools.length === 0) continue;
+      }
+      out.push({ source: s, tools, error: null });
+    } catch (err) {
+      out.push({ source: s, tools: null, error: err instanceof Error ? err.message : "unknown error" });
+    }
+  }
+  return out;
+}
+
 /**
  * "CONNECTOR TOOLS" system-prompt section: one
  * `connector.<key>.<toolName>: <description>` line per tool of every
@@ -103,24 +143,14 @@ export async function connectorToolsSection(
   grant?: readonly string[] | null,
 ): Promise<string> {
   const header = "## CONNECTOR TOOLS";
-  // Phase 5: connectors outside the task's grant are not listed at all.
-  const sources = (await boundDataSources(projectId)).filter((s) =>
-    isGroupGranted(grant, connectorGroup(s.connectorKey)),
-  );
+  const sources = await grantedSourceTools(projectId, grant);
   if (sources.length === 0) {
     return `${header}\n\nNo connector data sources are bound to this project.`;
   }
   const lines: string[] = [];
-  for (const s of sources) {
-    let tools: ConnectorToolDef[];
-    try {
-      const adapter = await getAdapterForConnection({
-        connectorKey: s.connectorKey,
-        connector: { mcpEndpoint: s.mcpEndpoint, config: s.connectorConfig },
-      });
-      tools = await listAdapterTools(adapter);
-    } catch (err) {
-      lines.push(`# ${s.displayName} (${s.connectorKey}) — tools unavailable: ${err instanceof Error ? err.message : "unknown error"}`);
+  for (const { source: s, tools, error } of sources) {
+    if (!tools) {
+      lines.push(`# ${s.displayName} (${s.connectorKey}) — tools unavailable: ${error}`);
       continue;
     }
     lines.push(`# ${s.displayName} (${s.connectorKey})`);
@@ -129,6 +159,30 @@ export async function connectorToolsSection(
     }
   }
   return `${header}\n\n${lines.join("\n")}`;
+}
+
+/**
+ * Phase 8: the same tools as native tool definitions for the agent loop
+ * (lib/agents/loop-tools.ts maps `connector.<key>.<tool>` to an API-safe
+ * name and back). Every call still goes through resolveConnectorTool's gates.
+ */
+export async function connectorChatTools(
+  projectId: string,
+  grant?: readonly string[] | null,
+): Promise<ConnectorChatTool[]> {
+  const out: ConnectorChatTool[] = [];
+  for (const { source, tools } of await grantedSourceTools(projectId, grant)) {
+    for (const t of tools ?? []) {
+      out.push({
+        connectorKey: source.connectorKey,
+        name: t.name,
+        description: t.description,
+        mutating: t.mutating,
+        argsSchema: t.argsSchema,
+      });
+    }
+  }
+  return out;
 }
 
 function parseConnectorTool(toolName: string): { key: string; tool: string } | null {
@@ -155,6 +209,27 @@ async function deny(
 }
 
 /**
+ * Phase 14 (approvals): the enabled Slack installation of this workspace
+ * whose project is this one (or unset), as a binding-shaped row — null when
+ * there is none or its connection is not active.
+ */
+async function slackInstallBinding(ctx: ToolContext) {
+  const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
+  const install = await withWorkspaceScope(ctx.workspaceId, (tx) =>
+    tx.slackInstallation.findFirst({
+      where: { workspaceId: ctx.workspaceId, enabled: true, OR: [{ projectId: ctx.projectId }, { projectId: null }] },
+      select: { connectionId: true },
+    }),
+  ).catch(() => null);
+  if (!install) return null;
+  const connection = await prisma.connectorConnection.findFirst({
+    where: { id: install.connectionId, workspaceId: ctx.workspaceId, connectorKey: "slack", status: "active" },
+    include: { connector: true },
+  });
+  return connection ? { projectConfig: null, connection } : null;
+}
+
+/**
  * Resolve and execute `connector.<key>.<toolName>`. Returns a ChatToolCall
  * status + summary; every denial is explained and audited.
  */
@@ -173,9 +248,12 @@ export async function resolveConnectorTool(
   const { key, tool } = parsed;
 
   // 0. Task grant (Phase 5): checked first, so a refused tool can't be
-  //    reached through any connector alias.
+  //    reached through any connector alias. Phase 11 (conncore): a custom
+  //    MCP tool's group comes from its connector's tool policy, checked as
+  //    soon as the binding is known (step 2b).
+  const builtin = isBuiltinKey(key);
   const group = connectorGroup(key);
-  if (!isGroupGranted(ctx.grant, group)) {
+  if (builtin && !isGroupGranted(ctx.grant, group)) {
     return {
       ...(await deny(
         ctx,
@@ -205,10 +283,15 @@ export async function resolveConnectorTool(
   }
 
   // 2. Project data-source binding with an active connection.
-  const binding = await prisma.projectDataSource.findFirst({
+  const bound = await prisma.projectDataSource.findFirst({
     where: { projectId: ctx.projectId, connectorKey: key },
     include: { connection: { include: { connector: true } } },
   });
+  // Phase 14 (approvals): the Slack app installed for this project (its
+  // mentions become this project's chat threads) counts as the project's
+  // Slack binding, so a held Slack reply posts through this same gate.
+  const binding =
+    bound?.connection?.status === "active" || key !== "slack" ? bound : ((await slackInstallBinding(ctx)) ?? bound);
   const connection = binding?.connection;
   if (!binding || !connection || connection.status !== "active") {
     return deny(
@@ -218,6 +301,22 @@ export async function resolveConnectorTool(
     );
   }
 
+  // 2b. Phase 11 (conncore): a custom MCP tool's mapped group must be granted.
+  const connectorConfig = connection.connector?.config ?? null;
+  if (!builtin) {
+    const toolGroup = mcpToolGroup(connectorConfig, tool);
+    if (!isGroupGranted(ctx.grant, toolGroup)) {
+      return {
+        ...(await deny(
+          ctx,
+          toolName,
+          `This task isn't allowed to use ${TOOL_GROUP_LABELS[toolGroup]} tools (${toolName}) — refusing.`,
+        )),
+        status: "denied",
+      };
+    }
+  }
+
   // 3. Adapter resolution + known-tool check.
   let adapter: ConnectorAdapter;
   try {
@@ -225,8 +324,9 @@ export async function resolveConnectorTool(
       connectorKey: key,
       connector: {
         mcpEndpoint: connection.connector?.mcpEndpoint ?? null,
-        config: connection.connector?.config ?? null,
+        config: connectorConfig,
       },
+      connectionId: connection.id,
     });
   } catch (err) {
     return deny(ctx, toolName, `No adapter for connector "${key}": ${err instanceof Error ? err.message : "unknown error"}`);
@@ -295,19 +395,24 @@ export async function resolveConnectorTool(
   }
 
   // 6. Confirmation gate: mutating tools behave like kind "publish" — unless
-  //    a per-agent auto-approve rule covers this write (Tier 0/1 only).
+  //    a per-agent auto-approve rule covers this write (Phase 14: Tier 0–2).
   let autoReason: string | null = null;
+  // Phase 11 (conncore): a custom MCP tool's action (tier) comes from its
+  // tool policy; unmapped → mcp_write (Phase 14: Tier 2, asks unless a rule says auto).
+  const action = builtin ? connectorAction(key, tool) : mcpToolAction(connectorConfig, tool);
   if (toolDef.mutating && !ctx.confirmed) {
     const decision = await autoApprovalFor(ctx.workspaceId, {
       agentKey: ctx.agentKey ?? "lead",
-      action: connectorAction(key, tool),
+      action,
       description: `${toolDef.name}: ${toolDef.description}`,
+      destructive: toolDef.destructive === true,
     }).catch(() => null);
     if (!decision?.auto) {
       return {
         status: "pending_confirmation",
         resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation`,
-        ...(decision && decision.tier <= 1 ? { autoAction: connectorAction(key, tool) } : {}),
+        // Phase 14: offered on every Tier 0–2 write (never Tier 3 / destructive).
+        ...(decision?.offerAuto ? { autoAction: action } : {}),
       };
     }
     autoReason = decision.reason;

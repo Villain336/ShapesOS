@@ -5,13 +5,19 @@
 // Phase 4a: passkey sign-in, the second step for accounts with two-factor
 // auth (authenticator code, recovery code or passkey), and the CAPTCHA
 // step-up after repeated failed passwords (only when a provider is set).
+//
+// Phase 6: an "Email" tab for email accounts (password or a magic link) next
+// to the self-host "Admin" tab. Hidden entirely when email sign-in isn't
+// configured (production without a mailer — lib/auth/email/mail.ts).
 
 "use client";
 
 import { signIn, signOut } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { EmailSignIn } from "./EmailSignIn";
 import { safeNext } from "@/lib/auth/redirect";
 import { CaptchaWidget, type CaptchaPublicConfig } from "@/components/security/CaptchaWidget";
 import {
@@ -149,7 +155,51 @@ function SecondStep({ methods, next }: { methods: string[]; next: string }) {
   );
 }
 
-function LoginBody({ captcha }: { captcha: CaptchaPublicConfig | null }) {
+type LoginTab = "email" | "admin";
+
+/** Pill segmented tabs (neutral: the selected tab is black, not a status colour). */
+function LoginTabs({ tab, onChange }: { tab: LoginTab; onChange: (t: LoginTab) => void }) {
+  const tabs: { id: LoginTab; label: string; Icon: typeof Mail }[] = [
+    { id: "email", label: "Email", Icon: Mail },
+    { id: "admin", label: "Admin", Icon: ShieldCheck },
+  ];
+  return (
+    <div role="tablist" aria-label="Sign-in method" className="mb-5 flex items-center gap-0.5 rounded-full bg-canvas p-1">
+      {tabs.map(({ id, label, Icon }) => {
+        const on = id === tab;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`login-tab-${id}`}
+            aria-selected={on}
+            aria-controls={`login-panel-${id}`}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(id)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                e.preventDefault();
+                const nextTab = id === "email" ? "admin" : "email";
+                onChange(nextTab);
+                document.getElementById(`login-tab-${nextTab}`)?.focus();
+              }
+            }}
+            className={cn(
+              "inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-[background-color,color] duration-150",
+              on ? "bg-ink text-paper" : "text-ink hover:bg-hover",
+            )}
+          >
+            <Icon className="size-4" aria-hidden="true" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LoginBody({ captcha, emailAuth }: { captcha: CaptchaPublicConfig | null; emailAuth: boolean }) {
   const params = useSearchParams();
   const next = safeNext(params.get("next"));
   const [email, setEmail] = useState("");
@@ -166,6 +216,7 @@ function LoginBody({ captcha }: { captcha: CaptchaPublicConfig | null }) {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaKey, setCaptchaKey] = useState(0);
   const canPasskey = usePasskeySupport();
+  const [tab, setTab] = useState<LoginTab>(emailAuth ? "email" : "admin");
 
   useEffect(() => {
     let cancelled = false;
@@ -285,11 +336,24 @@ function LoginBody({ captcha }: { captcha: CaptchaPublicConfig | null }) {
 
             <div className="my-5 flex items-center gap-3 text-xs text-muted">
               <span className="h-px flex-1 bg-line" />
-              or self-host admin login
+              {emailAuth ? "or" : "or self-host admin login"}
               <span className="h-px flex-1 bg-line" />
             </div>
 
-            <form onSubmit={onCredentials} className="flex flex-col gap-3">
+            {emailAuth && <LoginTabs tab={tab} onChange={setTab} />}
+
+            {emailAuth && tab === "email" && (
+              <div role="tabpanel" id="login-panel-email" aria-labelledby="login-tab-email">
+                <EmailSignIn captcha={captcha} next={next} onPending={(methods) => setPending({ methods })} />
+              </div>
+            )}
+
+            {(!emailAuth || tab === "admin") && (
+            <form
+              onSubmit={onCredentials}
+              className="flex flex-col gap-3"
+              {...(emailAuth ? { role: "tabpanel", id: "login-panel-admin", "aria-labelledby": "login-tab-admin" } : {})}
+            >
               <input
                 type="email"
                 required
@@ -331,6 +395,7 @@ function LoginBody({ captcha }: { captcha: CaptchaPublicConfig | null }) {
                 )}
               </button>
             </form>
+            )}
           </>
         )}
       </div>
@@ -340,10 +405,17 @@ function LoginBody({ captcha }: { captcha: CaptchaPublicConfig | null }) {
 
 // Wraps the body in Suspense: useSearchParams() requires a suspense boundary
 // for static prerendering (per the local Next.js docs).
-export default function LoginClient({ captcha }: { captcha: CaptchaPublicConfig | null }) {
+export default function LoginClient({
+  captcha,
+  emailAuth = false,
+}: {
+  captcha: CaptchaPublicConfig | null;
+  /** Email accounts are usable on this deployment (a mailer, or development). */
+  emailAuth?: boolean;
+}) {
   return (
     <Suspense fallback={<div className="p-8 text-center text-sm text-muted">Loading…</div>}>
-      <LoginBody captcha={captcha} />
+      <LoginBody captcha={captcha} emailAuth={emailAuth} />
     </Suspense>
   );
 }

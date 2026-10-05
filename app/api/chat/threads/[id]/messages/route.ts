@@ -1,6 +1,8 @@
 // Marketr — AI chat messages API (redesign §3a).
 // POST /api/chat/threads/[id]/messages  { content } → runs the agent loop
-//   → { message, toolCalls, threadTitle }
+//   → { message, toolCalls, threadTitle, runId, cancelled, queued }
+// (The chat panel streams through POST /api/agents/chat instead; this JSON
+// route stays for API clients.)
 // Editor+ (safe read tools run for anyone who can post; write tools are
 // role-gated per tool and held behind the confirmation gate).
 
@@ -64,7 +66,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { threadId: thread.id, role: "user", content },
   });
 
-  let turn: { assistantText: string; toolCalls: ChatToolCall[]; runId: string; cancelled?: boolean };
+  let turn: { assistantText: string; toolCalls: ChatToolCall[]; runId: string; cancelled?: boolean; queued?: boolean };
   try {
     // Phase 5: the turn is recorded as an AgentRun running as the thread's
     // agent inside its tool grant (Stop targets it). Phase 13B: the capture
@@ -105,5 +107,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     threadTitle,
     runId: turn.runId,
     cancelled: turn.cancelled === true,
+    // Phase 8: the turn outlived its inline budget and continues on the agent
+    // worker; its run (runId) streams on, and the thread shows the answer
+    // when it lands (GET /api/chat/threads/[id] → liveRunId while it works).
+    queued: turn.queued === true,
   });
 }

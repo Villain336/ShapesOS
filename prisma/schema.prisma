@@ -336,6 +336,11 @@ enum FileChangeAction {
   scim_user_deprovisioned
   scim_user_deleted
   scim_group_changed
+  // Phase 6 (email sign-in): account created, email verified, password reset.
+  // Summaries carry the email address, never a token or password.
+  auth_account_created
+  auth_email_verified
+  auth_password_reset
 }
 
 // ---------------------------------------------------------------------------
@@ -521,9 +526,10 @@ model Workspace {
   whiteLabelCustomDomain String? @map("white_label_custom_domain")
   whiteLabelBrandColor   String? @map("white_label_brand_color")
 
-  // Phase C (W5): MCP server opt-in. OFF by default — the new attack surface
-  // only exists for workspaces whose admin explicitly enables it.
-  mcpEnabled Boolean @default(false) @map("mcp_enabled")
+  // Phase C (W5): MCP server switch. Phase 11 (conncore): null = the plan
+  // default (ON for paid plans with API access — Pro, Agency — OFF otherwise;
+  // lib/mcp/enabled.ts); an explicit false is the workspace off switch.
+  mcpEnabled Boolean? @map("mcp_enabled")
 
   // Phase 3: end of the hosted trial (plan = trial). Past it, metered actions
   // are refused until the workspace picks a paid plan (lib/billing/trial.ts).
@@ -595,8 +601,29 @@ model Workspace {
   composioToolCatalog         ComposioToolCatalog[]
   // Phase 16 slice 5: viewable agent runs back-relation.
   agentRuns                   AgentRun[]
+  // Phase 8: durable agent work queue + per-run transcripts (resume).
+  agentJobs                   AgentJob[]
+  agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
+  // Phase 10 (ops-core) back-relations.
+  opsDepartments              OpsDepartment[]
+  opsLeavePolicies            OpsLeavePolicy[]
+  opsLeaveLedger              OpsLeaveLedger[]
+  opsJobOpenings              OpsJobOpening[]
+  opsApplicants               OpsApplicant[]
+  opsSlaPolicies              OpsSlaPolicy[]
+  opsTickets                  OpsTicket[]
+  opsTicketMessages           OpsTicketMessage[]
+  opsTasks                    OpsTask[]
+  opsCompanies                OpsCompany[]
+  opsContacts                 OpsContact[]
+  opsDeals                    OpsDeal[]
+  opsWarehouses               OpsWarehouse[]
+  opsLocations                OpsLocation[]
+  opsProductVariants          OpsProductVariant[]
+  opsTransfers                OpsTransfer[]
+  opsReorderRules             OpsReorderRule[]
   // Phase 17 slice 1: Business Operations back-relations (DocType entities).
   opsProducts                 OpsProduct[]
   opsOrders                   OpsOrder[]
@@ -614,6 +641,35 @@ model Workspace {
   // Phase 17 slice 5: HR essentials back-relations.
   opsTeamMembers              OpsTeamMember[]
   opsLeaveRequests            OpsLeaveRequest[]
+  // Phase 10 (finance): accounting, invoicing, quotes, purchasing, expenses.
+  opsAccounts                 OpsAccount[]
+  opsJournalEntries           OpsJournalEntry[]
+  opsJournalLines             OpsJournalLine[]
+  opsTaxRates                 OpsTaxRate[]
+  opsNumberSequences          OpsNumberSequence[]
+  opsFinanceSettings          OpsFinanceSettings?
+  opsRecurringInvoices        OpsRecurringInvoice[]
+  opsQuotes                   OpsQuote[]
+  opsVendors                  OpsVendor[]
+  opsPurchaseReceipts         OpsPurchaseReceipt[]
+  opsVendorBills              OpsVendorBill[]
+  opsExpenseClaims            OpsExpenseClaim[]
+  opsExpenseLines             OpsExpenseLine[]
+  // Phase 10 (store): public storefront + its product listings.
+  opsStores                   OpsStore[]
+  opsStoreListings            OpsStoreListing[]
+  // Phase 12 (people): payroll + events.
+  opsSalaryStructures         OpsSalaryStructure[]
+  opsSalaryAssignments        OpsSalaryAssignment[]
+  opsPayRuns                  OpsPayRun[]
+  opsPayslips                 OpsPayslip[]
+  // Phase 14 (connectors): a pay run sent to a payroll provider (Gusto).
+  opsPayRunProviderSyncs      OpsPayRunProviderSync[]
+  opsEvents                   OpsEvent[]
+  opsEventSessions            OpsEventSession[]
+  opsEventTicketTypes         OpsEventTicketType[]
+  opsEventRegistrations       OpsEventRegistration[]
+  opsEventAttendees           OpsEventAttendee[]
   // Phase 18 slice 1: ad-platforms ontology back-relations.
   adPlatforms                 AdPlatform[]
   adAccounts                  AdAccount[]
@@ -957,6 +1013,7 @@ model Workspace {
   // Phase 4a (orphaned rows): tables that had a workspace_id but no FK.
   agentRunEvents              AgentRunEvent[]
   agentRunRecordings          AgentRunRecording[]
+  agentRunSandboxes           AgentRunSandbox[] // Phase 8: one code sandbox per agent run
   authorityApprovalEvents     AuthorityApprovalEvent[]
   billingSetupIdempotency     BillingSetupIdempotency[]
   breakerEvents               BreakerEvent[]
@@ -988,6 +1045,50 @@ model Workspace {
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
+  // Phase 8 (ship): detected stack per cloned repository.
+  repoProfiles                RepoProfile[]
+  // Phase 9 (sites): agent-made draft revisions of SiteBuilder sites.
+  siteRevisions               SiteRevision[]
+  // Phase 11 (seotools): sitemap submissions (Search Console, IndexNow).
+  siteSitemapSubmissions      SiteSitemapSubmission[]
+  // Phase 9 (repos): agent pull requests + the GitHub deliveries about them.
+  agentPullRequests           AgentPullRequest[]
+  githubWebhookDeliveries     GitHubWebhookDelivery[]
+  // Phase 9 (apps): internal mini-apps (spec + versions + JSONB records).
+  miniApps                    MiniApp[]
+  miniAppVersions             MiniAppVersion[]
+  miniAppRecords              MiniAppRecord[]
+  // Phase 10 (portal): client portal magic links + sessions.
+  portalLoginLinks            PortalLoginLink[]
+  portalSessions              PortalSession[]
+  // Phase 11 (conncore): Slack app installs, Slack thread → chat thread map,
+  // Events API receipts (dedupe).
+  slackInstallations          SlackInstallation[]
+  slackThreadLinks            SlackThreadLink[]
+  slackEventReceipts          SlackEventReceipt[]
+  // Phase 11 (conncore): HubSpot ↔ Ops CRM id mapping (bidirectional sync).
+  hubspotSyncLinks            HubspotSyncLink[]
+  // Phase 11 (bizsync): Shopify / QuickBooks / Xero id mapping + sync run log.
+  bizSyncLinks                BizSyncLink[]
+  bizSyncRuns                 BizSyncRun[]
+  // Phase 11 (bizsync): chart ↔ QuickBooks/Xero account map + export ledger.
+  opsAccountingLinks          OpsAccountingLink[]
+  opsAccountingExports        OpsAccountingExport[]
+  // Phase 12 (mfgpos): manufacturing (work centres, routings, MOs, work
+  // orders, time logs, scrap) and point of sale (registers, sessions).
+  opsWorkCenters              OpsWorkCenter[]
+  opsRoutings                 OpsRouting[]
+  opsManufacturingOrders      OpsManufacturingOrder[]
+  opsWorkOrders               OpsWorkOrder[]
+  opsWorkTimeLogs             OpsWorkTimeLog[]
+  opsScraps                   OpsScrap[]
+  opsPosRegisters             OpsPosRegister[]
+  opsPosSessions              OpsPosSession[]
+  // Phase 13 (twincore): digital twin sites, their layout objects and the
+  // dock bookings (the one genuinely new operational record).
+  opsSites                    OpsSite[]
+  opsSiteObjects              OpsSiteObject[]
+  opsDockBookings             OpsDockBooking[]
 
   @@map("workspaces")
 }
@@ -1206,8 +1307,71 @@ model Client {
   // Phase 1 (R1): pipelines serving this white-label client.
   pipelines Pipeline[]
 
+  // Phase 10 (portal): client portal (magic-link login at /portal). Off until
+  // an admin turns it on. A client sees ONLY records linked here: invoices,
+  // quotes and projects whose customer is one of these CRM leads (or the
+  // lead a linked contact was converted from), tickets whose contact is a
+  // linked contact (or a contact of a linked company). Plain id arrays:
+  // every portal query ALSO filters by workspace_id under FORCE RLS, so a
+  // stale or foreign id matches nothing.
+  portalEnabled    Boolean           @default(false) @map("portal_enabled")
+  portalCompanyIds String[]          @default([]) @map("portal_company_ids")
+  portalContactIds String[]          @default([]) @map("portal_contact_ids")
+  portalLeadIds    String[]          @default([]) @map("portal_lead_ids")
+  portalLoginLinks PortalLoginLink[]
+  portalSessions   PortalSession[]
+
   @@unique([workspaceId, loginEmail])
   @@map("clients")
+}
+
+// ============================================================================
+// Phase 10 (portal) — client portal auth. A SEPARATE credential from the
+// workspace (Auth.js) session: a portal session names one (workspace,
+// client) pair, rides in its own cookie scoped to /portal and /api/portal,
+// and is only ever read by lib/portal (never by requireUser / auth()).
+// Only SHA-256 hashes of link and session tokens are stored. Both tables
+// are FORCE RLS on app.workspace_id; the raw tokens carry the workspace id
+// only to pick that RLS scope (the SCIM token pattern).
+// ============================================================================
+
+model PortalLoginLink {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  // Normalized address the link was sent to; must still be the client's
+  // loginEmail when the link is used.
+  email       String
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, clientId, createdAt])
+  @@map("portal_login_links")
+}
+
+model PortalSession {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // "client" (sign out), a workspace user id (Settings → Clients), or
+  // "system" (portal turned off / sign-in email changed).
+  revokedBy   String?   @map("revoked_by")
+  lastSeenAt  DateTime? @map("last_seen_at")
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, clientId, createdAt])
+  @@map("portal_sessions")
 }
 
 model Report {
@@ -1423,6 +1587,17 @@ model SiteAudit {
   openIssues  Int @default(0) @map("open_issues")
   errorIssues Int @default(0) @map("error_issues")
 
+  // Phase 11 (seotools): "files" = working-copy scan; "live" = crawl of the
+  // live URLs (lib/audit/live.ts). targetUrl is the crawl's start URL.
+  mode      String  @default("files")
+  targetUrl String? @map("target_url")
+  // Live crawl summary (pages, status codes, redirects, robots/sitemap,
+  // static vs JS rendering). Null for files audits.
+  crawl     Json?
+  // Core Web Vitals from PageSpeed Insights (lab + CrUX field data, per
+  // strategy) or { unavailable: reason }. Null = not measured. Never invented.
+  vitals    Json?
+
   issues SiteIssue[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1562,11 +1737,89 @@ model Site {
   audits           SiteAudit[]
   issues           SiteIssue[]
   fixRuns          FixRun[]
+  // Phase 9 (sites): draft revisions (agent drafts + pre-apply backups).
+  revisions        SiteRevision[]
+  // Phase 11 (seotools): sitemap submissions to Search Console / IndexNow.
+  sitemapSubmissions SiteSitemapSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("sites")
+}
+
+// ShapesOS Phase 9 (sites): a full snapshot of a site's working copy that is
+// NOT the live one. An agent's site_publish_draft writes a "draft" (source
+// agent) from its sandbox; a person applies it to the working copy (the
+// apply first saves the current files as a "backup" revision, so applying
+// that backup is the revert). Deploy / publish stay separate, gated actions.
+// files = [{ path, content }] (text only, capped in lib/sites/revisions.ts).
+// FORCE RLS on app.workspace_id; cascades from workspaces and sites.
+model SiteRevision {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId      String    @map("site_id")
+  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// Per-site sequence (#1, #2 …).
+  number          Int
+  /// draft | applied | discarded | backup
+  status          String    @default("draft")
+  /// agent | backup
+  source          String    @default("agent")
+  /// The agent run that produced it (agent drafts).
+  runId           String?   @map("run_id")
+  summary         String?
+  files           Json      @default("[]")
+  fileCount       Int       @default(0) @map("file_count")
+  bytes           Int       @default(0)
+  /// Unified diff against the files the agent checked out (capped).
+  patch           String?   @db.Text
+  patchTruncated  Boolean   @default(false) @map("patch_truncated")
+  /// Fingerprint of the working copy the draft started from (conflict check).
+  baseFingerprint String?   @map("base_fingerprint")
+  createdBy       String?   @map("created_by")
+  appliedAt       DateTime? @map("applied_at")
+  appliedBy       String?   @map("applied_by")
+  /// For applied drafts: the backup revision saved just before applying.
+  backupId        String?   @map("backup_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([siteId, number])
+  @@index([workspaceId, siteId, createdAt])
+  @@map("site_revisions")
+}
+
+// ShapesOS Phase 11 (seotools): one sitemap submission for a site — to
+// Google Search Console (the project's connected GSC property) or IndexNow
+// (keyless; Bing, Yandex, Seznam, Naver …). status: submitted |
+// not_connected | needs_reconnect | failed — a submission that did not
+// reach the engine is never recorded as submitted.
+// FORCE RLS on app.workspace_id; cascades from workspaces and sites.
+model SiteSitemapSubmission {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId      String    @map("site_id")
+  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// gsc | indexnow
+  target      String
+  /// submitted | not_connected | needs_reconnect | failed
+  status      String
+  sitemapUrl  String    @map("sitemap_url")
+  urlCount    Int       @default(0) @map("url_count")
+  httpStatus  Int?      @map("http_status")
+  detail      String?
+  submittedBy String?   @map("submitted_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, siteId, createdAt])
+  @@map("site_sitemap_submissions")
 }
 
 // Marketr — hosting deploy targets (milestone 9). Tokens encrypted in
@@ -1575,6 +1828,8 @@ model Site {
 enum DeployTargetType {
   vercel
   cloudflare_pages @map("cloudflare-pages")
+  // Phase 9 (sites): Netlify file-digest deploys.
+  netlify
 }
 
 model HostingConnection {
@@ -1614,6 +1869,12 @@ model Deployment {
   deploymentId String?          @map("deployment_id")
   status       String           @default("queued")
   mock         Boolean          @default(false)
+  // Phase 9 (sites): the provider-side project the deploy went to (Vercel
+  // project id, Cloudflare Pages project name, Netlify site id) — needed to
+  // roll back and to deploy the next version into the same place.
+  providerProject String?       @map("provider_project")
+  // Phase 9 (sites): set on a rollback row — the Deployment row restored.
+  rollbackOf      String?       @map("rollback_of")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2946,9 +3207,47 @@ model Workflow {
   nodes WorkflowNode[]
   edges WorkflowEdge[]
   runs  WorkflowRun[]
+  // Phase 6: signing secret for the webhook trigger's inbound URL (1:1).
+  webhook         WorkflowWebhook?
+  webhookReceipts WorkflowWebhookReceipt[]
 
   @@index([projectId, status])
   @@map("workflows")
+}
+
+// Phase 6 (runtime): the webhook trigger's signing secret. One per workflow,
+// minted on demand from the canvas, shown once, stored only as a secrets()
+// envelope (same convention as webhook_endpoints.secret_enc). Kept out of the
+// workflows row so GET /api/workflows/[id] never carries it.
+model WorkflowWebhook {
+  workflowId     String    @id @map("workflow_id")
+  workflow       Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  secretEnc      String    @map("secret_enc")
+  secretHint     String    @map("secret_hint")
+  createdBy      String?   @map("created_by")
+  lastReceivedAt DateTime? @map("last_received_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("workflow_webhooks")
+}
+
+// Phase 6 (runtime): replay guard for the inbound workflow webhook. Each
+// accepted signature is recorded once per workflow; the same signed request
+// inside the 5-minute window is refused. Rows older than the window are
+// pruned on the next receipt.
+model WorkflowWebhookReceipt {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  // The v1 HMAC (hex) that verified — unique per signed request.
+  signature  String
+  runId      String?  @map("run_id")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@unique([workflowId, signature])
+  @@index([workflowId, receivedAt])
+  @@map("workflow_webhook_receipts")
 }
 
 model WorkflowNode {
@@ -3342,7 +3641,7 @@ model WorkspaceSettings {
   notificationDefaults Json?     @map("notification_defaults")
   dataGovernance       Json?     @map("data_governance")
   // Tool namespaces the agent may use; empty = all enabled.
-  agentAllowList       String[]  @map("agent_allow_list")
+  agentAllowList       String[]  @default([]) @map("agent_allow_list")
   // Phase 14: manual risk-tier overrides for Composio tools, keyed by tool
   // slug → "low" | "medium" | "high". Overrides win over verb-derived
   // classification (spec §3).
@@ -3701,6 +4000,18 @@ model UsageEvent {
   // meter() in-transaction; the invoice cron sums this per month. 0 for
   // in-cap charges and zero-cost actions. See SEAM.md "Overage accrual".
   overageCredits Int       @default(0) @map("overage_credits")
+  // Phase 7: LLM token usage (action "llm_tokens", written by lib/llm/usage.ts
+  // through meter()). Null on every other action. Token counts per class —
+  // inputTokens is the uncached remainder — plus the estimated vendor cost in
+  // micro-USD (lib/llm/pricing.ts; null when a price is unknown, never guessed).
+  llmProvider         String? @map("llm_provider")
+  llmModel            String? @map("llm_model")
+  llmWorkload         String? @map("llm_workload")
+  llmInputTokens      Int?    @map("llm_input_tokens")
+  llmOutputTokens     Int?    @map("llm_output_tokens")
+  llmCacheReadTokens  Int?    @map("llm_cache_read_tokens")
+  llmCacheWriteTokens Int?    @map("llm_cache_write_tokens")
+  llmCostMicroUsd     BigInt? @map("llm_cost_micro_usd")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
@@ -3883,6 +4194,8 @@ model Pipeline {
 
   leads        Lead[]
   captureForms LeadCaptureForm[]
+  // Phase 10 (ops-core): real deals on this pipeline's stages.
+  opsDeals     OpsDeal[]
 
   @@index([workspaceId])
   @@map("crm_pipelines")
@@ -4420,6 +4733,8 @@ model NurtureSequence {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   enrollments SequenceEnrollment[]
+  // Phase 12 (people): events whose attendees get this sequence as reminders.
+  opsEvents   OpsEvent[]
 
   @@index([workspaceId, status])
   @@map("nurture_sequence")
@@ -8983,6 +9298,11 @@ enum AgentRunEventType {
   gate
   browser
   note
+  // Phase 7: one model call's tokens + estimated cost (lib/llm/usage.ts).
+  usage
+  // Phase 8: streamed model text (chunks of deltas, lib/agents/loop.ts) —
+  // what the AG-UI SSE route replays live; not a timeline step.
+  text
 
   @@map("AgentRunEventType")
 }
@@ -9017,12 +9337,46 @@ model AgentRun {
 
   recording AgentRunRecording?
   events    AgentRunEvent[]
+  // Phase 8: the loop's saved transcript (resume after a crash) and the
+  // queue jobs that worked on this run.
+  transcript AgentRunTranscript?
+  jobs       AgentJob[]
+  // Phase 8: the code sandbox this run works in (lib/sandbox).
+  sandbox   AgentRunSandbox?
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
   @@index([workspaceId, missionId])
   @@index([workspaceId, parentRunId])
   @@map("agent_runs")
+}
+
+// Phase 8: the code sandbox an agent run works in (lib/sandbox). One row per
+// run (run_id unique): the provider ("docker" | "e2b" | "daytona"), the
+// provider's sandbox id, the ports exposed for previews, and when it was
+// destroyed (run finished, Stop, idle timeout noticed). The sandbox itself
+// lives in the provider; this row is how a run finds it again and how the
+// restore / preview routes check it is still alive. FORCE RLS.
+model AgentRunSandbox {
+  id           String    @id @default(cuid()) @map("id")
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId        String    @unique @map("run_id")
+  run          AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  provider     String    @map("provider")
+  sandboxId    String    @map("sandbox_id")
+  // "active" | "destroyed"
+  status       String    @default("active") @map("status")
+  exposedPorts Int[]     @default([]) @map("exposed_ports")
+  // Provider access material a different process needs to reattach (E2B's
+  // traffic token for previews), as a secrets() envelope. Never sent out.
+  secretEnc    String?   @map("secret_enc")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastUsedAt   DateTime  @default(now()) @map("last_used_at")
+  destroyedAt  DateTime? @map("destroyed_at")
+
+  @@index([workspaceId, status])
+  @@map("agent_run_sandboxes")
 }
 
 model AgentRunRecording {
@@ -9065,6 +9419,78 @@ model AgentRunEvent {
   @@unique([runId, seq])
   @@index([workspaceId, runId, seq])
   @@map("agent_run_events")
+}
+
+// ============================================================================
+// Phase 8: agent runtime — durable queue + resumable transcripts.
+//
+// agent_jobs: one row per unit of background agent work (a chat turn handed
+// off by the request, a mission launch). Workers claim rows with
+// FOR UPDATE SKIP LOCKED (lib/jobs/claim.ts), hold a lease they extend on a
+// heartbeat, and a row whose lease expired is claimed again until
+// max_attempts, then it is `dead`. FORCE RLS on app.workspace_id like
+// agent_runs; a worker finds WHICH workspaces have due work through a
+// SELECT-only discovery policy keyed on app.agent_worker='discover'
+// (migration 20261009100000).
+// agent_run_transcripts: the agent loop's state (messages, tool results,
+// step / cost counters) saved after every step, so a requeued job resumes
+// from the last step and never re-runs a tool whose result was saved.
+// ============================================================================
+
+enum AgentJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+  dead
+
+  @@map("AgentJobStatus")
+}
+
+model AgentJob {
+  id          String         @id @default(cuid()) @map("id")
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Handler key (lib/agents/queue/handlers.ts): chat_turn | mission | …
+  kind        String         @map("kind")
+  payload     Json           @map("payload")
+  status      AgentJobStatus @default(queued) @map("status")
+  attempts    Int            @default(0) @map("attempts")
+  maxAttempts Int            @default(3) @map("max_attempts")
+  // Not claimable before this (retry backoff).
+  runAfter    DateTime       @default(now()) @map("run_after")
+  heartbeatAt DateTime?      @map("heartbeat_at")
+  // A running row whose lease passed is presumed orphaned (worker died).
+  leaseUntil  DateTime?      @map("lease_until")
+  lockedBy    String?        @map("locked_by")
+  // The AgentRun this job works on (the run carries the transcript).
+  runId       String?        @map("run_id")
+  run         AgentRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  lastError   String?        @map("last_error")
+  result      Json?          @map("result")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  finishedAt  DateTime?      @map("finished_at")
+
+  @@index([status, runAfter])
+  @@index([workspaceId, status, runAfter])
+  @@index([workspaceId, runId])
+  @@map("agent_jobs")
+}
+
+model AgentRunTranscript {
+  runId       String    @id @map("run_id")
+  run         AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // lib/agents/loop.ts LoopState (versioned JSON).
+  state       Json      @map("state")
+  step        Int       @default(0) @map("step")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("agent_run_transcripts")
 }
 
 // ============================================================================
@@ -9128,6 +9554,576 @@ model ReportSendApproval {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — CRM accounts: companies, contacts, deals. Lead stays
+// the capture record (forms, imports, inbox); converting a lead dedupes onto
+// a Contact (by email) and Company (by domain, then name). A Deal is a real
+// opportunity on a CRM pipeline's stage machine (crm_pipelines.stages).
+// ============================================================================
+
+enum OpsDealStatus {
+  open
+  won
+  lost
+}
+
+model OpsCompany {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Lower-cased registrable domain ("acme.com"); the dedupe key when set.
+  domain      String?
+  website     String?
+  phone       String?
+  industry    String?
+  // Owning user (Auth.js subject id), optional.
+  ownerId     String?   @map("owner_id")
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  contacts OpsContact[]
+  deals    OpsDeal[]
+
+  @@unique([workspaceId, domain])
+  @@index([workspaceId, name])
+  @@map("ops_companies")
+}
+
+model OpsContact {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  companyId   String?     @map("company_id")
+  company     OpsCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name        String
+  // Lower-cased; the dedupe key when set.
+  email       String?
+  phone       String?
+  title       String?
+  ownerId     String?     @map("owner_id")
+  // The capture lead this contact was converted from (crm_leads.id).
+  leadId      String?     @map("lead_id")
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  deals   OpsDeal[]
+  tickets OpsTicket[]
+  // Phase 12 (people): event registrations + attendees.
+  eventRegistrations OpsEventRegistration[]
+  eventAttendees     OpsEventAttendee[]
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, leadId])
+  @@index([workspaceId, companyId])
+  @@index([workspaceId, name])
+  @@map("ops_contacts")
+}
+
+model OpsDeal {
+  id              String        @id @default(cuid())
+  workspaceId     String        @map("workspace_id")
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title           String
+  // Stage machine: crm_pipelines.stages; stage must be one of its ids.
+  pipelineId      String        @map("pipeline_id")
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage           String
+  // Integer cents.
+  valueCents      Int           @default(0) @map("value_cents")
+  status          OpsDealStatus @default(open)
+  ownerId         String?       @map("owner_id")
+  ownerName       String?       @map("owner_name")
+  contactId       String?       @map("contact_id")
+  contact         OpsContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId       String?       @map("company_id")
+  company         OpsCompany?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  // The capture lead this deal came from (crm_leads.id), if any.
+  leadId          String?       @map("lead_id")
+  expectedCloseAt DateTime?     @map("expected_close_at")
+  closedAt        DateTime?     @map("closed_at")
+  lostReason      String?       @map("lost_reason")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  projects OpsProject[]
+
+  @@index([workspaceId, pipelineId, stage])
+  @@index([workspaceId, status, expectedCloseAt])
+  @@index([workspaceId, leadId])
+  @@map("ops_deals")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — projects: tasks (kanban), user-linked timesheets
+// with approval and rates, billing approved time onto draft invoices.
+// ============================================================================
+
+enum OpsTaskStage {
+  backlog
+  todo
+  in_progress
+  review
+  done
+  cancelled
+}
+
+enum OpsTaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTimesheetStatus {
+  pending
+  approved
+  rejected
+}
+
+model OpsTask {
+  id              String          @id @default(cuid())
+  workspaceId     String          @map("workspace_id")
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId       String          @map("project_id")
+  project         OpsProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?         @db.Text
+  stage           OpsTaskStage    @default(todo)
+  priority        OpsTaskPriority @default(normal)
+  // Workspace member (Auth.js subject id), validated on write.
+  assigneeId      String?         @map("assignee_id")
+  dueAt           DateTime?       @map("due_at")
+  estimateMinutes Int?            @map("estimate_minutes")
+  completedAt     DateTime?       @map("completed_at")
+  // Phase 10 (portal): shown to linked clients in the client portal.
+  clientVisible   Boolean         @default(false) @map("client_visible")
+  createdBy       String?         @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  timeEntries OpsTimeEntry[]
+
+  @@index([workspaceId, projectId, stage])
+  @@index([workspaceId, assigneeId, stage])
+  @@map("ops_tasks")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — helpdesk: tickets, ticket messages, SLA policies.
+// Inbound email reaches tickets through the EXISTING signed inbound route
+// (app/api/messaging/inbound/email): mail to the workspace's signed support
+// address — or an unknown sender replying to its reply address — opens or
+// threads onto a ticket. Replies go out through the messaging email
+// provider (lib/messaging/provider.ts).
+// ============================================================================
+
+enum OpsTicketStatus {
+  new
+  open
+  pending
+  solved
+  closed
+}
+
+enum OpsTicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTicketChannel {
+  email
+  web
+  phone
+  chat
+  agent
+}
+
+enum OpsTicketMessageDirection {
+  inbound
+  outbound
+  note
+}
+
+model OpsSlaPolicy {
+  id                   String            @id @default(cuid())
+  workspaceId          String            @map("workspace_id")
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  priority             OpsTicketPriority
+  // Calendar minutes from ticket creation.
+  firstResponseMinutes Int               @map("first_response_minutes")
+  resolutionMinutes    Int               @map("resolution_minutes")
+  active               Boolean           @default(true)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, priority])
+  @@map("ops_sla_policies")
+}
+
+model OpsTicket {
+  id                 String            @id @default(cuid())
+  workspaceId        String            @map("workspace_id")
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Per-workspace sequence shown as "#123" (threads replies by subject).
+  number             Int
+  subject            String
+  status             OpsTicketStatus   @default(new)
+  priority           OpsTicketPriority @default(normal)
+  channel            OpsTicketChannel  @default(web)
+  requesterEmail     String?           @map("requester_email")
+  requesterName      String?           @map("requester_name")
+  contactId          String?           @map("contact_id")
+  contact            OpsContact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Workspace member (Auth.js subject id).
+  assigneeId         String?           @map("assignee_id")
+  firstResponseDueAt DateTime?         @map("first_response_due_at")
+  resolutionDueAt    DateTime?         @map("resolution_due_at")
+  firstRespondedAt   DateTime?         @map("first_responded_at")
+  solvedAt           DateTime?         @map("solved_at")
+  closedAt           DateTime?         @map("closed_at")
+  // Set once by the SLA sweep when a target is missed (notifies once).
+  slaBreachedAt      DateTime?         @map("sla_breached_at")
+  slaBreachKind      String?           @map("sla_breach_kind")
+  lastMessageAt      DateTime          @default(now()) @map("last_message_at")
+  createdBy          String?           @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  messages OpsTicketMessage[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, priority])
+  @@index([workspaceId, assigneeId, status])
+  @@index([workspaceId, requesterEmail])
+  @@map("ops_tickets")
+}
+
+model OpsTicketMessage {
+  id             String                    @id @default(cuid())
+  workspaceId    String                    @map("workspace_id")
+  workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ticketId       String                    @map("ticket_id")
+  ticket         OpsTicket                 @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  direction      OpsTicketMessageDirection
+  authorUserId   String?                   @map("author_user_id")
+  fromEmail      String?                   @map("from_email")
+  toEmail        String?                   @map("to_email")
+  body           String                    @db.Text
+  // Inbound: the Resend email id (idempotency). Outbound: provider sid.
+  providerSid    String?                   @map("provider_sid")
+  // Outbound delivery: queued | sent | failed.
+  deliveryStatus String?                   @map("delivery_status")
+  error          String?
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, providerSid])
+  @@index([workspaceId, ticketId, createdAt])
+  @@map("ops_ticket_messages")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — HR: departments, team members linked to workspace
+// users, leave policies + an append-only leave ledger (balances are COMPUTED
+// from policy accrual, carry-over cap and the ledger), recruiting pipeline.
+// ============================================================================
+
+enum OpsLeaveLedgerKind {
+  taken
+  adjustment
+}
+
+enum OpsJobOpeningStatus {
+  open
+  paused
+  closed
+}
+
+enum OpsApplicantStage {
+  applied
+  screening
+  interview
+  offer
+  hired
+  rejected
+}
+
+model OpsDepartment {
+  id              String         @id @default(cuid())
+  workspaceId     String         @map("workspace_id")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  managerMemberId String?        @map("manager_member_id")
+  manager         OpsTeamMember? @relation("OpsDepartmentManager", fields: [managerMemberId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  members  OpsTeamMember[] @relation("OpsDepartmentMembers")
+  openings OpsJobOpening[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_departments")
+}
+
+// Yearly entitlement per leave type, accrued pro rata by month; unused days
+// carry into the next year up to the cap.
+model OpsLeavePolicy {
+  id               String       @id @default(cuid())
+  workspaceId      String       @map("workspace_id")
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type             OpsLeaveType
+  yearlyDays       Int          @map("yearly_days")
+  carryOverCapDays Int          @default(0) @map("carry_over_cap_days")
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, type])
+  @@map("ops_leave_policies")
+}
+
+// Append-only: approved leave posts one "taken" row (once per request);
+// corrections are signed adjustments. Amounts in hundredths of a day.
+model OpsLeaveLedger {
+  id             String             @id @default(cuid())
+  workspaceId    String             @map("workspace_id")
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId       String             @map("member_id")
+  member         OpsTeamMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type           OpsLeaveType
+  year           Int
+  kind           OpsLeaveLedgerKind
+  centidays      Int
+  leaveRequestId String?            @unique @map("leave_request_id")
+  note           String?
+  actor          String?
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@index([workspaceId, memberId, type, year])
+  @@map("ops_leave_ledger")
+}
+
+model OpsJobOpening {
+  id           String              @id @default(cuid())
+  workspaceId  String              @map("workspace_id")
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title        String
+  departmentId String?             @map("department_id")
+  department   OpsDepartment?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location     String?
+  description  String?             @db.Text
+  status       OpsJobOpeningStatus @default(open)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  applicants OpsApplicant[]
+
+  @@index([workspaceId, status])
+  @@map("ops_job_openings")
+}
+
+model OpsApplicant {
+  id           String            @id @default(cuid())
+  workspaceId  String            @map("workspace_id")
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  openingId    String            @map("opening_id")
+  opening      OpsJobOpening     @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  source       String?
+  stage        OpsApplicantStage @default(applied)
+  // 1–5, optional.
+  rating       Int?
+  notes        String?           @db.Text
+  // Set when hired: the team member created for them.
+  hiredMemberId String?          @map("hired_member_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([workspaceId, openingId, stage])
+  @@map("ops_applicants")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — inventory: warehouses, locations, variants,
+// transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
+// pattern, same append-only stock ledger). Phase 13's digital twin binds
+// racks/bins/docks to OpsLocation rows — keep the hierarchy clean:
+// warehouse → zone → aisle → rack → shelf → bin (docks sit under the
+// warehouse or a zone). Per-location stock is DERIVED from the ledger
+// (OpsInventoryTxn.locationId/variantId), never stored separately.
+// ============================================================================
+
+enum OpsLocationKind {
+  zone
+  aisle
+  rack
+  shelf
+  bin
+  dock
+}
+
+enum OpsTransferStatus {
+  draft
+  done
+  cancelled
+}
+
+model OpsWarehouse {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Short code shown everywhere, e.g. "WH-01". Unique per workspace.
+  code        String
+  address     String?   @db.Text
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  locations    OpsLocation[]
+  reorderRules OpsReorderRule[]
+  // Phase 13 (twincore): the digital twin layout over this warehouse (one).
+  twinSite     OpsSite?
+
+  @@unique([workspaceId, code])
+  @@map("ops_warehouses")
+}
+
+model OpsLocation {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouseId String          @map("warehouse_id")
+  warehouse   OpsWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Null = directly under the warehouse.
+  parentId    String?         @map("parent_id")
+  parent      OpsLocation?    @relation("OpsLocationTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children    OpsLocation[]   @relation("OpsLocationTree")
+  kind        OpsLocationKind
+  // Code unique within the warehouse, e.g. "A", "A-03", "A-03-2-B".
+  code        String
+  name        String?
+  // Denormalized display path "WH-01/A/A-03/A-03-2-B" (set on create;
+  // codes are immutable so it never goes stale).
+  path        String
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  inventoryTxns    OpsInventoryTxn[]
+  transfersOut     OpsTransfer[]     @relation("OpsTransferFrom")
+  transfersIn      OpsTransfer[]     @relation("OpsTransferTo")
+  reorderReceiving OpsReorderRule[]
+  // Phase 12 (mfgpos)
+  workCenters      OpsWorkCenter[]
+  moComponentsFrom OpsManufacturingOrder[] @relation("OpsMoComponentLocation")
+  moFinishedTo     OpsManufacturingOrder[] @relation("OpsMoFinishedLocation")
+  scrapsFrom       OpsScrap[]
+  posRegisters     OpsPosRegister[]
+  // Phase 13 (twincore): dock bookings at this dock; equipment tasks here.
+  dockBookings     OpsDockBooking[]
+  equipmentTasks   OpsSiteObject[]
+
+  @@unique([warehouseId, code])
+  @@index([workspaceId, warehouseId, parentId])
+  @@map("ops_locations")
+}
+
+// A sellable variant of a product with its own SKU/attributes. Products
+// without explicit variants get ONE default variant (isDefault) — created
+// by the migration for existing products and lazily for new ones on their
+// first stock move — so stockQty users keep working (stockQty stays the
+// product total).
+model OpsProductVariant {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String     @map("product_id")
+  product     OpsProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku         String
+  name        String
+  // { color: "red", size: "L" }
+  attributes  Json       @default("{}")
+  // Null = the product's price.
+  priceCents  Int?       @map("price_cents")
+  isDefault   Boolean    @default(false) @map("is_default")
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+  reorderRules  OpsReorderRule[]
+
+  @@unique([workspaceId, sku])
+  @@index([workspaceId, productId])
+  @@map("ops_product_variants")
+}
+
+// Stock transfer between two locations: draft → done (books a paired
+// -qty/+qty txn per line in ONE transaction; product totals unchanged) or
+// cancelled. lines: [{ productId, variantId?, qty }].
+model OpsTransfer {
+  id             String            @id @default(cuid())
+  workspaceId    String            @map("workspace_id")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromLocationId String            @map("from_location_id")
+  fromLocation   OpsLocation       @relation("OpsTransferFrom", fields: [fromLocationId], references: [id], onDelete: NoAction)
+  toLocationId   String            @map("to_location_id")
+  toLocation     OpsLocation       @relation("OpsTransferTo", fields: [toLocationId], references: [id], onDelete: NoAction)
+  lines          Json
+  status         OpsTransferStatus @default(draft)
+  note           String?           @db.Text
+  createdBy      String?           @map("created_by")
+  doneAt         DateTime?         @map("done_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+  // Phase 13 (twincore): trucks booked to carry this stock move.
+  dockBookings  OpsDockBooking[]
+
+  @@index([workspaceId, status, createdAt])
+  @@map("ops_transfers")
+}
+
+// Min/max reorder rule per product (+ optional variant) and warehouse.
+// The reorder cron drafts ONE OpsPurchaseOrder per breach (never sends —
+// sending stays gated): openPurchaseOrderId holds the draft until it is
+// received or cancelled, so a breach never drafts twice.
+model OpsReorderRule {
+  id                  String             @id @default(cuid())
+  workspaceId         String             @map("workspace_id")
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId           String             @map("product_id")
+  product             OpsProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId           String?            @map("variant_id")
+  variant             OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId         String             @map("warehouse_id")
+  warehouse           OpsWarehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Where receipts land (must be inside the warehouse); null = unlocated.
+  receiveLocationId   String?            @map("receive_location_id")
+  receiveLocation     OpsLocation?       @relation(fields: [receiveLocationId], references: [id], onDelete: SetNull)
+  minQty              Int                @map("min_qty")
+  maxQty              Int                @map("max_qty")
+  supplierName        String?            @map("supplier_name")
+  unitCostCents       Int?               @map("unit_cost_cents")
+  active              Boolean            @default(true)
+  openPurchaseOrderId String?            @map("open_purchase_order_id")
+  lastTriggeredAt     DateTime?          @map("last_triggered_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, productId, warehouseId, variantId])
+  @@index([workspaceId, active])
+  @@map("ops_reorder_rules")
+}
+
+// ============================================================================
 // Phase 17 slice 1 — Business Operations: DocType-style entity convention.
 //
 // Every Operations entity is tenant-scoped (workspace_id FK, ON DELETE
@@ -9155,6 +10151,8 @@ enum OpsOrderStatus {
 enum OpsPaymentKind {
   charge
   refund
+  // Phase 10 (finance): money paid OUT to a vendor against a bill.
+  payout
 }
 
 enum OpsPaymentStatus {
@@ -9169,6 +10167,10 @@ enum OpsPurchaseOrderStatus {
   sent
   received
   cancelled
+  // Phase 10 (finance): RFQ stage before the PO, and partial receipts.
+  rfq
+  rfq_sent
+  partially_received
 }
 
 enum OpsInvoiceStatus {
@@ -9183,6 +10185,14 @@ enum OpsInventoryReason {
   sale
   restock
   adjustment
+  // Phase 10 (ops-core): one leg of a location-to-location transfer.
+  transfer
+  // Phase 12 (mfgpos): a manufacturing order uses up components
+  // (consumption, negative), adds finished goods (production, positive);
+  // scrap writes stock off to the virtual scrap location (negative).
+  production
+  consumption
+  scrap
 }
 
 enum OpsProjectStatus {
@@ -9234,10 +10244,23 @@ model OpsProduct {
   // Low-stock alert threshold: alert when trackInventory && stockQty <=
   // lowStockThreshold. Slice 3. Default 0 = alert only when out of stock.
   lowStockThreshold Int       @default(0) @map("low_stock_threshold")
+  // Phase 10 (store): inactive products are never sold on the storefront.
+  active            Boolean   @default(true)
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
+  // Phase 10 (store)
+  storeListings OpsStoreListing[]
+  // Phase 10 (ops-core)
+  variants      OpsProductVariant[]
+  reorderRules  OpsReorderRule[]
+  // Phase 12 (mfgpos): CAD parts that ARE this product (component link),
+  // routings and manufacturing orders that make it, scrap write-offs.
+  cadParts            CadPart[]
+  routings            OpsRouting[]
+  manufacturingOrders OpsManufacturingOrder[]
+  scraps              OpsScrap[]
 
   @@unique([workspaceId, sku])
   @@index([workspaceId, name])
@@ -9259,13 +10282,43 @@ model OpsOrder {
   subtotalCents Int            @map("subtotal_cents")
   taxCents      Int            @default(0) @map("tax_cents")
   totalCents    Int            @map("total_cents")
+  // Phase 10 (finance): the quote this order was converted from.
+  quoteId       String?        @map("quote_id")
+  // ---- Phase 10 (store) ----
+  // Where the order came from: manual | web (storefront checkout) | quote | workflow.
+  source          String        @default("manual")
+  storeId         String?       @map("store_id")
+  store           OpsStore?     @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  // Buyer details (web orders: from the Stripe Checkout Session).
+  customerEmail   String?       @map("customer_email")
+  customerName    String?       @map("customer_name")
+  // Server-computed promotion discount; totalCents = subtotal - discount + tax.
+  discountCents   Int           @default(0) @map("discount_cents")
+  promotionId     String?       @map("promotion_id")
+  promotion       OpsPromotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionCode   String?       @map("promotion_code")
+  // Tenant Stripe Checkout Session (never the platform billing key).
+  stripeSessionId String?       @map("stripe_session_id")
+  paidAt          DateTime?     @map("paid_at")
+  // ---- Phase 12 (mfgpos): point of sale (source "pos") ----
+  posSessionId    String?        @map("pos_session_id")
+  posSession      OpsPosSession? @relation(fields: [posSessionId], references: [id], onDelete: SetNull)
+  // Client-generated id of a till sale: the offline queue replays it, the
+  // unique key makes the replay a no-op (one order per client order id).
+  clientOrderId   String?        @map("client_order_id")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   payments OpsPayment[]
+  // Phase 13 (twincore): the outbound trucks booked for this order.
+  dockBookings OpsDockBooking[]
 
+  @@unique([workspaceId, clientOrderId])
+  @@index([workspaceId, posSessionId])
+  @@unique([workspaceId, stripeSessionId])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, customerId])
+  @@index([workspaceId, source, createdAt])
   @@map("ops_orders")
 }
 
@@ -9285,8 +10338,17 @@ model OpsPayment {
   status      OpsPaymentStatus @default(pending)
   // Provider-side reference (Stripe payment intent / charge id).
   providerRef String?          @map("provider_ref")
+  // Phase 10 (finance): a customer payment applied to an invoice (partial
+  // payments: many rows per invoice), or a payout against a vendor bill.
+  invoiceId   String?          @map("invoice_id")
+  invoice     OpsInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  billId      String?          @map("bill_id")
+  bill        OpsVendorBill?   @relation(fields: [billId], references: [id], onDelete: SetNull)
+  note        String?          @db.Text
   createdAt   DateTime         @default(now()) @map("created_at")
 
+  @@index([workspaceId, invoiceId])
+  @@index([workspaceId, billId])
   @@index([workspaceId, orderId, createdAt])
   @@index([workspaceId, kind, status])
   @@map("ops_payments")
@@ -9303,8 +10365,14 @@ model OpsPromotion {
   usageLimit  Int?      @map("usage_limit")
   usedCount   Int       @default(0) @map("used_count")
   active      Boolean   @default(true)
+  // Phase 10 (store): optional validity window (null = open-ended).
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Phase 10 (store)
+  orders OpsOrder[]
 
   @@unique([workspaceId, code])
   @@index([workspaceId, active])
@@ -9314,28 +10382,55 @@ model OpsPromotion {
 // Invoice: draft → sent → paid (overdue derived by age). Sending is a
 // gated write (medium, approval required — money is a red lane).
 model OpsInvoice {
-  id             String           @id @default(cuid())
-  workspaceId    String           @map("workspace_id")
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // CRM adjacency: the lead-turned-customer being billed.
-  customerId     String?          @map("customer_id")
+  customerId      String?          @map("customer_id")
   // [{ description, qty, priceCents }]
-  lineItems      Json             @map("line_items")
-  taxCents       Int              @default(0) @map("tax_cents")
-  totalCents     Int              @map("total_cents")
-  status         OpsInvoiceStatus @default(draft)
-  sentAt         DateTime?        @map("sent_at")
+  lineItems       Json             @map("line_items")
+  taxCents        Int              @default(0) @map("tax_cents")
+  totalCents      Int              @map("total_cents")
+  status          OpsInvoiceStatus @default(draft)
+  sentAt          DateTime?        @map("sent_at")
   // Payment due date. Set explicitly at draft time or defaulted to
   // sentAt + 30 days when the invoice is sent. Drives the overdue sweep.
-  dueAt          DateTime?        @map("due_at")
+  dueAt           DateTime?        @map("due_at")
   // Idempotency / dedupe key for agent retries (nullable = not set).
-  idempotencyKey String?          @map("idempotency_key")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  idempotencyKey  String?          @map("idempotency_key")
+  // ---- Phase 10 (finance) ----
+  // invoice | credit_note (a credit note is a negative document linked to
+  // the invoice it credits; amounts are stored positive, kind is the sign).
+  kind            OpsInvoiceKind   @default(invoice)
+  // Gap-free per-workspace number (INV-0001 / CN-0001), assigned on send.
+  number          String?
+  // Applied customer payments and credit notes; balance due =
+  // totalCents - paidCents - creditedCents. Paid when the balance is 0.
+  paidCents       Int              @default(0) @map("paid_cents")
+  creditedCents   Int              @default(0) @map("credited_cents")
+  creditNoteOfId  String?          @map("credit_note_of_id")
+  creditNoteOf    OpsInvoice?      @relation("OpsCreditNotes", fields: [creditNoteOfId], references: [id], onDelete: SetNull)
+  creditNotes     OpsInvoice[]     @relation("OpsCreditNotes")
+  quoteId         String?          @map("quote_id")
+  recurringId     String?          @map("recurring_id")
+  // Recipient override (else the CRM lead's email).
+  customerEmail   String?          @map("customer_email")
+  // Last email delivery: sent | fake | not_configured | no_recipient | failed.
+  deliveryStatus  String?          @map("delivery_status")
+  deliveredAt     DateTime?        @map("delivered_at")
+  // Tenant Stripe Checkout (never the platform billing key).
+  paymentLinkUrl  String?          @map("payment_link_url") @db.Text
+  stripeSessionId String?          @map("stripe_session_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  payments OpsPayment[]
 
   @@unique([workspaceId, idempotencyKey])
+  @@unique([workspaceId, number])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, customerId])
+  @@index([workspaceId, creditNoteOfId])
   @@map("ops_invoices")
 }
 
@@ -9354,10 +10449,20 @@ model OpsInventoryTxn {
   // Who/what moved the stock: user id or "agent:<surface>".
   actor       String?
   note        String?            @db.Text
+  // Phase 10 (ops-core): where and which variant. Null location =
+  // unlocated stock (pre-location history); variant backfilled to the
+  // product's default variant.
+  variantId   String?            @map("variant_id")
+  variant     OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: NoAction)
+  locationId  String?            @map("location_id")
+  location    OpsLocation?       @relation(fields: [locationId], references: [id], onDelete: NoAction)
+  transferId  String?            @map("transfer_id")
+  transfer    OpsTransfer?       @relation(fields: [transferId], references: [id], onDelete: NoAction)
   createdAt   DateTime           @default(now()) @map("created_at")
 
   @@index([workspaceId, productId, createdAt])
   @@index([workspaceId, reason, createdAt])
+  @@index([workspaceId, locationId, productId])
   @@map("ops_inventory_txns")
 }
 
@@ -9380,11 +10485,22 @@ model OpsPurchaseOrder {
   status        OpsPurchaseOrderStatus @default(draft)
   sentAt        DateTime?              @map("sent_at")
   receivedAt    DateTime?              @map("received_at")
+  // Phase 10 (finance): the vendor record (supplierId/supplierName stay
+  // readable for older rows; the migration linked them to vendors).
+  vendorId      String?                @map("vendor_id")
+  vendor        OpsVendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  rfqSentAt     DateTime?              @map("rfq_sent_at")
   createdAt     DateTime               @default(now()) @map("created_at")
   updatedAt     DateTime               @updatedAt @map("updated_at")
 
+  receipts OpsPurchaseReceipt[]
+  bills    OpsVendorBill[]
+  // Phase 13 (twincore): the inbound trucks booked for this order.
+  dockBookings OpsDockBooking[]
+
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, supplierId])
+  @@index([workspaceId, vendorId])
   @@map("ops_purchase_orders")
 }
 
@@ -9400,11 +10516,16 @@ model OpsProject {
   status      OpsProjectStatus @default(planning)
   // CRM adjacency (Wave B canonical models).
   leadId      String?          @map("lead_id")
+  // Phase 10 (ops-core): a real relation (was a dangling string).
   dealId      String?          @map("deal_id")
+  deal        OpsDeal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  // Phase 10 (ops-core): default hourly rate for billing time (cents/hour).
+  hourlyRateCents Int?         @map("hourly_rate_cents")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   timeEntries OpsTimeEntry[]
+  tasks       OpsTask[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, leadId])
@@ -9429,15 +10550,31 @@ model OpsTimeEntry {
   actor       String?
   occurredAt  DateTime   @default(now()) @map("occurred_at")
   billed      Boolean    @default(false)
+  // Phase 10 (ops-core): whose time (workspace member subject id), the
+  // billing rate (cents/hour; null = the project's rate), the task, the
+  // approval decision, and the invoice the time was billed on. Minutes and
+  // rate stay immutable — only approval/billing metadata moves.
+  userId         String?            @map("user_id")
+  rateCents      Int?               @map("rate_cents")
+  billable       Boolean            @default(true)
+  taskId         String?            @map("task_id")
+  task           OpsTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  approvalStatus OpsTimesheetStatus @default(pending) @map("approval_status")
+  approvedBy     String?            @map("approved_by")
+  approvedAt     DateTime?          @map("approved_at")
+  // ops_invoices.id the entry was billed on (set exactly once).
+  invoiceId      String?            @map("invoice_id")
   createdAt   DateTime   @default(now()) @map("created_at")
 
   @@index([workspaceId, projectId, occurredAt])
   @@index([workspaceId, projectId, billed])
+  @@index([workspaceId, approvalStatus, userId])
+  @@index([workspaceId, invoiceId])
   @@map("ops_time_entries")
 }
 
 // HR essentials (Phase 17 slice 5, clean-room): team directory + leave
-// requests. v1 only — full HR (leave balances, payroll) waits for v2.
+// requests. Leave balances arrived in Phase 10; payroll in Phase 12 (people).
 model OpsTeamMember {
   id          String              @id @default(cuid())
   workspaceId String              @map("workspace_id")
@@ -9447,11 +10584,23 @@ model OpsTeamMember {
   email       String?
   startDate   DateTime?           @map("start_date")
   status      OpsTeamMemberStatus @default(active)
+  // Phase 10 (ops-core): the workspace user this person signs in as
+  // (Auth.js subject; optional) and their department.
+  userId       String?            @map("user_id")
+  departmentId String?            @map("department_id")
+  department   OpsDepartment?     @relation("OpsDepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
   leaveRequests OpsLeaveRequest[]
+  // Phase 10 (ops-core)
+  managedDepartments OpsDepartment[] @relation("OpsDepartmentManager")
+  leaveLedger        OpsLeaveLedger[]
+  // Phase 12 (people): payroll.
+  salaryAssignments  OpsSalaryAssignment[]
+  payslips           OpsPayslip[]
 
+  @@unique([workspaceId, userId])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, name])
   @@map("ops_team_members")
@@ -9526,6 +10675,382 @@ model OpsAuditEvent {
   @@index([workspaceId, entity, createdAt])
   @@index([workspaceId, entityId])
   @@map("ops_audit_events")
+}
+
+// ============================================================================
+// Phase 10 (finance): accounting core, invoicing upgrades, quotes,
+// purchasing (vendors, RFQ, receipts, bills) and company expenses.
+// Extends the Ops layer (lib/ops/*). Money is integer cents; every ledger is
+// append-only (journal entries/lines: DB triggers reject UPDATE/DELETE, and a
+// deferred constraint trigger rejects any unbalanced entry at commit).
+// All tables carry workspace_id with FORCE RLS on app.workspace_id.
+// ============================================================================
+
+enum OpsAccountType {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+enum OpsInvoiceKind {
+  invoice
+  credit_note
+}
+
+enum OpsRecurrenceCadence {
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+enum OpsQuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+}
+
+enum OpsVendorBillStatus {
+  draft
+  open
+  paid
+  cancelled
+}
+
+enum OpsExpenseClaimStatus {
+  draft
+  submitted
+  approved
+  rejected
+  reimbursed
+}
+
+// Chart of accounts. A standard small-business chart is seeded per
+// workspace on first use (lib/ops/accounting/chart.ts). systemKey marks the
+// accounts the posting rules use (ar, ap, cash, sales, tax_payable, ...).
+model OpsAccount {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  type        OpsAccountType
+  parentId    String?        @map("parent_id")
+  parent      OpsAccount?    @relation("OpsAccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    OpsAccount[]   @relation("OpsAccountTree")
+  systemKey   String?        @map("system_key")
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  lines OpsJournalLine[]
+  // Phase 11 (bizsync): the QuickBooks / Xero account this one maps to.
+  accountingLinks OpsAccountingLink[]
+
+  @@unique([workspaceId, code])
+  @@unique([workspaceId, systemKey])
+  @@index([workspaceId, type])
+  @@map("ops_accounts")
+}
+
+// Double-entry journal. Append-only: corrections are reversal entries
+// (reversalOfId), never edits. sourceKey makes posting idempotent: one entry
+// per source event ("invoice:<id>:issue", "payment:<id>", ...).
+model OpsJournalEntry {
+  id           String           @id @default(cuid())
+  workspaceId  String           @map("workspace_id")
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entryDate    DateTime         @map("entry_date")
+  memo         String?          @db.Text
+  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal | web_order (Phase 10 store)
+  sourceType   String           @default("manual") @map("source_type")
+  sourceId     String?          @map("source_id")
+  sourceKey    String?          @map("source_key")
+  reversalOfId String?          @unique @map("reversal_of_id")
+  reversalOf   OpsJournalEntry? @relation("OpsJournalReversal", fields: [reversalOfId], references: [id], onDelete: NoAction)
+  reversedBy   OpsJournalEntry? @relation("OpsJournalReversal")
+  // Σ debits (= Σ credits) for lists.
+  totalCents   Int              @map("total_cents")
+  createdBy    String           @map("created_by")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  lines OpsJournalLine[]
+
+  @@unique([workspaceId, sourceKey])
+  @@index([workspaceId, entryDate])
+  @@index([workspaceId, sourceType, sourceId])
+  @@map("ops_journal_entries")
+}
+
+// One side of a journal entry: exactly one of debit/credit is non-zero (DB
+// CHECK). entryDate is denormalized from the entry for report ranges.
+model OpsJournalLine {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entryId     String          @map("entry_id")
+  entry       OpsJournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId   String          @map("account_id")
+  account     OpsAccount      @relation(fields: [accountId], references: [id], onDelete: NoAction)
+  entryDate   DateTime        @map("entry_date")
+  debitCents  Int             @default(0) @map("debit_cents")
+  creditCents Int             @default(0) @map("credit_cents")
+  memo        String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, accountId, entryDate])
+  @@index([entryId])
+  @@map("ops_journal_lines")
+}
+
+// Tax rate in basis points (825 = 8.25%). salesAccountId is the output-tax
+// liability; purchaseAccountId the input-tax asset (defaults: the chart's
+// tax_payable / tax_receivable accounts).
+model OpsTaxRate {
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name              String
+  rateBps           Int       @map("rate_bps")
+  salesAccountId    String?   @map("sales_account_id")
+  purchaseAccountId String?   @map("purchase_account_id")
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@map("ops_tax_rates")
+}
+
+// Gap-free document numbers per workspace and kind (invoice, credit_note,
+// quote, bill, expense). Incremented with a row-locking upsert inside the
+// transaction that issues the document, so a rollback returns the number.
+model OpsNumberSequence {
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        String
+  prefix      String
+  nextValue   Int       @default(1) @map("next_value")
+  padding     Int       @default(4)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@id([workspaceId, kind])
+  @@map("ops_number_sequences")
+}
+
+// Per-workspace finance settings: invoice sender name/footer and the
+// TENANT's own Stripe keys (encrypted with lib/secrets; never the platform's
+// billing key, never sent to clients — only a hint is shown).
+model OpsFinanceSettings {
+  workspaceId            String    @id @map("workspace_id")
+  workspace              Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  currency               String    @default("USD")
+  invoiceFromName        String?   @map("invoice_from_name")
+  invoiceFooter          String?   @map("invoice_footer") @db.Text
+  stripeSecretEnc        String?   @map("stripe_secret_enc") @db.Text
+  stripeSecretHint       String?   @map("stripe_secret_hint")
+  stripeWebhookSecretEnc String?   @map("stripe_webhook_secret_enc") @db.Text
+  updatedBy              String?   @map("updated_by")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("ops_finance_settings")
+}
+
+// Recurring invoice schedule: a template + cadence. The finance cron drafts
+// the next invoice when nextRunAt passes (drafts only — sending still asks).
+model OpsRecurringInvoice {
+  id            String               @id @default(cuid())
+  workspaceId   String               @map("workspace_id")
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId    String?              @map("customer_id")
+  // [{ description, qty, priceCents, taxRateId? }]
+  lineItems     Json                 @map("line_items")
+  taxCents      Int                  @default(0) @map("tax_cents")
+  cadence       OpsRecurrenceCadence
+  intervalCount Int                  @default(1) @map("interval_count")
+  nextRunAt     DateTime             @map("next_run_at")
+  // Day of month the schedule started on (month-end clamping keeps it).
+  anchorDay     Int?                 @map("anchor_day")
+  endAt         DateTime?            @map("end_at")
+  dueDays       Int                  @default(30) @map("due_days")
+  active        Boolean              @default(true)
+  runCount      Int                  @default(0) @map("run_count")
+  lastInvoiceId String?              @map("last_invoice_id")
+  lastRunAt     DateTime?            @map("last_run_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  @@index([workspaceId, active, nextRunAt])
+  @@map("ops_recurring_invoices")
+}
+
+// Quote / estimate: draft → sent → accepted | declined | expired. Converts
+// to an OpsOrder or OpsInvoice (lines copied, links both ways).
+model OpsQuote {
+  id                 String         @id @default(cuid())
+  workspaceId        String         @map("workspace_id")
+  workspace          Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number             String?
+  customerId         String?        @map("customer_id")
+  customerEmail      String?        @map("customer_email")
+  // [{ description, qty, priceCents, taxRateId?, taxCents? }]
+  lineItems          Json           @map("line_items")
+  subtotalCents      Int            @map("subtotal_cents")
+  taxCents           Int            @default(0) @map("tax_cents")
+  totalCents         Int            @map("total_cents")
+  status             OpsQuoteStatus @default(draft)
+  validUntil         DateTime?      @map("valid_until")
+  notes              String?        @db.Text
+  sentAt             DateTime?      @map("sent_at")
+  decidedAt          DateTime?      @map("decided_at")
+  deliveryStatus     String?        @map("delivery_status")
+  convertedOrderId   String?        @map("converted_order_id")
+  convertedInvoiceId String?        @map("converted_invoice_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, customerId])
+  @@map("ops_quotes")
+}
+
+// Vendor master record (replaces the lead / free-text supplier on POs).
+model OpsVendor {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String
+  email            String?
+  phone            String?
+  taxId            String?   @map("tax_id")
+  address          String?   @db.Text
+  paymentTermsDays Int       @default(30) @map("payment_terms_days")
+  // Default expense account for this vendor's bill lines.
+  defaultAccountId String?   @map("default_account_id")
+  // Legacy link: the CRM lead that used to stand in for this supplier.
+  leadId           String?   @map("lead_id")
+  active           Boolean   @default(true)
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  purchaseOrders OpsPurchaseOrder[]
+  bills          OpsVendorBill[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, leadId])
+  @@map("ops_vendors")
+}
+
+// One receipt against a PO (partial receipts). Append-only; each receipt
+// books restock inventory txns for the received quantity in the same tx.
+model OpsPurchaseReceipt {
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  purchaseOrderId String           @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  // [{ index, productId?, name, qty }]
+  lines           Json
+  note            String?          @db.Text
+  actor           String
+  receivedAt      DateTime         @default(now()) @map("received_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([workspaceId, purchaseOrderId])
+  @@map("ops_purchase_receipts")
+}
+
+// Vendor bill: draft → open (posted to AP) → paid. Paying is gated.
+model OpsVendorBill {
+  id              String              @id @default(cuid())
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number          String?
+  vendorId        String?             @map("vendor_id")
+  vendor          OpsVendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  purchaseOrderId String?             @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  // The vendor's own invoice number.
+  vendorRef       String?             @map("vendor_ref")
+  // [{ description, qty, priceCents, taxRateId?, taxCents?, accountId? }]
+  lineItems       Json                @map("line_items")
+  subtotalCents   Int                 @map("subtotal_cents")
+  taxCents        Int                 @default(0) @map("tax_cents")
+  totalCents      Int                 @map("total_cents")
+  paidCents       Int                 @default(0) @map("paid_cents")
+  status          OpsVendorBillStatus @default(draft)
+  billDate        DateTime            @default(now()) @map("bill_date")
+  dueAt           DateTime?           @map("due_at")
+  postedAt        DateTime?           @map("posted_at")
+  paidAt          DateTime?           @map("paid_at")
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  payments OpsPayment[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, vendorId])
+  @@map("ops_vendor_bills")
+}
+
+// Company expense claim (NOT the personal WFH deduction tracker):
+// draft → submitted (approval proposed) → approved (posted) → reimbursed.
+model OpsExpenseClaim {
+  id             String                @id @default(cuid())
+  workspaceId    String                @map("workspace_id")
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number         String?
+  // The member claiming (user id) + display name at claim time.
+  claimantId     String                @map("claimant_id")
+  claimantName   String?               @map("claimant_name")
+  title          String
+  status         OpsExpenseClaimStatus @default(draft)
+  totalCents     Int                   @default(0) @map("total_cents")
+  notes          String?               @db.Text
+  submittedAt    DateTime?             @map("submitted_at")
+  approvalId     String?               @map("approval_id")
+  decidedBy      String?               @map("decided_by")
+  decidedAt      DateTime?             @map("decided_at")
+  rejectedReason String?               @map("rejected_reason")
+  reimbursedAt   DateTime?             @map("reimbursed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  lines OpsExpenseLine[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, claimantId])
+  @@map("ops_expense_claims")
+}
+
+model OpsExpenseLine {
+  id            String          @id @default(cuid())
+  workspaceId   String          @map("workspace_id")
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  claimId       String          @map("claim_id")
+  claim         OpsExpenseClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  spentAt       DateTime        @map("spent_at")
+  description   String
+  // travel | meals | software | office | other … (maps to an expense account)
+  category      String
+  accountId     String?         @map("account_id")
+  amountCents   Int             @map("amount_cents")
+  taxCents      Int             @default(0) @map("tax_cents")
+  // WorkspaceFile id of the uploaded receipt (POST /api/files).
+  receiptFileId String?         @map("receipt_file_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, claimId])
+  @@map("ops_expense_lines")
 }
 
 // ============================================================================
@@ -13042,6 +14567,9 @@ model CadBomVersion {
 
   lines     CadBomLine[]
   estimates CadCostEstimate[]
+  // Phase 12 (mfgpos): routings / manufacturing orders built from this BOM.
+  routings            OpsRouting[]
+  manufacturingOrders OpsManufacturingOrder[]
 
   @@unique([modelId, bomNumber])
   @@index([workspaceId, modelId])
@@ -13203,12 +14731,19 @@ model CadPart {
   supplierLinks CadPartSupplier[]
   bomLines      CadBomLine[]
 
+  // Phase 12 (mfgpos): the Ops product this part IS. A manufacturing order
+  // consumes BOM lines through this link (stock moves on the product); the
+  // CAD BOM stays the only BOM — no second BOM model.
+  opsProductId String?     @map("ops_product_id")
+  opsProduct   OpsProduct? @relation(fields: [opsProductId], references: [id], onDelete: SetNull)
+
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([workspaceId])
   @@index([workspaceId, category])
+  @@index([workspaceId, opsProductId])
   @@map("cad_parts")
 }
 
@@ -13598,6 +15133,56 @@ model AuthChallenge {
   @@map("auth_challenges")
 }
 
+// Phase 6: email + password accounts and email magic links. Sign-in stays
+// Auth.js stateless JWT (no adapter); an email account's stable subject is
+// user_id = "email:<normalized email>". No workspace data: no tenant RLS.
+model EmailAccount {
+  id              String    @id @default(cuid())
+  // "email:<email>" — the Auth.js subject (token.sub).
+  userId          String    @unique @map("user_id")
+  // Normalized (trimmed, lower-cased) address.
+  email           String    @unique
+  name            String?
+  // "scrypt$N$r$p$salt$hash" (lib/auth/email/password.ts). Null for
+  // magic-link-only accounts and after a magic link verifies an account whose
+  // password was never proven by the mailbox owner.
+  passwordHash    String?   @map("password_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("email_accounts")
+}
+
+enum EmailAuthTokenPurpose {
+  verify
+  login
+  reset
+}
+
+// Single-use, expiring email links. Only the SHA-256 of the token is stored;
+// consumption is one guarded UPDATE (used_at IS NULL AND expires_at > now).
+model EmailAuthToken {
+  id           String                @id @default(cuid())
+  tokenHash    String                @unique @map("token_hash")
+  // Normalized address the link was sent to (an account may not exist yet:
+  // an open-signup magic link creates it on first use).
+  email        String
+  purpose      EmailAuthTokenPurpose
+  // verify only: the password chosen in the signup that sent this link
+  // (scrypt hash). Verifying activates exactly that password, so a second
+  // signup for the same unverified address can't plant its own.
+  passwordHash String?               @map("password_hash")
+  expiresAt    DateTime              @map("expires_at")
+  usedAt       DateTime?             @map("used_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
+  @@map("email_auth_tokens")
+}
+
 model ScimToken {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
@@ -13780,4 +15365,1370 @@ model SocialPostMetric {
   @@unique([publicationId, integrationId, day])
   @@index([workspaceId, day])
   @@map("social_post_metrics")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 (runtime): in-app cron runner (lib/cron/runner.ts). One row per job
+// run, written by whichever replica claimed the run under the per-tick
+// advisory lock. Host-wide (no workspace) — read only by platform operators.
+// Pruned after CRON_RUN_RETENTION_DAYS (lib/cron/store.ts).
+// ---------------------------------------------------------------------------
+
+enum CronRunStatus {
+  running
+  ok
+  failed
+  timeout
+}
+
+model CronRun {
+  id           String        @id @default(cuid())
+  // Job key from lib/cron/jobs.ts (e.g. "webhooks", "scheduler-tick").
+  job          String
+  // The schedule slot this run covers (UTC minute).
+  scheduledFor DateTime      @map("scheduled_for")
+  startedAt    DateTime      @default(now()) @map("started_at")
+  finishedAt   DateTime?     @map("finished_at")
+  status       CronRunStatus @default(running)
+  httpStatus   Int?          @map("http_status")
+  durationMs   Int?          @map("duration_ms")
+  error        String?
+
+  @@index([job, startedAt])
+  @@index([startedAt])
+  @@map("cron_runs")
+}
+
+// Phase 6 (infra): shared rate-limit + login-lockout counters, so limits hold
+// across app replicas (lib/api/rate-limit-store.ts, RATE_LIMIT_STORE).
+// GLOBAL table, deliberately no workspace_id and no RLS: keys are opaque
+// limiter keys ("write:user:<id>", "login:ip:<ip>", ...) used BEFORE a tenant
+// is resolved (pre-auth login, the proxy). Rows hold counters and timestamps
+// only — never tenant content — and only the limiter module touches it.
+// Times are epoch milliseconds (BIGINT) so the window math is integer math.
+model RateLimitBucket {
+  key         String  @id
+  windowStart BigInt  @map("window_start")
+  count       Int
+  lockedUntil BigInt? @map("locked_until")
+  expiresAt   BigInt  @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
+}
+
+// Phase 8 (ship): what a repository is built with, detected on its first
+// clone into a run's sandbox (lockfiles → package manager; package.json
+// scripts / pyproject / Makefile → test, lint, build commands) and reused by
+// later runs (lib/sandbox/repo-profile.ts; the sandbox's run_tests reads it).
+// One row per repository per workspace; FORCE RLS on app.workspace_id.
+model RepoProfile {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // "owner/name", lower-cased.
+  repoFullName   String    @map("repo_full_name")
+  packageManager String?   @map("package_manager")
+  language       String?
+  // { install?, test?, lint?, build?, typecheck? } — shell commands.
+  commands       Json      @default("{}")
+  // Files the detection read (package.json, pnpm-lock.yaml, Makefile, …).
+  detectedFrom   String[]  @default([]) @map("detected_from")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, repoFullName])
+  @@map("repo_profiles")
+}
+
+// Phase 9 (repos): every branch an agent pushed (shapes/<runId>) and its pull
+// request, one row per (repository, branch). Written by saveShipState when a
+// push or a PR lands on a run's ship state (lib/ship/pull-requests.ts). It is
+// how a GitHub webhook (or the opt-in poller) finds the workspace, run and
+// chat thread a PR belongs to, and what the Repositories view lists.
+// FORCE RLS on app.workspace_id, plus ONE SELECT-only routing policy
+// (app.github_route = 'lookup') used to map an incoming delivery to its
+// workspace — every write runs under the row's own tenant GUC.
+model AgentPullRequest {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @map("workspace_id")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // "owner/name", lower-cased.
+  repoFullName       String    @map("repo_full_name")
+  // shapes/<runId> — the only branch this work pushes.
+  branch             String
+  // The run whose id names the branch (ShipState.cloneRunId).
+  runId              String    @map("run_id")
+  threadId           String?   @map("thread_id")
+  prNumber           Int?      @map("pr_number")
+  prUrl              String?   @map("pr_url")
+  // pushed (no PR yet) | open | closed | merged
+  state              String    @default("pushed")
+  // success | failure | pending | none (rolled-up checks on the head commit)
+  checks             String?
+  lastFeedbackAt     DateTime? @map("last_feedback_at")
+  lastFeedback       String?   @map("last_feedback")
+  lastFeedbackUrl    String?   @map("last_feedback_url")
+  // A continuation job is queued (later feedback coalesces into it).
+  pendingSince       DateTime? @map("pending_since")
+  continuations      Int       @default(0)
+  lastContinuedAt    DateTime? @map("last_continued_at")
+  lastContinuedRunId String?   @map("last_continued_run_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  deliveries GitHubWebhookDelivery[]
+
+  @@unique([repoFullName, branch])
+  @@index([workspaceId, state, updatedAt])
+  @@map("agent_pull_requests")
+}
+
+// Phase 9 (repos): GitHub feedback received for an agent pull request — one
+// row per webhook delivery (X-GitHub-Delivery) or per item the poller saw
+// ("poll:<kind>:<id>"); the primary key is the dedupe. A continuation turn
+// consumes the rows it was started for (continued_run_id).
+// FORCE RLS on app.workspace_id; cascades from the workspace and the PR row.
+model GitHubWebhookDelivery {
+  deliveryId     String           @id @map("delivery_id")
+  workspaceId    String           @map("workspace_id")
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pullRequestId  String           @map("pull_request_id")
+  pullRequest    AgentPullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  // webhook event name (pull_request_review, issue_comment, …) or "poll"
+  event          String
+  action         String?
+  // feedback (continues the work) | info (recorded only)
+  kind           String
+  author         String?
+  summary        String
+  url            String?
+  continuedRunId String?          @map("continued_run_id")
+  receivedAt     DateTime         @default(now()) @map("received_at")
+
+  @@index([workspaceId, receivedAt])
+  @@index([pullRequestId, continuedRunId])
+  @@map("github_webhook_deliveries")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 (apps): internal mini-apps. A zod-validated spec (lib/apps/spec.ts:
+// entities + fields, views, actions with a tier, per-view/action min role)
+// rendered at /dashboard/apps/[slug]; records live in a scoped JSONB store
+// validated server-side against the spec (lib/apps/records.ts). Agents can
+// only write the DRAFT spec; publishing (admin) copies it to `spec`, bumps
+// `version` and snapshots it in mini_app_versions, so records written under
+// an older version stay readable. All three tables FORCE RLS on
+// app.workspace_id and cascade from workspaces.
+// ---------------------------------------------------------------------------
+model MiniApp {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // URL segment (/dashboard/apps/<slug>); fixed at creation.
+  slug           String
+  name           String
+  description    String?
+  // The live spec (null until the first publish) and its version (0 = never published).
+  spec           Json?
+  version        Int       @default(0)
+  // False = hidden from the runtime (records kept); true once published.
+  published      Boolean   @default(false)
+  // The working draft: builder and agent edits land here, never on `spec`.
+  draftSpec      Json      @map("draft_spec")
+  draftUpdatedBy String?   @map("draft_updated_by")
+  createdBy      String    @map("created_by")
+  publishedBy    String?   @map("published_by")
+  publishedAt    DateTime? @map("published_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  versions MiniAppVersion[]
+  records  MiniAppRecord[]
+
+  @@unique([workspaceId, slug])
+  @@map("mini_apps")
+}
+
+// One immutable snapshot per published version (old records render with it).
+model MiniAppVersion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appId       String    @map("app_id")
+  app         MiniApp   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  version     Int
+  spec        Json
+  publishedBy String    @map("published_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([appId, version])
+  @@index([workspaceId])
+  @@map("mini_app_versions")
+}
+
+// A record of one entity of one app. `data` is validated against the spec
+// version current at write time (`specVersion`).
+model MiniAppRecord {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appId       String    @map("app_id")
+  app         MiniApp   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  // Entity key from the spec ("tickets", "vendors", ...).
+  entity      String
+  data        Json      @default("{}")
+  specVersion Int       @map("spec_version")
+  createdBy   String    @map("created_by")
+  updatedBy   String?   @map("updated_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, appId, entity, createdAt])
+  @@index([appId, entity])
+  @@map("mini_app_records")
+}
+
+// ============================================================================
+// Phase 10 (store): public storefront.
+//
+// One store per workspace, served at /shop/<slug> (slug globally unique).
+// Only a PUBLISHED store is visible; only LISTED listings of ACTIVE products
+// are sold. The public pages resolve slug → workspace through ONE extra,
+// SELECT-only RLS policy (app.store_route = 'lookup', published rows only);
+// everything after that runs under the tenant GUC like every ops table.
+// Orders are OpsOrder rows (source "web"), payments OpsPayment rows from the
+// tenant's own Stripe webhook, stock moves OpsInventoryTxn sale rows.
+// ============================================================================
+
+model OpsStore {
+  id           String    @id @default(cuid())
+  workspaceId  String    @unique @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Public URL segment: /shop/<slug> (lowercase letters, digits, hyphens).
+  slug         String    @unique
+  name         String
+  description  String?   @db.Text
+  published    Boolean   @default(false)
+  // ISO 4217; what the checkout charges in.
+  currency     String    @default("USD")
+  // Optional sales tax on the discounted subtotal (an OpsTaxRate id).
+  taxRateId    String?   @map("tax_rate_id")
+  // Optional: sales pick stock from this warehouse's locations first.
+  warehouseId  String?   @map("warehouse_id")
+  contactEmail String?   @map("contact_email")
+  createdBy    String?   @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  listings OpsStoreListing[]
+  orders   OpsOrder[]
+
+  @@map("ops_stores")
+}
+
+// A product offered in a store: its public URL slug, copy and image (a
+// WorkspaceFile id — validated to be an image of this workspace).
+model OpsStoreListing {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  storeId     String     @map("store_id")
+  store       OpsStore   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId   String     @map("product_id")
+  product     OpsProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // /shop/<store>/p/<slug>
+  slug        String
+  // Null = the product's name.
+  title       String?
+  description String?    @db.Text
+  imageFileId String?    @map("image_file_id")
+  position    Int        @default(0)
+  listed      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@unique([storeId, productId])
+  @@unique([storeId, slug])
+  @@index([workspaceId, storeId, listed, position])
+  @@map("ops_store_listings")
+}
+
+// ============================================================================
+// Phase 12 (people) — payroll. A salary structure is a small rules engine
+// (base salary or hourly pay from APPROVED timesheets, a weekly overtime
+// rule, allowances, pre-/post-tax deductions, employer contributions — see
+// lib/ops/payroll/rules.ts); team members get effective-dated assignments
+// carrying their tax profile. A pay run moves draft → computed → approved →
+// posted: approving and posting are gated Tier-3 money writes (never
+// automated) and posting writes ONE balanced entry through the Phase 10
+// journal. Tax tables are per-country plugins (lib/ops/payroll/tax/*). All
+// tables are FORCE RLS and cascade from workspaces.
+// ============================================================================
+
+enum OpsPayRunStatus {
+  draft
+  computed
+  approved
+  posted
+  cancelled
+}
+
+model OpsSalaryStructure {
+  id                       String    @id @default(cuid())
+  workspaceId              String    @map("workspace_id")
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                     String
+  // "salary" (annual base, prorated per period) | "hourly" (approved time × rate).
+  payType                  String    @default("salary") @map("pay_type")
+  // weekly | biweekly | semimonthly | monthly
+  payFrequency             String    @default("biweekly") @map("pay_frequency")
+  annualSalaryCents        Int?      @map("annual_salary_cents")
+  hourlyRateCents          Int?      @map("hourly_rate_cents")
+  // Weekly overtime: minutes past the threshold in a workweek × multiplier.
+  overtimeEnabled          Boolean   @default(true) @map("overtime_enabled")
+  overtimeThresholdMinutes Int       @default(2400) @map("overtime_threshold_minutes")
+  overtimeMultiplierBps    Int       @default(15000) @map("overtime_multiplier_bps")
+  // Allowances / deductions / employer contributions (PayComponent[]).
+  components               Json      @default("[]")
+  // Tax-table country (lib/ops/payroll/tax registry).
+  country                  String    @default("US")
+  active                   Boolean   @default(true)
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  assignments OpsSalaryAssignment[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_salary_structures")
+}
+
+// A structure assigned to a team member from effectiveFrom (inclusive) to
+// effectiveTo (inclusive, null = open). Ranges never overlap per member
+// (checked under an advisory lock). Tax profile = the 2020+ Form W-4 fields
+// plus the work state.
+model OpsSalaryAssignment {
+  id                    String             @id @default(cuid())
+  workspaceId           String             @map("workspace_id")
+  workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId              String             @map("member_id")
+  member                OpsTeamMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  structureId           String             @map("structure_id")
+  structure             OpsSalaryStructure @relation(fields: [structureId], references: [id], onDelete: NoAction)
+  effectiveFrom         DateTime           @map("effective_from") @db.Date
+  effectiveTo           DateTime?          @map("effective_to") @db.Date
+  // Per-person pay (overrides the structure's).
+  annualSalaryCents     Int?               @map("annual_salary_cents")
+  hourlyRateCents       Int?               @map("hourly_rate_cents")
+  // single | married_jointly | head_of_household
+  filingStatus          String             @default("single") @map("filing_status")
+  w4Step2               Boolean            @default(false) @map("w4_step2")
+  // W-4 step 3 (annual), 4a (annual), 4b (annual), 4c (per period).
+  dependentsCreditCents Int                @default(0) @map("dependents_credit_cents")
+  otherIncomeCents      Int                @default(0) @map("other_income_cents")
+  deductionsCents       Int                @default(0) @map("deductions_cents")
+  extraWithholdingCents Int                @default(0) @map("extra_withholding_cents")
+  // Two-letter work state; stateRateBps overrides the flat-rate table.
+  stateCode             String?            @map("state_code")
+  stateRateBps          Int?               @map("state_rate_bps")
+  createdBy             String             @map("created_by")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  @@index([workspaceId, memberId, effectiveFrom])
+  @@index([workspaceId, structureId])
+  @@map("ops_salary_assignments")
+}
+
+model OpsPayRun {
+  id                   String          @id @default(cuid())
+  workspaceId          String          @map("workspace_id")
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // PAY-0001, assigned when the run is computed.
+  number               String?
+  periodStart          DateTime        @map("period_start") @db.Date
+  periodEnd            DateTime        @map("period_end") @db.Date
+  payDate              DateTime        @map("pay_date") @db.Date
+  status               OpsPayRunStatus @default(draft)
+  grossCents           Int             @default(0) @map("gross_cents")
+  employeeTaxCents     Int             @default(0) @map("employee_tax_cents")
+  deductionCents       Int             @default(0) @map("deduction_cents")
+  netCents             Int             @default(0) @map("net_cents")
+  employerTaxCents     Int             @default(0) @map("employer_tax_cents")
+  employerContribCents Int             @default(0) @map("employer_contrib_cents")
+  payslipCount         Int             @default(0) @map("payslip_count")
+  // sha256 over the computed payslips — bound into the approval, so a
+  // recompute after approval was requested invalidates it.
+  computeDigest        String?         @map("compute_digest")
+  computedAt           DateTime?       @map("computed_at")
+  approvalId           String?         @map("approval_id")
+  approvedBy           String?         @map("approved_by")
+  approvedAt           DateTime?       @map("approved_at")
+  postedAt             DateTime?       @map("posted_at")
+  journalEntryId       String?         @map("journal_entry_id")
+  notes                String?         @db.Text
+  createdBy            String          @map("created_by")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  payslips OpsPayslip[]
+  // Phase 14 (connectors): this run's state at a payroll provider (Gusto).
+  providerSyncs OpsPayRunProviderSync[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, periodEnd])
+  @@map("ops_pay_runs")
+}
+
+// Phase 14 (connectors): a pay run handed to a payroll provider (Gusto —
+// lib/bizsync/gusto/payroll.ts). ONE row per (run, provider):
+//   sent    the run's hours were written into the provider's UNPROCESSED
+//           payroll (sentDigest = the run's compute digest at the time: the
+//           send is idempotent per run + figures; a recompute needs a new send)
+//   synced  the person submitted it in the provider; its processed payroll
+//           (taxes, deductions, net — computed by the provider) replaced the
+//           payslip figures ("taxes computed by Gusto")
+//   paid    the provider paid it (check date reached); once the run is posted,
+//           Net pay payable is cleared by ONE balanced payment entry
+//           (paymentEntryId; journal sourceKey pay_run:<id>:net_pay_paid)
+// The run and its posted entry are never changed after approval (the
+// lifecycle triggers still hold); differences found later are recorded in
+// summary.discrepancies. FORCE RLS; cascades from the workspace and the run.
+model OpsPayRunProviderSync {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payRunId        String    @map("pay_run_id")
+  payRun          OpsPayRun @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  // gusto
+  provider        String
+  // sent | synced | paid
+  status          String
+  remotePayrollId String?   @map("remote_payroll_id")
+  sentDigest      String?   @map("sent_digest")
+  sentAt          DateTime? @map("sent_at")
+  syncedAt        DateTime? @map("synced_at")
+  paidAt          DateTime? @map("paid_at")
+  remoteCheckDate DateTime? @map("remote_check_date") @db.Date
+  paymentEntryId  String?   @map("payment_entry_id")
+  // What was sent / skipped / warned, the last sync's outcome, discrepancies.
+  summary         Json      @default("{}")
+  sentBy          String?   @map("sent_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([payRunId, provider])
+  @@index([workspaceId, provider, status])
+  @@map("ops_pay_run_provider_syncs")
+}
+
+// One member's pay for one run. Line items are a snapshot (lines JSON);
+// net = gross − pre-tax − employee taxes − post-tax (DB-checked).
+model OpsPayslip {
+  id                    String        @id @default(cuid())
+  workspaceId           String        @map("workspace_id")
+  workspace             Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payRunId              String        @map("pay_run_id")
+  payRun                OpsPayRun     @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  memberId              String        @map("member_id")
+  member                OpsTeamMember @relation(fields: [memberId], references: [id], onDelete: NoAction)
+  memberName            String        @map("member_name")
+  assignmentId          String?       @map("assignment_id")
+  structureName         String        @map("structure_name")
+  payType               String        @map("pay_type")
+  regularMinutes        Int           @default(0) @map("regular_minutes")
+  overtimeMinutes       Int           @default(0) @map("overtime_minutes")
+  grossCents            Int           @map("gross_cents")
+  preTaxDeductionCents  Int           @map("pre_tax_deduction_cents")
+  taxableWagesCents     Int           @map("taxable_wages_cents")
+  employeeTaxCents      Int           @map("employee_tax_cents")
+  postTaxDeductionCents Int           @map("post_tax_deduction_cents")
+  netCents              Int           @map("net_cents")
+  employerTaxCents      Int           @map("employer_tax_cents")
+  employerContribCents  Int           @map("employer_contrib_cents")
+  // Wage bases this period (YTD caps: Social Security, Medicare surtax, FUTA).
+  ssWagesCents          Int           @default(0) @map("ss_wages_cents")
+  medicareWagesCents    Int           @default(0) @map("medicare_wages_cents")
+  futaWagesCents        Int           @default(0) @map("futa_wages_cents")
+  // PayslipLine[]: { code, label, kind, amountCents, liability?, detail? }
+  lines                 Json
+  // Tax table id + source year, e.g. "us-federal-2026+us-state-flat-2026".
+  taxTable              String        @map("tax_table")
+  warnings              Json          @default("[]")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  @@unique([payRunId, memberId])
+  @@index([workspaceId, memberId, createdAt])
+  @@map("ops_payslips")
+}
+
+// ============================================================================
+// Phase 12 (people) — events. An event has sessions (venue or webinar URL,
+// time, optional capacity) and ticket types (free or paid, quantity, sales
+// window, optionally scoped to one session). Registrations come from the
+// public page /events/<slug> (or staff); each creates attendees linked to an
+// OpsContact (matched by email or created). Paid tickets pay through the
+// workspace's own Stripe Checkout and stay PENDING until the signed webhook
+// confirms them. Capacity is reserved with row-locked conditional counter
+// updates and DB CHECKs (never oversold); unpaid holds expire and release.
+// Attendees carry a signed QR ticket; check-in happens once. FORCE RLS;
+// published events are readable by slug through a SELECT-only routing policy.
+// ============================================================================
+
+enum OpsEventStatus {
+  draft
+  published
+  cancelled
+}
+
+enum OpsEventRegistrationStatus {
+  pending
+  confirmed
+  cancelled
+  expired
+}
+
+model OpsEvent {
+  id                 String           @id @default(cuid())
+  workspaceId        String           @map("workspace_id")
+  workspace          Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title              String
+  // Public page /events/<slug> — globally unique.
+  slug               String           @unique
+  description        String?          @db.Text
+  venue              String?
+  webinarUrl         String?          @map("webinar_url")
+  timezone           String           @default("UTC")
+  startsAt           DateTime         @map("starts_at")
+  endsAt             DateTime         @map("ends_at")
+  // Whole-event cap on attendees (null = only ticket/session caps).
+  capacity           Int?
+  reservedCount      Int              @default(0) @map("reserved_count")
+  status             OpsEventStatus   @default(draft)
+  currency           String           @default("USD")
+  // Confirmed attendees are enrolled into this nurture sequence (reminders).
+  reminderSequenceId String?          @map("reminder_sequence_id")
+  reminderSequence   NurtureSequence? @relation(fields: [reminderSequenceId], references: [id], onDelete: SetNull)
+  createdBy          String           @map("created_by")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  sessions      OpsEventSession[]
+  ticketTypes   OpsEventTicketType[]
+  registrations OpsEventRegistration[]
+  attendees     OpsEventAttendee[]
+
+  @@index([workspaceId, startsAt])
+  @@index([workspaceId, status])
+  @@map("ops_events")
+}
+
+model OpsEventSession {
+  id            String    @id @default(cuid())
+  workspaceId   String    @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId       String    @map("event_id")
+  event         OpsEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title         String
+  venue         String?
+  webinarUrl    String?   @map("webinar_url")
+  startsAt      DateTime  @map("starts_at")
+  endsAt        DateTime  @map("ends_at")
+  // Cap on attendees holding a ticket scoped to this session.
+  capacity      Int?
+  reservedCount Int       @default(0) @map("reserved_count")
+  position      Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  ticketTypes OpsEventTicketType[]
+
+  @@index([workspaceId, eventId, startsAt])
+  @@map("ops_event_sessions")
+}
+
+model OpsEventTicketType {
+  id           String           @id @default(cuid())
+  workspaceId  String           @map("workspace_id")
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId      String           @map("event_id")
+  event        OpsEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // Null = the whole event; set = admits to that session only.
+  sessionId    String?          @map("session_id")
+  session      OpsEventSession? @relation(fields: [sessionId], references: [id], onDelete: NoAction)
+  name         String
+  description  String?
+  // 0 = free.
+  priceCents   Int              @default(0) @map("price_cents")
+  // Null = unlimited (event/session caps still apply).
+  quantity     Int?
+  // Held by pending + confirmed registrations.
+  soldCount    Int              @default(0) @map("sold_count")
+  salesStartAt DateTime?        @map("sales_start_at")
+  salesEndAt   DateTime?        @map("sales_end_at")
+  maxPerOrder  Int              @default(10) @map("max_per_order")
+  active       Boolean          @default(true)
+  position     Int              @default(0)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  registrations OpsEventRegistration[]
+  attendees     OpsEventAttendee[]
+
+  @@index([workspaceId, eventId])
+  @@map("ops_event_ticket_types")
+}
+
+model OpsEventRegistration {
+  id                  String                     @id @default(cuid())
+  workspaceId         String                     @map("workspace_id")
+  workspace           Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId             String                     @map("event_id")
+  event               OpsEvent                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTypeId        String                     @map("ticket_type_id")
+  ticketType          OpsEventTicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction)
+  contactId           String?                    @map("contact_id")
+  contact             OpsContact?                @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  name                String
+  // Lower-cased.
+  email               String
+  quantity            Int
+  unitPriceCents      Int                        @map("unit_price_cents")
+  amountCents         Int                        @map("amount_cents")
+  currency            String                     @default("USD")
+  status              OpsEventRegistrationStatus @default(pending)
+  // public | staff | agent
+  source              String                     @default("public")
+  stripeSessionId     String?                    @unique @map("stripe_session_id")
+  paymentRef          String?                    @map("payment_ref")
+  paidAt              DateTime?                  @map("paid_at")
+  confirmedAt         DateTime?                  @map("confirmed_at")
+  cancelledAt         DateTime?                  @map("cancelled_at")
+  // Unpaid holds release after this (checkout expiry).
+  expiresAt           DateTime?                  @map("expires_at")
+  remindersEnrolledAt DateTime?                  @map("reminders_enrolled_at")
+  createdBy           String                     @map("created_by")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+
+  attendees OpsEventAttendee[]
+
+  @@index([workspaceId, eventId, status])
+  @@index([workspaceId, status, expiresAt])
+  @@map("ops_event_registrations")
+}
+
+model OpsEventAttendee {
+  id             String                     @id @default(cuid())
+  workspaceId    String                     @map("workspace_id")
+  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId        String                     @map("event_id")
+  event          OpsEvent                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationId String                     @map("registration_id")
+  registration   OpsEventRegistration       @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  ticketTypeId   String                     @map("ticket_type_id")
+  ticketType     OpsEventTicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction)
+  contactId      String?                    @map("contact_id")
+  contact        OpsContact?                @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  name           String
+  email          String?
+  // Random secret behind the signed QR ticket (lib/ops/events/tickets.ts).
+  ticketCode     String                     @unique @map("ticket_code")
+  status         OpsEventRegistrationStatus @default(pending)
+  checkedInAt    DateTime?                  @map("checked_in_at")
+  checkedInBy    String?                    @map("checked_in_by")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  @@index([workspaceId, eventId, status])
+  @@index([workspaceId, registrationId])
+  @@map("ops_event_attendees")
+}
+
+// ============================================================================
+// Phase 11 (conncore) — Slack app. One install per Slack team (the bot token
+// lives in the vault as the "slack" ConnectorConnection's credential). The
+// Events API receiver (POST /api/hooks/slack/events) routes team_id → the
+// installing workspace through a SELECT-only policy (app.slack_route =
+// 'lookup'); every write runs under that workspace's GUC. All three tables
+// are FORCE RLS and cascade from workspaces.
+// ============================================================================
+
+model SlackInstallation {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Slack team (workspace) id, e.g. T0123ABC — one ShapesOS workspace per team.
+  teamId         String    @unique @map("team_id")
+  teamName       String?   @map("team_name")
+  botUserId      String?   @map("bot_user_id")
+  // The vault connection holding the bot token (connector_connections.id).
+  connectionId   String    @map("connection_id")
+  // Who installed it: Slack mentions run as this member (with their CURRENT role).
+  installedBy    String    @map("installed_by")
+  // Project whose chat threads mentions become.
+  projectId      String?   @map("project_id")
+  // Slack user ids allowed to start tasks; empty = anyone in the Slack team.
+  allowedUserIds String[]  @default([]) @map("allowed_user_ids")
+  enabled        Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("slack_installations")
+}
+
+// A Slack thread (channel + root ts) mapped to the ShapesOS chat thread that
+// answers it: follow-up mentions in the same Slack thread continue the chat.
+model SlackThreadLink {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teamId       String    @map("team_id")
+  channelId    String    @map("channel_id")
+  threadTs     String    @map("thread_ts")
+  chatThreadId String    @map("chat_thread_id")
+  lastRunId    String?   @map("last_run_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([teamId, channelId, threadTs])
+  @@index([workspaceId, chatThreadId])
+  @@map("slack_thread_links")
+}
+
+// One row per Events API event_id (the primary key is the dedupe: Slack
+// retries a delivery it thinks failed).
+model SlackEventReceipt {
+  eventId     String    @id @map("event_id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teamId      String    @map("team_id")
+  eventType   String    @map("event_type")
+  // queued | ignored | refused
+  outcome     String
+  jobId       String?   @map("job_id")
+  receivedAt  DateTime  @default(now()) @map("received_at")
+
+  @@index([workspaceId, receivedAt])
+  @@map("slack_event_receipts")
+}
+
+// ============================================================================
+// Phase 11 (conncore) — HubSpot ↔ Ops CRM bidirectional sync. One row per
+// mapped object (contact | company | deal | pipeline): the HubSpot id, the
+// local ops_* / crm_pipelines id, and both sides' updatedAt at the last sync
+// — the inputs of the conflict rule in lib/hubspot/sync.ts. Both uniques make
+// the mapping idempotent (a re-sync never duplicates). FORCE RLS, cascades
+// from workspaces.
+// ============================================================================
+
+model HubspotSyncLink {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // contact | company | deal | pipeline
+  objectType       String    @map("object_type")
+  hubspotId        String    @map("hubspot_id")
+  localId          String    @map("local_id")
+  // HubSpot's updatedAt / the local row's updatedAt right after the last sync.
+  hubspotUpdatedAt DateTime? @map("hubspot_updated_at")
+  localUpdatedAt   DateTime? @map("local_updated_at")
+  // pull | push
+  lastDirection    String    @default("pull") @map("last_direction")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, objectType, hubspotId])
+  @@unique([workspaceId, objectType, localId])
+  @@map("hubspot_sync_links")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — commerce + accounting connectors (Shopify, QuickBooks
+// Online, Xero). Same shape as hubspot_sync_links, keyed by provider:
+// one row per mapped object (product | variant | location | inventory_level |
+// order | customer | vendor | item | invoice_customer …) — the remote id, the
+// local id, the remote updatedAt and a fingerprint of the local mapped fields
+// at the last sync (the conflict rule's inputs, lib/bizsync/links.ts). Both
+// uniques make every pull/push idempotent. FORCE RLS, cascades from
+// workspaces. (ConnectorImportBatch is the consent-gated person-graph import
+// receipt — a different contract — so sync runs get their own small log.)
+// ============================================================================
+
+model BizSyncLink {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // shopify | quickbooks | xero
+  provider        String
+  objectType      String    @map("object_type")
+  remoteId        String    @map("remote_id")
+  localId         String    @map("local_id")
+  // The remote record's updatedAt as of the last sync.
+  remoteUpdatedAt DateTime? @map("remote_updated_at")
+  // sha256 of the local mapped fields right after the last sync ("changed
+  // locally" = the current fingerprint differs), plus the local updatedAt.
+  localHash       String?   @map("local_hash")
+  localUpdatedAt  DateTime? @map("local_updated_at")
+  // pull | push
+  lastDirection   String    @default("pull") @map("last_direction")
+  // Non-secret extras (e.g. inventory: { qty } last agreed on; Shopify
+  // inventory item id on a variant link).
+  meta            Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, objectType, remoteId])
+  @@unique([workspaceId, provider, objectType, localId])
+  @@map("biz_sync_links")
+}
+
+// One sync / export run per row: what ran, when, how it ended, the counts
+// (summary JSON) and a short error. The Settings → Connectors → Business
+// sync page reads it; the agent tool results carry the same summary.
+model BizSyncRun {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String
+  // e.g. sync_catalog | sync_inventory | sync_orders | sync_customers |
+  // push_inventory | webhook | import_contacts | export
+  operation   String
+  // running | succeeded | partial | failed
+  status      String    @default("running")
+  // Who started it: user id, or "webhook:shopify".
+  actor       String
+  summary     Json      @default("{}")
+  error       String?
+  startedAt   DateTime  @default(now()) @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  @@index([workspaceId, provider, startedAt])
+  @@map("biz_sync_runs")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — accounting connectors (QuickBooks Online, Xero).
+// One account-mapping model shared by both providers (keyed by provider):
+// each local chart account → one remote account, "suggested" by code /
+// system role / name, "confirmed" by a person in Settings → Connectors →
+// Business sync. Exports only use confirmed rows.
+// ops_accounting_exports is the export ledger: ONE row per (provider,
+// source document) — journal:<entry> | invoice:<id> | credit_note:<id> |
+// bill:<id> | payment:<id> | bill_payment:<id> — claimed BEFORE the remote
+// call, so a second export is a no-op and a crashed one is retried with the
+// SAME provider idempotency key (QuickBooks requestid / Xero Idempotency-Key,
+// derived from source key + attempt). Exports read the append-only journal;
+// nothing here ever writes it.
+// ============================================================================
+
+model OpsAccountingLink {
+  id              String     @id @default(cuid())
+  workspaceId     String     @map("workspace_id")
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // quickbooks | xero
+  provider        String
+  accountId       String     @map("account_id")
+  account         OpsAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  remoteAccountId String     @map("remote_account_id")
+  remoteCode      String?    @map("remote_code")
+  remoteName      String     @map("remote_name")
+  remoteType      String?    @map("remote_type")
+  // suggested | confirmed
+  status          String     @default("suggested")
+  // code | system | name | type (why it was suggested)
+  matchReason     String?    @map("match_reason")
+  confirmedBy     String?    @map("confirmed_by")
+  confirmedAt     DateTime?  @map("confirmed_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, accountId])
+  @@index([workspaceId, provider, remoteAccountId])
+  @@map("ops_accounting_links")
+}
+
+model OpsAccountingExport {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider     String
+  sourceKey    String    @map("source_key")
+  // journal_entry | invoice | credit_note | bill | payment | bill_payment
+  docType      String    @map("doc_type")
+  localId      String    @map("local_id")
+  // The journal entry the document was posted with (what was exported).
+  entryId      String?   @map("entry_id")
+  // pending (claimed; remote call in flight or interrupted) | exported | failed
+  status       String    @default("pending")
+  remoteId     String?   @map("remote_id")
+  remoteNumber String?   @map("remote_number")
+  // Bumped only after a definitive refusal; ambiguous failures keep it, so
+  // the retry reuses the same provider idempotency key.
+  attempt      Int       @default(1)
+  lastError    String?   @map("last_error")
+  exportedAt   DateTime? @map("exported_at")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, sourceKey])
+  @@index([workspaceId, provider, status])
+  @@map("ops_accounting_exports")
+}
+
+// ============================================================================
+// Phase 12 (mfgpos): MANUFACTURING — work centres, routings, manufacturing
+// orders, work orders with time logging, scrap. Built on the Ops layer: the
+// BOM is the CAD BOM (CadBomVersion/CadBomLine, parts linked to products via
+// CadPart.opsProductId), stock only moves through the Phase 10 ledger
+// (recordInventoryTxn) and costing posts through the accounting journal
+// (lib/ops/accounting) — rules in lib/ops/mfg/*.
+// ============================================================================
+
+enum OpsMoStatus {
+  draft
+  confirmed
+  in_progress
+  done
+  cancelled
+}
+
+enum OpsWorkOrderStatus {
+  pending
+  in_progress
+  paused
+  done
+  cancelled
+}
+
+// A place work happens: a machine, a bench, a line. capacity = how many work
+// orders it runs at once; hourlyCostCents prices logged time for costing.
+model OpsWorkCenter {
+  id              String       @id @default(cuid())
+  workspaceId     String       @map("workspace_id")
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  // Short permanent code, e.g. "CNC-1". Unique per workspace.
+  code            String
+  capacity        Int          @default(1)
+  hourlyCostCents Int          @default(0) @map("hourly_cost_cents")
+  // Where it stands (digital twin binding, optional).
+  locationId      String?      @map("location_id")
+  location        OpsLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  active          Boolean      @default(true)
+  notes           String?      @db.Text
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  workOrders OpsWorkOrder[]
+
+  @@unique([workspaceId, code])
+  @@map("ops_work_centers")
+}
+
+// How a product is made: the CAD BOM revision it uses (the product-level BOM
+// is DERIVED from it) and ordered operations
+// [{ sequence, name, workCenterId, plannedMinutes }] (per unit).
+model OpsRouting {
+  id           String         @id @default(cuid())
+  workspaceId  String         @map("workspace_id")
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId    String         @map("product_id")
+  product      OpsProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  bomVersionId String?        @map("bom_version_id")
+  bomVersion   CadBomVersion? @relation(fields: [bomVersionId], references: [id], onDelete: SetNull)
+  name         String
+  operations   Json           @default("[]")
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  manufacturingOrders OpsManufacturingOrder[]
+
+  @@index([workspaceId, productId, active])
+  @@map("ops_routings")
+}
+
+// Manufacturing order: draft → confirmed → in_progress → done (cancelled
+// from draft/confirmed). Confirm snapshots the components from the CAD BOM
+// and creates one work order per routing step; completion consumes the
+// components and produces the finished goods through stock moves, then posts
+// the WIP and finished-goods entries — all in ONE transaction, once.
+model OpsManufacturingOrder {
+  id                  String          @id @default(cuid())
+  workspaceId         String          @map("workspace_id")
+  workspace           Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // MO-0001, assigned on confirm (gap-free, lib/ops/finance/numbering.ts).
+  number              String?
+  productId           String          @map("product_id")
+  product             OpsProduct      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId           String?         @map("variant_id")
+  qty                 Int
+  status              OpsMoStatus     @default(draft)
+  routingId           String?         @map("routing_id")
+  routing             OpsRouting?     @relation(fields: [routingId], references: [id], onDelete: SetNull)
+  bomVersionId        String?         @map("bom_version_id")
+  bomVersion          CadBomVersion?  @relation(fields: [bomVersionId], references: [id], onDelete: SetNull)
+  // Where components are taken from / finished goods are put (null = unlocated).
+  componentLocationId String?         @map("component_location_id")
+  componentLocation   OpsLocation?    @relation("OpsMoComponentLocation", fields: [componentLocationId], references: [id], onDelete: NoAction)
+  finishedLocationId  String?         @map("finished_location_id")
+  finishedLocation    OpsLocation?    @relation("OpsMoFinishedLocation", fields: [finishedLocationId], references: [id], onDelete: NoAction)
+  // Snapshot at confirm: [{ bomLineId, productId?, variantId?, name, sku?,
+  // qtyPerUnit, unitCostCents, stocked }] — BOM edits never change an MO.
+  components          Json            @default("[]")
+  plannedStart        DateTime?       @map("planned_start")
+  // Planned cost from the latest CadCostEstimate of the BOM (labelled estimate).
+  plannedCostCents    Int?            @map("planned_cost_cents")
+  costEstimateId      String?         @map("cost_estimate_id")
+  // Set on completion.
+  producedQty         Int             @default(0) @map("produced_qty")
+  scrappedQty         Int             @default(0) @map("scrapped_qty")
+  componentCostCents  Int             @default(0) @map("component_cost_cents")
+  labourCostCents     Int             @default(0) @map("labour_cost_cents")
+  scrapCostCents      Int             @default(0) @map("scrap_cost_cents")
+  finishedCostCents   Int             @default(0) @map("finished_cost_cents")
+  note                String?         @db.Text
+  createdBy           String?         @map("created_by")
+  confirmedAt         DateTime?       @map("confirmed_at")
+  startedAt           DateTime?       @map("started_at")
+  doneAt              DateTime?       @map("done_at")
+  cancelledAt         DateTime?       @map("cancelled_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  workOrders OpsWorkOrder[]
+  scraps     OpsScrap[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, productId])
+  @@map("ops_manufacturing_orders")
+}
+
+// One routing step of an MO at a work centre. Time is logged with a timer
+// (start / pause / finish) or by hand; actualSeconds is the sum of its logs.
+model OpsWorkOrder {
+  id             String                @id @default(cuid())
+  workspaceId    String                @map("workspace_id")
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  moId           String                @map("mo_id")
+  mo             OpsManufacturingOrder @relation(fields: [moId], references: [id], onDelete: Cascade)
+  sequence       Int
+  name           String
+  workCenterId   String                @map("work_center_id")
+  workCenter     OpsWorkCenter         @relation(fields: [workCenterId], references: [id], onDelete: NoAction)
+  plannedMinutes Int                   @default(0) @map("planned_minutes")
+  status         OpsWorkOrderStatus    @default(pending)
+  actualSeconds  Int                   @default(0) @map("actual_seconds")
+  // Set while the timer runs (in_progress).
+  runningSince   DateTime?             @map("running_since")
+  startedAt      DateTime?             @map("started_at")
+  finishedAt     DateTime?             @map("finished_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  timeLogs OpsWorkTimeLog[]
+
+  @@unique([moId, sequence])
+  @@index([workspaceId, workCenterId, status])
+  @@map("ops_work_orders")
+}
+
+// Append-only time log of a work order: a timer segment or a manual entry.
+model OpsWorkTimeLog {
+  id          String       @id @default(cuid())
+  workspaceId String       @map("workspace_id")
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workOrderId String       @map("work_order_id")
+  workOrder   OpsWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  userId      String       @map("user_id")
+  startedAt   DateTime     @map("started_at")
+  endedAt     DateTime     @map("ended_at")
+  seconds     Int
+  // timer | manual
+  source      String       @default("manual")
+  note        String?      @db.Text
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([workspaceId, workOrderId])
+  @@map("ops_work_time_logs")
+}
+
+// Scrap: stock written off from a location to the virtual scrap location
+// (one "scrap" ledger row — scrapped goods are no longer on hand), valued at
+// unitCostCents and posted Dr Scrap loss / Cr Inventory (Tier 3, gated).
+model OpsScrap {
+  id             String                 @id @default(cuid())
+  workspaceId    String                 @map("workspace_id")
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId      String                 @map("product_id")
+  product        OpsProduct             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId      String?                @map("variant_id")
+  qty            Int
+  locationId     String?                @map("location_id")
+  location       OpsLocation?           @relation(fields: [locationId], references: [id], onDelete: NoAction)
+  moId           String?                @map("mo_id")
+  mo             OpsManufacturingOrder? @relation(fields: [moId], references: [id], onDelete: SetNull)
+  reason         String
+  unitCostCents  Int                    @default(0) @map("unit_cost_cents")
+  totalCostCents Int                    @default(0) @map("total_cost_cents")
+  inventoryTxnId String?                @map("inventory_txn_id")
+  journalEntryId String?                @map("journal_entry_id")
+  createdBy      String?                @map("created_by")
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, moId])
+  @@map("ops_scraps")
+}
+
+// ============================================================================
+// Phase 12 (mfgpos): POINT OF SALE — registers and cash sessions. A sale is
+// an OpsOrder (source "pos", posSessionId, clientOrderId) with OpsPayment
+// rows (cash / card); stock leaves through the ledger at the register's
+// location; closing a session posts ONE balanced journal entry (Tier 3).
+// ============================================================================
+
+enum OpsPosSessionStatus {
+  open
+  closing
+  closed
+}
+
+model OpsPosRegister {
+  id               String       @id @default(cuid())
+  workspaceId      String       @map("workspace_id")
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String
+  // Stock leaves from here (null = unlocated stock).
+  locationId       String?      @map("location_id")
+  location         OpsLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  // Sales tax rate applied at the till (OpsTaxRate id; null = no tax).
+  taxRateId        String?      @map("tax_rate_id")
+  // Stripe Terminal reader id (tmr_…) for card payments.
+  terminalReaderId String?      @map("terminal_reader_id")
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  sessions OpsPosSession[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_pos_registers")
+}
+
+// open (selling) → closing (cash counted, no more sales) → closed (posted).
+// One open/closing session per register (partial unique index).
+model OpsPosSession {
+  id                  String              @id @default(cuid())
+  workspaceId         String              @map("workspace_id")
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  registerId          String              @map("register_id")
+  register            OpsPosRegister      @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  // POS-0001, assigned on open.
+  number              String?
+  status              OpsPosSessionStatus @default(open)
+  openedBy            String              @map("opened_by")
+  openedAt            DateTime            @default(now()) @map("opened_at")
+  openingCashCents    Int                 @map("opening_cash_cents")
+  countedCashCents    Int?                @map("counted_cash_cents")
+  countedBy           String?             @map("counted_by")
+  countedAt           DateTime?           @map("counted_at")
+  // Snapshot written on close.
+  expectedCashCents   Int?                @map("expected_cash_cents")
+  cashDifferenceCents Int?                @map("cash_difference_cents")
+  orderCount          Int                 @default(0) @map("order_count")
+  netSalesCents       Int                 @default(0) @map("net_sales_cents")
+  discountCents       Int                 @default(0) @map("discount_cents")
+  taxCents            Int                 @default(0) @map("tax_cents")
+  cashSalesCents      Int                 @default(0) @map("cash_sales_cents")
+  cardSalesCents      Int                 @default(0) @map("card_sales_cents")
+  journalEntryId      String?             @map("journal_entry_id")
+  closedBy            String?             @map("closed_by")
+  closedAt            DateTime?           @map("closed_at")
+  note                String?             @db.Text
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  orders OpsOrder[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, registerId, status])
+  @@map("ops_pos_sessions")
+}
+
+// ============================================================================
+// Phase 13 (twincore): DIGITAL TWIN — a site is a LAYOUT LAYER over an
+// existing OpsWarehouse. Racks, bins, shelves and dock doors bind to
+// OpsLocation rows, work centres to OpsWorkCenter, registers to
+// OpsPosRegister. LIVE STATE IS DERIVED, NOT STORED: lib/twin/state.ts reads
+// the bound records (stock ledger, work orders, till sessions, dock
+// bookings) at request time — the only exception is equipment (forklifts,
+// carts), whose small status lives on its object because nothing else
+// records it. All three tables are FORCE RLS on app.workspace_id and cascade
+// from workspaces.
+// ============================================================================
+
+enum OpsSiteKind {
+  warehouse
+  factory
+  store
+}
+
+enum OpsSiteStatus {
+  draft
+  published
+}
+
+enum OpsSiteObjectKind {
+  building
+  dock_door
+  rack
+  bin_zone
+  yard_slot
+  work_center
+  register
+  shelf
+  path
+  equipment
+}
+
+enum OpsSiteBindingType {
+  location
+  work_center
+  register
+  product
+}
+
+enum OpsEquipmentStatus {
+  available
+  busy
+  charging
+}
+
+enum OpsDockDirection {
+  inbound
+  outbound
+}
+
+enum OpsDockBookingStatus {
+  booked
+  arrived
+  loading
+  unloading
+  done
+  cancelled
+}
+
+// One isometric site. Publishing (draft → published) is a gated step a
+// person approves (OPS_TWIN_SITE_PUBLISH); agents only draft.
+model OpsSite {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        OpsSiteKind
+  status      OpsSiteStatus @default(draft)
+  name        String
+  // Short code, e.g. "WH-04". Unique per workspace.
+  code        String
+  // Grid size in cells (1 cell = 1 metre).
+  gridW       Int           @map("grid_w")
+  gridD       Int           @map("grid_d")
+  // The warehouse this site lays out (one site per warehouse).
+  warehouseId String        @unique @map("warehouse_id")
+  warehouse   OpsWarehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  notes       String?       @db.Text
+  createdBy   String?       @map("created_by")
+  publishedAt DateTime?     @map("published_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  objects      OpsSiteObject[]
+  dockBookings OpsDockBooking[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, status])
+  @@map("ops_sites")
+}
+
+// A laid-out object on the site grid. x/z/w/d are grid cells (w along x,
+// d along z — axis-aligned extents whatever the rotation; rotation is the
+// model's facing). bindingType + bindingId point at the record the object
+// shows (validated in the same workspace on write; no FK because the target
+// table depends on the type). Live state is derived from that record — the
+// equipment* columns are the one stored state (equipment only).
+model OpsSiteObject {
+  id              String              @id @default(cuid())
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId          String              @map("site_id")
+  site            OpsSite             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  kind            OpsSiteObjectKind
+  label           String
+  x               Int
+  z               Int
+  w               Int                 @default(1)
+  d               Int                 @default(1)
+  h               Int                 @default(1)
+  rotation        Int                 @default(0)
+  bindingType     OpsSiteBindingType? @map("binding_type")
+  bindingId       String?             @map("binding_id")
+  // ---- equipment only (forklifts, carts): nothing else records them ----
+  equipmentStatus OpsEquipmentStatus? @map("equipment_status")
+  taskLocationId  String?             @map("task_location_id")
+  taskLocation    OpsLocation?        @relation(fields: [taskLocationId], references: [id], onDelete: SetNull)
+  taskNote        String?             @map("task_note")
+  taskAssignedAt  DateTime?           @map("task_assigned_at")
+  homeX           Int?                @map("home_x")
+  homeZ           Int?                @map("home_z")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([workspaceId, siteId])
+  @@index([workspaceId, bindingType, bindingId])
+  @@map("ops_site_objects")
+}
+
+// A truck booked at a dock door: what it serves (at most one of a purchase
+// order, a sales order or a stock move), its ETA and its progress
+// booked → arrived → loading | unloading → done (any active → cancelled).
+// A dock never holds two overlapping active bookings: enforced in code
+// (lib/twin/service.ts) AND by an exclusion constraint on
+// [eta, eta + duration) (migration 20261014100000).
+model OpsDockBooking {
+  id              String               @id @default(cuid())
+  workspaceId     String               @map("workspace_id")
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId          String               @map("site_id")
+  site            OpsSite              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  dockLocationId  String               @map("dock_location_id")
+  dockLocation    OpsLocation          @relation(fields: [dockLocationId], references: [id], onDelete: Cascade)
+  direction       OpsDockDirection
+  carrier         String?
+  truckRef        String?              @map("truck_ref")
+  purchaseOrderId String?              @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  orderId         String?              @map("order_id")
+  order           OpsOrder?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  transferId      String?              @map("transfer_id")
+  transfer        OpsTransfer?         @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  eta             DateTime
+  // The dock slot the booking holds, from the ETA.
+  durationMinutes Int                  @default(60) @map("duration_minutes")
+  status          OpsDockBookingStatus @default(booked)
+  arrivedAt       DateTime?            @map("arrived_at")
+  startedAt       DateTime?            @map("started_at")
+  doneAt          DateTime?            @map("done_at")
+  cancelledAt     DateTime?            @map("cancelled_at")
+  notes           String?              @db.Text
+  createdBy       String?              @map("created_by")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@index([workspaceId, siteId, status])
+  @@index([workspaceId, dockLocationId, eta])
+  @@map("ops_dock_bookings")
 }

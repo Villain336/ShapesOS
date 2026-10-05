@@ -1,19 +1,23 @@
 // Marketr — hosting manager (milestone 9).
 //
-// Connect Vercel / Cloudflare Pages deploy targets (tokens encrypted at
+// Connect Vercel / Cloudflare Pages / Netlify deploy targets (tokens encrypted at
 // rest, test-before-save), deploy any site's working copy to a live URL, and
 // list each site's deployment history. Live provider APIs are untested from
 // this sandbox — demo mode runs the full flow on labeled mocks.
+// Phase 9: Netlify, and one-click rollback to an earlier deployment — it
+// changes a live site, so it asks for approval first (Actions), then runs.
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { RotateCcw } from "lucide-react";
 import { confirmAction } from "@/lib/ui/feedback";
 
 interface HostingConnection {
   id: string;
   name: string;
-  target: "vercel" | "cloudflare-pages";
+  target: "vercel" | "cloudflare-pages" | "netlify";
   tokenHint: string;
   demo: boolean;
   createdAt: string;
@@ -33,12 +37,24 @@ interface DeploymentRow {
   status: string;
   mock: boolean;
   createdAt: string;
+  // Phase 9: rollback state (GET /api/websites/[id]/deployments).
+  current?: boolean;
+  canRollBack?: boolean;
+  rollbackReason?: string | null;
+  rollbackOf?: string | null;
+  rollback?: { approvalId: string; status: string } | null;
 }
 
 const TARGET_LABEL: Record<string, string> = {
   vercel: "Vercel",
   "cloudflare-pages": "Cloudflare Pages",
+  netlify: "Netlify",
 };
+
+const INPUT =
+  "mt-1 h-control w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+const PILL_SECONDARY =
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
 
 const STATUS_COLOR: Record<string, string> = {
   // Deployment states read as text; only an error takes the failed color.
@@ -51,7 +67,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function HostingManager({ projectId }: { projectId: string }) {
   const [conns, setConns] = useState<HostingConnection[]>([]);
   const [sites, setSites] = useState<SiteRow[]>([]);
-  const [form, setForm] = useState<"vercel" | "cloudflare" | null>(null);
+  const [form, setForm] = useState<"vercel" | "cloudflare" | "netlify" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -72,6 +88,22 @@ export default function HostingManager({ projectId }: { projectId: string }) {
   const [cDemo, setCDemo] = useState(false);
   const [cTest, setCTest] = useState<string | null>(null);
   const [cTestBusy, setCTestBusy] = useState(false);
+
+  // Netlify form (Phase 9)
+  const [nName, setNName] = useState("");
+  const [nToken, setNToken] = useState("");
+  const [nSiteId, setNSiteId] = useState("");
+  const [nDemo, setNDemo] = useState(false);
+  const [nTest, setNTest] = useState<string | null>(null);
+  const [nTestBusy, setNTestBusy] = useState(false);
+
+  // Phase 11 (devtools): reuse a Netlify hosting connection for the Netlify agent connector.
+  const [agentBusy, setAgentBusy] = useState<string | null>(null);
+  const [agentMsg, setAgentMsg] = useState<string | null>(null);
+
+  // Rollback (Phase 9)
+  const [rbBusy, setRbBusy] = useState<string | null>(null);
+  const [rbMsg, setRbMsg] = useState<string | null>(null);
 
   // Deploy flow
   const [depSite, setDepSite] = useState<string>("");
@@ -151,6 +183,85 @@ export default function HostingManager({ projectId }: { projectId: string }) {
     }
   }
 
+  async function testNetlify() {
+    setNTestBusy(true);
+    setNTest(null);
+    try {
+      const res = await fetch("/api/hosting/netlify/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, token: nToken, siteId: nSiteId, demo: nDemo }),
+      });
+      const data = await res.json();
+      setNTest(res.ok && data.ok ? `Connected: ${data.info}${data.mock ? " (mock)" : ""}` : `Failed: ${data.error ?? "unknown error"}`);
+    } catch {
+      setNTest("Failed: request failed");
+    } finally {
+      setNTestBusy(false);
+    }
+  }
+
+  async function saveNetlify() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/hosting/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          target: "netlify",
+          name: nName.trim() || "Netlify",
+          token: nToken,
+          siteId: nSiteId,
+          demo: nDemo,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      setNName(""); setNToken(""); setNSiteId(""); setNTest(null);
+      setForm(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Phase 9: roll back to an earlier deployment. First click asks for
+   * approval (Tier 2 — it changes a live site); once approved in Actions,
+   * the same button runs it with that approval.
+   */
+  async function rollBack(siteId: string, d: DeploymentRow) {
+    const approved = d.rollback?.status === "approved" ? d.rollback.approvalId : null;
+    if (!approved) {
+      const ok = await confirmAction(
+        `Ask to roll ${d.targetLabel} back to the deployment from ${new Date(d.createdAt).toLocaleString()}? It changes the live site, so someone approves it in Actions first.`,
+      );
+      if (!ok) return;
+    }
+    setRbBusy(d.id);
+    setRbMsg(null);
+    try {
+      const res = await fetch(`/api/websites/${siteId}/deployments/${d.id}/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(approved ? { projectId, approvalId: approved } : { projectId }),
+      });
+      const data = await res.json();
+      if (res.status === 202) setRbMsg("Rollback requested — approve it in Actions, then run it here.");
+      else if (!res.ok) throw new Error(data.error ?? "Rollback failed");
+      else setRbMsg(`Rolled back (${data.status})${data.mock ? " (mock)" : ""}${data.url ? `: ${data.url}` : ""}`);
+      await loadHistory(siteId);
+    } catch (err) {
+      setRbMsg(err instanceof Error ? err.message : "Rollback failed");
+    } finally {
+      setRbBusy(null);
+    }
+  }
+
   async function saveVercel() {
     setBusy(true);
     setError(null);
@@ -215,6 +326,24 @@ export default function HostingManager({ projectId }: { projectId: string }) {
     await refresh();
   }
 
+  async function connectForAgents(c: HostingConnection) {
+    setAgentBusy(c.id);
+    setAgentMsg(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/connectors/netlify/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostingConnectionId: c.id, label: c.name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.error ?? "Could not connect Netlify for agents.");
+      else setAgentMsg(`Agents can now use "${c.name}" through the Netlify connector. Enable it for a project in its data sources.`);
+    } finally {
+      setAgentBusy(null);
+    }
+  }
+
   async function runDeploy() {
     if (!depSite || !depConn) return;
     setDepBusy(true);
@@ -241,7 +370,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">Hosting — Vercel & Cloudflare Pages</h2>
+        <h2 className="text-sm font-semibold text-ink">Hosting — Vercel, Cloudflare Pages & Netlify</h2>
         <div className="flex gap-2">
           <button
             onClick={() => { setForm(form === "vercel" ? null : "vercel"); setError(null); }}
@@ -254,6 +383,12 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
           >
             Connect Cloudflare
+          </button>
+          <button
+            onClick={() => { setForm(form === "netlify" ? null : "netlify"); setError(null); }}
+            className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+          >
+            Connect Netlify
           </button>
         </div>
       </div>
@@ -341,9 +476,44 @@ export default function HostingManager({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {form === "netlify" && (
+        <div className="rounded-lg bg-paper p-4 shadow-hairline">
+          <h3 className="mb-3 text-sm font-semibold text-ink">Connect Netlify</h3>
+          <label className="mb-3 flex items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={nDemo} onChange={(e) => { setNDemo(e.target.checked); setNTest(null); }} />
+            Use demo target <span className="text-xs text-muted">(mock — no token or network needed)</span>
+          </label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-sm text-muted">Name
+              <input value={nName} onChange={(e) => setNName(e.target.value)} placeholder="Netlify" className={INPUT} />
+            </label>
+            {!nDemo && (
+              <>
+                <label className="text-sm text-muted">Personal access token
+                  <input type="password" value={nToken} onChange={(e) => setNToken(e.target.value)} placeholder="app.netlify.com/user/applications" className={INPUT} />
+                </label>
+                <label className="text-sm text-muted">Site id <span className="text-xs text-muted">(optional — created on first deploy)</span>
+                  <input value={nSiteId} onChange={(e) => setNSiteId(e.target.value)} className={INPUT} />
+                </label>
+              </>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted">Tokens are encrypted at rest and never shown in the UI.</p>
+          {nTest && <p className="mt-3 text-xs text-muted">{nTest}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => void testNetlify()} disabled={nTestBusy} className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40">
+              {nTestBusy ? "Testing…" : "Test"}
+            </button>
+            <button onClick={() => void saveNetlify()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40">
+              {busy ? "Saving…" : "Connect"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {conns.length === 0 && (
-          <p className="text-sm text-muted">No hosting connections yet — connect Vercel or Cloudflare to deploy sites to a live URL.</p>
+          <p className="text-sm text-muted">No hosting connections yet — connect Vercel, Cloudflare or Netlify to deploy sites to a live URL.</p>
         )}
         {conns.map((c) => (
           <div key={c.id} className="flex items-center justify-between rounded-sm bg-paper px-4 py-2.5 shadow-hairline">
@@ -353,14 +523,26 @@ export default function HostingManager({ projectId }: { projectId: string }) {
               {c.demo && <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-muted">Mock</span>}
               <span className="ml-2 text-xs text-muted">token {c.tokenHint}</span>
             </div>
-            <button
-              onClick={() => void deleteConn(c.id, c.name)}
-              className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
-            >
-              Remove
-            </button>
+            <div className="flex items-center gap-2">
+              {c.target === "netlify" && !c.demo && (
+                <button
+                  onClick={() => void connectForAgents(c)}
+                  disabled={agentBusy === c.id}
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {agentBusy === c.id ? "Connecting…" : "Use for agents"}
+                </button>
+              )}
+              <button
+                onClick={() => void deleteConn(c.id, c.name)}
+                className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
+        {agentMsg && <p className="text-sm text-muted">{agentMsg}</p>}
       </div>
 
       {conns.length > 0 && sites.length > 0 && (
@@ -411,6 +593,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
           </button>
           {historyOpen === depSite && (
             <div className="mt-3 flex flex-col gap-2">
+              {rbMsg && <p role="status" className="text-sm text-muted">{rbMsg}</p>}
               {history[depSite].map((d) => (
                 <div key={d.id} className="flex items-center justify-between rounded-sm bg-canvas px-3 py-2 text-sm">
                   <div className="flex items-center gap-3">
@@ -423,7 +606,27 @@ export default function HostingManager({ projectId }: { projectId: string }) {
                       </a>
                     )}
                   </div>
-                  <span className="text-xs text-muted">{new Date(d.createdAt).toLocaleString()}</span>
+                  <div className="flex items-center gap-3">
+                    {d.current && <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-ink">Live</span>}
+                    {d.rollbackOf && <span className="text-xs text-muted">Rollback</span>}
+                    <span className="text-xs text-muted">{new Date(d.createdAt).toLocaleString()}</span>
+                    {d.canRollBack && d.rollback?.status === "pending" && (
+                      <Link href="/dashboard/actions" className="text-xs font-semibold text-ink underline hover:text-focus">
+                        Waiting for approval
+                      </Link>
+                    )}
+                    {d.canRollBack && d.rollback?.status !== "pending" && (
+                      <button
+                        onClick={() => void rollBack(depSite, d)}
+                        disabled={rbBusy !== null}
+                        title={d.rollback?.status === "approved" ? "Approved — run the rollback" : "Ask to roll back to this deployment"}
+                        className={PILL_SECONDARY}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                        {rbBusy === d.id ? "Working…" : d.rollback?.status === "approved" ? "Run rollback" : "Roll back"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {history[depSite].length === 0 && <p className="text-sm text-muted">No deployments yet.</p>}

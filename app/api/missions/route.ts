@@ -1,13 +1,16 @@
 // Marketr — /api/missions
 // GET  -> dense mission list (viewer+)
 // POST -> start a mission from a template (editor+). Tier 0: drafts plans,
-//         executes nothing.
+//         executes nothing by itself. Phase 8: the launch is queued for the
+//         agent worker (lib/agents/mission-runtime.ts), which runs the plan's
+//         steps up to the first human approval as sub-agent loops.
 
 import type { NextRequest } from "next/server";
 import { missionsGuard, safetyError, readJson, serializeMission, toListItem, missionDeps } from "./_lib";
 import { loadMission, startMission, type LoadedMission } from "@/lib/missions/engine";
 import { missionAgentView } from "@/lib/aos/missions";
 import { safeMissionRuns } from "@/lib/aos/missions.server";
+import { enqueueMissionLaunch } from "@/lib/agents/mission-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +46,19 @@ export async function POST(req: NextRequest) {
       goal: body.goal,
       name: typeof body.name === "string" ? body.name : undefined,
     });
-    return Response.json({ mission: serializeMission(mission) }, { status: 201 });
+    // Phase 8: queue the launch. The mission exists either way; a queue
+    // failure is reported, never hidden.
+    let launch: { runId: string; jobId: string } | null = null;
+    let launchError: string | null = null;
+    try {
+      launch = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: gate.workspaceId, userId: gate.userId });
+    } catch (err) {
+      launchError = err instanceof Error ? err.message : "could not queue the mission";
+    }
+    return Response.json(
+      { mission: serializeMission(mission), runId: launch?.runId ?? null, ...(launchError ? { launchError } : {}) },
+      { status: 201 },
+    );
   } catch (err) {
     return safetyError(err);
   }

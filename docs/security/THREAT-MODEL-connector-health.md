@@ -135,8 +135,9 @@ flows or token refreshes cross-site.
 
 ## Residual risks (accepted, documented)
 
-- **Honest blind spots:** the 7 mock-only adapters report `unknown` forever
-  (no live wiring exists to check), and `api_key` adapters report `unknown`
+- **Honest blind spots:** mock-only adapters report `unknown` forever (no
+  live wiring exists to check; since Phase 4b there are 0 — all 14
+  built-ins are live-wired), and `api_key` adapters report `unknown`
   until a successful sync is recorded. This is deliberate: faking green is
   worse than admitting ignorance. Tico owns live adapter wiring separately.
 - **Token-expiry check is provider-trust:** a non-expired OAuth token may

@@ -5,7 +5,7 @@
 
 import { syncSocialWorkspace } from "@/lib/social/engagement";
 import { getSocialProvider, SOCIAL_NOT_CONNECTED_MESSAGE } from "@/lib/social/provider";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { BadRequestError } from "@/lib/api/errors";
 import { guardWorkspace, socialError } from "../_lib";
 
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export async function POST() {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
-    const rl = checkRateLimit(`social-sync:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`social-sync:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
     const provider = getSocialProvider();
     if (!provider) throw new BadRequestError(SOCIAL_NOT_CONNECTED_MESSAGE);

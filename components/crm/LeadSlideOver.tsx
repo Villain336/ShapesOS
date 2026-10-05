@@ -9,6 +9,7 @@ import {
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { LeadActions } from "./LeadActions";
+import { ConvertLeadStrip } from "@/components/ops/CrmAccounts";
 import { feedback } from "@/lib/ui/feedback";
 import { Avatar, MiniBars, ScoreBar, StageBadge, backdropCls, btnGhostSm, btnPrimarySm, errorBoxCls, inputCls, labelCls, sectionTitleCls, selectCls, slideoverCls } from "./ui";
 
@@ -253,6 +254,8 @@ export function LeadSlideOver({
           }}
           registerEscape={registerEscape}
         />
+        {/* Phase 10 (ops-core): lead → contact / company / deal. */}
+        <ConvertLeadStrip leadId={lead.id} hasValue={lead.valueCents != null} onConverted={() => void load()} />
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (

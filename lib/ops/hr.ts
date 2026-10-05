@@ -56,3 +56,58 @@ export async function resolveMemberNames(
   })) as LeaveMemberRef[];
   return rows;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): recruiting. Applicants move through
+// applied → screening → interview → offer → hired / rejected on a kanban;
+// moving one to "hired" creates their OpsTeamMember once (department from
+// the opening) and links it back.
+// ---------------------------------------------------------------------------
+
+export async function createApplicantRow(tx: Tx, actor: { workspaceId: string; userId: string }, body: Record<string, unknown>) {
+  const opening = await tx.opsJobOpening.findFirst({ where: { id: String(body.openingId), workspaceId: actor.workspaceId } });
+  if (!opening) throw new OpsError(404, `job-openings "${String(body.openingId)}" not found in workspace`);
+  if (opening.status === "closed") throw new OpsError(422, `"${opening.title}" is closed to new applicants`);
+  return tx.opsApplicant.create({
+    data: {
+      workspaceId: actor.workspaceId,
+      openingId: opening.id,
+      name: String(body.name),
+      email: (body.email as string | undefined) ?? null,
+      phone: (body.phone as string | undefined) ?? null,
+      source: (body.source as string | undefined) ?? null,
+      stage: (body.stage as "applied") ?? "applied",
+      rating: (body.rating as number | undefined) ?? null,
+      notes: (body.notes as string | undefined) ?? null,
+    },
+  }) as unknown as Promise<Record<string, unknown>>;
+}
+
+export async function patchApplicantRow(
+  tx: Tx,
+  actor: { workspaceId: string; userId: string },
+  id: string,
+  patch: Record<string, unknown>,
+  existing: Record<string, unknown>,
+) {
+  const data: Record<string, unknown> = { ...patch };
+  if (patch.stage === "hired" && !existing.hiredMemberId) {
+    const opening = await tx.opsJobOpening.findFirst({ where: { id: String(existing.openingId), workspaceId: actor.workspaceId } });
+    const member = await tx.opsTeamMember.create({
+      data: {
+        workspaceId: actor.workspaceId,
+        name: String(existing.name),
+        email: (patch.email as string | undefined) ?? (existing.email as string | null) ?? null,
+        title: opening?.title ?? null,
+        departmentId: opening?.departmentId ?? null,
+        startDate: new Date(),
+      },
+    });
+    data.hiredMemberId = member.id;
+  }
+  // Guard the move on the stage we read, so a double "hired" can't create
+  // two team members.
+  const claimed = await tx.opsApplicant.updateMany({ where: { id, workspaceId: actor.workspaceId, stage: existing.stage as "applied" }, data });
+  if (claimed.count !== 1) throw new OpsError(409, "Applicant changed concurrently — reload and retry");
+  return (await tx.opsApplicant.findFirst({ where: { id, workspaceId: actor.workspaceId } })) as unknown as Record<string, unknown>;
+}

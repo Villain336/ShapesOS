@@ -63,6 +63,28 @@ export interface MeterOptions {
    * meaning.
    */
   credits?: number;
+  /**
+   * Phase 7: token usage of one model call (action "llm_tokens", written by
+   * lib/llm/usage.ts). Stored on the same append-only event row. costMicroUsd
+   * is the estimated vendor cost; null when a price is unknown.
+   */
+  llm?: LlmUsageFields | null;
+}
+
+export interface LlmUsageFields {
+  provider: string;
+  model: string;
+  workload: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  costMicroUsd: number | null;
+}
+
+function nonNegInt(n: number, field: string): number {
+  if (!Number.isInteger(n) || n < 0) throw new Error(`metering: llm.${field} must be a non-negative integer`);
+  return n;
 }
 
 export type MeterResult =
@@ -209,9 +231,22 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     action,
     idempotencyKey,
     evidenceRef = null,
+    llm = null,
   } = opts;
   if (!workspaceId) throw new Error("metering: workspaceId is required");
   if (!idempotencyKey) throw new Error("metering: idempotencyKey is required");
+  const llmData = llm
+    ? {
+        llmProvider: llm.provider,
+        llmModel: llm.model,
+        llmWorkload: llm.workload,
+        llmInputTokens: nonNegInt(llm.inputTokens, "inputTokens"),
+        llmOutputTokens: nonNegInt(llm.outputTokens, "outputTokens"),
+        llmCacheReadTokens: nonNegInt(llm.cacheReadTokens, "cacheReadTokens"),
+        llmCacheWriteTokens: nonNegInt(llm.cacheWriteTokens, "cacheWriteTokens"),
+        llmCostMicroUsd: llm.costMicroUsd === null ? null : BigInt(nonNegInt(llm.costMicroUsd, "costMicroUsd")),
+      }
+    : {};
 
   if (!isMeteredAction(action)) {
     return {
@@ -370,6 +405,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             overageCredits,
             idempotencyKey,
             evidenceRef,
+            ...llmData,
           },
           select: { id: true },
         });

@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import SitesManager from "@/components/SitesManager";
 import HostingManager from "@/components/HostingManager";
 import FixAgentManager from "@/components/FixAgentManager";
+import SiteDrafts from "@/components/SiteDrafts";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function SitesPage({
         </p>
       </div>
       <SitesManager projectId={project.id} />
+      <SiteDrafts projectId={project.id} />
       <HostingManager projectId={project.id} />
       <FixAgentManager projectId={project.id} />
     </div>

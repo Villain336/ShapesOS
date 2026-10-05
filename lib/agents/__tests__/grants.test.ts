@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   AGENT_KEYS,
   AGENT_MAX_GROUPS,
+  ALWAYS_GRANTED,
   TOOL_GROUPS,
   computeGrant,
   connectorAction,
@@ -53,6 +54,33 @@ describe("computeGrant", () => {
     }
   });
 
+  it("media (image generation): the lead, the Writer and the Operator only", () => {
+    assert.ok(TOOL_GROUPS.includes("media"));
+    for (const k of ["lead", "drafter", "actor"] as const) {
+      assert.ok(AGENT_MAX_GROUPS[k].includes("media"), `${k} should be able to generate images`);
+    }
+    for (const k of ["researcher", "planner", "analyst", "scheduler"] as const) {
+      assert.ok(!AGENT_MAX_GROUPS[k].includes("media"), `${k} should not generate images`);
+    }
+    assert.deepEqual(computeGrant({ agentKey: "drafter", requested: ["media"] }).groups, ["workspace", "media"]);
+    assert.deepEqual(computeGrant({ agentKey: "researcher", requested: ["media"] }).dropped, ["media"]);
+  });
+
+  it("ship (push, pull requests): the lead and the Operator only, never always granted", () => {
+    assert.ok(TOOL_GROUPS.includes("ship"));
+    assert.ok(!ALWAYS_GRANTED.includes("ship"));
+    for (const k of ["lead", "actor"] as const) assert.ok(AGENT_MAX_GROUPS[k].includes("ship"), `${k} may ship`);
+    for (const k of ["researcher", "planner", "drafter", "analyst", "scheduler"] as const) {
+      assert.ok(!AGENT_MAX_GROUPS[k].includes("ship"), `${k} must not ship`);
+    }
+    assert.deepEqual(computeGrant({ agentKey: "actor", requested: ["ship"] }).groups, ["workspace", "ship"]);
+    assert.deepEqual(computeGrant({ agentKey: "actor", requested: ["code"] }).groups, ["workspace", "code"], "code without ship can't push");
+    assert.deepEqual(computeGrant({ agentKey: "analyst", requested: ["ship"] }).dropped, ["ship"]);
+    // A narrowed parent without ship never hands it down.
+    const parent = computeGrant({ agentKey: "lead", requested: ["code"] }).groups;
+    assert.ok(!computeGrant({ agentKey: "actor", requested: ["ship"], parentGrant: parent }).groups.includes("ship"));
+  });
+
   it("a null grant means role checks only (legacy callers)", () => {
     assert.equal(isGroupGranted(null, "ops"), true);
     assert.equal(isGroupGranted(["workspace"], "ops"), false);
@@ -68,10 +96,14 @@ describe("connectors", () => {
     assert.equal(connectorGroup("my-mcp-server"), "connectors");
   });
 
-  it("maps owned-channel writes to Tier-1 kinds and everything else to a kind that always asks", () => {
+  it("maps owned-channel writes to Tier-1 kinds and everything else to a per-connector write_<key> switch (Phase 14)", () => {
     assert.equal(connectorAction("buffer", "create_post"), "post_owned_social");
     assert.equal(connectorAction("wordpress", "save_content"), "publish_owned");
     assert.equal(connectorAction("buffer", "delete_post"), "delete_social_post");
-    assert.equal(connectorAction("my-mcp", "send_invoice"), "connector_write");
+    assert.equal(connectorAction("my-mcp", "send_invoice"), "write_my_mcp");
+    assert.equal(connectorAction("slack", "post_message"), "write_slack");
+    // Money connectors: an unmapped write is a Tier-3 kind (never auto).
+    assert.equal(connectorAction("quickbooks", "anything_new"), "money_connector_write");
+    assert.equal(connectorAction("gusto", "anything_new"), "money_connector_write");
   });
 });

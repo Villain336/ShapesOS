@@ -57,6 +57,10 @@ import {
   Settings,
   History,
   MousePointer,
+  Copy,
+  Check,
+  RefreshCw,
+  KeyRound,
 } from "lucide-react";
 import {
   NODE_CATALOG,
@@ -1092,6 +1096,7 @@ function CanvasInner({
               <NodeInspector
                 node={selNode}
                 def={selNodeDef}
+                workflowId={selectedId}
                 canEdit={canEdit}
                 onLabel={(label) => updateNodeData(selNode.id, { label })}
                 onConfig={(key, value) =>
@@ -1121,6 +1126,7 @@ function CanvasInner({
 function NodeInspector({
   node,
   def,
+  workflowId,
   canEdit,
   onLabel,
   onConfig,
@@ -1128,6 +1134,7 @@ function NodeInspector({
 }: {
   node: WfNode;
   def: ReturnType<typeof nodeTypeDef>;
+  workflowId: string | null;
   canEdit: boolean;
   onLabel: (label: string) => void;
   onConfig: (key: string, value: unknown) => void;
@@ -1149,7 +1156,11 @@ function NodeInspector({
       <Field label="Label">
         <Input value={node.data.label} disabled={!canEdit} onChange={(e) => onLabel(e.target.value)} />
       </Field>
-      {def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />}
+      {node.data.kind === "trigger" && node.data.type === "webhook" ? (
+        workflowId ? <WebhookTriggerPanel key={workflowId} workflowId={workflowId} canEdit={canEdit} /> : null
+      ) : (
+        def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />
+      )}
       {node.data.type === "condition" && (
         <p className="rounded-sm bg-paper px-3 py-2 text-[11px] leading-snug text-muted">
           Branch tip: click an outgoing edge and set its label to <b>true</b> or <b>false</b>. Unlabeled
@@ -1167,6 +1178,158 @@ function NodeInspector({
           Last run status: <StatusPill status={node.data.status} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Webhook trigger: inbound URL + signing secret (Phase 6). The secret is shown
+// once, right after it is created or rotated; afterwards only its hint.
+// ---------------------------------------------------------------------------
+
+interface WebhookView {
+  hasTrigger: boolean;
+  configured: boolean;
+  secretHint: string | null;
+  lastReceivedAt: string | null;
+  url: string;
+  signatureHeader: string;
+}
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="secondary"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          setCopied(false);
+        }
+      }}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+function WebhookTriggerPanel({ workflowId, canEdit }: { workflowId: string; canEdit: boolean }) {
+  const [view, setView] = useState<WebhookView | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // State resets per workflow via the component key (see NodeInspector).
+    let live = true;
+    fetch(`/api/workflows/${workflowId}/webhook`)
+      .then(async (res) => {
+        const j = await res.json().catch(() => ({}));
+        if (!live) return;
+        if (res.ok) setView(j.webhook as WebhookView);
+        else setError(typeof j.error === "string" ? j.error : "Couldn't load the webhook settings.");
+      })
+      .catch(() => live && setError("Couldn't load the webhook settings."));
+    return () => {
+      live = false;
+    };
+  }, [workflowId]);
+
+  const rotate = useCallback(async () => {
+    if (view?.configured) {
+      const ok = await confirmAction({
+        title: "Rotate the signing secret?",
+        description: "The old secret stops working immediately. Update the sender with the new one.",
+        confirmLabel: "Rotate",
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/webhook`, { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof j.error === "string" ? j.error : "Couldn't create the secret.");
+        return;
+      }
+      setView(j.webhook as WebhookView);
+      setSecret(String(j.secret));
+    } finally {
+      setBusy(false);
+    }
+  }, [view?.configured, workflowId]);
+
+  if (error && !view) return <p className="text-[13px] text-failed-text">{error}</p>;
+  if (!view) {
+    return (
+      <p className="flex items-center gap-2 text-[13px] text-muted">
+        <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Loading webhook settings
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Inbound URL" hint="POST JSON here. The body is available to later nodes as trigger.<field>.">
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md bg-paper px-3 py-2 font-mono text-xs text-ink shadow-hairline" title={view.url}>
+            {view.url}
+          </code>
+          <CopyButton value={view.url} label="Copy inbound URL" />
+        </div>
+      </Field>
+
+      <Field label="Signing secret">
+        {secret ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-xs text-ink shadow-hairline">
+                {secret}
+              </code>
+              <CopyButton value={secret} label="Copy signing secret" />
+            </div>
+            <p className="text-[13px] text-muted">Copy it now. This is the only time it&apos;s shown.</p>
+          </div>
+        ) : view.configured ? (
+          <code className="block rounded-md bg-paper px-3 py-2 font-mono text-xs text-muted shadow-hairline">{view.secretHint}</code>
+        ) : (
+          <p className="text-[13px] text-muted">
+            No secret yet. Calls to this URL are refused until you create one.
+          </p>
+        )}
+      </Field>
+
+      {!view.hasTrigger && (
+        <p className="text-[13px] text-muted">Save the workflow first, then create the secret.</p>
+      )}
+      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+
+      {canEdit && (
+        <div>
+          <Button type="button" size="sm" variant={view.configured ? "secondary" : "primary"} onClick={rotate} disabled={busy || !view.hasTrigger}>
+            {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : view.configured ? <RefreshCw className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
+            {busy ? (view.configured ? "Rotating" : "Creating") : view.configured ? "Rotate secret" : "Create secret"}
+          </Button>
+        </div>
+      )}
+
+      {view.lastReceivedAt && (
+        <p className="text-[13px] text-muted">Last call received {new Date(view.lastReceivedAt).toLocaleString()}.</p>
+      )}
+
+      <p className="rounded-sm bg-paper px-3 py-2 text-[13px] leading-snug text-muted">
+        Sign each request with <span className="font-mono">{view.signatureHeader}: t=&lt;unix&gt;,v1=&lt;hex&gt;</span>,
+        the HMAC-SHA256 of <span className="font-mono">&lt;t&gt;.&lt;raw body&gt;</span> with this secret. Requests older
+        than 5 minutes, replays and bodies over 64 KB are refused. The workflow must be active.
+      </p>
     </div>
   );
 }
