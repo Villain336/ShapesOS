@@ -220,6 +220,9 @@ describe("agency credit pooling (Phase 15.2)", () => {
     assert.equal(await used(ids.client2), 0);
     const e1 = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `pool1-${RUN}` } });
     assert.equal(e1.workspaceId, ids.client1, "usage stays attributed to the client workspace");
+    assert.equal(e1.chargedToWorkspaceId, ids.agency, "and records the pool it was charged to");
+    const e3 = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `pool3-${RUN}` } });
+    assert.equal(e3.chargedToWorkspaceId, null, "the agency's own charge is on its own pool");
 
     const owner = await getUsageSummary({ workspaceId: ids.agency });
     assert.equal(owner.pool?.role, "owner");
@@ -268,6 +271,23 @@ describe("agency credit pooling (Phase 15.2)", () => {
     assert.equal(clientCap?.lastAlertAt ?? null, null, "no alert on the client's own (unused) cap");
   });
 
+  it("overage charged by a client workspace is invoiced to the agency, never to the client", async () => {
+    const { getOverageState } = await import("@/lib/metering/billing");
+    const before = (await getOverageState(ids.agency)).accruedCents;
+    // Auto-overage ON for the pool; the cap is already spent.
+    await setSpendCap(ids.agency, { autoOverage: true });
+    const usedBefore = await used(ids.agency);
+    // A charge that crosses the agency's 30,000-credit paid pool.
+    const r = await meter({ workspaceId: ids.client2, action: "keyword_research", credits: 30_000, idempotencyKey: `pool-ov-${RUN}` });
+    assert.ok(r.ok);
+    const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `pool-ov-${RUN}` } });
+    assert.equal(ev.overageCredits, usedBefore, "the part beyond the paid pool is overage");
+    assert.ok(ev.overageCredits > 0);
+    assert.ok((await getOverageState(ids.agency)).accruedCents > before, "accrues on the agency");
+    assert.equal((await getOverageState(ids.client2)).accruedCents, 0, "never on the client");
+    await setSpendCap(ids.agency, { autoOverage: false });
+  });
+
   it("leaving the pool returns the workspace to its own pool", async () => {
     await leaveCreditPool({ clientWorkspaceId: ids.client2, actorUserId: OWNER });
     const before = await used(ids.client2);
@@ -275,5 +295,10 @@ describe("agency credit pooling (Phase 15.2)", () => {
     assert.ok(r.ok);
     assert.equal((await used(ids.client2)) - before, 1);
     assert.equal((await checkCap(ids.client2)).poolWorkspaceId, undefined);
+    // History stays with the pool it was charged to.
+    const owner = await getUsageSummary({ workspaceId: ids.agency });
+    assert.ok((owner.pool?.byWorkspace?.[ids.client2] ?? 0) >= 30_030, "the agency still sees what client 2 charged it");
+    const own = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `pool7-${RUN}` } });
+    assert.equal(own.chargedToWorkspaceId, null);
   });
 });

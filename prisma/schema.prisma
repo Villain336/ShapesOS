@@ -4038,12 +4038,19 @@ model UsageEvent {
   // Phase 15 (keys): credits this event WOULD have cost on the platform key
   // (BYOK savings on Settings → Usage). 0 unless keySource is "workspace".
   waivedCredits       Int     @default(0) @map("waived_credits")
+  // Phase 15.2 (keys): the agency pool this event was CHARGED to, when it is
+  // not the event's own workspace (a pooled client workspace). Null = the
+  // workspace's own pool. Overage invoicing and the pool's usage read
+  // COALESCE(charged_to_workspace_id, workspace_id), so history stays right
+  // after a workspace joins or leaves a pool.
+  chargedToWorkspaceId String? @map("charged_to_workspace_id")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
   @@index([projectId])
   @@index([workspaceId, keyId])
   @@index([workspaceId, keySource])
+  @@index([chargedToWorkspaceId, occurredAt])
   @@map("usage_events")
 }
 

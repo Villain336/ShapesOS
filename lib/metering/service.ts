@@ -500,6 +500,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             evidenceRef,
             keySource,
             waivedCredits,
+            chargedToWorkspaceId: poolId !== workspaceId ? poolId : null,
             ...llmData,
           },
           select: { id: true },
@@ -623,13 +624,19 @@ export async function getUsageSummary(opts: {
   // Phase 15.2: the pool this workspace spends (itself unless pooled), and
   // the workspaces sharing it. The balance and cap are the pool's.
   const poolId = await resolvePoolWorkspaceId(prisma, workspaceId);
-  const members = await prisma.workspace.findMany({
-    where: { creditPoolOwnerId: poolId },
-    select: { id: true },
+  const members = await prisma.workspace.count({ where: { creditPoolOwnerId: poolId } });
+  // Events charged to this pool: its own (charged_to null) plus every event a
+  // client workspace charged to it — recorded per event, so history is right
+  // after a workspace joins or leaves the pool.
+  const chargedToPool = (id: string): Prisma.UsageEventWhereInput => ({
+    OR: [{ chargedToWorkspaceId: id }, { workspaceId: id, chargedToWorkspaceId: null }],
   });
-  const pooled = poolId !== workspaceId || members.length > 0;
+  const ownerHasPooledUsage =
+    poolId === workspaceId && members === 0
+      ? (await prisma.usageEvent.count({ where: { chargedToWorkspaceId: poolId }, take: 1 })) > 0
+      : false;
+  const pooled = poolId !== workspaceId || members > 0 || ownerHasPooledUsage;
   const isOwner = pooled && poolId === workspaceId;
-  const poolIds = [poolId, ...members.map((m) => m.id)];
 
   const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: poolId } });
   let included = bal?.includedCredits ?? 0;
@@ -641,9 +648,8 @@ export async function getUsageSummary(opts: {
   const start = opts.periodStart ? new Date(opts.periodStart) : (bal?.periodStart ?? monthStart(new Date()));
   // The owner's summary covers every workspace in its pool (so the ledger
   // reconciles with the pool counter); a client sees its own usage.
-  const scopeIds = isOwner ? poolIds : [workspaceId];
   const where: Prisma.UsageEventWhereInput = {
-    workspaceId: scopeIds.length === 1 ? scopeIds[0] : { in: scopeIds },
+    ...(isOwner ? chargedToPool(poolId) : { workspaceId }),
     occurredAt: { gte: start },
     ...(opts.projectId ? { projectId: opts.projectId } : {}),
     ...(opts.keyId ? { keyId: opts.keyId } : {}),
@@ -659,7 +665,7 @@ export async function getUsageSummary(opts: {
     pooled
       ? prisma.usageEvent.groupBy({
           by: ["workspaceId"],
-          where: { workspaceId: { in: poolIds }, occurredAt: { gte: start } },
+          where: { ...chargedToPool(poolId), occurredAt: { gte: start } },
           _sum: { credits: true },
         })
       : Promise.resolve([]),

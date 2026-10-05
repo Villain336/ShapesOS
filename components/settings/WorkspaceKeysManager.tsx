@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, KeyRound, Loader2, Plug, ShieldCheck, Trash2 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 import { Notice, btnCls, dangerBtnCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "./ui";
 
 interface FieldView {
@@ -121,7 +122,7 @@ function CredentialCard({ cred, onChanged }: { cred: CredentialView; onChanged: 
   }
 
   async function remove() {
-    if (!window.confirm(`Remove this workspace's ${cred.label} settings?`)) return;
+    if (!(await confirmAction(`Remove this workspace's ${cred.label} settings?`))) return;
     setBusy("remove");
     setNotice(null);
     try {
