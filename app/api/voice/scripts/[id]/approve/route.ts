@@ -24,16 +24,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Plain validation Errors from the lib layer surface as 400; HttpErrors keep
-// their own status via httpErrorResponse.
-function asResponse(e: unknown, fallback: string) {
-  if (e instanceof HttpError) return httpErrorResponse(e);
-  return Response.json(
-    { error: e instanceof Error ? e.message : fallback },
-    { status: 400 },
-  );
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -76,7 +66,7 @@ export async function POST(
         );
       return Response.json({ script });
     } catch (e) {
-      return asResponse(e, "Review action failed");
+      return httpErrorResponse(e);
     }
   } catch (e) {
     return httpErrorResponse(e);

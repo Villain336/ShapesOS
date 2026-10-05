@@ -67,3 +67,7 @@ db-backups/
 
 # Phase 16 slice 5: agent run recordings (WebM video + Playwright trace.zip, host-owned)
 .run-artifacts/
+
+# Generated artifacts (screenshot captures, agent traces) — kept out of git
+/previews/
+/training/traces/

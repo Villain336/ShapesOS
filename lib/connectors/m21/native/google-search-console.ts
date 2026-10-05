@@ -1,16 +1,20 @@
-// Marketr — M21 Google Search Console adapter.
+// ShapesOS — M21 Google Search Console adapter.
 //
-// LIVE WIRING (not yet implemented): this adapter is MOCK-ONLY today. The
-// live pass must call the Google Search Console API:
-//   POST https://www.googleapis.com/v1/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
-//     → query() and pages()
-//   GET  https://www.googleapis.com/v1/webmasters/v3/sites
-//     → listSites()
-// Auth: OAuth2 Bearer access_token (scope webmasters.readonly); refresh
-// via lib/vault/refresh.ts. Docs: https://developers.google.com/webmaster-tools/search-console-api-original/v3/searchanalytics/query
+// LIVE WIRING (Phase 4b): with a vault credential this adapter calls the
+// Search Console API (Webmasters v3):
+//   GET  https://www.googleapis.com/webmasters/v3/sites → list_sites() + health check
+//   POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
+//     → query_performance() (dimension query) and page_performance()
+//       (dimension page), paged by startRow
+// Auth: OAuth2 Bearer (scope webmasters — read + sitemap submit since Phase 11;
+// older connections hold webmasters.readonly), refresh-on-401 through
+// the vault; 429/5xx/quota-403 back off and retry. Phase 6: the HTTP client
+// is the one in lib/intelligence/gsc/api.ts, shared with the bulk snapshot
+// cron (lib/intelligence/gsc/client.ts) — there is no second GSC client.
+// Docs: https://developers.google.com/webmaster-tools/v1/searchanalytics/query
 //
-// MOCK MODE: deterministic demo rows for a demo property; every row is
-// flagged mock: true and titles carry "(MOCK)". No network calls.
+// MOCK MODE (no credential): deterministic demo rows for a demo property;
+// every row is flagged mock: true and titles carry "(MOCK)". No network calls.
 
 import type {
   ConnectorAdapter,
@@ -19,7 +23,9 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { strProp, numProp, mockOk, fail } from "../types";
+import { strProp, numProp, mockOk, liveOk, fail } from "../types";
+import { clampInt, isIsoDate, liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
+import { gscListSites, gscQuery, normalizeProperty, shapeGscRow } from "@/lib/intelligence/gsc/api";
 
 interface GscRow {
   query: string;
@@ -80,6 +86,8 @@ export class GoogleSearchConsoleAdapter implements ConnectorAdapter {
     },
   };
 
+  constructor(private readonly deps: LiveDeps = {}) {}
+
   listTools(): ConnectorToolDef[] {
     return [
       {
@@ -126,9 +134,54 @@ export class GoogleSearchConsoleAdapter implements ConnectorAdapter {
   async invoke(
     tool: string,
     args: Record<string, unknown>,
-    _credential: DecryptedCredential | null,
+    credential: DecryptedCredential | null,
     ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return this.mockInvoke(tool, args, ctx);
+    try {
+      switch (tool) {
+        case "list_sites":
+          return liveOk(await gscListSites(auth, this.deps));
+        case "query_performance":
+        case "page_performance": {
+          const dimension = tool === "query_performance" ? "query" : "page";
+          const property = normalizeProperty(args.property ?? ctx.projectConfig?.property);
+          if (!isIsoDate(args.startDate) || !isIsoDate(args.endDate)) {
+            throw new ConnectorApiError(this.displayName, "bad_request", `${this.displayName}: startDate and endDate must be YYYY-MM-DD.`);
+          }
+          const rows = await gscQuery(
+            auth,
+            { property, startDate: args.startDate, endDate: args.endDate, dimension, limit: clampInt(args.limit, 10, 1, 50_000) },
+            this.deps,
+          );
+          return liveOk({
+            property,
+            startDate: args.startDate,
+            endDate: args.endDate,
+            rows: rows.map((r) => shapeGscRow(r, dimension)),
+          });
+        }
+        default:
+          return fail(`Unknown tool "${tool}" for connector ${this.key}`);
+      }
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return { ok: false, error: "No access token stored.", errorCode: "not_connected" };
+    try {
+      const sites = await gscListSites(auth, this.deps);
+      return liveOk({ reachable: true, sites: sites.length });
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  private mockInvoke(tool: string, args: Record<string, unknown>, ctx: InvokeContext): InvokeResult {
     const property =
       (args.property as string | undefined) ??
       (ctx.projectConfig?.property as string | undefined) ??

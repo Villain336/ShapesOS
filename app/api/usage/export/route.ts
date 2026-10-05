@@ -3,6 +3,7 @@
 // The agency chargeback story: Mara bills each client from this ledger.
 // Reads: admin+. evidence_ref is labeled unverified (threat model T7).
 
+import { csvCell } from "@/lib/csv";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -10,10 +11,6 @@ import { requireWorkspaceAccess, workspaceIdFrom } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
-function csvCell(v: string | number | null | undefined): string {
-  const s = v === null || v === undefined ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();

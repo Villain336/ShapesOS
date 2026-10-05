@@ -54,6 +54,7 @@ import {
   withAlpha,
 } from "./chart-math";
 import { validateDesignDocument } from "./validate";
+import { sanitizeSvgFragment } from "./svg-sanitize";
 
 export type SvgExportResult = { ok: true; svg: string } | { ok: false; error: string };
 
@@ -249,11 +250,14 @@ function svgPathToSvg(el: SvgElement): string {
     // nested <svg> (valid SVG) with the element's fill as `color`, tinting
     // currentColor artwork. No network — everything is in the document.
     const vb = el.viewBox && el.viewBox.trim().length > 0 ? el.viewBox : "0 0 24 24";
+    // H1: the body is untrusted markup — re-sanitized at render time too, so
+    // bodies stored before write-time sanitization can never inline script.
+    const body = sanitizeSvgFragment(el.body);
     return (
       `<g transform="translate(${formatNumber(el.x)},${formatNumber(el.y)})"${opacityAttr(el)}>` +
       `<svg x="0" y="0" width="${formatNumber(el.width)}" height="${formatNumber(el.height)}"` +
       ` viewBox="${escapeXml(vb)}" xmlns="http://www.w3.org/2000/svg" color="${escapeXml(el.fill)}">` +
-      el.body +
+      body +
       `</svg></g>`
     );
   }
@@ -538,7 +542,7 @@ export function exportPageToSvg(
   const body = page.elements.map((el) => elementToSvg(el, opts)).filter(Boolean).join("\n");
   const svg =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<!-- Exported from Marketr Canvas (schema v${validated.doc.schemaVersion}) — page "${escapeXml(page.name)}" -->\n` +
+    `<!-- Exported from ShapesOS Canvas (schema v${validated.doc.schemaVersion}) — page "${escapeXml(page.name)}" -->\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="${formatNumber(page.width)}" height="${formatNumber(page.height)}" viewBox="0 0 ${formatNumber(page.width)} ${formatNumber(page.height)}">\n` +
     `<rect x="0" y="0" width="${formatNumber(page.width)}" height="${formatNumber(page.height)}" fill="${escapeXml(page.background)}"/>\n` +
     (body ? body + "\n" : "") +

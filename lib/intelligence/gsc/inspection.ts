@@ -85,7 +85,7 @@ export const dataSourceStore: QueueStore = {
       const base = (existing?.config ?? {}) as Record<string, unknown>;
       const next = { ...base, inspectionQueue: state as unknown as Prisma.InputJsonValue };
       if (existing) {
-        await tx.dataSource.update({ where: { id: existing.id }, data: { config: next } });
+        await tx.dataSource.update({ where: { id: existing.id, workspaceId }, data: { config: next } });
       } else {
         await tx.dataSource.create({
           data: { workspaceId, type: "gsc", config: next, status: "active" },

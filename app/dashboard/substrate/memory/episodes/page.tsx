@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G3: episodes log (SPEC-PHASE8.md §6).
+// Marketr — Phase 8 G3: episodes log (docs/specs/SPEC-PHASE8.md §6).
 // Immutable event history: type/actor/since filters, badges top-right.
 
 import { redirect } from "next/navigation";
@@ -20,7 +20,7 @@ const EPISODE_TYPES = ["run", "session", "sync", "agent_call"] as const;
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Episodes — Growth Memory — Marketr",
+  title: "Episodes — Growth Memory — ShapesOS",
   description: "The immutable event history everything was distilled from.",
 };
 

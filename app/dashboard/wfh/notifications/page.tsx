@@ -15,7 +15,7 @@ import NotificationsPanel from "./_components/NotificationsPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH notifications — Marketr",
+  title: "WFH notifications — ShapesOS",
   description: "Async-first notification digests: urgent breaks through, the rest waits for a window.",
 };
 

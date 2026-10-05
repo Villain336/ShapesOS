@@ -6,11 +6,11 @@
 // GET  /api/reports/send-approvals  → list this workspace's send approvals (newest first)
 
 import type { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { draftReportSend } from "@/lib/reports/report-gate";
 import type { ReportFigure } from "@/lib/reports/figures";
+import { scopedDb, withWorkspaceScope } from "@/lib/substrate/memory/rls";
 
 function validFigure(f: unknown): f is ReportFigure {
   if (!f || typeof f !== "object") return false;
@@ -52,11 +52,14 @@ export async function GET() {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
 
-  const approvals = await prisma.reportSendApproval.findMany({
-    where: { workspaceId: workspace.id },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  // report_send_approvals is FORCE-RLS: read inside the workspace scope.
+  const approvals = await withWorkspaceScope(workspace.id, (tx) =>
+    tx.reportSendApproval.findMany({
+      where: { workspaceId: workspace.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  );
   return Response.json({ approvals: approvals.map((a) => serialize(a as unknown as Record<string, unknown>)) });
 }
 
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const approval = await draftReportSend(prisma, {
+    const approval = await draftReportSend(scopedDb(workspace.id), {
       workspaceId: workspace.id,
       createdBy: user.id,
       templateName: body.templateName.trim(),

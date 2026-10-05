@@ -120,6 +120,7 @@ describe("runChangeDetection robots enforcement", () => {
 
     const fetcher = new PoliteFetcher({
       fetchImpl,
+      resolve: async () => ["93.184.216.34"],
       minDelayMs: 0, // speed up the test; the politeness suite covers delays
       sleep: async () => {},
     });
@@ -146,6 +147,30 @@ describe("runChangeDetection robots enforcement", () => {
     assert.equal(result.changed, 0);
   });
 
+  it("off-domain tracked URLs (from a hostile sitemap) are never fetched (H8)", async () => {
+    const fetched: string[] = [];
+    const fetcher = new PoliteFetcher({
+      fetchImpl: (async (url: string | URL | Request) => {
+        fetched.push(String(url));
+        return new Response("<html>x</html>", { status: 200, headers: { "content-type": "text/html" } });
+      }) as typeof fetch,
+      resolve: async () => ["93.184.216.34"],
+      minDelayMs: 0,
+      sleep: async () => {},
+    });
+    const result = await runChangeDetection({
+      tx: fakeTx(),
+      workspaceId: "ws_test",
+      watch: { id: "watch_3", competitorDomain: "comp.example" },
+      trackedUrls: ["http://169.254.169.254/latest/meta-data/", "https://intranet.other.example/admin"],
+      fetcher,
+      robotsCache: createRobotsCache(),
+    });
+    assert.deepEqual(fetched, []);
+    assert.equal(result.errors.length, 2);
+    assert.ok(result.errors.every((e) => e.error === "off-domain URL refused"));
+  });
+
   it("second pass over unchanged content emits no change rows", async () => {
     const html = "<html><title>T</title><body>stable content</body></html>";
     let snapshots: Record<string, unknown> = {};
@@ -164,6 +189,7 @@ describe("runChangeDetection robots enforcement", () => {
       new PoliteFetcher({
         fetchImpl: (async () =>
           new Response(html, { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch,
+        resolve: async () => ["93.184.216.34"],
         minDelayMs: 0,
         sleep: async () => {},
       });

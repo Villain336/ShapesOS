@@ -18,8 +18,8 @@
 #
 # Listmonk image: official `listmonk/listmonk:latest` from the project
 # maintainers. Default web/admin UI: http://localhost:9000
-# Default admin: listmonk / listmonk (change LISTMONK_ADMIN_USER/PASSWORD
-# via env before first run).
+# Required: LISTMONK_DB_PASSWORD and LISTMONK_ADMIN_PASSWORD (no defaults
+# ship). The UI binds to 127.0.0.1 only — reverse-proxy it for remote access.
 
 name: marketr-listmonk
 
@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${LISTMONK_DB_USER:-listmonk}
-      POSTGRES_PASSWORD: ${LISTMONK_DB_PASSWORD:-listmonk}
+      POSTGRES_PASSWORD: ${LISTMONK_DB_PASSWORD:?set LISTMONK_DB_PASSWORD (openssl rand -hex 32)}
       POSTGRES_DB: ${LISTMONK_DB_NAME:-listmonk}
     volumes:
       - listmonk-pgdata:/var/lib/postgresql/data
@@ -52,19 +52,19 @@ services:
       LISTMONK_db__host: listmonk-postgres
       LISTMONK_db__port: 5432
       LISTMONK_db__user: ${LISTMONK_DB_USER:-listmonk}
-      LISTMONK_db__password: ${LISTMONK_DB_PASSWORD:-listmonk}
+      LISTMONK_db__password: ${LISTMONK_DB_PASSWORD:?set LISTMONK_DB_PASSWORD}
       LISTMONK_db__database: ${LISTMONK_DB_NAME:-listmonk}
       LISTMONK_db__ssl_mode: disable
       # Admin user created on first install. Prefer overriding via .env.
       LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:-listmonk}
-      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:-listmonk}
+      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:?set LISTMONK_ADMIN_PASSWORD}
       # Marketr talks to this sidecar with LISTMONK_USER/LISTMONK_TOKEN.
       # Listmonk supports user/password Basic auth on /api/*. Generate a
       # dedicated non-admin user in Listmonk Settings → Users, or point
       # LISTMONK_TOKEN at the admin password during dev only.
     command: --install --yes --config ""
     ports:
-      - "${LISTMONK_PORT:-9000}:9000"
+      - "127.0.0.1:${LISTMONK_PORT:-9000}:9000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:9000/api/health"]
       interval: 30s

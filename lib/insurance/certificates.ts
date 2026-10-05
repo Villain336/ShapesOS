@@ -753,7 +753,7 @@ export function certificatePdfLines(payload: CertificatePayload): PdfLine[] {
   };
 
   section("PRODUCER");
-  free("Marketr Insurance — software only. Licensed producer of record on file.");
+  free("ShapesOS Insurance — software only. Licensed producer of record on file.");
   y -= 4;
 
   section("NAMED INSURED");

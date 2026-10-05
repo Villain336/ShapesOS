@@ -25,16 +25,6 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-// Plain validation Errors from the lib layer surface as 400; HttpErrors keep
-// their own status via httpErrorResponse.
-function asResponse(e: unknown, fallback: string) {
-  if (e instanceof HttpError) return httpErrorResponse(e);
-  return Response.json(
-    { error: e instanceof Error ? e.message : fallback },
-    { status: 400 },
-  );
-}
-
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const { workspace } = await guardWorkspace();
@@ -96,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
       return Response.json({ session });
     } catch (e) {
-      return asResponse(e, "Session update failed");
+      return httpErrorResponse(e);
     }
   } catch (e) {
     return httpErrorResponse(e);

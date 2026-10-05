@@ -9,6 +9,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { validateStandup, WfhStandupError, isStandupLate } from "@/lib/wfh/standups";
+import { resolveTimeZone } from "@/lib/time/zoned";
 import { signalStandupSubmitted } from "@/lib/wfh/dayview";
 import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
@@ -48,15 +49,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // The user's local workday ("YYYY-MM-DD" is taken as-is; an instant is
+  // read in their IANA timezone).
+  const mode = await prisma.wfhWorkMode.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+    select: { timezone: true },
+  });
+  const tz = resolveTimeZone(mode?.timezone);
+
   try {
     const v = validateStandup({
-      date: body.date ? new Date(String(body.date)) : new Date(),
+      date: body.date ? String(body.date) : new Date(),
       yesterday: String(body.yesterday ?? ""),
       today: String(body.today ?? ""),
       blockers: body.blockers != null ? String(body.blockers) : null,
       videoUrl: body.videoUrl != null ? String(body.videoUrl) : null,
       visibility: (body.visibility as "team" | "private" | undefined) ?? "team",
-    });
+    }, tz);
     if (!v.ok || !v.normalized) {
       throw new WfhStandupError("VALIDATION_FAILED", "Standup is invalid.", v.errors);
     }
@@ -92,7 +101,7 @@ export async function POST(req: NextRequest) {
       user.id,
       signalStandupSubmitted({
         standupId: standup.id,
-        late: isStandupLate(new Date()),
+        late: isStandupLate(new Date(), 10, tz),
         visibility: standup.visibility,
         hasBlockers: !!standup.blockers,
         hasVideo: !!standup.videoUrl,

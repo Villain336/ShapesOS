@@ -57,6 +57,8 @@ export function ElementsPanel() {
       <div className="space-y-4 px-3 pb-4">
         <div>
           <div className={panelSectionLabel}>Shapes</div>
+          {/* Legit literal hex below: default fills written into the user's design
+              document (Konva canvas, exported to PNG/PDF), not UI chrome. */}
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => addElement(makeRect({ width: 320, height: 200, fill: "#1c1917", cornerRadius: 8, ...dims, name: "Rectangle" }))}
@@ -110,7 +112,7 @@ export function ElementsPanel() {
               <span className="text-[10px] font-medium text-muted">QR code</span>
             </button>
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-subtle">
+          <p className="pt-2 text-[11px] leading-snug text-muted">
             Charts and QR codes drop in with starter content — edit data, colors, and links from the toolbar once selected.
           </p>
         </div>
@@ -130,7 +132,7 @@ export function ElementsPanel() {
               </button>
             ))}
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-subtle">
+          <p className="pt-2 text-[11px] leading-snug text-muted">
             Icons drop in ink — recolor them from the toolbar.
           </p>
         </div>

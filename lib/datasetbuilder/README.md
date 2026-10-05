@@ -176,3 +176,37 @@ upsert in Postgres, find-first in memory).
   Source → Document → Chunk citation breadcrumbs.
 - DB: migration `20261001180000_dataset_builder_slice4` adds
   `dataset_publishes` (unique `(dataset_id, target, version)`, cascade deletes).
+
+## Phase 4b: slices 3–4 follow-through
+
+What the spec asked for that slices 3–4 didn't yet do (REMEDIATION-PLAN
+Phase 4b "datasets slices 3–4"):
+
+- **Staleness alerts reach people** (slice 3: "staleness alerts"):
+  `stale-sweep.ts` + `POST /api/cron/dataset-health` (cron gate; daily).
+  Fires once per compiled version (claim = conditional update of
+  `datasets.stale_alerted_version`; a recompile re-arms): in-app
+  notification to editors+, the `dataset_stale` alert-hub trigger (tenant
+  rules → Slack/email/digest), and the `dataset.stale` webhook. Threshold
+  `DATASET_STALE_AFTER_DAYS` (default 90).
+- **Versioning / rollback** (spec open question "versioning/rollback UX"):
+  `publishDataset({ version })` makes any compiled version live; the live
+  record is the most recently published (`published_at`, strictly
+  increasing per target), not the highest version. Publishing the live
+  version is a no-op (`alreadyLive`). UI: version picker per target with a
+  confirmed "Roll back to vN".
+- **BriefNow as a live connector** (slice 4; was a local file drop that has
+  no target in a hosted deploy): the package is rebuilt from the database
+  on every pull through the ShapesOS MCP tool `get_dataset_adapter`
+  (scoped key, metered, audited, paged ≤ 200 entries). The briefnow target
+  therefore needs the plan's `api_access` entitlement. The file drop still
+  happens when `BRIEFNOW_ADAPTERS_ROOT` is set (co-located runtime).
+  `artifactRef` is `mcp://get_dataset_adapter?type=<type>&version=<n>`.
+- **OS RAG/Feed grounding** (slice 4: "so briefs and answers ground in
+  it"): `askPublishedDatasets` searches every dataset live on `rag` (never
+  unpublished ones), with Source → Document → Chunk citations and a refusal
+  when nothing matches. Wired into the chat agent (`ask_business_data`,
+  safe/viewer) and MCP (`ask_business_data`).
+- Webhooks: `dataset.compiled`, `dataset.published` (incl. rollbacks),
+  `dataset.stale`. Record search kind `dataset` (→ `?tab=build`).
+- Tests: `activate-rollback.test.ts` (unit), `datasets-activate-db.test.ts` (DB).

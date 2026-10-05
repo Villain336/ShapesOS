@@ -23,6 +23,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { activateOnKey, closeOnEscape } from "@/lib/ui/keyboard";
 
 // ---------------------------------------------------------------------------
 // Types + tiny API helper
@@ -290,6 +291,8 @@ export function EddmApp() {
                     key={o.id}
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     onClick={() => openOrder(o.id)}
+                    tabIndex={0}
+                    onKeyDown={activateOnKey(() => openOrder(o.id))}
                   >
                     <td className="px-3 py-2 font-medium text-ink">{o.name}</td>
                     <td className="px-3 py-2">
@@ -494,7 +497,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
           <h3 className="text-[14px] font-semibold text-ink">New EDDM order</h3>
@@ -511,7 +514,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             <input className={inputCls} placeholder="e.g. Triad Direct Mail" value={mailhouse} onChange={(e) => setMailhouse(e.target.value)} />
           </Field>
           <Note>
-            There is no USPS EDDM API — your mailhouse executes the drop. Marketr plans it and
+            There is no USPS EDDM API — your mailhouse executes the drop. ShapesOS plans it and
             produces the handoff brief they work from.
           </Note>
           <div className="flex justify-end gap-2">
@@ -836,7 +839,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
       <Err message={localError} />
       <Note>
         Estimates only — postage is paid at acceptance (EDDM Retail) or via permit imprint (BMEU).
-        No spend is authorized in Marketr.
+        No spend is authorized in ShapesOS.
       </Note>
       <div className="mb-4 grid gap-3 md:grid-cols-2">
         <Field label="Postage entry">

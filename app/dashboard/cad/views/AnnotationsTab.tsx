@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, MapPin, StickyNote, Trash2, X } from "lucide-react";
 import { CadViewer } from "./CadViewer";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface VersionLite {
   id: string;
@@ -100,7 +101,7 @@ export function AnnotationsTab({
   }
 
   async function remove(id: string) {
-    if (!window.confirm("Delete this annotation?")) return;
+    if (!await confirmAction("Delete this annotation?")) return;
     try {
       await api(`/api/cad/annotations/${id}`, { method: "DELETE" });
       await load();

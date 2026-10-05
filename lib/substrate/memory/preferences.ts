@@ -116,7 +116,7 @@ export async function setPreference(
     });
     if (current) {
       await tx.memoryFact.update({
-        where: { id: current.id },
+        where: { id: current.id, workspaceId },
         data: { invalidAt: now, expiredAt: now, supersededById: created.id },
       });
     }

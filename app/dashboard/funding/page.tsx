@@ -10,7 +10,7 @@ import { FundingApp } from "./FundingApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Funding — Marketr",
+  title: "Funding — ShapesOS",
   description:
     "Your funding network and raise workflow. Boardy AI ships as your preloaded starter contact for warm intros matched to your target investor profile.",
 };

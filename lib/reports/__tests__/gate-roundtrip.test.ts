@@ -25,6 +25,10 @@ import {
   editReportSend,
 } from "@/lib/reports/report-gate";
 import { UngroundedFiguresError, type ReportFigure } from "@/lib/reports/figures";
+import { weasyprintAvailable } from "@/lib/reports/render-service";
+
+/** Real-PDF cases need the WeasyPrint venv (MARKETR_WEASYPRINT_PYTHON); skip, never fail, without it. */
+const NO_WEASYPRINT = weasyprintAvailable() ? false : "WeasyPrint interpreter not installed (set MARKETR_WEASYPRINT_PYTHON)";
 
 interface Captured {
   rows: Map<string, Record<string, unknown>>;
@@ -121,7 +125,7 @@ describe("report send gate round-trip", () => {
     assert.equal(captured.audits[0].action, "report_send_flagged");
   });
 
-  it("approve renders a real PDF via WeasyPrint", async () => {
+  it("approve renders a real PDF via WeasyPrint", { skip: NO_WEASYPRINT }, async () => {
     const captured: Captured = { rows: new Map(), audits: [], seq: 0 };
     const db = stubDb(captured);
     const draft = await draftReportSend(db, {

@@ -58,7 +58,7 @@ export async function deliverEvent(eventId: string): Promise<AlertEvent> {
   const payload: AlertPayload = {
     title: event.title,
     body: event.body,
-    links: event.link ? [{ label: "Open in Marketr", url: event.link }] : [],
+    links: event.link ? [{ label: "Open in ShapesOS", url: event.link }] : [],
   };
 
   const channels = event.rule.channels.filter((c: AlertChannel) => c.enabled);

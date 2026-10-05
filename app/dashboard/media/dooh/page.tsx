@@ -9,7 +9,7 @@ import { DoohApp } from "./DoohApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "DOOH Planner — Marketr",
+  title: "DOOH Planner — ShapesOS",
   description: "Plan digital out-of-home: Blip, Blindspot, Adomni. Estimate ranges, launch packets.",
 };
 
@@ -18,7 +18,7 @@ export default async function DoohPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading text-ink">DOOH Planner</h1>
         <p className="mt-0.5 text-[13px] text-muted">

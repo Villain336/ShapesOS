@@ -13,6 +13,8 @@ import {
   proposeInvoiceReminder,
 } from "@/lib/ops/invoices";
 import { OpsError } from "@/lib/ops/doctype";
+import { deliverInvoice } from "@/lib/ops/finance/invoicing";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,10 @@ export async function POST(
     if (result.outcome === "approval_required") {
       return Response.json({ approval_required: true, approval: result.approval }, { status: 202 });
     }
-    return Response.json({ done: true, invoiceId: result.invoiceId });
+    // Phase 10 (finance): the approved reminder is now actually emailed
+    // (with the invoice PDF) after the approval was consumed.
+    const delivery = await deliverInvoice(actor, id, { reminderText: text });
+    return Response.json({ done: true, invoiceId: result.invoiceId, delivery });
   } catch (err) {
     if (err instanceof OpsError) {
       return Response.json({ error: err.message }, { status: err.status });
@@ -53,7 +58,6 @@ export async function POST(
     if (err instanceof OpsGateError) {
       return Response.json({ error: err.message, code: err.code }, { status: 422 });
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 500 });
+    return errorResponse(err);
   }
 }

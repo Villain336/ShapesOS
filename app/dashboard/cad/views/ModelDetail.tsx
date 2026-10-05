@@ -106,21 +106,28 @@ const TABS = [
   { key: "links", label: "Share links", icon: Link2 },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+export type TabKey = (typeof TABS)[number]["key"];
+
+export function isModelTab(v: string | null | undefined): v is TabKey {
+  return TABS.some((t) => t.key === v);
+}
 
 export function ModelDetail({
   modelId,
   onBack,
   onChanged,
+  initialTab,
 }: {
   modelId: string;
   onBack: () => void;
   onChanged: () => void;
+  /** Deep link (e.g. record search → ?tab=prototype). */
+  initialTab?: TabKey;
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("viewer");
+  const [tab, setTab] = useState<TabKey>(initialTab ?? "viewer");
   const [showUpload, setShowUpload] = useState(false);
 
   const load = useCallback(async () => {

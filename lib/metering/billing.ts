@@ -14,8 +14,9 @@
 import Stripe from "stripe";
 import { Prisma, type BillingOverageInvoice, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { applyTopUp, setSpendCap } from "./service";
+import { applyPlanChange, applyTopUp, setSpendCap } from "./service";
 import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
+import { deploymentMode, lapsedPlanFor } from "@/lib/billing/trial";
 import {
   PLANS,
   planById,
@@ -159,8 +160,15 @@ CREATE TABLE IF NOT EXISTS billing_topup_idempotency (
 let idempotencyReady = false;
 async function ensureIdempotencyTable(): Promise<void> {
   if (idempotencyReady) return;
-  await prisma.$executeRawUnsafe(IDEMPOTENCY_DDL);
+  // Migrations create the table; the runtime app role has no CREATE right on
+  // the schema, so only fall back to DDL when it is genuinely missing.
+  if (!(await tableExists("billing_topup_idempotency"))) await prisma.$executeRawUnsafe(IDEMPOTENCY_DDL);
   idempotencyReady = true;
+}
+
+async function tableExists(name: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ ok: boolean }>>`SELECT to_regclass(${"public." + name}) IS NOT NULL AS ok`;
+  return rows[0]?.ok === true;
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -333,7 +341,7 @@ export class StripeBillingSink implements BillingSink {
           price_data: {
             currency: "usd",
             unit_amount: pack.priceCents,
-            product_data: { name: `Marketr credit top-up — ${pack.credits.toLocaleString()} credits` },
+            product_data: { name: `ShapesOS credit top-up — ${pack.credits.toLocaleString()} credits` },
           },
           quantity: 1,
         },
@@ -626,7 +634,7 @@ export class StripeBillingSink implements BillingSink {
     if (!customerId) {
       const customer = await this.client().customers.create({
         metadata: { workspaceId },
-        description: `Marketr workspace ${workspaceId}`,
+        description: `ShapesOS workspace ${workspaceId}`,
       });
       customerId = customer.id;
       await prisma.billingWorkspace.update({
@@ -958,7 +966,7 @@ export class StripeBillingSink implements BillingSink {
       // Card gate above guarantees a bound customer — never create one here.
       const customerId = bw.stripeCustomerId as string;
       const description =
-        `Marketr overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
+        `ShapesOS overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
         `(usage past cap, through ${label})`;
       await this.client().invoiceItems.create(
         { customer: customerId, amount: amountCents, currency: "usd", description },
@@ -1284,7 +1292,7 @@ export interface PortalSessionRequest {
 }
 
 // Same CREATE TABLE IF NOT EXISTS safety-net pattern as the top-up
-// idempotency table above: no migration coordination needed.
+// idempotency table above (now also created by a migration).
 const SUBSCRIPTIONS_DDL = `
 CREATE TABLE IF NOT EXISTS billing_subscriptions (
   workspace_id               TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -1302,7 +1310,8 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
 let subscriptionsReady = false;
 async function ensureSubscriptionsTable(): Promise<void> {
   if (subscriptionsReady) return;
-  await prisma.$executeRawUnsafe(SUBSCRIPTIONS_DDL);
+  // Created by migration 20261003120000; DDL only as a fallback (see above).
+  if (!(await tableExists("billing_subscriptions"))) await prisma.$executeRawUnsafe(SUBSCRIPTIONS_DDL);
   subscriptionsReady = true;
 }
 
@@ -1384,7 +1393,9 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
  * signed Stripe webhook paths in this module — never from UI input.
  */
 async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: string): Promise<void> {
-  await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: planId } });
+  // Plan + included pool + cap move together (one locked transaction) —
+  // an upgraded workspace is never left capped at the old tier's pool.
+  await applyPlanChange(workspaceId, planId);
   await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
 }
 
@@ -1452,7 +1463,9 @@ export async function syncSubscriptionFromStripe(
   });
 
   if (ended) {
-    await setWorkspacePlan(workspaceId, "self_hosted" as Plan, `subscription ${sub.id} ended (${sub.status})`);
+    // Phase 3: on a hosted deployment a lapsed subscription becomes an ended
+    // trial (read-only for metered actions), never unbilled self_hosted.
+    await setWorkspacePlan(workspaceId, lapsedPlanFor(deploymentMode()), `subscription ${sub.id} ended (${sub.status})`);
   } else if (planId) {
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (ws && ws.plan !== planId) {

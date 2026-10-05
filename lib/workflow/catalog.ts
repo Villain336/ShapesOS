@@ -55,6 +55,13 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
           hint: "Minute hour day month weekday. Checked every minute by /api/cron/workflows.",
           required: true,
         },
+        {
+          key: "timezone",
+          label: "Timezone (IANA)",
+          type: "text",
+          placeholder: "America/New_York",
+          hint: "The cron is read in this timezone. Blank = the workflow's timezone (UTC by default).",
+        },
       ],
     },
     {
@@ -90,11 +97,14 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
     {
       type: "webhook",
       label: "Webhook",
-      description: "Fire on an inbound webhook call (v1: fired manually via run API).",
+      description:
+        "Fire when a signed POST reaches this workflow's inbound URL. The JSON body is available to later nodes as trigger.<field>.",
       icon: "WebhooksLogo",
       defaultLabel: "Webhook",
-      defaultConfig: { secret: "" },
-      fields: [{ key: "secret", label: "Shared secret", type: "text", hint: "v1: informational only." }],
+      // URL and signing secret live outside node config (lib/workflow/webhook.ts);
+      // the canvas shows them in this node's settings.
+      defaultConfig: {},
+      fields: [],
     },
   ],
   action: [

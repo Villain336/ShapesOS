@@ -27,6 +27,7 @@ import {
 import { renderReportPdf } from "./render-service";
 import { brandKitRowToInput } from "./brand-css";
 import { resolveTemplate } from "./templates/registry";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 type Db = PrismaClient;
 
@@ -154,6 +155,14 @@ export async function draftReportSend(db: Db, input: DraftReportInput): Promise<
       ? `Report drafted: "${row.clientName}" (${row.templateName}@${row.templateVersion}, ${row.period})`
       : `Report drafted and FLAGGED: "${row.clientName}" — figures without sources: ${grounding.ungroundedKeys.join(", ")}`,
   );
+  // Phase 3 (J): best-effort "needs you" notification (never throws).
+  await notifyApprovalNeeded({
+    workspaceId: input.workspaceId,
+    source: "report",
+    sourceId: row.id,
+    title: `${row.clientName} · ${row.period}`,
+    requestedBy: input.createdBy,
+  });
   return row;
 }
 
@@ -220,6 +229,15 @@ export async function approveReportSend(
       `Report approved + rendered: "${row.clientName}" (${row.templateName}@${row.templateVersion}, ` +
         `${rendered.pageCount}p, ${(rendered.sizeBytes / 1024).toFixed(1)} KB, all ${payload.figures.length} figures source-traced)`,
     );
+    await notifyApprovalDecided({
+      workspaceId: args.workspaceId,
+      source: "report",
+      sourceId: row.id,
+      title: `${row.clientName} · ${row.period}`,
+      decision: "approved",
+      decidedBy: args.actor,
+      requestedBy: row.createdBy,
+    });
     return updated;
   } catch (err) {
     if (err instanceof UngroundedFiguresError) {
@@ -273,6 +291,15 @@ export async function denyReportSend(
     "denied",
     `Report denied: "${row.clientName}" (${row.period})${args.note ? ` — ${args.note}` : ""}`,
   );
+  await notifyApprovalDecided({
+    workspaceId: args.workspaceId,
+    source: "report",
+    sourceId: row.id,
+    title: `${row.clientName} · ${row.period}`,
+    decision: "denied",
+    decidedBy: args.actor,
+    requestedBy: row.createdBy,
+  });
 }
 
 /**

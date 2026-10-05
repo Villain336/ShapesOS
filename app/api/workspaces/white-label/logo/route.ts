@@ -16,6 +16,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { reportStorageDir } from "@/lib/pdf/generate";
 import { resolveWithinDir, validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
+import { EntitlementError, entitlementDenied, featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,10 @@ export async function POST(req: NextRequest) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   if (!(await requireWorkspaceRole(user.id, workspace.id, "admin"))) return forbidden();
+  // Phase 4a: white-label is a plan entitlement (403 + upgrade prompt).
+  if (!planHasFeature(workspace.plan, "white_label")) {
+    return entitlementDenied(new EntitlementError(featureUpgradeMessage("white_label"), "white_label"));
+  }
 
   let form: FormData;
   try {
@@ -58,6 +63,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: reason }, { status });
   };
   if (!check.ok) return reject(check.reason);
+  // The white-label logo is served PUBLICLY on the app origin. SVG is active
+  // content (script, external loads), so only raster formats are accepted.
+  if (check.ext === "svg") {
+    return reject("SVG logos aren't accepted for white-label branding. Upload a PNG, JPEG, GIF or WebP.");
+  }
   const screen = await screenUploadBuffer(buf);
   if (!screen.ok) return reject(screen.reason, screen.status);
 

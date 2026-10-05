@@ -70,6 +70,7 @@ export function LayersPanel() {
           return (
             <div
               key={el.id}
+              role="presentation"
               onClick={() => select([el.id])}
               onDoubleClick={() => rename(el)}
               title="Click to select · double-click to rename"
@@ -80,7 +81,24 @@ export function LayersPanel() {
               } ${el.visible ? "" : "opacity-50"}`}
             >
               <TypeIcon type={el.type} />
-              <span className="min-w-0 flex-1 truncate font-medium">{el.name}</span>
+              {/* Keyboard path: Enter selects, F2 renames. */}
+              <button
+                type="button"
+                aria-pressed={selected}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  select([el.id]);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "F2") {
+                    e.preventDefault();
+                    rename(el);
+                  }
+                }}
+                className="min-w-0 flex-1 truncate rounded-sm text-left font-medium"
+              >
+                {el.name}
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

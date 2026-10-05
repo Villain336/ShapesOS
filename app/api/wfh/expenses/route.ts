@@ -63,9 +63,11 @@ export async function POST(req: NextRequest) {
 
     const v = validateExpense({
       categoryKey: category.key,
-      amountCents: Number(body.amountCents),
-      currency: body.currency != null ? String(body.currency) : "USD",
-      occurredOn: body.occurredOn ? new Date(String(body.occurredOn)) : new Date(),
+      // Raw values: validateExpense type-checks them (a numeric currency or
+      // a fractional amount is a 422, never a 500 or a silent rounding).
+      amountCents: body.amountCents,
+      currency: body.currency ?? "USD",
+      occurredOn: body.occurredOn != null ? (body.occurredOn as string) : new Date(),
       allocation: {
         method: category.allocationMethod as AllocationMethod,
         percent: category.allocationPct,

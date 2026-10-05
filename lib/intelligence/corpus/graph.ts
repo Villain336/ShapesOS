@@ -103,7 +103,7 @@ function teachesOf(record: CorpusSourceRecord): string {
     record.catalogStatus === "rights-review-pending" ||
     record.catalogStatus === "acquisition-pending"
   )
-    return "Cataloged source — not yet ingested. It will teach Marketr once rights are cleared and the corpus build runs.";
+    return "Cataloged source — not yet ingested. It will teach ShapesOS once rights are cleared and the corpus build runs.";
   const def = SEED_SOURCES.find((d) => d.id === record.id);
   if (def?.teaches) return def.teaches;
   if (record.mode === "synthesis-1s")
@@ -224,7 +224,7 @@ export function buildCorpusGraph(
   // Edge kind 2: same non-synthesis author (e.g. Hopkins' two books).
   const byAuthor = new Map<string, string[]>();
   for (const n of nodes) {
-    if (n.author === "Marketr (original synthesis)") continue;
+    if (n.author === "ShapesOS (original synthesis)") continue;
     const arr = byAuthor.get(n.author) ?? [];
     arr.push(n.id);
     byAuthor.set(n.author, arr);
@@ -249,7 +249,7 @@ export function buildCorpusGraph(
       chunks: 0,
       status: "pending",
       mode: "synthesis-1s",
-      teaches: p.teaches ?? "Awaiting ingest — will teach Marketr once vetted and built.",
+      teaches: p.teaches ?? "Awaiting ingest — will teach ShapesOS once vetted and built.",
       synthesizedFrom: [],
       kind: "proposed",
       manifestVersion: null,

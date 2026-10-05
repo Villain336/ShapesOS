@@ -4,6 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
@@ -29,19 +30,32 @@ interface Member {
 const ROLES = ["owner", "admin", "editor", "viewer"] as const;
 
 export default function MembersManager({ myRole }: { myRole: string }) {
+  // Mirrors the server rule (lib/authz.ts memberChangeError): nobody grants
+  // above their own role, and only owners touch owner rows.
+  const myIndex = ROLES.indexOf(myRole as (typeof ROLES)[number]);
+  const grantable = ROLES.filter((_, i) => myIndex >= 0 && i >= myIndex);
+  const isOwner = myRole === "owner";
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<(typeof ROLES)[number]>("editor");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  // Phase 3: invites are emailed when the deployment has mail set up.
+  const [inviteEmail, setInviteEmail] = useState(false);
+  // Phase 4a: the plan's seat limit (null = unlimited).
+  const [seatLimit, setSeatLimit] = useState<number | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ emailed: boolean; to: string; note?: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [resent, setResent] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/workspace/members");
     if (r.ok) {
       const j = await r.json();
       setMembers(j.members ?? []);
+      setInviteEmail(j.inviteEmail === true);
+      setSeatLimit(typeof j.seatLimit === "number" ? j.seatLimit : null);
     }
   }, []);
 
@@ -52,6 +66,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   async function invite() {
     setError(null);
     setInviteUrl(null);
+    setInviteResult(null);
     setBusy(true);
     try {
       const r = await fetch("/api/workspace/members", {
@@ -65,6 +80,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         return;
       }
       if (j.inviteUrl) setInviteUrl(j.inviteUrl);
+      setInviteResult({ emailed: j.emailed === true, to: email, note: j.emailNote });
       setEmail("");
       await load();
     } finally {
@@ -93,6 +109,26 @@ export default function MembersManager({ myRole }: { myRole: string }) {
     }
   }
 
+  async function emailInviteAgain(id: string) {
+    setError(null);
+    const r = await fetch(`/api/workspace/members/${id}/invite-link`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error ?? "Could not send the invite.");
+      return;
+    }
+    if (!j.emailed) {
+      setError(j.emailNote ?? "The invite email didn't go out. Copy the invite link instead.");
+      return;
+    }
+    setResent(id);
+    setTimeout(() => setResent(null), 2000);
+  }
+
   async function changeRole(id: string, newRole: string) {
     setError(null);
     const r = await fetch(`/api/workspace/members/${id}`, {
@@ -106,7 +142,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   }
 
   async function remove(id: string) {
-    if (!confirm("Remove this member from the workspace?")) return;
+    if (!await confirmAction("Remove this member from the workspace?")) return;
     setError(null);
     const r = await fetch(`/api/workspace/members/${id}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}));
@@ -119,10 +155,25 @@ export default function MembersManager({ myRole }: { myRole: string }) {
       <div className="rounded-xl border border-line bg-paper p-5">
         <h2 className="text-sm font-medium text-ink">Invite a teammate</h2>
         <p className="mt-1 text-xs text-muted">
-          They join through a single-use invite link (valid 7 days) — no email
-          is sent, so share the link with them directly. Your role:{" "}
-          <span className="font-mono">{myRole}</span>
+          {inviteEmail
+            ? "We email them a single-use invite link (valid 7 days). You can also copy the link and send it yourself."
+            : "They join through a single-use invite link (valid 7 days). Email isn't set up on this deployment, so share the link with them directly."}{" "}
+          Your role: <span className="font-mono">{myRole}</span>
+          {seatLimit !== null && (
+            <>
+              {" "}· Seats: {members.length} of {seatLimit} on your plan
+            </>
+          )}
         </p>
+        {seatLimit !== null && members.length >= seatLimit && (
+          <p className="mt-2 text-xs text-muted">
+            Every seat on your plan is taken.{" "}
+            <a href="/dashboard/billing" className="font-semibold text-ink underline">
+              Upgrade in Billing
+            </a>{" "}
+            to invite more people.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <input
             type="email"
@@ -137,13 +188,17 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
             className={inputCls}
           >
-            {ROLES.map((r) => (
+            {grantable.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
             ))}
           </select>
-          <button onClick={invite} disabled={busy || !email} className={btnPrimary}>
+          <button
+            onClick={invite}
+            disabled={busy || !email || (seatLimit !== null && members.length >= seatLimit)}
+            className={btnPrimary}
+          >
             {busy ? "Inviting…" : "Invite"}
           </button>
         </div>
@@ -156,7 +211,9 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         {inviteUrl && (
           <div className="mt-3 rounded-md border border-line bg-canvas p-3">
             <p className="text-xs text-muted">
-              Invite created — share this single-use link with them:
+              {inviteResult?.emailed
+                ? `Invite emailed to ${inviteResult.to}. The same single-use link, if you'd rather send it yourself:`
+                : `${inviteResult?.note ? `${inviteResult.note} ` : ""}Invite created — share this single-use link with them:`}
             </p>
             <div className="mt-2 flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1 font-mono text-xs text-muted">
@@ -202,9 +259,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                   <select
                     value={m.role}
                     onChange={(e) => changeRole(m.id, e.target.value)}
+                    disabled={m.role === "owner" && !isOwner}
                     className={`${inputCls} py-1`}
                   >
-                    {ROLES.map((r) => (
+                    {ROLES.filter((r) => r === m.role || grantable.includes(r)).map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -214,7 +272,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 <td className="px-4 py-3">
                   {m.pending ? (
                     <span className={chipCls}>
-                      pending — needs invite link
+                      {inviteEmail ? "pending invite" : "pending — needs invite link"}
                     </span>
                   ) : (
                     <span className={chipCls}>active</span>
@@ -222,9 +280,18 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    {m.pending && inviteEmail && m.email && (
+                      <button
+                        onClick={() => emailInviteAgain(m.id)}
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-ink shadow-control hover:bg-hover-paper"
+                      >
+                        {resent === m.id ? "Sent" : "Email invite again"}
+                      </button>
+                    )}
                     {m.pending && (
                       <button
                         onClick={() => copyInviteLink(m.id)}
+                        title="Makes a fresh link. Earlier links, including an emailed one, stop working."
                         className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                       >
                         {copied === m.id ? "Copied!" : "Copy invite link"}

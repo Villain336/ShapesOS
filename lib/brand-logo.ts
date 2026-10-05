@@ -11,6 +11,8 @@ import path from "node:path";
 import { prisma } from "./prisma";
 import { reportStorageDir } from "./pdf/generate";
 import { resolveWithinDir } from "./security/upload-safety";
+import { USER_CONTENT_CSP } from "./security/headers";
+import { effectiveWhiteLabel } from "./billing/entitlements";
 
 const EXT_MIME: Record<string, string> = {
   png: "image/png",
@@ -49,10 +51,30 @@ export async function loadDefaultBrandLogo(workspaceId: string): Promise<BrandLo
 export async function loadWhiteLabelLogo(workspaceId: string): Promise<BrandLogoFile | null> {
   const ws = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { whiteLabelLogoUrl: true },
+    select: { plan: true, whiteLabelLogoUrl: true, whiteLabelCustomDomain: true, whiteLabelBrandColor: true },
   });
   if (!ws) return null;
-  return loadBrandKitLogoFile(ws.whiteLabelLogoUrl);
+  // Phase 4a: a plan without white-label publishes no logo (honest 404).
+  return loadBrandKitLogoFile(effectiveWhiteLabel(ws).logoUrl);
+}
+
+/**
+ * Response headers for serving an uploaded logo. Uploaded bytes are user
+ * content: nosniff + a sandboxed, resource-less CSP on every response, and
+ * SVG is served as an attachment so navigating to the URL never renders it
+ * on the app origin (an <img src> still displays it — images ignore
+ * Content-Disposition, and SVG-as-image never runs script).
+ */
+export function brandLogoHeaders(file: BrandLogoFile, cacheControl: string): Record<string, string> {
+  const safeName = file.filename.replace(/["\\\r\n]/g, "_").slice(0, 200) || "logo";
+  const isSvg = file.mime === "image/svg+xml";
+  return {
+    "Content-Type": file.mime,
+    "Cache-Control": cacheControl,
+    "Content-Disposition": `${isSvg ? "attachment" : "inline"}; filename="${safeName}"`,
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": USER_CONTENT_CSP,
+  };
 }
 
 /** Resolve one brand kit's logoPath (repo-root-relative) to bytes. */

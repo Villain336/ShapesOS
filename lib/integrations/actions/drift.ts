@@ -34,6 +34,7 @@ import {
   type ComposioToolkitTool,
 } from "@/lib/integrations/actions/discovery";
 import { getToolTierOverrides } from "@/lib/integrations/actions/connections";
+import { BadRequestError, NotFoundError } from "@/lib/api/errors";
 
 export type DriftChangeType = "added" | "removed" | "renamed";
 
@@ -141,7 +142,7 @@ export async function detectDrift(
     toolkits.find((t) => t.appKey === appKey) ??
     toolkits.find((t) => t.toolkitSlug === appKey);
   if (!toolkit) {
-    throw new Error(`No toolkit found for app "${appKey}"`);
+    throw new BadRequestError(`No toolkit found for app "${appKey}"`);
   }
   const fresh = await router.getToolkitTools(toolkit.toolkitSlug);
   const cached = await withWorkspaceScope(workspaceId, (tx) =>
@@ -258,7 +259,7 @@ export async function acknowledgeDrift(
 ): Promise<DriftReport> {
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.composioCatalogDrift.update({
-      where: { id: driftId },
+      where: { id: driftId, workspaceId },
       data: { acknowledgedAt: new Date() },
       select: {
         id: true,
@@ -273,7 +274,7 @@ export async function acknowledgeDrift(
     }),
   ).catch(() => null);
   if (!row) {
-    throw new Error("Drift report not found");
+    throw new NotFoundError("Drift report not found");
   }
   return { ...row, changeType: row.changeType as DriftChangeType };
 }

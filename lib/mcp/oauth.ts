@@ -13,11 +13,17 @@
 //   workspaceId + scope set. No refresh tokens in v1.
 // - the consent screen renders the server-stored requested scope set; the
 //   consent POST can only approve/deny that stored set.
+// - Phase 1: only editor+ of the chosen workspace can approve; the code is
+//   capped to the scopes the approver's role allows (TOOL_MIN_ROLE), and
+//   lib/mcp/auth.ts re-checks membership + re-caps on every call.
 
+import { mcpEffectiveState } from "./enabled";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import type { WorkspaceRole } from "@prisma/client";
 import { secrets } from "@/lib/secrets";
-import { isKnownScope } from "./scopes";
+import { getMembership, roleAtLeast } from "@/lib/authz";
+import { capScopesToRole, isKnownScope } from "./scopes";
 import { mintAccessToken } from "./auth";
 
 export const OAUTH_CODE_TTL_MS = 10 * 60_000;
@@ -176,7 +182,15 @@ export async function approveAuthorization(
   pending: PendingAuthorization,
   userId: string,
   workspaceId: string,
-): Promise<{ code: string; redirectUri: string; state?: string }> {
+): Promise<{ code: string; redirectUri: string; state?: string; scopes: string[] }> {
+  // Phase 1: editor+ only, and the code carries no scope above the
+  // approver's role (lib/mcp/scopes.ts TOOL_MIN_ROLE). Checked here too so
+  // every caller of this primitive is covered.
+  const gate = await consentGate(userId, workspaceId);
+  if (!gate.ok) throw new Error(gate.error);
+  const scopes = capScopesToRole(pending.scopes, gate.role);
+  if (scopes.length === 0) throw new Error("no_permitted_scopes");
+
   // Ownership claim (T6b): the first approver owns the client. A public DCR
   // client starts unowned (userId null); whoever approves first claims it.
   // A different user can never steal a claimed client.
@@ -203,7 +217,7 @@ export async function approveAuthorization(
       userId,
       workspaceId,
       redirectUri: pending.redirectUri,
-      scopes: pending.scopes,
+      scopes,
       codeChallenge: pending.codeChallenge ?? null,
       expiresAt: new Date(Date.now() + OAUTH_CODE_TTL_MS),
     },
@@ -216,12 +230,12 @@ export async function approveAuthorization(
         filePath: "mcp:mcp_oauth_authorized",
         actor: "user",
         action: "mcp_oauth_authorized",
-        summary: `[mcp] oauth authorized client=${pending.clientId} scopes=${pending.scopes.join(",")} workspace=${workspaceId}`.slice(0, 500),
+        summary: `[mcp] oauth authorized client=${pending.clientId} scopes=${scopes.join(",")} workspace=${workspaceId}`.slice(0, 500),
         approvedBy: userId,
       },
     })
     .catch(() => {});
-  return { code, redirectUri: pending.redirectUri, state: pending.state };
+  return { code, redirectUri: pending.redirectUri, state: pending.state, scopes };
 }
 
 function base64UrlDecode(input: string): Buffer {
@@ -315,6 +329,24 @@ export async function userWorkspaceIds(userId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
+/** Minimum role to approve an MCP OAuth client for a workspace (Phase 1). */
+export const MCP_CONSENT_MIN_ROLE: WorkspaceRole = "editor";
+
+/**
+ * Fresh membership + role check for consent (T14 + Phase 1): the approver
+ * must be an editor+ of the workspace the token will bind to — a viewer
+ * could otherwise mint a token that fires flows and burns credits.
+ */
+export async function consentGate(
+  userId: string,
+  workspaceId: string,
+): Promise<{ ok: true; role: WorkspaceRole } | { ok: false; error: "workspace_not_accessible" | "insufficient_role" }> {
+  const membership = await getMembership(userId, workspaceId);
+  if (!membership) return { ok: false, error: "workspace_not_accessible" };
+  if (!roleAtLeast(membership.role, MCP_CONSENT_MIN_ROLE)) return { ok: false, error: "insufficient_role" };
+  return { ok: true, role: membership.role };
+}
+
 function decryptPending(grant: string): PendingAuthorization | null {
   try {
     const pending = JSON.parse(secrets().decrypt(grant)) as PendingAuthorization;
@@ -343,10 +375,8 @@ export async function bindWorkspaceToGrant(
   // Re-validate against current DB state (client may have been deleted).
   const client = await prisma.mcpOAuthClient.findUnique({ where: { clientId: pending.clientId } });
   if (!client) return { ok: false, error: "unknown client" };
-  const accessible = await userWorkspaceIds(userId);
-  if (!accessible.includes(workspaceId)) {
-    return { ok: false, error: "workspace_not_accessible" };
-  }
+  const gate = await consentGate(userId, workspaceId);
+  if (!gate.ok) return { ok: false, error: gate.error };
   const resealed = secrets().encrypt(JSON.stringify({ ...pending, workspaceId }));
   return { ok: true, grant: resealed };
 }
@@ -367,12 +397,11 @@ export async function approveWorkspaceBoundGrant(grant: string, userId: string):
   if (typeof workspaceId !== "string" || workspaceId.length === 0) {
     return { ok: false, status: 400, error: "workspace_not_selected" };
   }
-  const accessible = await userWorkspaceIds(userId);
-  if (!accessible.includes(workspaceId)) {
-    return { ok: false, status: 403, error: "workspace_not_accessible" };
-  }
-  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true } });
-  if (!ws?.mcpEnabled) {
+  const gate = await consentGate(userId, workspaceId);
+  if (!gate.ok) return { ok: false, status: 403, error: gate.error };
+  // Phase 11 (conncore): explicit switch, else the paid-plan default.
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true, plan: true } });
+  if (!mcpEffectiveState(ws).on) {
     return { ok: false, status: 403, error: "MCP is not enabled for this workspace" };
   }
   try {

@@ -19,6 +19,7 @@ import { meter } from "@/lib/metering/service";
 import { auditEvent } from "@/lib/auditlog";
 import { getLlmProviderFor, WORKLOAD_MAX_TOKENS } from "@/lib/llm";
 import type { FileChangeAction } from "@prisma/client";
+import { NotFoundError } from "@/lib/api/errors";
 
 export interface ProspectResearch {
   summary: string;
@@ -141,7 +142,7 @@ export async function researchProspect(
     where: { id: prospectId, workspaceId },
     include: { list: { select: { name: true, icp: true } } },
   });
-  if (!prospect) throw new Error("Prospect not found");
+  if (!prospect) throw new NotFoundError("Prospect not found");
 
   const ctx: ProspectContext = {
     name: prospect.name,

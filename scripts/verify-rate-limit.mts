@@ -135,9 +135,10 @@ __resetRateLimits();
   ok("429 body has error message", typeof body.error === "string" && body.error.length > 0);
 }
 {
-  // clientIp parsing.
+  // clientIp parsing: the trusted-proxy hop (TRUSTED_PROXY_HOPS, default 1),
+  // never the client-written leftmost entry.
   const h = new Headers({ "x-forwarded-for": "5.6.7.8, 9.9.9.9" });
-  ok("x-forwarded-for first IP", clientIp(h) === "5.6.7.8");
+  ok("x-forwarded-for trusted (rightmost) IP", clientIp(h) === "9.9.9.9");
   ok("missing headers → null", clientIp(new Headers()) === null);
 }
 await noThrow("limiter under adversarial key churn", () => {
@@ -215,7 +216,9 @@ console.log("proxy choke point");
 {
   const proxy = readFileSync(join(ROOT, "proxy.ts"), "utf8");
   ok("proxy.ts exists at repo root", true);
-  ok("matcher covers /api/*", /matcher:\s*["']\/api\/:path\*["']/.test(proxy));
+  // The matcher is a single string or (Phase 3, CSP on every page) an array
+  // whose first entry is the /api catch-all.
+  ok("matcher covers /api/*", /matcher:\s*(?:\[\s*(?:\/\/[^\n]*\n\s*)*)?["']\/api\/:path\*["']/.test(proxy));
   ok("uses classifyTier + checkRateLimit", /classifyTier/.test(proxy) && /checkRateLimit/.test(proxy));
   ok("oversize guard returns 400 (adversarial contract)", /status:\s*400/.test(proxy));
   ok("429 path returns tooManyRequests", /tooManyRequests/.test(proxy));

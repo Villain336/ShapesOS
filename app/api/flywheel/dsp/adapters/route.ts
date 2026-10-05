@@ -14,8 +14,8 @@ export async function GET() {
   const adapters = await ensureAdapters(gate.workspaceId);
   return Response.json({
     zeroCustody:
-      "DSP contracts and billing sit with the agency/client entity — never Marketr. " +
-      "Marketr orchestrates, approves, kill-switches, and accounts.",
+      "DSP contracts and billing sit with the agency/client entity — never ShapesOS. " +
+      "ShapesOS orchestrates, approves, kill-switches, and accounts.",
     adapters: adapters.map((a) => ({
       id: a.id,
       dsp: a.dsp,

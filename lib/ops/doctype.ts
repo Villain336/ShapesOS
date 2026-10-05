@@ -20,9 +20,11 @@
 // All writes carry workspaceId explicitly AND run inside withWorkspaceScope
 // (RLS fail-closed). Reads filter by workspaceId; cross-workspace ids 404.
 
+import { emitOpsWriteEvents } from "@/lib/webhooks/ops-events";
 import type { Prisma } from "@prisma/client";
 import {
   OPS_ENTITY_MAP,
+  OPS_MAX_CENTS,
   type OpsEntityDef,
 } from "./entities";
 import {
@@ -31,7 +33,7 @@ import {
   opsBindingFor,
   phase14GatePort,
   requestOpsApproval,
-  verifyOpsApproval,
+  verifyAndConsumeOpsApproval,
   type OpsGatePort,
   type OpsGateProposal,
   type OpsWriteClassification,
@@ -56,6 +58,8 @@ export class OpsNotFoundError extends OpsError {
 export interface OpsActor {
   workspaceId: string;
   userId: string;
+  /** Phase 14: the agent acting (chat tools), so its own automation rule applies. */
+  agentKey?: string;
 }
 
 export interface OpsListQuery {
@@ -64,7 +68,8 @@ export interface OpsListQuery {
 }
 
 export type OpsWriteResult =
-  | { outcome: "done"; row: Record<string, unknown>; action: string }
+  /** Phase 14: autoApproved = a rule approved the gated write (names the rule). */
+  | { outcome: "done"; row: Record<string, unknown>; action: string; autoApproved?: string }
   | {
       outcome: "approval_required";
       approval: OpsGateProposal;
@@ -85,6 +90,8 @@ interface Delegate {
   findFirst(args: unknown): Promise<Record<string, unknown> | null>;
   create(args: unknown): Promise<Record<string, unknown>>;
   update(args: unknown): Promise<Record<string, unknown>>;
+  updateMany(args: unknown): Promise<{ count: number }>;
+  upsert(args: unknown): Promise<Record<string, unknown>>;
 }
 
 function delegateFor(tx: Tx, def: OpsEntityDef): Delegate {
@@ -125,10 +132,43 @@ interface LineItem {
   priceCents: number;
 }
 
-/** Totals are server-computed from line items — never trusted from the client. */
+/**
+ * Totals are server-computed from line items — never trusted from the
+ * client. The money columns are int4: a total past OPS_MAX_CENTS is a 400
+ * here, never a raw Prisma range error.
+ */
 function totalsFor(lineItems: LineItem[], taxCents: number) {
   const subtotalCents = lineItems.reduce((s, li) => s + li.qty * li.priceCents, 0);
-  return { subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
+  const totalCents = subtotalCents + taxCents;
+  if (totalCents > OPS_MAX_CENTS) {
+    throw new OpsError(400, `Total exceeds the maximum of ${OPS_MAX_CENTS} cents`);
+  }
+  return { subtotalCents, taxCents, totalCents };
+}
+
+/** Max rows per list page. */
+export const OPS_LIST_MAX = 200;
+
+// Phase 10 (finance): per-entity server hooks (lib/ops/finance/hooks.ts),
+// loaded lazily — the finance modules import this file.
+type EntityHooks = import("./finance/hooks").OpsEntityHooks;
+async function entityHooks(slug: string): Promise<EntityHooks | undefined> {
+  const { FINANCE_ENTITY_HOOKS } = await import("./finance/hooks");
+  return FINANCE_ENTITY_HOOKS[slug];
+}
+
+/** createRows, with the entity's prepare/create hooks when it has them. */
+async function materialize(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  body: Record<string, unknown>,
+): Promise<Array<Record<string, unknown>>> {
+  const hooks = await entityHooks(def.slug);
+  const prepared = hooks?.prepare ? await hooks.prepare(tx, actor, body, null) : body;
+  // A create hook may decline (null) and leave the generic insert to run.
+  const rows = hooks?.create ? await hooks.create(tx, actor, prepared) : null;
+  return rows ?? createRows(tx, def, actor, prepared);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +181,13 @@ export async function opsList(
   actor: OpsActor,
   query: OpsListQuery = {},
 ): Promise<{ entity: string; rows: Array<Record<string, unknown>> }> {
-  const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+  // Paging is validated, never passed through: ?limit=1.5 / NaN would reach
+  // Prisma's `take` and 500.
+  const rawLimit = query.limit ?? 50;
+  if (!Number.isInteger(rawLimit) || rawLimit < 1) {
+    throw new OpsError(400, `Invalid limit: must be an integer between 1 and ${OPS_LIST_MAX}`);
+  }
+  const limit = Math.min(rawLimit, OPS_LIST_MAX);
   const where: Record<string, unknown> = { workspaceId: actor.workspaceId };
   for (const f of def.filterable) {
     const v = query.filters?.[f];
@@ -181,7 +227,8 @@ export async function opsCreate(
 
   if (classification.mode === "gated") {
     // Fail-closed: no approvalId → propose and ask the human (202-style).
-    const approvalId = typeof rawApprovalId === "string" ? rawApprovalId : undefined;
+    let approvalId = typeof rawApprovalId === "string" ? rawApprovalId : undefined;
+    let autoApproved: string | undefined;
     const mutation = { ...body };
     delete mutation.approvalId;
     if (!approvalId) {
@@ -202,27 +249,55 @@ export async function opsCreate(
         mutation,
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize(summaryRow)}`,
+        agentKey: actor.agentKey,
       });
       await auditOpsEvent(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
-      return { outcome: "approval_required", approval, classification };
+      if (!(approval.autoApproved && approval.status === "approved")) {
+        return { outcome: "approval_required", approval, classification };
+      }
+      // Phase 14: a rule approved it (automatable, no-money slugs only) —
+      // run it now under that approval, through the same verify + claim.
+      autoApproved = approval.autoApproved;
+      approvalId = approval.id;
+      await auditOpsEvent(tx, def, actor, "gate_auto_approved", null, `${classification.label} (approval ${approval.id}): ${autoApproved}`);
     }
-    await verifyOpsApproval(port, {
+    // Verify, then claim approved → executed in THIS transaction before
+    // writing: one approval = one execution (replays fail closed).
+    await verifyAndConsumeOpsApproval(port, tx, {
       workspaceId: actor.workspaceId,
       slug: classification.slug!,
       entity: def.slug,
       mutation,
       approvalId,
+      actor: actor.userId,
     });
-    const rows = await createRows(tx, def, actor, body);
+    const rows = await materialize(tx, def, actor, body);
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+      // Phase 11 (conncore): outbound webhook events, in this transaction.
+      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
     }
-    return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
+    return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
-  const rows = await createRows(tx, def, actor, body);
+  // Invoice idempotency key: a retry returns the ORIGINAL invoice (200),
+  // never a unique-violation error. (createRows upserts on the key too, so
+  // a concurrent duplicate also resolves to the one row.)
+  if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
+    const prior = await delegateFor(tx, def).findFirst({
+      where: { workspaceId: actor.workspaceId, idempotencyKey: body.idempotencyKey },
+    });
+    if (prior) {
+      await auditOpsEvent(tx, def, actor, "idempotent_replay", String(prior.id), `idempotency key reused: ${def.summarize(prior)}`);
+      return { outcome: "done", row: prior, action: "idempotent_replay" };
+    }
+  }
+
+  const rows = await materialize(tx, def, actor, body);
   for (const row of rows) {
     await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
+    // Phase 11 (conncore): outbound webhook events, in this transaction.
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
   }
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
@@ -238,10 +313,17 @@ export async function recordInventoryTxn(
   args: {
     productId: string;
     delta: number;
-    reason: "sale" | "restock" | "adjustment";
+    // Phase 12 (mfgpos): production (+), consumption (−) and scrap (−) rows
+    // written by manufacturing orders and scrap records.
+    reason: "sale" | "restock" | "adjustment" | "transfer" | "production" | "consumption" | "scrap";
     note?: string | null;
     /** Defaults to the acting user — callers may pass "agent:<surface>". */
     actorName?: string | null;
+    // Phase 10 (ops-core): which variant (default variant when omitted) and
+    // where (null = unlocated); transferId links the two legs of a transfer.
+    variantId?: string | null;
+    locationId?: string | null;
+    transferId?: string | null;
   },
 ): Promise<Record<string, unknown>> {
   if (!Number.isInteger(args.delta) || args.delta === 0) {
@@ -256,6 +338,10 @@ export async function recordInventoryTxn(
   if (!product.trackInventory) {
     throw new OpsError(422, `Product "${args.productId}" does not track inventory`);
   }
+  // Phase 10 (ops-core): resolve variant + location (lazy import: stock.ts
+  // imports this module).
+  const { resolveStockTarget } = await import("./stock");
+  const target = await resolveStockTarget(tx, actor, args.productId, args.variantId, args.locationId);
   const txn = await txns.create({
     data: {
       workspaceId: actor.workspaceId,
@@ -264,6 +350,9 @@ export async function recordInventoryTxn(
       reason: args.reason,
       actor: args.actorName ?? actor.userId,
       note: args.note ?? null,
+      variantId: target.variantId,
+      locationId: target.locationId,
+      ...(args.transferId ? { transferId: args.transferId } : {}),
     },
   });
   await products.update({
@@ -291,6 +380,8 @@ async function createRows(
 ): Promise<Array<Record<string, unknown>>> {
   const d = delegateFor(tx, def);
   const base = { workspaceId: actor.workspaceId };
+  // Phase 10 (ops-core): entities with their own create rules.
+  if (def.hooks?.create) return [await def.hooks.create(tx, actor, body)];
 
   switch (def.slug) {
     case "orders":
@@ -307,31 +398,46 @@ async function createRows(
         }
         dueAt = parsed;
       }
-      return [
-        await d.create({
-          data: {
-            ...base,
-            // Initial statuses are set explicitly (not left to DB defaults)
-            // so the service's contract is visible in code and in stubs.
-            status: "draft",
-            lineItems: toJson(lineItems),
-            taxCents,
-            totalCents,
-            // subtotalCents exists on orders + purchase-orders, not invoices.
-            ...(def.slug === "invoices" ? {} : { subtotalCents }),
-            ...(def.slug === "purchase-orders"
-              ? {
-                  supplierId: (body.supplierId as string) ?? null,
-                  supplierName: (body.supplierName as string) ?? null,
-                }
-              : { customerId: body.customerId ?? null }),
-            ...(def.slug === "invoices" && body.idempotencyKey
-              ? { idempotencyKey: body.idempotencyKey }
-              : {}),
-            ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
-          },
-        }),
-      ];
+      const data = {
+        ...base,
+        // Initial statuses are set explicitly (not left to DB defaults)
+        // so the service's contract is visible in code and in stubs.
+        status: "draft",
+        lineItems: toJson(lineItems),
+        taxCents,
+        totalCents,
+        // subtotalCents exists on orders + purchase-orders, not invoices.
+        ...(def.slug === "invoices" ? {} : { subtotalCents }),
+        ...(def.slug === "purchase-orders"
+          ? {
+              supplierId: (body.supplierId as string) ?? null,
+              supplierName: (body.supplierName as string) ?? null,
+              // Phase 10 (finance): vendor link + RFQ stage.
+              vendorId: (body.vendorId as string) ?? null,
+              ...(body.rfq === true ? { status: "rfq" } : {}),
+            }
+          : { customerId: body.customerId ?? null }),
+        ...(def.slug === "invoices" && body.idempotencyKey
+          ? { idempotencyKey: body.idempotencyKey }
+          : {}),
+        ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
+        // Phase 10 (finance): recipient override for invoice delivery.
+        ...(def.slug === "invoices" && typeof body.customerEmail === "string" ? { customerEmail: body.customerEmail } : {}),
+      };
+      if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
+        // Atomic on the (workspaceId, idempotencyKey) unique: a concurrent
+        // duplicate resolves to the existing row instead of a P2002.
+        return [
+          await d.upsert({
+            where: {
+              workspaceId_idempotencyKey: { workspaceId: actor.workspaceId, idempotencyKey: body.idempotencyKey },
+            },
+            create: data,
+            update: { idempotencyKey: body.idempotencyKey },
+          }),
+        ];
+      }
+      return [await d.create({ data })];
     }
     case "payments": {
       // Bulk refund batch → N rows in one transaction.
@@ -377,6 +483,8 @@ async function createRows(
         reason: body.reason as "sale" | "restock" | "adjustment",
         note: (body.note as string) ?? null,
         actorName: (body.actor as string) ?? null,
+        variantId: (body.variantId as string) ?? null,
+        locationId: (body.locationId as string) ?? null,
       });
       return [txn];
     }
@@ -385,6 +493,11 @@ async function createRows(
       // the model stores a Date.
       const data: Record<string, unknown> = { ...base, ...stripInternal(body) };
       if (body.startDate != null) data.startDate = parseDate(body.startDate, "startDate");
+      // Phase 10 (ops-core): an optional workspace-user link must be a member.
+      if (typeof body.userId === "string") {
+        const { assertWorkspaceUser } = await import("./people");
+        await assertWorkspaceUser(tx, actor.workspaceId, body.userId);
+      }
       return [await d.create({ data })];
     }
     case "leave-requests": {
@@ -454,9 +567,12 @@ export async function opsPatch(
   // 404 for "not your workspace's row" (RLS + explicit scope).
   const existing = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
   if (!existing) throw new OpsNotFoundError(def.slug, id);
+  // Illegal moves fail before anything is proposed or written.
+  assertOpsPatchAllowed(def, existing, patch);
 
   if (classification.mode === "gated") {
-    const approvalId = body.approvalId as string | undefined;
+    let approvalId = body.approvalId as string | undefined;
+    let autoApproved: string | undefined;
     const mutation = { id, ...patch };
     if (!approvalId) {
       const approval = await requestOpsApproval(port, {
@@ -467,26 +583,78 @@ export async function opsPatch(
         mutation,
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize({ ...existing, ...patch })}`,
+        agentKey: actor.agentKey,
       });
       await auditOpsEvent(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
-      return { outcome: "approval_required", approval, classification };
+      if (!(approval.autoApproved && approval.status === "approved")) {
+        return { outcome: "approval_required", approval, classification };
+      }
+      // Phase 14: a rule approved it (automatable, no-money slugs only) —
+      // run it now under that approval, through the same verify + claim.
+      autoApproved = approval.autoApproved;
+      approvalId = approval.id;
+      await auditOpsEvent(tx, def, actor, "gate_auto_approved", id, `${classification.label} (approval ${approval.id}): ${autoApproved}`);
     }
-    await verifyOpsApproval(port, {
+    await verifyAndConsumeOpsApproval(port, tx, {
       workspaceId: actor.workspaceId,
       slug: classification.slug!,
       entity: def.slug,
       entityId: id,
       mutation,
       approvalId,
+      actor: actor.userId,
     });
-    const row = await applyPatch(tx, def, actor, id, patch, existing);
+    const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
-    return { outcome: "done", row, action: "gate_executed" };
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
+    return { outcome: "done", row, action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
-  const row = await applyPatch(tx, def, actor, id, patch, existing);
+  const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
+  // Phase 11 (conncore): outbound webhook events (invoice sent/paid, deal
+  // moved/won/lost, ticket solved…) in this transaction.
+  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
   return { outcome: "done", row, action: "update" };
+}
+
+/** Phase 10 (finance): run the entity's prepare hook on a validated patch. */
+async function preparePatch(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  patch: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const hooks = await entityHooks(def.slug);
+  return hooks?.prepare ? hooks.prepare(tx, actor, patch, existing) : patch;
+}
+
+/**
+ * Status machine + draft-only money edits for entities that declare
+ * statusTransitions (invoices, orders, purchase orders). 409 on an illegal
+ * move (e.g. draft → overdue, paid → overdue, draft PO → received) or on a
+ * tax/line edit to a non-draft document.
+ */
+export function assertOpsPatchAllowed(
+  def: OpsEntityDef,
+  existing: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): void {
+  const table = def.statusTransitions;
+  if (!table) return;
+  const from = String(existing.status);
+  if (typeof patch.status === "string") {
+    const allowed = table[from] ?? [];
+    if (!allowed.includes(patch.status)) {
+      throw new OpsError(409, `${def.label} cannot move from ${from} to ${patch.status}`);
+    }
+  }
+  // Phase 10 (finance): RFQ-stage POs stay editable (editableStatuses).
+  const editable = def.editableStatuses ?? ["draft"];
+  if ((patch.taxCents !== undefined || patch.lineItems !== undefined) && !editable.includes(from)) {
+    throw new OpsError(409, `${def.label} totals can only be edited while draft (it is ${from})`);
+  }
 }
 
 /** Apply the patch: entity-specific rules (compensation append, sentAt). */
@@ -499,6 +667,8 @@ async function applyPatch(
   existing: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const d = delegateFor(tx, def);
+  // Phase 10 (ops-core): entities with their own patch rules.
+  if (def.hooks?.patch) return def.hooks.patch(tx, actor, id, patch, existing);
   const data: Record<string, unknown> = { ...patch };
 
   if (def.slug === "workflow-runs" && patch.compensationAppend) {
@@ -516,6 +686,12 @@ async function applyPatch(
       data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
     }
   }
+  // Phase 10 (ops-core): team-member user links must be workspace members.
+  if (def.slug === "team-members" && typeof patch.userId === "string") {
+    const { assertWorkspaceUser } = await import("./people");
+    await assertWorkspaceUser(tx, actor.workspaceId, patch.userId);
+  }
+  if (def.slug === "team-members" && patch.startDate != null) data.startDate = parseDate(patch.startDate, "startDate");
   if (def.slug === "projects" && typeof patch.status === "string") {
     // Slice 4: guard the status flow — planning → active → on_hold /
     // completed / cancelled. Terminal states have no exits. Non-status
@@ -533,36 +709,66 @@ async function applyPatch(
       data.decidedBy = actor.userId;
       data.decidedAt = new Date();
     }
+    // Phase 10 (ops-core): approving deducts the leave balance (one ledger
+    // row per request; refuses to overdraw a policy-tracked balance).
+    if (patch.status === "approved") {
+      const { deductApprovedLeave } = await import("./leave");
+      await deductApprovedLeave(tx, actor, existing);
+    }
   }
-  if (def.slug === "purchase-orders") {
-    // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
-    // fulfillment write that atomically books restock txns for line items
-    // carrying a productId. Idempotent: restock only on the transition.
-    if (patch.status === "sent" && !existing.sentAt) {
-      data.sentAt = new Date();
+  // Phase 10 (store): web orders are priced at checkout (discount, tax, the
+  // Stripe amount); their money fields never change afterwards.
+  if (def.slug === "orders" && existing.source === "web" && (patch.lineItems !== undefined || patch.taxCents !== undefined)) {
+    throw new OpsError(409, "Web orders are priced at checkout — their lines and tax can't be edited");
+  }
+  if (def.statusTransitions) {
+    // Draft edits to tax/lines recompute the stored totals (never stale).
+    if (patch.taxCents !== undefined || patch.lineItems !== undefined) {
+      const lineItems = (patch.lineItems ?? existing.lineItems ?? []) as LineItem[];
+      const totals = totalsFor(lineItems, (patch.taxCents as number | undefined) ?? Number(existing.taxCents ?? 0));
+      data.taxCents = totals.taxCents;
+      data.totalCents = totals.totalCents;
+      if (def.slug !== "invoices") data.subtotalCents = totals.subtotalCents;
+      if (patch.lineItems !== undefined) data.lineItems = toJson(patch.lineItems);
     }
-    if (patch.status === "received" && existing.status !== "received") {
-      data.receivedAt = new Date();
-      const items = (existing.lineItems ?? []) as Array<{
-        productId?: string;
-        qty: number;
-        name: string;
-      }>;
-      let restocked = 0;
-      for (const it of items) {
-        if (!it.productId) continue;
-        await recordInventoryTxn(tx, actor, {
-          productId: it.productId,
-          delta: it.qty,
-          reason: "restock",
-          note: `purchase order ${id}`,
-        });
-        restocked += 1;
-      }
-      const row = await d.update({ where: { id, workspaceId: actor.workspaceId }, data });
-      // Non-persisted metadata for the caller (the route passes it through).
-      return { ...row, restocked };
+    if (def.slug === "purchase-orders") {
+      // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
+      // fulfillment write that books restock txns for line items carrying a
+      // productId — only on the sent → received move (transition table).
+      if (patch.status === "sent" && !existing.sentAt) data.sentAt = new Date();
+      if (patch.status === "received") data.receivedAt = new Date();
     }
+    // Phase 10 (finance): extra columns written with the move (e.g. the
+    // invoice number) — inside the same guarded write.
+    const hooks = await entityHooks(def.slug);
+    const moving = typeof patch.status === "string" && patch.status !== existing.status;
+    const transition = moving
+      ? { id, from: String(existing.status), to: String(patch.status), existing, patch }
+      : null;
+    if (transition && hooks?.beforeTransition) {
+      Object.assign(data, (await hooks.beforeTransition(tx, actor, transition)) ?? {});
+    }
+    // Status-guarded write: lands only if the row is still in the status we
+    // validated against. A racing transition (double receive, sweep vs
+    // mark-paid) matches 0 rows → 409, and nothing below it runs.
+    const claimed = await d.updateMany({
+      where: { id, workspaceId: actor.workspaceId, status: existing.status },
+      data,
+    });
+    if (claimed.count !== 1) {
+      throw new OpsError(409, `${def.label} changed concurrently (no longer ${String(existing.status)}) — reload and retry`);
+    }
+    // Phase 10 (finance): receiving (restock of the still-outstanding
+    // quantities, with a receipt record) moved to the purchase-orders
+    // afterTransition hook (lib/ops/finance/hooks.ts) so partial receipts are
+    // never restocked twice; it still returns { restocked } metadata.
+    const moved = (await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!;
+    // Phase 10 (finance): posting / payments / receipts in the same tx.
+    if (transition && hooks?.afterTransition) {
+      const meta = await hooks.afterTransition(tx, actor, { ...transition, row: moved });
+      if (meta) return { ...(await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!, ...meta };
+    }
+    return moved;
   }
   return d.update({ where: { id, workspaceId: actor.workspaceId }, data });
 }

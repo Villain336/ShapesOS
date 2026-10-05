@@ -5,6 +5,7 @@ import { Phone, Mail, Star, EllipsisVertical } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { Avatar, ScoreBar, Sparkline, StageBadge, tableCls, tableWrapCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 const ACT_ICON: Record<string, typeof Phone> = {
   call: Phone, email: Mail, sms: Mail, meeting: Mail, note: Mail,
@@ -45,6 +46,8 @@ export function LeadsTable({
               <tr
                 key={l.id}
                 onClick={() => onOpen(l.id)}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => onOpen(l.id))}
                 className={selectedId === l.id ? "!bg-hover" : ""}
               >
                 <td onClick={(e) => e.stopPropagation()}>

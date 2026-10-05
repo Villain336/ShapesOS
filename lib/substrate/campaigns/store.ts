@@ -1,5 +1,5 @@
 // Marketr — Phase 8 G2: the Campaign object engine.
-// (SPEC-PHASE8.md §2 G2, §4; §9 safety invariants 1, 2, 7.)
+// (docs/specs/SPEC-PHASE8.md §2 G2, §4; §9 safety invariants 1, 2, 7.)
 //
 // Campaign CRUD + hierarchy enforcement (≤3 levels, cycle detection), link
 // attach/detach (surgical, auditable), the backfill proposer (precision over
@@ -245,7 +245,7 @@ export async function updateCampaign(
       throw new CampaignError("validation", "Campaign name cannot be empty");
     }
     return tx.growthCampaign.update({
-      where: { id: campaignId },
+      where: { id: campaignId, workspaceId },
       data: {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.objective ? { objective: patch.objective } : {}),
@@ -319,14 +319,14 @@ export interface AttachLinkInput {
 }
 
 async function recomputeBudgetRollup(tx: CampaignTx, workspaceId: string, campaignId: string): Promise<number> {
-  const links = await tx.campaignLink.findMany({ where: { campaignId } });
+  const links = await tx.campaignLink.findMany({ where: { campaignId, campaign: { workspaceId } } });
   let total = 0;
   for (const l of links) {
     const f = await readFragment(tx, workspaceId, l.linkedType, l.linkedId);
     const spend = f?.metrics.find((m) => m.key === "spend_cents");
     if (typeof spend?.value === "number" && spend.value > 0) total += Math.round(spend.value);
   }
-  await tx.growthCampaign.update({ where: { id: campaignId }, data: { budgetRollupCents: total } });
+  await tx.growthCampaign.update({ where: { id: campaignId, workspaceId }, data: { budgetRollupCents: total } });
   return total;
 }
 
@@ -367,7 +367,7 @@ export async function attachLink(workspaceId: string, campaignId: string, input:
       linkedType: input.linkedType,
       linkedId: input.linkedId,
     });
-    await tx.growthCampaign.update({ where: { id: campaignId }, data: { stages: toJson(stages) } });
+    await tx.growthCampaign.update({ where: { id: campaignId, workspaceId }, data: { stages: toJson(stages) } });
     const budgetRollupCents = await recomputeBudgetRollup(tx, workspaceId, campaignId);
     return { link, budgetRollupCents };
   });
@@ -377,7 +377,7 @@ export async function attachLink(workspaceId: string, campaignId: string, input:
 export async function detachLink(workspaceId: string, campaignId: string, linkId: string) {
   return withCampaignScope(workspaceId, async (tx) => {
     const link = await tx.campaignLink.findFirst({
-      where: { id: linkId },
+      where: { id: linkId, campaignId, campaign: { workspaceId } },
       include: { campaign: { select: { id: true, workspaceId: true, stages: true } } },
     });
     if (!link || link.campaign.workspaceId !== workspaceId || link.campaign.id !== campaignId) {
@@ -385,7 +385,7 @@ export async function detachLink(workspaceId: string, campaignId: string, linkId
     }
     await tx.campaignLink.delete({ where: { id: linkId } });
     const stages = stageWithoutRef(normalizeStages(link.campaign.stages), link.linkedType, link.linkedId);
-    await tx.growthCampaign.update({ where: { id: campaignId }, data: { stages: toJson(stages) } });
+    await tx.growthCampaign.update({ where: { id: campaignId, workspaceId }, data: { stages: toJson(stages) } });
     const budgetRollupCents = await recomputeBudgetRollup(tx, workspaceId, campaignId);
     return { detached: linkId, budgetRollupCents };
   });
@@ -400,7 +400,7 @@ export async function updateLinkStage(
 ) {
   return withCampaignScope(workspaceId, async (tx) => {
     const link = await tx.campaignLink.findFirst({
-      where: { id: linkId },
+      where: { id: linkId, campaignId, campaign: { workspaceId } },
       include: { campaign: { select: { id: true, workspaceId: true, stages: true } } },
     });
     if (!link || link.campaign.workspaceId !== workspaceId || link.campaign.id !== campaignId) {
@@ -409,7 +409,7 @@ export async function updateLinkStage(
     const ref = { linkedType: link.linkedType as CampaignLinkedType, linkedId: link.linkedId };
     let stages = stageWithoutRef(normalizeStages(link.campaign.stages), ref.linkedType, ref.linkedId);
     stages = stageWithRef(stages, input.stageKey, ref);
-    await tx.growthCampaign.update({ where: { id: campaignId }, data: { stages: toJson(stages) } });
+    await tx.growthCampaign.update({ where: { id: campaignId, workspaceId }, data: { stages: toJson(stages) } });
     return { linkId, stageKey: input.stageKey };
   });
 }
@@ -610,7 +610,7 @@ export async function resolveProposal(
     }
     if (decision === "rejected") {
       return tx.campaignLinkProposal.update({
-        where: { id: proposalId },
+        where: { id: proposalId, workspaceId },
         data: { status: "rejected", decidedBy: decidedBy ?? null, decidedAt: new Date() },
       });
     }
@@ -655,11 +655,11 @@ export async function resolveProposal(
         linkedType: proposal.linkedType,
         linkedId: proposal.linkedId,
       });
-      await tx.growthCampaign.update({ where: { id: campaign.id }, data: { stages: toJson(stages) } });
+      await tx.growthCampaign.update({ where: { id: campaign.id, workspaceId }, data: { stages: toJson(stages) } });
       await recomputeBudgetRollup(tx, workspaceId, campaign.id);
     }
     const updated = await tx.campaignLinkProposal.update({
-      where: { id: proposalId },
+      where: { id: proposalId, workspaceId },
       data: { status: "approved", decidedBy: decidedBy ?? null, decidedAt: new Date() },
     });
     return { proposal: updated, linkId };

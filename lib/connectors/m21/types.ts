@@ -1,6 +1,6 @@
 // Marketr — M21 connectors, uniform interface (spec §7, §11).
 //
-// Every data source (12 built-in native adapters + workspace-custom MCP
+// Every data source (27 built-in native adapters + workspace-custom MCP
 // servers) implements ConnectorAdapter so the agent loop, skill-declared
 // tool gating, and project data-source bindings all go through one
 // interface. Credentials are decrypted server-side only (lib/vault) and
@@ -12,6 +12,11 @@ export interface ConnectorToolDef {
   description: string;
   /** true when the tool writes/mutates/publishes something externally. */
   mutating: boolean;
+  /**
+   * Phase 14 (approvals): the tool may destroy data (MCP destructiveHint:
+   * true). A destructive tool never runs without asking, whatever a rule says.
+   */
+  destructive?: boolean;
   argsSchema: {
     type: "object";
     properties: Record<string, { type: string; description: string }>;
@@ -37,6 +42,13 @@ export interface InvokeContext {
   userId: string;
   /** ProjectDataSource.projectConfig, e.g. { property: "sc-domain:example.com" }. */
   projectConfig?: Record<string, unknown>;
+  /**
+   * Phase 4b: silent token refresh for live adapters. Called at most once
+   * per request when the provider answers 401; persists the refreshed token
+   * through the vault (lib/vault/refresh.ts) and returns the new credential,
+   * or null when the connection needs re-auth. Never carries a secret itself.
+   */
+  refreshCredential?: () => Promise<DecryptedCredential | null>;
 }
 
 /** Uniform result shape every adapter returns from invoke(). */
@@ -46,6 +58,11 @@ export interface InvokeResult {
   error?: string;
   /** true when the data came from the labeled mock path. */
   mock?: boolean;
+  /**
+   * Closed error code for live failures (lib/connectors/m21/live/http.ts
+   * ConnectorErrorCode). Never carries provider text or secrets.
+   */
+  errorCode?: string;
 }
 
 export interface ConnectorAdapter {
@@ -61,6 +78,11 @@ export interface ConnectorAdapter {
     credential: DecryptedCredential | null,
     ctx: InvokeContext,
   ): Promise<InvokeResult>;
+  /**
+   * Phase 4b: cheap live liveness call (e.g. list one site/account) used by
+   * the manual connector health check. Only live-wired adapters define it.
+   */
+  healthCheck?(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult>;
 }
 
 /** Tool argument helper: string property. */

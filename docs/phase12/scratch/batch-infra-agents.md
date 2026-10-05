@@ -187,7 +187,7 @@ What "offering hosting" actually commits the business to:
 
 **Also worth mining (secondary):** 🎭 Brand Guardian (Design) — on-brand enforcement, directly matches "the editor that keeps clients on-brand"; 🔮 AI Citation Strategist + 🏗️ AEO Foundations Architect (Marketing) — AEO/GEO patterns for Marketr's AI-search visibility tracking; 🚀 Growth Hacker (Marketing) — experiment-loop seed for Missions; 🐑 Project Shepherd (Project Management) — Mission execution tracking; 📣 PR & Communications Manager (Marketing) — campaign comms; 🧭 Chief of Staff (Specialized) — decision-routing pattern for the Chief's executive layer.
 
-**Caveats:** These are *persona prompt files*, not executable agents — the value is their system-prompt structure (identity, mission, rules, deliverables, workflow, success metrics), which maps cleanly onto Marketr's EXPERT-CONSTITUTION.md prompt-layer approach. Quality varies by agent (community-contributed); treat as seeds to adapt, not drop-in prompts. No per-agent license differences were found (all MIT under the repo root), but per-file text was not individually audited.
+**Caveats:** These are *persona prompt files*, not executable agents — the value is their system-prompt structure (identity, mission, rules, deliverables, workflow, success metrics), which maps cleanly onto Marketr's docs/specs/EXPERT-CONSTITUTION.md prompt-layer approach. Quality varies by agent (community-contributed); treat as seeds to adapt, not drop-in prompts. No per-agent license differences were found (all MIT under the repo root), but per-file text was not individually audited.
 
 ---
 

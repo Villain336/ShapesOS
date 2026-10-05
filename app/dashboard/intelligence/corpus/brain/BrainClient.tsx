@@ -359,7 +359,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-paper p-6 text-center">
               <Orbit className="h-6 w-6 text-subtle" />
               <p className="max-w-[220px] text-sm text-muted">
-                Click any neuron to inspect the source — what it taught Marketr, its license basis,
+                Click any neuron to inspect the source — what it taught ShapesOS, its license basis,
                 and its provenance.
               </p>
             </div>

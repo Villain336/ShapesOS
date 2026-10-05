@@ -20,6 +20,7 @@ import {
 import { buttonVariants } from "@/components/vault/atoms/button-variants";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/vault/EmptyState";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface BindingRow {
   id: string;
@@ -125,6 +126,13 @@ export default function DataClient({
   }
 
   async function unbind(bindingId: string) {
+    const ok = await confirmAction({
+      title: "Unlink this data source?",
+      description: "The project stops using it. The data source itself is kept.",
+      confirmLabel: "Unlink",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -150,7 +158,7 @@ export default function DataClient({
         <EmptyState
           icon={<Link className="size-5" />}
           title="No data sources bound"
-          description="Bind a workspace connection below to give this project — and Marketr — access to it."
+          description="Bind a workspace connection below to give this project — and ShapesOS — access to it."
         />
       ) : (
         <ul className="flex flex-col">

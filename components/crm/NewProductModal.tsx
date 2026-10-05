@@ -85,7 +85,7 @@ export function NewProductModal({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
+      <div className={backdropCls} onClick={onClose} aria-hidden />
       <div className={modalWrapCls}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <h3 className="text-lg font-bold tracking-tight text-ink">New product</h3>

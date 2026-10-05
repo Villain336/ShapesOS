@@ -26,8 +26,12 @@ export function isInlineSafeMime(mimeType: string): boolean {
  * Build the security headers for a file download. `mimeType` must be the
  * sniffed mime stored in the registry at upload time.
  */
-export function buildDownloadHeaders(mimeType: string, filename: string): Record<string, string> {
-  const inline = isInlineSafeMime(mimeType);
+export function buildDownloadHeaders(
+  mimeType: string,
+  filename: string,
+  opts: { forceAttachment?: boolean } = {},
+): Record<string, string> {
+  const inline = !opts.forceAttachment && isInlineSafeMime(mimeType);
   const safeName = filename.replace(/["\\\r\n]/g, "_").slice(0, 200) || "file";
   return {
     "content-type": mimeType,

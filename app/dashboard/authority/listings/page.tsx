@@ -21,7 +21,7 @@ import BriefBuilder from "./_components/brief-builder";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Listings — Marketr Authority",
+  title: "Listings — ShapesOS Authority",
   description: "Listings & citations, honestly tiered: GBP, Bing, LDE prototype, Apple claims, citation briefs.",
 };
 
@@ -244,7 +244,7 @@ export default async function ListingsPage() {
                         {dirs.length} directories · {(gaps.gaps ?? []).filter((g) => g.priority === "high").length} high-priority gaps
                       </td>
                       <td className="px-3 py-2 text-[12px] text-muted">
-                        {fmtDate(b.createdAt)} · manual submission — Marketr tracks, a human submits.
+                        {fmtDate(b.createdAt)} · manual submission — ShapesOS tracks, a human submits.
                       </td>
                     </tr>
                   );

@@ -42,7 +42,7 @@ export const CONNECTOR_DEFS: ConnectorDef[] = [
     description: "Search/display spend and auction performance." },
   { key: "crm", label: "CRM", vaultKey: "native:crm", mode: "native",
     contributesTo: ["conversion", "crm"],
-    description: "Marketr's own lead pipeline CRM — always available in-workspace." },
+    description: "ShapesOS's own lead pipeline CRM — always available in-workspace." },
   { key: "email", label: "Email platform", vaultKey: "email-platform", mode: "api_key",
     contributesTo: ["crm", "content"],
     description: "Newsletter lists, broadcasts, and nurture sequence coverage." },
@@ -134,7 +134,7 @@ function resolveOne(
     // CRM: native to Marketr — always connected.
     return {
       key: def.key, label: def.label, status: "connected", mode: "native",
-      completenessNote: "Connected — Marketr's own pipeline CRM, always available.",
+      completenessNote: "Connected — ShapesOS's own pipeline CRM, always available.",
     };
   }
 

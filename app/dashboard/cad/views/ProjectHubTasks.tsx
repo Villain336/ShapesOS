@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Loader2, MessageSquare, Trash2 } from "lucide-react";
 import { ErrorNote, LoadingNote, StatusPill } from "./ProjectHubTab";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface ModelSummary {
   id: string;
@@ -288,7 +289,7 @@ function TaskDetailView({ taskId, onChanged }: { taskId: string; onChanged: () =
     ).then(() => setComment(""));
 
   const deleteTask = async () => {
-    if (!window.confirm("Delete this task and its activity trail?")) return;
+    if (!await confirmAction("Delete this task and its activity trail?")) return;
     await mutate(() => fetch(`/api/cad/tasks/${taskId}`, { method: "DELETE" }));
   };
 

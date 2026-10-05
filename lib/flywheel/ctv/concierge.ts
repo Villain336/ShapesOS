@@ -23,7 +23,7 @@ import type { CreativeValidation } from "./validator";
 
 /** Canonical alert-only copy. Enforced in UI + API responses. */
 export const CONCIERGE_ALERT_ONLY_COPY =
-  "Marketr cannot pause this buy — alerts only. Pause it in the vendor's UI, then mark it paused here.";
+  "ShapesOS cannot pause this buy — alerts only. Pause it in the vendor's UI, then mark it paused here.";
 
 export const CONCIERGE_VENDORS = ["mntn", "roku", "tatari", "tvscientific"] as const;
 export type ConciergeVendor = (typeof CONCIERGE_VENDORS)[number];
@@ -41,14 +41,14 @@ export const CONCIERGE_VENDOR_NOTES: ConciergeVendorNote[] = [
     label: "MNTN",
     honestyNotes: [
       "Minimums conflict in 2026 sources: MNTN's site says no minimums; third parties report $5K–$25K tiers. Verify the current minimum with your rep at IO time.",
-      "2026 forensic-audit allegations about MNTN supply paths have been reported. Marketr does not endorse vendor supply-quality claims as its own — evaluate independently.",
+      "2026 forensic-audit allegations about MNTN supply paths have been reported. ShapesOS does not endorse vendor supply-quality claims as its own — evaluate independently.",
     ],
     typicalLeadTime: "Managed buys commonly need 3–7 business days before first air.",
   },
   {
     vendor: "roku",
     label: "Roku Ads Manager",
-    honestyNotes: ["Self-serve; you place the buy yourself in Roku Ads Manager. Marketr prepares the IO and brief, nothing else."],
+    honestyNotes: ["Self-serve; you place the buy yourself in Roku Ads Manager. ShapesOS prepares the IO and brief, nothing else."],
     typicalLeadTime: "Self-serve — live once you click through; creative review can add 1–2 days.",
   },
   {
@@ -285,7 +285,7 @@ export function reconcileConcierge(
     platformReport,
     discrepancies,
     attributionNote:
-      "Reconciliation joins three independent signals (Marketr pixel, QR/pURL scans, vendor report). " +
+      "Reconciliation joins three independent signals (ShapesOS pixel, QR/pURL scans, vendor report). " +
       "Impression-to-conversion remains probabilistic inference — deterministic CTV ROAS is never presented.",
   };
 }

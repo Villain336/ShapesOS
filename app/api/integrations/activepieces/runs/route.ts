@@ -1,7 +1,7 @@
 // Marketr — GET /api/integrations/activepieces/runs (Phase 12, Worker 3).
 // ?flowId=… → newest run for that flow. Honest 503 when not connected.
 
-import { latestFlowRun } from "@/lib/integrations/activepieces";
+import { workspaceFlows } from "@/lib/integrations/activepieces";
 import { integrationsGuard, badRequest, engineError, notConnected } from "../_lib";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const flowId = new URL(req.url).searchParams.get("flowId");
   if (!flowId) return badRequest("flowId query parameter is required.");
   try {
-    const run = await latestFlowRun(flowId);
+    const run = await workspaceFlows(gate.workspaceId).latestRun(flowId);
     if (run === null) {
       // latestFlowRun only returns null when the engine is unconfigured
       // (listFlows degrades) or the flow has no runs — disambiguate honestly.

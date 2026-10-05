@@ -21,6 +21,13 @@
 // approval, and binding mismatch (the approval's bound mutation must equal
 // the mutation being executed — canonical JSON compare, so "approve $100,
 // execute $10,000" is impossible).
+//
+// consumeOpsApproval() is the replay lock: after verification, the write
+// path claims the approval approved → executed with a status-guarded
+// updateMany IN THE SAME TRANSACTION as the mutation. Exactly one caller
+// can win the claim (count === 1); a replay or a concurrent second request
+// gets count 0 and fails closed — and if the write itself fails, the
+// transaction rolls the claim back so the approval is not burned.
 
 import { canonicalize } from "@/lib/authority/approvals";
 import {
@@ -35,6 +42,7 @@ import {
 } from "@/lib/integrations/actions/gate";
 import { redactArgs } from "@/lib/integrations/actions/redact";
 import { OPS_ENTITY_MAP } from "./entities";
+import { NotFoundError } from "@/lib/api/errors";
 
 const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
@@ -56,6 +64,16 @@ export interface OpsMoneyAction {
   label: string;
   /** Minimum tier — the Phase 14 derivation must meet or exceed this. */
   expectedTier: RiskTier;
+  /**
+   * Phase 14 (approvals, owner decision 2026-10-05): true ONLY for gated
+   * ops actions that move no money and no stock value. When true and an
+   * automation rule says "auto" for `action`, requestOpsApproval approves
+   * the request itself (audit entry naming the rule) and the write runs.
+   * Everything that moves money or stock value stays false — always asks.
+   */
+  automatable?: boolean;
+  /** Phase 14: the automation action (lib/automation/actions.ts) an automatable slug's rule is keyed on. */
+  action?: string;
 }
 
 export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
@@ -82,7 +100,52 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // slugs as high (conservative floor), which meets the medium pin.
   { slug: "OPS_WORKFLOW_RUN", label: "Run operations workflow", expectedTier: "medium" },
   { slug: "OPS_RECORD_DELETE", label: "Delete operations record", expectedTier: "medium" },
+  // Phase 10 (finance): posting to / reversing the ledger, credit notes,
+  // quote sends, vendor bill payments and expense approvals/reimbursements.
+  // Phase 14 derives unknown OPS_* slugs as high, which meets the pins.
+  { slug: "OPS_JOURNAL_POST", label: "Post journal entry", expectedTier: "medium" },
+  { slug: "OPS_JOURNAL_REVERSE", label: "Reverse journal entry", expectedTier: "medium" },
+  { slug: "OPS_CREDIT_NOTE_ISSUE", label: "Issue credit note", expectedTier: "medium" },
+  { slug: "OPS_QUOTE_SEND", label: "Send quote", expectedTier: "medium" },
+  { slug: "OPS_BILL_PAY", label: "Pay vendor bill", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_APPROVE", label: "Approve expense claim", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_REIMBURSE", label: "Reimburse expense claim", expectedTier: "medium" },
+  // Phase 12 (mfgpos): confirming a manufacturing order commits components
+  // and the work plan; completing it moves stock and posts the costing to
+  // the books; scrap writes stock off (and its value); closing a till
+  // session posts the day's takings. Phase 14 derives unknown OPS_* slugs as
+  // high, which meets the pins.
+  // Phase 14: confirming only snapshots components and creates work orders
+  // (lib/ops/mfg/service.ts confirmMo) — no stock moves, nothing posts to the
+  // books, and a confirmed MO can still be cancelled. Automatable.
+  { slug: "OPS_MO_CONFIRM", label: "Confirm manufacturing order", expectedTier: "medium", automatable: true, action: "confirm_manufacturing_order" },
+  { slug: "OPS_MO_COMPLETE", label: "Complete manufacturing order", expectedTier: "medium" },
+  { slug: "OPS_SCRAP_POST", label: "Scrap stock", expectedTier: "medium" },
+  { slug: "OPS_POS_SESSION_CLOSE", label: "Close till session", expectedTier: "medium" },
+  // Phase 12 (people): approving a computed pay run (what every person is
+  // paid) and posting it to the books. Never automated (Tier 3 kinds
+  // approve_pay_run / post_pay_run); both bind the run's compute digest.
+  { slug: "OPS_PAYROLL_APPROVE", label: "Approve pay run", expectedTier: "high" },
+  { slug: "OPS_PAYROLL_POST", label: "Post pay run to the books", expectedTier: "medium" },
+  // Phase 14 (connectors): writing a computed run's hours into the payroll
+  // provider's (Gusto's) unprocessed payroll — what people will be paid.
+  // Money: never automated (Tier 3 kind send_payroll_to_provider), bound to
+  // the run's compute digest. Pinned medium like the other money sends
+  // (OPS_INVOICE_SEND, OPS_BILL_PAY): the Phase 14 classifier derives the
+  // SEND verb as medium, and a gated write needs a person's approval at any
+  // tier.
+  { slug: "OPS_PAYROLL_SEND_PROVIDER", label: "Send pay run to Gusto", expectedTier: "medium" },
+  // Phase 13 (twincore): publishing a digital twin site layout (an agent's
+  // twin_draft_layout output, or a person's edits) is a person's decision.
+  // No money moves; it rides the same propose → approve → execute gate.
+  // Phase 14: publishing a layout moves no money or stock — automatable.
+  { slug: "OPS_TWIN_SITE_PUBLISH", label: "Publish twin site layout", expectedTier: "medium", automatable: true, action: "publish_site_layout" },
 ];
+
+/** Phase 14: the slugs a rule may approve (no money, no stock value). */
+export const OPS_AUTOMATABLE_SLUGS: ReadonlySet<string> = new Set(
+  OPS_MONEY_ACTIONS.filter((a) => a.automatable === true).map((a) => a.slug),
+);
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =
   Object.fromEntries(OPS_MONEY_ACTIONS.map((a) => [a.slug, a]));
@@ -144,6 +207,9 @@ export function classifyOpsWrite(input: ClassifyOpsWriteInput): OpsWriteClassifi
       if (kind === "refund") return gated("OPS_PAYMENT_REFUND", "Refund payment — gated write");
       return gated("OPS_PAYMENT_RECORD_CHARGE", "Record charge — gated write");
     }
+    // Phase 10 (finance): entities whose create moves the books (manual
+    // journal entries) declare their gate.
+    if (def.createGate) return gated(def.createGate, `Create ${def.label} — gated write`);
     return free(`Draft-creator: create ${def.label} runs freely, logged`);
   }
 
@@ -187,6 +253,8 @@ export interface OpsGateProposal {
   id: string;
   status: string;
   riskTier: string;
+  /** Phase 14: set when a rule approved it at once (the reason names the rule). */
+  autoApproved?: string;
 }
 
 export interface OpsGateApproval {
@@ -194,6 +262,8 @@ export interface OpsGateApproval {
   status: string;
   expiresAt: Date;
   proposedArgs: unknown;
+  /** Phase 14 append-only trail (the claim appends an execution entry). */
+  auditTrail?: unknown;
 }
 
 export interface OpsGatePort {
@@ -204,14 +274,30 @@ export interface OpsGatePort {
     args: Record<string, unknown>;
     proposedBy: string;
     plainSummary: string;
+    /** Phase 14: store it already approved by this rule (automatable slugs only). */
+    autoApprovedReason?: string;
   }): Promise<OpsGateProposal>;
-  getApproval(workspaceId: string, id: string): Promise<OpsGateApproval>;
+  /**
+   * Phase 14: the automation decision for an automatable slug's action.
+   * Absent (test stubs) = no rule, so it asks.
+   */
+  autoDecision?(workspaceId: string, input: { agentKey: string; action: string; description: string }): Promise<{ auto: boolean; reason: string }>;
+  /**
+   * Load an approval. When `tx` is given (the gated write's open transaction),
+   * read through it: a second pooled connection per concurrent write exhausted
+   * small pools and surfaced as a bogus "not found".
+   */
+  getApproval(workspaceId: string, id: string, tx?: unknown): Promise<OpsGateApproval>;
 }
 
 /** Production port: the real Phase 14 gate. */
 export const phase14GatePort: OpsGatePort = {
   async propose(input) {
     const { approval, classified } = await proposeAction(input);
+    // Phase 14: proposeAction refuses to pre-approve a high tier; report the stored state.
+    if (input.autoApprovedReason && approval.status === "approved") {
+      return { id: approval.id, status: approval.status, riskTier: approval.riskTier, autoApproved: input.autoApprovedReason };
+    }
     // Fail closed: the Phase 14 tier must meet the ops pin.
     const pin = OPS_MONEY_ACTION_MAP[input.toolName];
     if (pin && TIER_RANK[classified.tier] < TIER_RANK[pin.expectedTier]) {
@@ -222,9 +308,22 @@ export const phase14GatePort: OpsGatePort = {
     }
     return { id: approval.id, status: approval.status, riskTier: approval.riskTier };
   },
-  async getApproval(workspaceId: string, id: string) {
-    const a = await getApproval(workspaceId, id);
-    return { id: a.id, status: a.status, expiresAt: a.expiresAt, proposedArgs: a.proposedArgs };
+  async autoDecision(workspaceId, input) {
+    const { autoApprovalFor } = await import("@/lib/automation/policy");
+    return autoApprovalFor(workspaceId, input);
+  },
+  async getApproval(workspaceId: string, id: string, tx?: unknown) {
+    const a = tx
+      ? await (tx as ApprovalReadTx).composioActionApproval.findFirst({ where: { id, workspaceId } })
+      : await getApproval(workspaceId, id);
+    if (!a) throw new NotFoundError("Approval not found");
+    return {
+      id: a.id,
+      status: a.status,
+      expiresAt: a.expiresAt,
+      proposedArgs: a.proposedArgs,
+      auditTrail: a.auditTrail,
+    };
   },
 };
 
@@ -274,11 +373,24 @@ export async function requestOpsApproval(
     mutation: Record<string, unknown>;
     actor: string;
     summary: string;
+    /** Phase 14: the agent asking (its own rule wins); default every-agent rules. */
+    agentKey?: string;
   },
 ): Promise<OpsGateProposal> {
   const action = OPS_MONEY_ACTION_MAP[args.slug];
   if (!action) throw new OpsGateError("unknown_money_action", `Unknown money action ${args.slug}`);
+  // Phase 14: an automatable slug (no money, no stock value) whose action has
+  // an "auto" rule is stored already approved, naming the rule. Money slugs
+  // never get here (automatable is false), whatever a rule says.
+  let autoApprovedReason: string | undefined;
+  if (action.automatable === true && action.action && OPS_AUTOMATABLE_SLUGS.has(args.slug) && port.autoDecision) {
+    const decision = await port
+      .autoDecision(args.workspaceId, { agentKey: args.agentKey ?? "*", action: action.action, description: action.label })
+      .catch(() => null);
+    if (decision?.auto) autoApprovedReason = decision.reason;
+  }
   return port.propose({
+    ...(autoApprovedReason ? { autoApprovedReason } : {}),
     workspaceId: args.workspaceId,
     appKey: "ops",
     toolName: args.slug,
@@ -308,6 +420,7 @@ export async function verifyOpsApproval(
     mutation: Record<string, unknown>;
     approvalId: string | null | undefined;
   },
+  tx?: unknown,
 ): Promise<OpsGateApproval> {
   if (!args.approvalId) {
     throw new OpsGateError(
@@ -317,9 +430,14 @@ export async function verifyOpsApproval(
   }
   let approval: OpsGateApproval;
   try {
-    approval = await port.getApproval(args.workspaceId, args.approvalId);
-  } catch {
-    throw new OpsGateError("approval_not_found", `Ops approval ${args.approvalId} not found in workspace`);
+    approval = await port.getApproval(args.workspaceId, args.approvalId, tx);
+  } catch (err) {
+    // Only a genuine miss is "not found"; anything else (pool timeout, DB
+    // outage) must surface as itself, not as a misleading gate verdict.
+    if (err instanceof NotFoundError) {
+      throw new OpsGateError("approval_not_found", `Ops approval ${args.approvalId} not found in workspace`);
+    }
+    throw err;
   }
   if (approval.status === "executed") {
     throw new OpsGateError("approval_replayed", "Approval already executed — replay blocked");
@@ -343,5 +461,73 @@ export async function verifyOpsApproval(
       "Approval binding does not match this mutation — execution HALTED",
     );
   }
+  return approval;
+}
+
+// ---------------------------------------------------------------------------
+// Consume: the atomic approved → executed claim (replay lock).
+// ---------------------------------------------------------------------------
+
+interface ApprovalReadTx {
+  composioActionApproval: {
+    findFirst(args: { where: { id: string; workspaceId: string } }): Promise<{
+      id: string;
+      status: string;
+      expiresAt: Date;
+      proposedArgs: unknown;
+      auditTrail: unknown;
+    } | null>;
+  };
+}
+
+interface ApprovalClaimTx {
+  composioActionApproval: {
+    updateMany(args: unknown): Promise<{ count: number }>;
+  };
+}
+
+/**
+ * Claim a verified approval for execution. MUST run inside the transaction
+ * that performs the gated write, BEFORE the write: the status-guarded
+ * updateMany row-locks the approval, so a concurrent second request blocks
+ * until the first commits and then matches 0 rows. count !== 1 → the
+ * approval was already executed (or expired/revoked in between) — fail
+ * closed, nothing is written.
+ */
+export async function consumeOpsApproval(
+  tx: unknown,
+  args: { workspaceId: string; approval: OpsGateApproval; actor: string; slug: string },
+): Promise<void> {
+  const now = new Date();
+  const prior = Array.isArray(args.approval.auditTrail) ? args.approval.auditTrail : [];
+  const claimed = await (tx as ApprovalClaimTx).composioActionApproval.updateMany({
+    where: {
+      id: args.approval.id,
+      workspaceId: args.workspaceId,
+      status: "approved",
+      expiresAt: { gt: now },
+    },
+    data: {
+      status: "executed",
+      auditTrail: [
+        ...prior,
+        { at: now.toISOString(), actor: args.actor, event: "execution_claimed", detail: `ops ${args.slug}` },
+      ],
+    },
+  });
+  if (claimed.count !== 1) {
+    throw new OpsGateError("approval_replayed", "Approval already executed — replay blocked");
+  }
+}
+
+/** verifyOpsApproval + consumeOpsApproval: the only way a gated ops write may proceed. */
+export async function verifyAndConsumeOpsApproval(
+  port: OpsGatePort,
+  tx: unknown,
+  args: Parameters<typeof verifyOpsApproval>[1] & { actor: string },
+): Promise<OpsGateApproval> {
+  const { actor, ...verifyArgs } = args;
+  const approval = await verifyOpsApproval(port, verifyArgs, tx);
+  await consumeOpsApproval(tx, { workspaceId: args.workspaceId, approval, actor, slug: args.slug });
   return approval;
 }

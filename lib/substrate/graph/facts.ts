@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: append-only fact log (SPEC-PHASE8.md §4 graph_facts).
+// Marketr — Phase 8 G1: append-only fact log (docs/specs/SPEC-PHASE8.md §4 graph_facts).
 //
 // Safety invariant §9.4: application code NEVER updates or deletes
 // graph_facts. Corrections are new facts; retention archival moves rows to

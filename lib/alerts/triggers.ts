@@ -125,7 +125,7 @@ export const TRIGGERS: TriggerDef[] = [
   {
     key: "programmatic_publish_failed",
     label: "Programmatic publish failed",
-    description: "A programmatic SEO page failed to push to its publish target (WordPress, Webflow, or a Marketr site).",
+    description: "A programmatic SEO page failed to push to its publish target (WordPress, Webflow, or a ShapesOS site).",
     conditionKeys: ["projectIds"],
     dedupAvailable: true,
     live: true, // milestone 17 push: emitted by the programmatic push service.
@@ -266,6 +266,51 @@ export const TRIGGERS: TriggerDef[] = [
     conditionKeys: ["severities"],
     dedupAvailable: true,
     live: true, // Funding slice 2: emitted by the funding follow-up sweep cron.
+  },
+  {
+    key: "dataset_stale",
+    label: "Dataset gone stale",
+    description:
+      "A compiled business dataset's newest data is older than the staleness threshold (default 90 days), e.g. \"Your pricing dataset is 120 days old\". Fires once per compiled version. Emitted by the dataset health sweep.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true, // Phase 4b: emitted by /api/cron/dataset-health.
+  },
+  // Phase 13 (twincore): the digital twin's conditions — the same ones the
+  // twin highlights on each object (lib/twin/derive.ts). Emitted by the
+  // /api/cron/twin-alerts sweep; the dedup key names the record, so one
+  // condition alerts once.
+  {
+    key: "twin.dock_overdue",
+    label: "Truck overdue at a dock",
+    description: "A booked truck is more than 30 minutes past its ETA, or a truck has been on a dock (arrived, loading or unloading) for more than 4 hours.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true,
+  },
+  {
+    key: "twin.bin_low",
+    label: "Bin or rack below its reorder point",
+    description: "A product held in a twin rack, bin zone or shelf is at or below its reorder rule's minimum (or its low-stock threshold) across the warehouse.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true,
+  },
+  {
+    key: "twin.machine_stopped_late",
+    label: "Machine stopped while its order is late",
+    description: "A work centre is paused or stopped while its manufacturing order is past its planned start and not done.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true,
+  },
+  {
+    key: "twin.register_left_open",
+    label: "Register session left open",
+    description: "A till session has been open (or counted but not closed) for more than 12 hours.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true,
   },
 ];
 

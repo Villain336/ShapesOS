@@ -1,0 +1,37 @@
+-- ShapesOS — runtime app role (least privilege). The app must NOT connect as
+-- the schema owner/superuser: superusers bypass every FORCE ROW LEVEL SECURITY
+-- policy, silently disabling tenant isolation. Run as the migrator after
+-- migrations, e.g.:
+--   psql "$MIGRATOR_URL" -v app_password='…' -f scripts/db/create-app-role.sql
+-- Idempotent; re-run after new migrations (grants cover new tables).
+\if :{?app_role}
+\else
+  \set app_role marketr_app
+\endif
+SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD %L',
+              :'app_role', :'app_password')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'app_role') \gexec
+SELECT format('ALTER ROLE %I NOSUPERUSER NOBYPASSRLS PASSWORD %L', :'app_role', :'app_password') \gexec
+SELECT format('GRANT USAGE ON SCHEMA public TO %I', :'app_role') \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I', :'app_role') \gexec
+SELECT format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO %I', :'app_role') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'app_role') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', :'app_role') \gexec
+-- Payload CMS keeps its tables in its own `payload` schema (payload.config.ts)
+-- and connects with the same DATABASE_URL, i.e. as this role. Grant what
+-- Payload needs there: read/write on its tables and
+-- sequences, and CREATE so its schema sync can add tables. Payload tables
+-- hold CMS content only (no tenant RLS), so this doesn't widen tenant access.
+-- Create it (owned by the migrator running this script) on fresh installs, so
+-- the grants below always apply and Payload never needs CREATE SCHEMA rights.
+CREATE SCHEMA IF NOT EXISTS payload;
+SELECT format('GRANT USAGE, CREATE ON SCHEMA payload TO %I', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA payload TO %I', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec
+SELECT format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA payload TO %I', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA payload GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA payload GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec

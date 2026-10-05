@@ -9,7 +9,7 @@ import { authorityGuard, safetyError } from "@/app/api/authority/_lib";
 import { authorityAudit, authorityTablesReady } from "@/lib/authority/db";
 import { getQueueItem } from "@/lib/authority/reviews/service";
 import { pollReplyState, MAX_AUTO_REJECTION_RETRIES } from "@/lib/authority/reviews/replyState";
-import { gbpClientForRoutes } from "@/lib/authority/reviews/gbpClient";
+import { gbpClientForWorkspace } from "@/lib/authority/reviews/gbpClient";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         rejectionCount: item.rejectionCount,
         createdAt: item.createdAt,
       },
-      gbp: gbpClientForRoutes(),
+      gbp: await gbpClientForWorkspace(gate.workspaceId),
     });
 
     const updated = await prisma.reviewQueue.update({

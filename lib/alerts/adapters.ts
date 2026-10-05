@@ -76,16 +76,34 @@ export interface TelegramConfig {
   chatId: string;
 }
 
+/**
+ * Bot API token shape: "<bot id>:<35+ char secret>". Validated because the
+ * token is interpolated into the request PATH (…/bot<token>/sendMessage):
+ * an unvalidated value like "x/../../other" or "x?y#" would rewrite the
+ * request target.
+ */
+export const TELEGRAM_BOT_TOKEN_RE = /^\d{3,20}:[A-Za-z0-9_-]{30,100}$/;
+/** Numeric chat id (groups/channels are negative) or a public @channelname. */
+export const TELEGRAM_CHAT_ID_RE = /^(-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
+
+/** Escape a value for a double-quoted HTML attribute. */
+function escAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 /** Bot API sendMessage. HTML parse mode, links appended as <a> tags. */
 export async function sendTelegram(config: TelegramConfig, payload: AlertPayload): Promise<AdapterResult> {
   if (!config.botToken || !config.chatId) {
     return { ok: false, error: "telegram bot token or chat id missing" };
   }
+  if (!TELEGRAM_BOT_TOKEN_RE.test(config.botToken)) {
+    return { ok: false, error: "telegram bot token is malformed" };
+  }
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let text = `<b>${esc(payload.title)}</b>\n\n${esc(payload.body)}`.slice(0, 3900);
   if (payload.links?.length) {
-    const linkText = payload.links.map((l) => `<a href="${l.url}">${esc(l.label)}</a>`).join(" · ");
+    const linkText = payload.links.map((l) => `<a href="${escAttr(l.url)}">${esc(l.label)}</a>`).join(" · ");
     text = `${text}\n\n${linkText}`.slice(0, 4000);
   }
   // TELEGRAM_API_BASE override exists for smoke tests against a mock endpoint;
@@ -150,14 +168,14 @@ export function renderAlertEmail(payload: AlertPayload): { subject: string; html
       .replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>");
   const links = (payload.links ?? [])
-    .map((l) => `<a href="${l.url}" style="color:#2563eb">${esc(l.label)}</a>`)
+    .map((l) => `<a href="${escAttr(l.url)}" style="color:#2563eb">${esc(l.label)}</a>`)
     .join(" &middot; ");
   const html = `<!doctype html><html><body style="font-family:system-ui,-apple-system,sans-serif;color:#111827;max-width:560px;margin:0 auto;padding:24px">
 <h2 style="font-size:18px;margin:0 0 12px">${esc(payload.title)}</h2>
 <p style="font-size:14px;line-height:1.6;white-space:pre-wrap">${esc(payload.body)}</p>
 ${links ? `<p style="font-size:14px;margin-top:16px">${links}</p>` : ""}
 <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 12px">
-<p style="font-size:12px;color:#6b7280">Sent by Marketr alert hub. Manage rules in your workspace settings.</p>
+<p style="font-size:12px;color:#6b7280">Sent by ShapesOS alert hub. Manage rules in your workspace settings.</p>
 </body></html>`;
   const text = `${payload.title}\n\n${payload.body}${payload.links?.length ? `\n\n${payload.links.map((l) => `${l.label}: ${l.url}`).join("\n")}` : ""}`;
   return { subject: payload.title.slice(0, 120), html, text };

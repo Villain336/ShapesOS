@@ -16,11 +16,13 @@ const WS_A = "17s6-ws-a";
 const WS_B = "17s6-ws-b";
 
 async function createWorkspace(id: string) {
-  await prisma.$executeRawUnsafe(`INSERT INTO workspaces (id) VALUES ('${id}') ON CONFLICT DO NOTHING`);
+  // Targets the fully migrated schema (scripts/db/migrate.sh).
+  await prisma.$executeRaw`INSERT INTO workspaces (id, name, owner_user_id, updated_at)
+    VALUES (${id}, ${id}, ${"test:" + id}, now()) ON CONFLICT DO NOTHING`;
 }
 
 async function deleteWorkspace(id: string) {
-  await prisma.$executeRawUnsafe(`DELETE FROM workspaces WHERE id = '${id}'`);
+  await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
 }
 
 before(async () => {

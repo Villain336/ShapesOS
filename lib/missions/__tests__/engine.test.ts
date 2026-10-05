@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: mission engine tests (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: mission engine tests (docs/specs/SPEC-PHASE9.md §P9C).
 // Run: npx tsx --test lib/missions/__tests__/engine.test.ts
 //
 // Memory-store backed throughout (the Prisma twin is exercised by the API

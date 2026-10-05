@@ -34,6 +34,7 @@ import {
   type ParsedDeclarations,
   type RenewalAlertLevel,
 } from "@/lib/insurance/types";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // ── House atoms ──────────────────────────────────────────────────────────────
 
@@ -634,7 +635,7 @@ export function InsuranceApp() {
           ? "This partner will be able to satisfy the bind gate again."
           : "Binding will be blocked (PARTNER_NOT_APPOINTED) until an active partner is on file.";
       if (
-        !window.confirm(
+        !await confirmAction(
           `${status === "active" ? "Reactivate" : status === "suspended" ? "Suspend" : "Revoke"} "${p.name}"?\n\n${consequence}`,
         )
       ) {
@@ -1800,7 +1801,7 @@ export function InsuranceApp() {
             <Info size={14} className="mt-0.5 shrink-0 text-muted" />
             <span>
               The licensed partner is the <strong className="text-ink">producer of record</strong> —
-              the partner holds the licenses, Marketr provides the software. Binding is blocked
+              the partner holds the licenses, ShapesOS provides the software. Binding is blocked
               (PARTNER_NOT_APPOINTED) until an <strong className="text-ink">active, appointed</strong> partner
               with a producer license number and licensed states is on file. Status changes are admin-gated.
             </span>

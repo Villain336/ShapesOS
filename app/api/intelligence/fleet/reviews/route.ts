@@ -8,6 +8,7 @@
 // guard (types.ts) makes unlicensed review scraping structurally impossible.
 
 import type { NextRequest } from "next/server";
+import { requireWorkspaceRole } from "@/lib/authz";
 import { requireUser } from "@/lib/session";
 import { getOrCreateWorkspace } from "@/lib/session";
 import {
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
   }
 
   const workspaceId = (await getOrCreateWorkspace(user.id, user.email)).id;
+  // Spends DataForSEO credits — editor+, like the other paid pulls.
+  if (!(await requireWorkspaceRole(user.id, workspaceId, "editor")))
+    return Response.json({ error: "Forbidden" }, { status: 403 });
 
   if (body.source === "yelp") {
     if (!body.businessId?.trim()) {

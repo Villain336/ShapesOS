@@ -7,6 +7,18 @@
 
 import { prisma } from "@/lib/prisma";
 import type { ApprovalItem } from "@prisma/client";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
+
+/** Inbox queue for an ApprovalItem kind (insurance governed actions have their own). */
+function inboxSourceFor(kind: unknown): "insurance" | "messaging" {
+  return typeof kind === "string" && kind.startsWith("insurance_") ? "insurance" : "messaging";
+}
+
+function approvalTitle(item: ApprovalItem): string {
+  const p = (item?.payload ?? {}) as Record<string, unknown>;
+  const pick = ["subject", "summary", "title", "to"].map((k) => p[k]).find((v) => typeof v === "string" && v.trim());
+  return typeof pick === "string" ? pick : String(item?.kind ?? "approval").replace(/_/g, " ");
+}
 
 export type MessageKind =
   | "sequence"
@@ -39,7 +51,7 @@ export async function requestApproval(input: {
 }): Promise<ApprovalItem> {
   const kind = (input.kind ?? "").trim();
   if (!kind) throw new Error("approval kind is required");
-  return prisma.approvalItem.create({
+  const item = await prisma.approvalItem.create({
     data: {
       workspaceId: input.workspaceId,
       kind,
@@ -48,6 +60,15 @@ export async function requestApproval(input: {
       requestedBy: input.requestedBy ?? null,
     },
   });
+  // Phase 3 (J): best-effort "needs you" notification (never throws).
+  await notifyApprovalNeeded({
+    workspaceId: item?.workspaceId ?? input.workspaceId,
+    source: inboxSourceFor(item?.kind),
+    sourceId: item?.id ?? "",
+    title: approvalTitle(item),
+    requestedBy: item?.requestedBy ?? null,
+  });
+  return item;
 }
 
 export async function decideApproval(
@@ -62,7 +83,7 @@ export async function decideApproval(
   if (item.status !== "pending") {
     throw new Error(`Approval item is already ${item.status}`);
   }
-  return prisma.approvalItem.update({
+  const updated = await prisma.approvalItem.update({
     where: { id },
     data: {
       status: decision === "approve" ? "approved" : "rejected",
@@ -71,4 +92,14 @@ export async function decideApproval(
       note: note ?? null,
     },
   });
+  await notifyApprovalDecided({
+    workspaceId,
+    source: inboxSourceFor(updated?.kind),
+    sourceId: updated?.id ?? id,
+    title: approvalTitle(updated),
+    decision: decision === "approve" ? "approved" : "denied",
+    decidedBy: decidedBy ?? null,
+    requestedBy: updated?.requestedBy ?? null,
+  });
+  return updated;
 }

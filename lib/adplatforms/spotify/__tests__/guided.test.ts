@@ -64,10 +64,10 @@ describe("spotify guided checklist integrity", () => {
     assert.match(joined, /billing/i);
   });
 
-  it("never claims API control — Marketr tracks, the user launches", () => {
+  it("never claims API control — ShapesOS tracks, the user launches", () => {
     const joined = SPOTIFY_GUIDED_STEPS.map((s) => `${s.title} ${s.detail}`).join(" ");
-    assert.doesNotMatch(joined, /Marketr launches/i);
-    assert.match(joined, /Marketr/i);
+    assert.doesNotMatch(joined, /ShapesOS launches/i);
+    assert.match(joined, /ShapesOS/i);
   });
 
   it("links to Spotify's official getting-started help center", () => {

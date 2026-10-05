@@ -25,6 +25,7 @@ import {
   validateConnectorMode,
   type ConnectorMode,
 } from "./modes";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 /** Boardy is reached by email — the rail's destination, per the agentskill. */
 export const BOARDY_EMAIL = "boardy@boardy.ai";
@@ -460,6 +461,15 @@ export class PrismaBoardyRailStore {
       opts.draftedBy,
       `Boardy escalation drafted for ${value.targetName}. Awaiting tenant approval — nothing sent.`,
     );
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    await notifyApprovalNeeded({
+      workspaceId,
+      source: "boardy",
+      sourceId: row.id,
+      title: value.draftedSubject || `Request an intro to ${value.targetName}`,
+      href: "/dashboard/connector",
+      requestedBy: opts.draftedBy.identity,
+    });
     return toBoardyRequestView(row, await this.listEvents(row.id));
   }
 

@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { MCP_TOOL_NAMES, SCOPE_LABELS, scopeForTool, type McpToolName } from "@/lib/mcp/scopes";
+import { confirmAction } from "@/lib/ui/feedback";
+import { SwitchRow } from "@/components/aos/Controls";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -23,36 +25,6 @@ const btnDeny =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 const chipCls =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
-
-function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
-        checked ? "bg-ink" : "bg-disabled-fg"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[21px]" : "left-[3px]"
-        }`}
-      />
-    </button>
-  );
-}
 
 interface ApiKey {
   id: string;
@@ -77,6 +49,11 @@ interface OAuthClient {
 
 export default function McpManager() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  // Phase 4a: false when the plan doesn't include API/MCP access.
+  const [entitled, setEntitled] = useState(true);
+  // Phase 11 (conncore): whether "on/off" is the plan default or the admin's switch.
+  const [source, setSource] = useState<"explicit_on" | "explicit_off" | "plan_default">("plan_default");
+  const [planDefault, setPlanDefault] = useState(false);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [clients, setClients] = useState<OAuthClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +73,9 @@ export default function McpManager() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load");
       setEnabled(data.enabled);
+      setEntitled(data.entitled !== false);
+      if (data.source) setSource(data.source);
+      setPlanDefault(data.planDefault === true);
       setKeys(data.keys);
       const cres = await fetch("/api/mcp/oauth/clients");
       const cdata = await cres.json().catch(() => ({ clients: [] }));
@@ -123,6 +103,7 @@ export default function McpManager() {
       return;
     }
     setEnabled(data.enabled);
+    if (data.source) setSource(data.source);
   }
 
   function toggleScope(tool: McpToolName) {
@@ -162,7 +143,7 @@ export default function McpManager() {
   }
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this API key? Calls using it will fail immediately.")) return;
+    if (!await confirmAction("Revoke this API key? Calls using it will fail immediately.")) return;
     const res = await fetch(`/api/mcp/keys/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -173,7 +154,7 @@ export default function McpManager() {
   }
 
   async function revokeClient(clientId: string) {
-    if (!confirm("Disconnect this app? All of its tokens stop working immediately.")) return;
+    if (!await confirmAction("Disconnect this app? All of its tokens stop working immediately.")) return;
     const res = await fetch(`/api/mcp/oauth/clients/${encodeURIComponent(clientId)}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -194,20 +175,47 @@ export default function McpManager() {
         </p>
       )}
 
+      {!entitled && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-paper px-4 py-3 shadow-hairline">
+          <p className="text-sm text-ink">
+            API and MCP access isn&apos;t included in your plan. Upgrade to Pro or above in Billing.
+          </p>
+          <a
+            href="/dashboard/billing"
+            className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press"
+          >
+            See plans
+          </a>
+        </div>
+      )}
+
       <section className={cardCls}>
         <h2 className="text-base font-semibold text-ink">MCP server</h2>
         <p className="mt-1 text-sm text-muted">
           Expose this workspace to MCP clients (Claude Code, Claude, ChatGPT) over streamable HTTP
-          at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. Disabled by default — enabling
-          opens a new authenticated API surface for this workspace.
+          at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. On by default on Pro and Agency
+          plans, off otherwise. Callers still need a key or an OAuth sign-in you approve; turning it off closes
+          the surface for this workspace.
         </p>
-        <div className="mt-4 flex items-center gap-3">
-          <Switch
+        <div className="mt-4 rounded-lg border border-line">
+          <SwitchRow
+            title="Enable MCP server for this workspace"
+            description={
+              !entitled
+                ? "Not included in your plan"
+                : source === "plan_default"
+                  ? `${planDefault ? "On" : "Off"} by default on your plan`
+                  : source === "explicit_off"
+                    ? "Turned off for this workspace"
+                    : "Turned on for this workspace"
+            }
             checked={enabled === true}
-            onChange={toggleEnabled}
-            label="Enable MCP server for this workspace"
+            disabled={!entitled && enabled !== true}
+            onChange={(v) => {
+              if (v && !entitled) return;
+              void toggleEnabled(v);
+            }}
           />
-          <span className="text-sm font-medium text-ink">Enable MCP server for this workspace</span>
         </div>
       </section>
 
@@ -324,7 +332,10 @@ export default function McpManager() {
             </div>
           </fieldset>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-xs font-medium text-muted">Expires (optional)</span>
+            <span className="text-xs font-medium text-muted">
+              Expires (defaults to 90 days, at most 1 year). Keys also stop working if their creator
+              stops being an admin.
+            </span>
             <input
               type="datetime-local"
               value={expiresAt}
@@ -335,7 +346,7 @@ export default function McpManager() {
           <button
             type="button"
             onClick={createKey}
-            disabled={creating || enabled !== true}
+            disabled={creating || enabled !== true || !entitled}
             className={`${btnPrimary} self-start`}
           >
             {creating ? "Creating…" : "Create key"}

@@ -7,6 +7,7 @@
 //   downloads it when it runs.
 // GET  /api/clipper/sources — dense list with clip counts.
 
+import { assertSafeUrl, UnsafeUrlError } from "@/lib/safe-url";
 import { z } from "zod";
 import { guardWorkspace, httpErrorResponse } from "../../integrations/_lib";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
@@ -49,6 +50,7 @@ export async function GET() {
     const { workspace } = await guardWorkspace();
     const sources = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clipSource.findMany({
+        where: { workspaceId: workspace.id },
         orderBy: { createdAt: "desc" },
         take: 100,
         select: sourceSelect,
@@ -101,6 +103,16 @@ export async function POST(req: Request) {
       if (!parsed.success) {
         return Response.json(
           { error: "Provide either multipart 'file' or JSON {url, title}.", issues: parsed.error.issues },
+          { status: 400 },
+        );
+      }
+      // SSRF guard: refuse internal targets at creation (the pipeline's
+      // safeFetch re-validates at download time and on every redirect hop).
+      try {
+        await assertSafeUrl(parsed.data.url);
+      } catch (err) {
+        return Response.json(
+          { error: `URL refused: ${err instanceof UnsafeUrlError ? err.message : "not allowed"}` },
           { status: 400 },
         );
       }

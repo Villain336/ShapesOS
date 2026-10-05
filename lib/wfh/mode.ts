@@ -7,6 +7,8 @@
 // changed before the OS starts batching notifications and proposing focus
 // blocks. Disabling back to office never requires the gate.
 
+import { isValidTimeZone, resolveTimeZone, zonedParts } from "@/lib/time/zoned";
+
 export type WfhMode = "wfh" | "office" | "hybrid";
 export type WfhStandupCadence = "daily" | "none";
 export type WfhNotificationProfile = "realtime" | "batched";
@@ -32,6 +34,8 @@ export interface SetupInput {
   focusBlockMinutes?: unknown;
   standupCadence?: unknown;
   notificationProfile?: unknown;
+  /** IANA timezone for the user's local day (standups, digests, focus). */
+  timezone?: unknown;
 }
 
 export interface NormalizedSetup {
@@ -41,6 +45,8 @@ export interface NormalizedSetup {
   focusBlockMinutes: number;
   standupCadence: WfhStandupCadence;
   notificationProfile: WfhNotificationProfile;
+  /** null = not provided (keep the stored zone; UTC for a new row). */
+  timezone: string | null;
 }
 
 export interface SetupValidation {
@@ -89,6 +95,12 @@ export function validateSetupInput(input: SetupInput): SetupValidation {
     errors.push("Notification profile must be 'realtime' or 'batched'.");
   }
 
+  let timezone: string | null = null;
+  if (input.timezone != null && input.timezone !== "") {
+    if (isValidTimeZone(input.timezone)) timezone = input.timezone;
+    else errors.push("Timezone must be an IANA name such as America/New_York.");
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors, normalized: null };
   }
@@ -102,6 +114,7 @@ export function validateSetupInput(input: SetupInput): SetupValidation {
       focusBlockMinutes: blockMin,
       standupCadence: cadence as WfhStandupCadence,
       notificationProfile: profile as WfhNotificationProfile,
+      timezone,
     },
   };
 }
@@ -117,6 +130,8 @@ export interface WorkModeState {
   mode: WfhMode;
   wfhDays: string[];
   setupCompletedAt: Date | null;
+  /** IANA timezone; absent/invalid = UTC. */
+  timezone?: string | null;
 }
 
 export class WfhModeError extends Error {
@@ -188,12 +203,12 @@ export function toggleMode(
 
 /**
  * Is WFH effectively on for the given day? wfh = always; hybrid = only on
- * configured wfh days; office = never.
+ * configured wfh days (the weekday in the user's timezone); office = never.
  */
 export function isWfhEffectiveOn(state: WorkModeState | null, at: Date): boolean {
   if (!state || state.mode === "office") return false;
   if (state.mode === "wfh") return true;
-  const code = JS_DAY_TO_CODE[at.getDay()];
+  const code = JS_DAY_TO_CODE[zonedParts(at, resolveTimeZone(state.timezone)).weekday];
   return state.wfhDays.map((d) => d.toLowerCase()).includes(code);
 }
 

@@ -140,6 +140,27 @@
   --aos-dur-base: 150ms;  /* press, toggles */
   --aos-dur-slow: 300ms;  /* toasts entering, panels */
   --aos-dur-pulse: 1.6s;  /* running indicator */
+
+  /* ---------- Twin scene: neutral clay (Phase 13) ----------
+     The digital twin's 3D scene and its top-down SVG are drawn in these
+     greys only: 0 = lightest (tops, ground), 4 = darkest (tyres, frames).
+     No hue, no accent; status colours appear only on agent markers. */
+  --aos-clay-0: #FBFBF9;  /* ground, lit tops */
+  --aos-clay-1: #ECECE8;  /* floors, slabs, paths */
+  --aos-clay-2: #DADAD5;  /* walls, machine bodies, pallets */
+  --aos-clay-3: #BDBDB7;  /* rack frames, trucks */
+  --aos-clay-4: #8E8E88;  /* tyres, forks, deep details */
+  --aos-clay-grid: #E0E0DC; /* ground grid lines */
+}
+
+/* Dark variant of the clay scene (the repo's inert `.dark` class variant). */
+.dark {
+  --aos-clay-0: #2A2A28;
+  --aos-clay-1: #33332F;
+  --aos-clay-2: #45453F;
+  --aos-clay-3: #5C5C55;
+  --aos-clay-4: #7A7A72;
+  --aos-clay-grid: #3A3A36;
 }
 
 /* ---------- Base ---------- */

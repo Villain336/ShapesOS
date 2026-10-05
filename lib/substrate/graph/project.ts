@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: fact → node/edge projection (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: fact → node/edge projection (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // New facts INVALIDATE old edges (invalid_at/expired_at + superseded_by_id)
 // instead of deleting them — Graphiti-style bi-temporal edges. Point-in-time

@@ -30,11 +30,13 @@ export async function PATCH(
   }
 
   try {
+    // Raw values: the validator parses them, so a blank percent ("") is
+    // "missing" (400), never coerced to 0.
     const v = validateAllocationRule({
-      method: body.method as "flat_percent" | "square_footage" | undefined,
-      percent: body.percent != null ? Number(body.percent) : undefined,
-      officeSqft: body.officeSqft != null ? Number(body.officeSqft) : null,
-      totalSqft: body.totalSqft != null ? Number(body.totalSqft) : null,
+      method: body.method as string | undefined,
+      percent: body.percent,
+      officeSqft: body.officeSqft,
+      totalSqft: body.totalSqft,
     });
     if (!v.ok || !v.normalized) {
       throw new WfhExpenseError("VALIDATION_FAILED", "Allocation rule is invalid.", v.errors);

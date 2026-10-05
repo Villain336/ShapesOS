@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const updated = await withWorkspaceScope(access.workspaceId, (tx) =>
     tx.styleRule.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId: access.workspaceId },
       data: {
         ...(body.pattern?.trim() ? { pattern: body.pattern } : {}),
         ...(body.replacement !== undefined ? { replacement: body.replacement } : {}),
@@ -96,7 +96,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!existing) return notFound("Style rule not found");
 
   await withWorkspaceScope(access.workspaceId, (tx) =>
-    tx.styleRule.delete({ where: { id: existing.id } }),
+    tx.styleRule.delete({ where: { id: existing.id, workspaceId: access.workspaceId } }),
   );
   return Response.json({ deleted: true });
 }

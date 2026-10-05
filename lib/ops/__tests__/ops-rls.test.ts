@@ -18,14 +18,16 @@ import { opsCreate, type OpsActor } from "../doctype";
 const WS_A = "17s1-ws-a";
 const WS_B = "17s1-ws-b";
 
-// The scratch DB carries a minimal workspaces stub (id TEXT PRIMARY KEY),
-// so workspaces are managed with raw SQL, not the prisma Workspace model.
+// Workspaces are managed with raw SQL so the battery stays independent of the
+// prisma Workspace model's relations.
 async function createWorkspace(id: string) {
-  await prisma.$executeRawUnsafe(`INSERT INTO workspaces (id) VALUES ('${id}') ON CONFLICT DO NOTHING`);
+  // Targets the fully migrated schema (scripts/db/migrate.sh).
+  await prisma.$executeRaw`INSERT INTO workspaces (id, name, owner_user_id, updated_at)
+    VALUES (${id}, ${id}, ${"test:" + id}, now()) ON CONFLICT DO NOTHING`;
 }
 
 async function deleteWorkspace(id: string) {
-  await prisma.$executeRawUnsafe(`DELETE FROM workspaces WHERE id = '${id}'`);
+  await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
 }
 
 before(async () => {

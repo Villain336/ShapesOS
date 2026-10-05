@@ -9,12 +9,19 @@
 //   write — POST/PUT/PATCH/DELETE: 60 req/min, keyed by user (IP fallback)
 //   ai    — LLM / skill-execution routes (see AI_ROUTE_PATTERNS): 20 req/min, keyed by user
 //
-// In-memory fixed windows, single-instance by design — same documented stance
-// as lib/auth/rate-limit.ts (the login brute-force limiter, which is
-// complementary: lockouts for credential abuse, this for API abuse).
-// Front with a shared limiter (Redis etc.) if you run replicas.
+// Two stores (Phase 6): checkRateLimitAsync() — what proxy.ts and the route
+// handlers call — uses the shared Postgres table (lib/api/rate-limit-store.ts,
+// RATE_LIMIT_STORE, default postgres when DATABASE_URL is set) so the limits
+// hold across replicas, and FAILS OPEN to the in-memory limiter below when
+// the database errors or is slow. checkRateLimit() is that in-memory fixed
+// window: per process, kept for the fallback, scripts and tests. The login
+// brute-force limiter (lib/auth/rate-limit.ts) is complementary: lockouts for
+// credential abuse, this for API abuse.
 // Bounded bucket map (oldest evicted past MAX_BUCKETS) so the limiter itself
 // can't be used as a memory-exhaustion vector.
+
+import { clientIpFromHeaders } from "./client-ip";
+import { maybeCleanup, sharedCounterStore, storeWarn, withStoreTimeout } from "./rate-limit-store";
 
 export type RateLimitTier = "auth" | "read" | "write" | "ai";
 
@@ -31,6 +38,9 @@ const AUTH_READ_PATHS = new Set([
   "/api/auth/csrf",
   "/api/auth/providers",
 ]);
+
+/** Phase 10 (portal): client-portal sign-in routes (auth tier, IP-keyed). */
+const PORTAL_AUTH_PATHS = new Set(["/api/portal/login", "/api/portal/link"]);
 
 /**
  * Routes that burn LLM / skill-execution budget. Matched against the concrete
@@ -56,6 +66,8 @@ export function classifyTier(pathname: string, method: string): RateLimitTier {
   if (pathname.startsWith("/api/auth/")) {
     return AUTH_READ_PATHS.has(pathname) ? "read" : "auth";
   }
+  // Phase 10 (portal): client-portal sign-in is a sign-in surface too.
+  if (PORTAL_AUTH_PATHS.has(pathname)) return "auth";
   const m = method.toUpperCase();
   // Read tier is the GET/listing traffic — checked before the AI patterns so
   // that history/list GETs on AI-adjacent routes (chat threads, autopilot
@@ -104,6 +116,33 @@ export function checkRateLimit(
 }
 
 /**
+ * Shared fixed-window check-and-increment (Phase 6). Uses the store that
+ * RATE_LIMIT_STORE selects; any store error or timeout falls back to the
+ * in-memory checkRateLimit() — fail open to per-process limiting, never to
+ * no limiting at all.
+ */
+export async function checkRateLimitAsync(
+  key: string,
+  tier: RateLimitTier,
+  now: number = Date.now(),
+): Promise<RateLimitResult> {
+  const store = sharedCounterStore();
+  if (!store) return checkRateLimit(key, tier, now);
+  const { limit, windowMs } = TIER_LIMITS[tier];
+  try {
+    const hit = await withStoreTimeout(store.hit(key, windowMs, now));
+    maybeCleanup(store, now);
+    if (hit.count > limit) {
+      return { allowed: false, retryAfterMs: Math.max(0, hit.windowStart + windowMs - now) };
+    }
+    return { allowed: true, retryAfterMs: 0 };
+  } catch (err) {
+    storeWarn("hit", err);
+    return checkRateLimit(key, tier, now);
+  }
+}
+
+/**
  * Bucket key. Auth tier is always IP-keyed (pre-auth by definition).
  * Other tiers prefer the user id so one abusive IP can't burn a shared
  * user's budget — falling back to IP when the caller is unauthenticated
@@ -127,11 +166,12 @@ export function tooManyRequests(retryAfterMs: number): Response {
   );
 }
 
-/** Best-effort client IP from proxy headers. */
+/**
+ * Client IP for rate-limit keys — the trusted-proxy hop, never the
+ * client-written leftmost X-Forwarded-For entry (see lib/api/client-ip.ts).
+ */
 export function clientIp(headers: Headers): string | null {
-  const fwd = headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]?.trim() || null;
-  return headers.get("x-real-ip")?.trim() || null;
+  return clientIpFromHeaders(headers);
 }
 
 /** Test hook: clear all limiter state for deterministic tests. */

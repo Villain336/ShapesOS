@@ -1,10 +1,17 @@
 // Marketr — Phase 6 O1: Smartlead / Instantly webhook handler.
 //
 // Signature-verified (HMAC-SHA256 of the raw body against the provider
-// webhook secret), idempotent (provider event ids deduped in-process and
+// webhook secret), idempotent (provider event ids claimed in
+// outreach_webhook_events — durable across instances/restarts — and
 // recorded on the event), and stop-on-reply enforced: a reply halts the
 // sequence, marks the prospect replied, and suppresses reply-based —
 // in the same processing cycle.
+//
+// Tenant binding (Phase 1): the workspace comes ONLY from signed data — the
+// referenced sequence's own workspace, or a workspaceId field inside the
+// signed body. An unsigned ?workspaceId= query param is never trusted (the
+// HMAC covers only the body, so a captured event could otherwise be
+// replayed into another tenant).
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -23,6 +30,8 @@ const webhookPayloadSchema = z.object({
   sequenceId: z.string().optional(),
   email: z.string().email().optional(),
   replyId: z.string().optional(),
+  /** Our workspace id, when the relay includes it — covered by the HMAC. */
+  workspaceId: z.string().min(1).optional(),
   detail: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -48,16 +57,69 @@ export function verifyWebhookSignature(provider: WebhookProvider, rawBody: strin
   }
 }
 
-// In-process idempotency set (batteries + single-instance dev). Production
-// multi-instance would back this with a DB unique constraint on the provider
-// event id; every event also records providerEventId in its detail.
-const seenEventIds = new Set<string>();
+/**
+ * Resolve the tenant from SIGNED payload data only: the referenced
+ * sequence's own workspace, else the body's workspaceId. A body workspaceId
+ * that disagrees with the sequence's workspace is rejected (null).
+ */
+export async function resolveWebhookWorkspace(
+  payload: { sequenceId?: string; workspaceId?: string },
+  sequenceWorkspace: (sequenceId: string) => Promise<string | null>,
+): Promise<string | null> {
+  const claimed = payload.workspaceId?.trim() || null;
+  if (payload.sequenceId) {
+    const owner = await sequenceWorkspace(payload.sequenceId);
+    if (owner) return claimed && claimed !== owner ? null : owner;
+  }
+  return claimed;
+}
+
+/** Parse + validate a webhook body (after the signature was verified). */
+export function parseWebhookPayload(rawBody: string): WebhookPayload {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    throw new Error("Invalid webhook JSON.");
+  }
+  return webhookPayloadSchema.parse(parsed);
+}
+
+/**
+ * Durable idempotency port. claim() returns false when the (provider,
+ * eventId) was already processed; release() undoes a claim when processing
+ * failed so the provider's retry can succeed.
+ */
+export interface WebhookEventStore {
+  claim(input: { provider: WebhookProvider; eventId: string; workspaceId: string; type: string }): Promise<boolean>;
+  release(provider: WebhookProvider, eventId: string): Promise<void>;
+}
+
+/** In-memory store (unit tests / batteries). Production uses the Prisma store. */
+export function memoryWebhookEventStore(seen: Set<string> = new Set<string>()): WebhookEventStore {
+  return {
+    async claim({ provider, eventId }) {
+      const key = `${provider}:${eventId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    },
+    async release(provider, eventId) {
+      seen.delete(`${provider}:${eventId}`);
+    },
+  };
+}
+
+const defaultClaims = new Set<string>();
+const defaultEventStore = memoryWebhookEventStore(defaultClaims);
 
 export interface WebhookDeps {
   sequences: SequenceStore;
   prospects: ProspectStore;
   campaigns: CampaignStore;
   suppression: SuppressionStore;
+  /** Durable dedupe (outreach_webhook_events). Defaults to in-memory. */
+  events?: WebhookEventStore;
 }
 
 export interface WebhookResult {
@@ -74,18 +136,31 @@ export async function handleProviderWebhook(
 ): Promise<WebhookResult> {
   verifyWebhookSignature(opts.provider, opts.rawBody, opts.signature);
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(opts.rawBody);
-  } catch {
-    throw new Error("Invalid webhook JSON.");
+  const payload = parseWebhookPayload(opts.rawBody);
+  if (payload.workspaceId && payload.workspaceId !== opts.workspaceId) {
+    throw new Error("Invalid input: webhook workspace does not match the signed payload.");
   }
-  const payload = webhookPayloadSchema.parse(parsed);
-  const dedupeKey = `${opts.provider}:${payload.eventId}`;
-  if (seenEventIds.has(dedupeKey)) {
+  const events = deps.events ?? defaultEventStore;
+  const claimed = await events.claim({
+    provider: opts.provider, eventId: payload.eventId, workspaceId: opts.workspaceId, type: payload.type,
+  });
+  if (!claimed) {
     return { provider: opts.provider, eventId: payload.eventId, type: payload.type, handled: true, duplicate: true };
   }
+  try {
+    return await processWebhookEvent(deps, opts, payload);
+  } catch (err) {
+    // Let the provider's retry reprocess an event we failed to apply.
+    await events.release(opts.provider, payload.eventId).catch(() => {});
+    throw err;
+  }
+}
 
+async function processWebhookEvent(
+  deps: WebhookDeps,
+  opts: { provider: WebhookProvider; workspaceId: string },
+  payload: WebhookPayload,
+): Promise<WebhookResult> {
   const detail = { providerEventId: payload.eventId, provider: opts.provider, ...(payload.detail ?? {}) };
   let handled = false;
 
@@ -150,7 +225,6 @@ export async function handleProviderWebhook(
     handled = true;
   }
 
-  seenEventIds.add(dedupeKey);
   await authorityAudit.logAsync({
     workspaceId: opts.workspaceId, actor: `webhook:${opts.provider}`, action: `webhook_${payload.type}`,
     entityType: "outreach_sequence", entityId: payload.sequenceId ?? payload.eventId, detail,
@@ -159,7 +233,7 @@ export async function handleProviderWebhook(
   return { provider: opts.provider, eventId: payload.eventId, type: payload.type, handled, duplicate: false };
 }
 
-/** Test seam: clear the in-process idempotency set. */
+/** Test seam: forget the default in-memory claims (the Prisma store is durable). */
 export function __clearWebhookIdempotency(): void {
-  seenEventIds.clear();
+  for (const key of [...defaultClaims]) defaultClaims.delete(key);
 }

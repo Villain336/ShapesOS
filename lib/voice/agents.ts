@@ -9,6 +9,7 @@
 import { Prisma, type VoiceAgent, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { BadRequestError } from "@/lib/api/errors";
 
 type TxClient = Prisma.TransactionClient | PrismaClient;
 
@@ -82,11 +83,11 @@ export async function createAgent(
   input: CreateAgentInput,
 ): Promise<VoiceAgent> {
   const name = input.name.trim();
-  if (!name) throw new Error("Agent name is required.");
-  if (!input.voiceId.trim()) throw new Error("voiceId is required.");
+  if (!name) throw new BadRequestError("Agent name is required.");
+  if (!input.voiceId.trim()) throw new BadRequestError("voiceId is required.");
   const purpose = input.purpose ?? "followup";
   if (purpose !== "followup" && purpose !== "voiceover")
-    throw new Error("purpose must be followup or voiceover.");
+    throw new BadRequestError("purpose must be followup or voiceover.");
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.create({
       data: {
@@ -110,7 +111,7 @@ export async function updateAgent(
 ): Promise<VoiceAgent> {
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.update({
-      where: { id: agentId },
+      where: { id: agentId, workspaceId },
       data: {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.voiceId !== undefined ? { voiceId: patch.voiceId.trim() } : {}),
@@ -135,7 +136,7 @@ export async function setKillSwitch(
 ): Promise<VoiceAgent> {
   const agent = await withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.update({
-      where: { id: agentId },
+      where: { id: agentId, workspaceId },
       data: { killSwitch: enabled },
     }),
   );
@@ -152,7 +153,7 @@ export async function deleteAgent(
 ): Promise<void> {
   // RESTRICT on call_sessions: deleting an agent with session history throws.
   await withWorkspaceScope(workspaceId, (tx: TxClient) =>
-    tx.voiceAgent.delete({ where: { id: agentId } }),
+    tx.voiceAgent.delete({ where: { id: agentId, workspaceId } }),
   );
 }
 

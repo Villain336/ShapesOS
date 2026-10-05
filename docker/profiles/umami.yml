@@ -4,6 +4,9 @@
 #   docker compose -f docker-compose.yml -f docker/profiles/umami.yml \
 #     --profile umami up -d
 #
+# Required: UMAMI_POSTGRES_PASSWORD, UMAMI_APP_SECRET (no defaults ship).
+# The UI binds to 127.0.0.1 only — reverse-proxy it for remote access.
+#
 # Then create a website in the Umami UI (http://localhost:3002) and set on
 # the Marketr host:
 #   UMAMI_URL=http://umami:3000          (server-side stats API)
@@ -23,7 +26,7 @@ services:
     environment:
       POSTGRES_DB: ${UMAMI_POSTGRES_DB:-umami}
       POSTGRES_USER: ${UMAMI_POSTGRES_USER:-umami}
-      POSTGRES_PASSWORD: ${UMAMI_POSTGRES_PASSWORD:-umami-sidecar-secret}
+      POSTGRES_PASSWORD: ${UMAMI_POSTGRES_PASSWORD:?set UMAMI_POSTGRES_PASSWORD (openssl rand -hex 32)}
     volumes:
       - umami-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -40,11 +43,11 @@ services:
       umami-db:
         condition: service_healthy
     ports:
-      - "${UMAMI_PORT:-3002}:3000"
+      - "127.0.0.1:${UMAMI_PORT:-3002}:3000"
     environment:
-      DATABASE_URL: postgresql://${UMAMI_POSTGRES_USER:-umami}:${UMAMI_POSTGRES_PASSWORD:-umami-sidecar-secret}@umami-db:5432/${UMAMI_POSTGRES_DB:-umami}
+      DATABASE_URL: postgresql://${UMAMI_POSTGRES_USER:-umami}:${UMAMI_POSTGRES_PASSWORD:?set UMAMI_POSTGRES_PASSWORD}@umami-db:5432/${UMAMI_POSTGRES_DB:-umami}
       DATABASE_TYPE: postgresql
-      APP_SECRET: ${UMAMI_APP_SECRET:-change-me-to-a-random-secret}
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET (openssl rand -hex 32)}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/heartbeat || exit 1"]
       interval: 15s

@@ -10,7 +10,7 @@ import { RadioPrintApp } from "./RadioPrintApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Radio & Print IOs — Marketr",
+  title: "Radio & Print IOs — ShapesOS",
   description: "IO-brief concierge for broadcast radio and print. Signature tracking and proof-of-run.",
 };
 
@@ -19,7 +19,7 @@ export default async function RadioPrintPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading text-ink">Radio &amp; Print IOs</h1>
         <p className="mt-0.5 text-[13px] text-muted">

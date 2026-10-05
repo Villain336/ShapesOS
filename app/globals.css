@@ -200,30 +200,6 @@ a {
  * Remapped to Agentic OS tokens. Area slices replace these with aos
  * component patterns (.aos-display, real buttons/inputs/cards). */
 
-/* Old display-serif (Newsreader) → Archivo display treatment. */
-.display-serif {
-  font-family: var(--aos-font-sans);
-  font-weight: var(--aos-weight-display);
-  font-stretch: var(--aos-stretch-display);
-  letter-spacing: var(--aos-tracking-display);
-  line-height: 1.1;
-}
-
-/* Translucent floating layer. COMPAT ONLY — the design system forbids
- * glassmorphism; area slices replace with solid white + shadow-overlay. */
-.material-float {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .material-float {
-    background: var(--aos-paper);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-
 /* Thin scrollbars for chat rails */
 .thin-scroll { scrollbar-width: thin; scrollbar-color: var(--aos-line-strong) transparent; }
 .thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -239,6 +215,12 @@ a {
 }
 a:hover .animated-underline::after,
 a:focus-visible .animated-underline::after { transform: scaleX(1); }
+
+/* A control whose WRAPPER draws the focus state (kit Field: focus border +
+ * halo on the container; the ⌘K search row; the composer prompt) opts out of
+ * the global outline with data-focus-ring="container". Unlayered on purpose:
+ * the global :focus-visible rule in tokens.css is unlayered too. */
+[data-focus-ring="container"]:focus-visible { outline: none; }
 
 /* StreamingText / ContextCards — favicon source avatars */
 .source-avatar { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); }
@@ -324,3 +306,4 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
   }
   .msg-enter, .widget-enter { animation: none; }
 }
+

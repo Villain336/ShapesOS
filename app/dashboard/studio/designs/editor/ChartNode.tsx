@@ -27,6 +27,8 @@ import {
 } from "@/lib/design/chart-math";
 
 const FONT = "Inter";
+// Legit literal hex: this draws the user's design document on a Konva canvas
+// that is exported to PNG/PDF (canvas can't resolve CSS vars), not UI chrome.
 const GRID = "#eceae6";
 const BASELINE = "#d8d4cf";
 const TICK_FILL = "#a8a29e";

@@ -24,7 +24,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Digital PR — Marketr",
+  title: "Digital PR — ShapesOS",
   description: "Journalist queries, draft workspace, relationship CRM, coverage attribution. Humans send.",
 };
 
@@ -82,7 +82,7 @@ export default async function PrPage() {
           <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Journalist queries aggregated and matched — then a draft workspace with research
             brief, pitch-the-gap, and a de-AI pass. <strong>Humans send everything.</strong>{" "}
-            Marketr records sends against a pr_send approval; it never sends on your identity.
+            ShapesOS records sends against a pr_send approval; it never sends on your identity.
           </p>
         </div>
         <IngestButton />

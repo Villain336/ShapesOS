@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash, Copy, Check, Earth } from "lucide-react";
 import { EmptyState, btnGhostSm, btnPrimary, chipCls, inputCls } from "./ui";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 interface CrmForm {
   id: string;
@@ -50,7 +51,7 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
       setName("");
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Create failed");
+      toastError(e instanceof Error ? e.message : "Create failed");
     } finally {
       setCreating(false);
     }
@@ -66,7 +67,7 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
   };
 
   const remove = async (f: CrmForm) => {
-    if (!confirm(`Delete form "${f.name}"? The embed URL stops working.`)) return;
+    if (!await confirmAction(`Delete form "${f.name}"? The embed URL stops working.`)) return;
     const r = await fetch(`/api/crm/forms/${f.id}`, { method: "DELETE" });
     if (r.ok) load();
   };

@@ -52,10 +52,11 @@ function stubCtx(): AdsActionContext {
       proposals.set(p.id, p);
       return p;
     },
-    async get(id) {
-      return proposals.get(id) ?? null;
+    async get(id, ws) {
+      const p = proposals.get(id);
+      return p && p.workspaceId === ws ? p : null;
     },
-    async setStatus(id, status: SpendProposalStatus, decidedBy?: string) {
+    async setStatus(id, _ws: string, status: SpendProposalStatus, decidedBy?: string) {
       const p = proposals.get(id)!;
       const next = { ...p, status, decidedBy: decidedBy ?? null, decidedAt: new Date() };
       proposals.set(id, next);
@@ -75,8 +76,9 @@ function stubCtx(): AdsActionContext {
       approvals.set(input.proposalId, a);
       return a;
     },
-    async getByProposalId(proposalId) {
-      return approvals.get(proposalId) ?? null;
+    async getByProposalId(proposalId, ws) {
+      const a = approvals.get(proposalId);
+      return a && a.workspaceId === ws ? a : null;
     },
   };
   return { workspaceId: "ws_oauth", actor: "user_oauth", proposals: proposalStore, approvals: approvalStore };

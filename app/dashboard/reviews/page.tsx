@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ReviewsApp } from "@/components/reviews/ReviewsApp";
 
-export const metadata = { title: "Reviews — Marketr" };
+export const metadata = { title: "Reviews — ShapesOS" };
 
 export default async function ReviewsPage() {
   const session = await auth();

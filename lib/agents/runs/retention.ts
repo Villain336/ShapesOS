@@ -179,7 +179,7 @@ export async function sweepExpiredRecordings(opts?: SweepOptions): Promise<Sweep
         const newSize = Math.max(0, (Number.isFinite(recorded) ? recorded : 0) - reclaimed);
 
         await tx.agentRunRecording.update({
-          where: { id: c.id },
+          where: { id: c.id, workspaceId: c.workspaceId },
           data: { videoPath: null, videoPurgedAt: now, sizeBytes: newSize },
         });
 

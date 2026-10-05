@@ -43,6 +43,7 @@ import {
   type EddmPostageTier,
   type EddmRouteRow,
 } from "@/lib/mail/eddm";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 export function eddmBriefStorageDir(): string {
   const override = (process.env.EDDM_BRIEF_STORAGE_DIR ?? "").trim();
@@ -279,7 +280,7 @@ export function buildEddmBriefDocument(input: EddmBriefInput): ReactElement {
               style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}
             >
               <SpanText style={{ fontSize: 9, color: "#71717a" }}>
-                Generated {input.generatedAt} · {input.workspaceName} · Marketr EDDM concierge
+                Generated {input.generatedAt} · {input.workspaceName} · ShapesOS EDDM concierge
               </SpanText>
               <PageNumber format="Page {page} of {total}" align="right" />
             </View>
@@ -322,9 +323,9 @@ export async function generateEddmBriefPdf(
     where: { id: input.orderId, workspaceId: input.workspaceId },
     include: { workspace: { select: { name: true } } },
   });
-  if (!orderRow) throw new Error("EDDM order not found");
+  if (!orderRow) throw new NotFoundError("EDDM order not found");
   if (orderRow.status !== "draft" && orderRow.status !== "briefed") {
-    throw new Error(`Cannot generate a brief for a ${orderRow.status} order.`);
+    throw new ConflictError(`Cannot generate a brief for a ${orderRow.status} order.`);
   }
   // creativeId is a scalar (no Prisma relation) — fetch the creative directly.
   const creative = orderRow.creativeId
@@ -333,13 +334,13 @@ export async function generateEddmBriefPdf(
       })
     : null;
   const order = { ...orderRow, creative };
-  if (!order.creative) throw new Error("Bind a creative before generating the brief.");
+  if (!order.creative) throw new ConflictError("Bind a creative before generating the brief.");
   if (order.creative.formatTrack !== "eddm") {
-    throw new Error("Bound creative is not on the EDDM format track.");
+    throw new BadRequestError("Bound creative is not on the EDDM format track.");
   }
   const routes = coerceEddmRoutes(order.routes).filter((r) => r.selected !== false);
   if (routes.length === 0 || order.pieceCount <= 0) {
-    throw new Error("Add carrier routes before generating the brief.");
+    throw new ConflictError("Add carrier routes before generating the brief.");
   }
 
   const estimate = estimateEddmCost({

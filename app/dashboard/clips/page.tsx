@@ -8,7 +8,7 @@ import { ClipsApp } from "./ClipsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Clips — Marketr",
+  title: "Clips — ShapesOS",
   description: "Turn long videos into viral shorts: scored clip drafts, brand-styled captions, approved-to-Postiz handoff.",
 };
 

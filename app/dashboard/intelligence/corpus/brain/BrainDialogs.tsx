@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { BrainPillar } from "@/lib/intelligence/corpus/graph";
 import { inputCls, btnPrimary, btnGhost } from "./brain-ui";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 function DialogShell({
   title,
@@ -28,7 +29,7 @@ function DialogShell({
   footer: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="w-full max-w-lg rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
@@ -178,7 +179,7 @@ export function AddSourceDialog({ onClose, onAdded }: { onClose: () => void; onA
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste the text Marketr should learn from (min 200 characters)…"
+          placeholder="Paste the text ShapesOS should learn from (min 200 characters)…"
           rows={6}
           className={`${inputCls} w-full resize-y py-2.5`}
         />

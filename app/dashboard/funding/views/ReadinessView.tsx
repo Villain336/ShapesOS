@@ -21,6 +21,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface ReadinessItem {
   id: string;
@@ -244,6 +245,13 @@ export function ReadinessView({ roundId }: { roundId: string }) {
   }
 
   async function deleteStakeholder(id: string) {
+    const ok = await confirmAction({
+      title: "Remove this stakeholder from the cap table?",
+      description: "Their holdings are removed from this round's cap table.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(`del-${id}`);
     try {
       const res = await fetch(`/api/funding/rounds/${roundId}/cap-table/${id}`, { method: "DELETE" });

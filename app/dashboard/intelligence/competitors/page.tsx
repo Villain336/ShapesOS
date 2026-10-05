@@ -16,7 +16,7 @@ import { CompetitorsClient } from "./CompetitorsClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Competitor change fleet — Marketr",
+  title: "Competitor change fleet — ShapesOS",
   description:
     "Semantic competitor intelligence: what changed on competitor sites, why it matters for your tracked keywords, and the proposed response.",
 };

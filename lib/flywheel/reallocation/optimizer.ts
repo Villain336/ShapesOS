@@ -3,7 +3,7 @@
 // The optimizer PROPOSES. It cannot touch money — proposals flow to the
 // human approval queue (mode a) or the deterministic Policy Engine (mode b).
 //
-// Methodology per SPEC-PHASE7.md §2/F1:
+// Methodology per docs/specs/SPEC-PHASE7.md §2/F1:
 // - Lag handling: optimize on attribution-lagged windows only (data-maturity
 //   delay; never today's partials); require multi-window agreement (7d +
 //   14–28d); measurement-health pre-check that FREEZES on degraded data.

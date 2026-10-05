@@ -7,6 +7,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PrismaFundingStore } from "@/lib/funding/prisma-store";
 import { FundingError } from "@/lib/funding/types";
+import { resolveShareLink } from "@/lib/funding/dataroom";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { token, viewId } = await params;
     const store = new PrismaFundingStore(prisma);
     const link = await store.getShareLinkByToken(token);
-    if (!link || link.revoked) {
+    // Revoked OR expired links accept nothing (expiry is enforced at access
+    // time, exactly like the viewer route).
+    if (
+      !link ||
+      !resolveShareLink({ revoked: link.revoked, expiresAt: link.expiresAt, viewerEmails: [] }, {}, new Date()).ok
+    ) {
       return Response.json({ error: "Link unavailable." }, { status: 404 });
     }
     // The beacon only touches a view row inside this link's workspace.

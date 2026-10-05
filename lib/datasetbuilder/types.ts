@@ -99,6 +99,7 @@ export interface DatasetChunkRecord {
   createdAt: Date;
 }
 
+import { HttpError } from "@/lib/api/errors";
 import type {
   ClassificationInput,
   ClassificationRecord,
@@ -284,12 +285,41 @@ export type DatasetBuilderErrorCode =
   | "PUBLISH_RECORD_EXISTS"
   | "ADAPTER_WRITE_FAILED";
 
-export class DatasetBuilderError extends Error {
-  readonly code: DatasetBuilderErrorCode;
+/** HTTP status per error code, so routes can hand these to errorResponse. */
+const DATASET_ERROR_STATUS: Record<DatasetBuilderErrorCode, number> = {
+  INVALID_CHUNKING_CONFIG: 400,
+  ORPHAN_CHUNK_REJECTED: 400,
+  VALIDATION_FAILED: 400,
+  INVALID_PUBLISH_TARGET: 400,
+  UNKNOWN_SOURCE: 404,
+  UNKNOWN_DOCUMENT: 404,
+  UNKNOWN_CHUNK: 404,
+  UNKNOWN_CLASSIFICATION: 404,
+  UNKNOWN_REVIEW_ITEM: 404,
+  UNKNOWN_DATASET: 404,
+  UNKNOWN_DATASET_VERSION: 404,
+  REVIEW_ALREADY_EXISTS: 409,
+  REVIEW_ALREADY_DECIDED: 409,
+  DATASET_VERSION_EXISTS: 409,
+  PUBLISH_RECORD_EXISTS: 409,
+  UNSUPPORTED_FILE_TYPE: 415,
+  EXTRACTION_FAILED: 422,
+  COMPILE_EMPTY: 422,
+  NO_VERSION_TO_PUBLISH: 422,
+  FETCH_FAILED: 502,
+  ADAPTER_WRITE_FAILED: 502,
+  NANGO_NOT_CONFIGURED: 503,
+  ENGINE_NOT_CONFIGURED: 503,
+  // Internal integrity failure: logged, never echoed.
+  LINEAGE_BROKEN: 500,
+};
+
+export class DatasetBuilderError extends HttpError {
+  declare readonly code: DatasetBuilderErrorCode;
   constructor(code: DatasetBuilderErrorCode, message: string) {
-    super(message);
+    const status = DATASET_ERROR_STATUS[code] ?? 500;
+    super(status, message, { code, expose: status !== 500 });
     this.name = "DatasetBuilderError";
-    this.code = code;
   }
 }
 
@@ -412,9 +442,16 @@ export interface DatasetPublishInput {
    * rag → snapshot pointer (rag://workspace/type/vN).
    */
   artifactRef: string;
+  /**
+   * Phase 4b (rollback / roll-forward): when the (target, version) record
+   * already exists, refresh its publishedAt so it becomes the live one
+   * again. The live record is the most recently published, not the
+   * highest version.
+   */
+  makeLive?: boolean;
 }
 
-export interface DatasetPublishRecord extends DatasetPublishInput {
+export interface DatasetPublishRecord extends Omit<DatasetPublishInput, "makeLive"> {
   id: string;
   publishedAt: Date;
 }

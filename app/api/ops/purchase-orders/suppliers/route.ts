@@ -3,9 +3,11 @@
 // Read-only — viewer+. Mirrors /api/ops/invoices/customers.
 
 import type { NextRequest } from "next/server";
+import { requireWorkspaceRole } from "@/lib/authz";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { resolveCustomerNames } from "@/lib/ops/invoices";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,9 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // Read-only name lookup, but membership is still checked explicitly.
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "viewer")))
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   let body: { ids?: unknown };
   try {
     body = (await req.json()) as { ids?: unknown };
@@ -26,7 +31,6 @@ export async function POST(req: NextRequest) {
     );
     return Response.json({ suppliers });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 500 });
+    return errorResponse(err);
   }
 }

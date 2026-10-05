@@ -13,7 +13,7 @@ import ExpensesPanel from "./_components/ExpensesPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH home-office expenses — Marketr",
+  title: "WFH home-office expenses — ShapesOS",
   description: "Home-office expense pack with allocation rules and monthly summaries.",
 };
 

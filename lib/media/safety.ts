@@ -4,7 +4,7 @@
 // module declares its rung, escalation triggers, and rollback story.
 //
 // STRUCTURAL INVARIANTS (enforced in code, not config — see also
-// SPEC-PHASE5.md §9):
+// docs/specs/SPEC-PHASE5.md §9):
 //   1. Autopilot NEVER buys media. Buying modules carry neverAutopilot: true
 //      and the executor's requireHumanSupervisedApproval() throws unless a
 //      human-approved approval backs the execution. There is no rung, flag,
@@ -12,7 +12,8 @@
 //   2. ZERO custody: BudgetPool is an accounting object only — Marketr never
 //      holds, fronts, or co-mingles client money. (See lib/media/pools.ts.)
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { requireSecret } from "@/lib/env/secrets";
 
 export type LadderRung = "manual" | "supervised" | "scheduled" | "autopilot";
 
@@ -37,7 +38,7 @@ export interface RungAssignment {
   rollback: string;
 }
 
-// Rung assignments (fixed per SPEC-PHASE5.md §2 S1):
+// Rung assignments (fixed per docs/specs/SPEC-PHASE5.md §2 S1):
 // - all media buying = supervised, always
 // - planning / attribution computation / receipt reconciliation = scheduled/autopilot-safe
 // - budget reallocations = supervised (propose; human approves)
@@ -323,63 +324,100 @@ export function assertCanPropose(mediaRole: MediaRole): void {
 // OTP challenge for high-value approvals + cryptographically verified receipt
 // ---------------------------------------------------------------------------
 
-export interface OtpChallenge {
+/** What a challenge is bound to: one approval, one approver (Phase 1). */
+export interface OtpBinding {
+  approvalId: string;
+  approverId: string;
+}
+
+export interface OtpChallenge extends OtpBinding {
   challengeId: string;
   codeHash: string;
   expiresAt: Date;
-  used: boolean;
+  /** Wrong guesses so far; the challenge is burned at OTP_MAX_ATTEMPTS. */
+  attempts: number;
+}
+
+/** Wrong guesses allowed per challenge before it is burned (Phase 1). */
+export const OTP_MAX_ATTEMPTS = 5;
+const OTP_MAX_PENDING = 10_000;
+
+function hashOtp(code: string): string {
+  return createHash("sha256").update(code.trim(), "utf8").digest("hex");
 }
 
 /**
- * In-memory challenge store. Test/fake default. PRODUCTION NOTE: persist
- * challenges in the DB or a short-lived KV store — a process restart must
- * not resurrect or lose pending challenges silently.
+ * In-memory challenge store. PRODUCTION NOTE: persist challenges in the DB
+ * or a short-lived KV store — a process restart must not resurrect or lose
+ * pending challenges silently.
+ *
+ * Phase 1 hardening:
+ *   - codes come from crypto.randomInt (never Math.random);
+ *   - only the SHA-256 of the code is kept — the plaintext exists once, in
+ *     mint()'s return value, for the server to deliver out-of-band (email);
+ *     it is never returned by an API route;
+ *   - a challenge is bound to one approval AND one approver;
+ *   - OTP_MAX_ATTEMPTS wrong guesses burn the challenge;
+ *   - single-use.
  */
 export class OtpChallengeStore {
-  private challenges = new Map<string, OtpChallenge & { code: string }>();
+  private challenges = new Map<string, OtpChallenge>();
 
-  mint(ttlMinutes = 10): { challengeId: string; code: string; expiresAt: Date } {
+  mint(binding: OtpBinding, ttlMinutes = 10): { challengeId: string; code: string; expiresAt: Date } {
+    const now = Date.now();
+    this.prune(now);
     const challengeId = `otp_${randomBytes(12).toString("hex")}`;
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const expiresAt = new Date(now + ttlMinutes * 60 * 1000);
     this.challenges.set(challengeId, {
       challengeId,
-      codeHash: createHash("sha256").update(code, "utf8").digest("hex"),
+      codeHash: hashOtp(code),
       expiresAt,
-      used: false,
-      code,
+      attempts: 0,
+      approvalId: binding.approvalId,
+      approverId: binding.approverId,
     });
-    // NOTE: the code is returned to the caller so the TEST harness can
-    // deliver it out-of-band. Never log it; never store it in the DB.
-    // Live deployments deliver via authenticator/SMS, not this return value.
+    // The code is returned to the SERVER caller for out-of-band delivery.
+    // Never log it, never store it, never put it in an API response.
     return { challengeId, code, expiresAt };
   }
 
-  verify(challengeId: string, code: string, now: Date = new Date()): boolean {
+  verify(challengeId: string, code: string, binding: OtpBinding, now: Date = new Date()): boolean {
     const ch = this.challenges.get(challengeId);
-    if (!ch || ch.used || now >= ch.expiresAt) return false;
-    const candidate = createHash("sha256").update(code.trim(), "utf8").digest("hex");
-    const ok =
+    if (!ch) return false;
+    if (now >= ch.expiresAt) {
+      this.challenges.delete(challengeId);
+      return false;
+    }
+    const candidate = hashOtp(code);
+    const codeOk =
       candidate.length === ch.codeHash.length &&
       timingSafeEqual(Buffer.from(candidate), Buffer.from(ch.codeHash));
-    if (ok) ch.used = true; // single-use
-    return ok;
+    const bound = ch.approvalId === binding.approvalId && ch.approverId === binding.approverId;
+    if (codeOk && bound) {
+      this.challenges.delete(challengeId); // single-use
+      return true;
+    }
+    ch.attempts += 1;
+    if (ch.attempts >= OTP_MAX_ATTEMPTS) this.challenges.delete(challengeId);
+    return false;
   }
 
-  /**
-   * TEST-ONLY: peek the pending code (fake/test mode). Production must
-   * deliver the code out-of-band (authenticator/SMS), never via an API.
-   */
-  testPeekCode(challengeId: string): string | null {
-    if (process.env.MEDIA_CARD_MODE === "live") return null;
-    return this.challenges.get(challengeId)?.code ?? null;
+  /** Drop expired challenges; past the cap, drop the oldest (bounded memory). */
+  private prune(now: number): void {
+    for (const [id, ch] of this.challenges) {
+      if (ch.expiresAt.getTime() <= now) this.challenges.delete(id);
+    }
+    while (this.challenges.size >= OTP_MAX_PENDING) {
+      const oldest = this.challenges.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.challenges.delete(oldest);
+    }
   }
 }
 
 export function approvalReceiptSecret(env: NodeJS.ProcessEnv = process.env): string {
-  const s = (env.MARKETR_APPROVAL_SECRET ?? "marketr-approval-dev-secret").trim();
-  if (!s) throw new SafetyViolationError("MARKETR_APPROVAL_SECRET must not be empty.");
-  return s;
+  return requireSecret("MARKETR_APPROVAL_SECRET", "marketr-approval-dev-secret", env);
 }
 
 /**

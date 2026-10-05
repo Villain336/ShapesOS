@@ -1,6 +1,6 @@
 // Marketr — /api/substrate shared guard (not a route: no HTTP exports).
 //
-// Phase 8 substrate namespace (SPEC-PHASE8.md §5). Session → workspace;
+// Phase 8 substrate namespace (docs/specs/SPEC-PHASE8.md §5). Session → workspace;
 // reads need viewer, mutations need editor. Mirrors
 // app/api/flywheel/_lib.ts conventions.
 
@@ -8,6 +8,7 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, getMembership, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { CampaignError } from "@/lib/substrate/campaigns/types";
+import { errorResponse } from "@/lib/api/errors";
 
 export interface SubstrateGuard {
   userId: string;
@@ -69,8 +70,7 @@ export function campaignError(err: unknown) {
       : 422;
     return Response.json({ error: err.message, code: err.code }, { status });
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return Response.json({ error: message }, { status: 500 });
+  return errorResponse(err);
 }
 
 /** Parse a JSON request body (empty/invalid -> {}). */

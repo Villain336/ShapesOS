@@ -103,7 +103,7 @@ function buildPrompt(topic: string, format: RepurposeFormatId, hits: ExpertHit[]
         `[Source ${i + 1}] "${h.sourceTitle}" by ${h.author} (${h.license}):\n${h.text.slice(0, 1500)}`,
     )
     .join("\n\n");
-  return `You are Marketr's content repurposing engine. Topic: "${topic}".
+  return `You are ShapesOS's content repurposing engine. Topic: "${topic}".
 
 Use ONLY the source material below as your factual basis. Synthesize it into ORIGINAL
 copy — teach the substance in fresh words, NEVER reproduce source sentences verbatim.

@@ -10,6 +10,7 @@ import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { createLeadRecord, LEAD_SOURCES, UtmSchema } from "@/lib/crm/leads";
 import { applyPromoCodeToLead } from "@/lib/physical/bundles";
 import { triggerSpeedToLead } from "@/lib/messaging/speed-to-lead";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 const CreateSchema = z.object({
   pipelineId: z.string().min(1).max(64),
@@ -73,7 +74,9 @@ export async function GET(req: Request) {
     ];
   }
 
-  const limit = Math.min(200, Math.max(1, Number(sp.get("limit") ?? "50") || 50));
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), sp);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const cursor = sp.get("cursor") ?? undefined;
   const sort = sp.get("sort") ?? "recent";
   const orderBy =

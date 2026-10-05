@@ -3,11 +3,11 @@
 // The render service re-checks figure grounding: ungrounded figures throw and
 // the approval stays pending — no PDF, no silent render.
 
-import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { approveReportSend } from "@/lib/reports/report-gate";
 import { UngroundedFiguresError } from "@/lib/reports/figures";
+import { scopedDb } from "@/lib/substrate/memory/rls";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,7 +17,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
 
   try {
-    const approval = await approveReportSend(prisma, { workspaceId: workspace.id, id, actor: user.id });
+    const approval = await approveReportSend(scopedDb(workspace.id), { workspaceId: workspace.id, id, actor: user.id });
     return Response.json({ ok: true, approval });
   } catch (err) {
     if (err instanceof UngroundedFiguresError) {

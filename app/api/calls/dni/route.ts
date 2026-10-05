@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/prisma";
 import { InMemoryRateLimiter } from "@/lib/mcp/rateLimit";
 import { resolveDniNumber } from "@/lib/calls/dni";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 const limiter = new InMemoryRateLimiter();
 
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   if (!workspaceId) {
     return Response.json({ error: "workspace is required" }, { status: 400 });
   }
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIpFromHeaders(req.headers) ?? "unknown";
   const rl = await limiter.check(`dni:${workspaceId}:${ip}`, 60, 60_000);
   if (!rl.allowed) {
     return Response.json({ error: "Too many requests" }, { status: 429 });

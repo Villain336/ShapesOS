@@ -4,7 +4,8 @@
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
-import { updateSpend, deleteSpend, SpendInputSchema } from "@/lib/attribution/spend";
+import { updateSpend, deleteSpend, SpendFieldsSchema } from "@/lib/attribution/spend";
+import { errorResponse } from "@/lib/api/errors";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,7 +18,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   try { body = await req.json(); } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const parsed = SpendInputSchema.partial().safeParse(body);
+  const parsed = SpendFieldsSchema.partial().safeParse(body);
   if (!parsed.success) {
     return Response.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
@@ -28,9 +29,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   ) {
     return Response.json({ error: "periodEnd must be >= periodStart" }, { status: 400 });
   }
-  const spend = await updateSpend(workspace.id, id, parsed.data);
-  if (!spend) return Response.json({ error: "Spend entry not found" }, { status: 404 });
-  return Response.json({ spend });
+  try {
+    const spend = await updateSpend(workspace.id, id, parsed.data);
+    if (!spend) return Response.json({ error: "Spend entry not found" }, { status: 404 });
+    return Response.json({ spend });
+  } catch (e) {
+    return errorResponse(e, "PATCH /api/attribution/spend/[id]");
+  }
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {

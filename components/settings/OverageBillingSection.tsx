@@ -141,7 +141,7 @@ export default function OverageBillingSection({
               )}
             </p>
             <p className="mt-1 text-xs text-muted">
-              Card details are collected by Stripe — they never touch Marketr.
+              Card details are collected by Stripe — they never touch ShapesOS.
             </p>
           </div>
           <button className={btnGhost} disabled={adding} onClick={addCard}>

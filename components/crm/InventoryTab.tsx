@@ -11,6 +11,7 @@ import { ProductDetail } from "./ProductDetail";
 import { NewProductModal } from "./NewProductModal";
 import { StockMoveModal } from "./StockMoveModal";
 import { btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, needsBoxCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export interface OpsProduct {
   id: string;
@@ -184,7 +185,7 @@ export function InventoryTab() {
                 const st = productStockStatus(p);
                 const meta = STOCK_STATUS_META[st];
                 return (
-                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className={trClickableCls}>
+                  <tr key={p.id} onClick={() => setSelectedId(p.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedId(p.id))} className={trClickableCls}>
                     <td className="font-semibold text-ink">{p.name}</td>
                     <td className="text-muted">{p.sku}</td>
                     <td className="text-right font-semibold tabular-nums text-ink">

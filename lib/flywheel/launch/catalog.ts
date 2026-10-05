@@ -1,6 +1,6 @@
 // Marketr — F6 launch-readiness checklist catalog.
 //
-// The canonical item list derived from SPEC-PHASE7.md §2/F6 and §10 exit
+// The canonical item list derived from docs/specs/SPEC-PHASE7.md §2/F6 and §10 exit
 // gate 9. Rows in the `launch_checklist` table are seeded from this catalog
 // (keyed by `key`, idempotent per workspace). Editing a title here does not
 // rewrite history — rows denormalize the title at seed time.
@@ -18,7 +18,7 @@ export interface LaunchChecklistItem {
   title: string;
   /** What "done" means, concretely. */
   doneWhen: string;
-  /** Spec reference (SPEC-PHASE7.md section). */
+  /** Spec reference (docs/specs/SPEC-PHASE7.md section). */
   specRef: string;
   /** What counts as evidence (commits, docs, CI runs). */
   evidenceHint: string;
@@ -124,7 +124,7 @@ export const LAUNCH_CHECKLIST_CATALOG: LaunchChecklistItem[] = [
     category: "legal",
     title: "Trademark / AGPLv3 §7 branding note staged",
     doneWhen:
-      "Decision brief staged on protecting the \"Marketr\" brand via AGPLv3 §7 additional permissions " +
+      "Decision brief staged on protecting the \"ShapesOS\" brand via AGPLv3 §7 additional permissions " +
       "(the OnlyOffice 2026 \"Logo Trap\" precedent): white-label boundary without touching the license grant. " +
       "Decision itself deferred with the open-core split.",
     specRef: "§2/F6 (Legal & license), §12.5",

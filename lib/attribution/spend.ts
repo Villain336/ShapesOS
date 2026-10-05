@@ -8,19 +8,26 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { BadRequestError } from "@/lib/api/errors";
 
-export const SpendInputSchema = z
-  .object({
-    channel: z.string().trim().min(1).max(64).transform((s) => s.toLowerCase()),
-    campaign: z.string().trim().max(160).optional(),
-    amountCents: z.number().int().min(0).max(100_000_000_000),
-    periodStart: z.coerce.date(),
-    periodEnd: z.coerce.date(),
-    notes: z.string().trim().max(500).optional(),
-  })
-  .refine((d) => d.periodEnd.getTime() >= d.periodStart.getTime(), {
-    message: "periodEnd must be >= periodStart",
-  });
+/**
+ * The spend fields without the cross-field rule. Use this for partial
+ * (PATCH) parsing: zod 4 throws at runtime on `.partial()` of a refined
+ * object, which turned every PATCH into a 500.
+ */
+export const SpendFieldsSchema = z.object({
+  channel: z.string().trim().min(1).max(64).transform((s) => s.toLowerCase()),
+  campaign: z.string().trim().max(160).optional(),
+  amountCents: z.number().int().min(0).max(100_000_000_000),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export const SpendInputSchema = SpendFieldsSchema.refine(
+  (d) => d.periodEnd.getTime() >= d.periodStart.getTime(),
+  { message: "periodEnd must be >= periodStart" },
+);
 
 export type SpendInput = z.infer<typeof SpendInputSchema>;
 
@@ -63,6 +70,12 @@ export async function updateSpend(
 ) {
   const existing = await prisma.attributionSpend.findFirst({ where: { id, workspaceId } });
   if (!existing) return null;
+  // The period rule holds against the stored row too (a PATCH may send one end).
+  const start = input.periodStart ?? existing.periodStart;
+  const end = input.periodEnd ?? existing.periodEnd;
+  if (end.getTime() < start.getTime()) {
+    throw new BadRequestError("periodEnd must be >= periodStart");
+  }
   return prisma.attributionSpend.update({
     where: { id },
     data: {

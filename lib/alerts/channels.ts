@@ -2,7 +2,7 @@
 
 import type { AlertChannelType } from "@prisma/client";
 import type { ChannelConfig } from "@/lib/alerts/adapters";
-import { channelHint } from "@/lib/alerts/adapters";
+import { channelHint, TELEGRAM_BOT_TOKEN_RE, TELEGRAM_CHAT_ID_RE } from "@/lib/alerts/adapters";
 import { getSecretsProvider } from "@/lib/secrets";
 import { prisma } from "@/lib/prisma";
 
@@ -24,6 +24,12 @@ export function validateChannelConfig(
     const chatId = String(c.chatId ?? "").trim();
     if (!botToken || !chatId) {
       return { ok: false, error: "telegram requires botToken and chatId" };
+    }
+    if (!TELEGRAM_BOT_TOKEN_RE.test(botToken)) {
+      return { ok: false, error: "telegram botToken must look like 123456789:AA… (from @BotFather)" };
+    }
+    if (!TELEGRAM_CHAT_ID_RE.test(chatId)) {
+      return { ok: false, error: "telegram chatId must be a numeric id or an @channel name" };
     }
     return { ok: true, config: { botToken, chatId } };
   }

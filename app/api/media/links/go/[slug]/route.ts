@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { getMediaStore } from "@/lib/media/store";
 import { resolveLinkEngine } from "@/lib/media/links";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,8 +32,7 @@ export async function GET(
   }
 
   const engine = resolveLinkEngine(getMediaStore());
-  const forwarded = req.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0].trim() : null;
+  const ip = clientIpFromHeaders(req.headers);
   const result = await engine.recordScan({
     workspaceId,
     slug: decodeURIComponent(slug),

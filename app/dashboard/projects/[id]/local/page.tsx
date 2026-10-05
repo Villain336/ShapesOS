@@ -61,12 +61,12 @@ export default async function LocalSeoPage({ params }: { params: Promise<{ id: s
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-600"
+          className="text-sm text-muted hover:text-ink"
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Local SEO</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="mt-1 text-xl font-heading stretch-heading tracking-heading text-ink">Local SEO</h1>
+        <p className="mt-1 text-sm text-muted">
           Geo-grid rank tracking, local competitor intelligence, and review monitoring.
           Maps SERP runs are metered — every run shows its cost before it runs and counts
           against the workspace monthly budget.

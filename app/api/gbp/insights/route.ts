@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { gbpGate } from "../_gate";
-import { getGbpProvider } from "@/lib/local/gbp";
+import { gbpProviderForWorkspace } from "@/lib/local/gbp-live";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +28,13 @@ export async function GET(req: NextRequest) {
   const account = await prisma.gbpAccount.findFirst({ where: { id: accountId, workspaceId: workspace.id } });
   if (!account) return Response.json({ error: "Account not found" }, { status: 404 });
 
-  const provider = getGbpProvider();
+  const provider = await gbpProviderForWorkspace(workspace.id);
   const daysRaw = Number(sp.get("days") ?? 30);
   const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, Math.round(daysRaw))) : 30;
-  const insights = await provider.insights(locationId, days);
-  return Response.json({ insights, provider: provider.name, mock: !provider.isConfigured() });
+  try {
+    const insights = await provider.insights(locationId, days);
+    return Response.json({ insights, provider: provider.name, mock: !provider.isLive });
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : "Insights read failed." }, { status: 502 });
+  }
 }

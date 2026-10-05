@@ -11,8 +11,8 @@ import { OfficeClient } from "./OfficeClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Office — Marketr",
-  description: "Sheets, docs and decks your agents and reports produce — editable, stored by Marketr.",
+  title: "Office — ShapesOS",
+  description: "Sheets, docs and decks your agents and reports produce — editable, stored by ShapesOS.",
 };
 
 export default async function OfficePage({
@@ -35,7 +35,7 @@ export default async function OfficePage({
         <h1 className="aos-heading">Office</h1>
         <p className="mt-1 text-sm text-muted">
           Reports as live spreadsheets, content calendars, client deliverables — created by
-          you or your agents, stored by Marketr, editable right here.
+          you or your agents, stored by ShapesOS, editable right here.
         </p>
       </div>
       <OfficeClient initialDocs={JSON.parse(JSON.stringify(docs))} openId={openId} />

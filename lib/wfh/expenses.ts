@@ -11,6 +11,8 @@
 // own allocation settings; the numbers are a starting point for their
 // accountant, not a filing.
 
+import { z } from "zod";
+
 export type AllocationMethod = "flat_percent" | "square_footage";
 
 export const ALLOCATION_METHODS = ["flat_percent", "square_footage"] as const;
@@ -88,7 +90,27 @@ export interface AllocationRule {
   totalSqft?: number | null;
 }
 
-export function validateAllocationRule(rule: Partial<AllocationRule>): {
+/**
+ * A numeric input from a form/JSON body. Missing values — undefined, null, an
+ * empty or whitespace-only string — are NaN, never 0 (`Number("")` is 0,
+ * which silently turned a blank percent into a 0% deduction). Booleans,
+ * arrays and objects are NaN too.
+ */
+export function numericInput(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") return Number(value.trim());
+  return NaN;
+}
+
+/** Raw (unparsed) allocation fields as they arrive from a request body. */
+export interface AllocationRuleInput {
+  method?: AllocationMethod | string;
+  percent?: unknown;
+  officeSqft?: unknown;
+  totalSqft?: unknown;
+}
+
+export function validateAllocationRule(rule: AllocationRuleInput | Partial<AllocationRule>): {
   ok: boolean;
   errors: string[];
   normalized?: AllocationRule;
@@ -99,10 +121,10 @@ export function validateAllocationRule(rule: Partial<AllocationRule>): {
     errors.push(`method: must be one of ${ALLOCATION_METHODS.join(", ")}`);
   }
 
-  let percent = Number(rule.percent);
+  let percent = numericInput(rule.percent);
   if (method === "square_footage") {
-    const office = Number(rule.officeSqft);
-    const total = Number(rule.totalSqft);
+    const office = numericInput(rule.officeSqft);
+    const total = numericInput(rule.totalSqft);
     if (!isFinite(office) || office <= 0) errors.push("officeSqft: required, positive");
     if (!isFinite(total) || total <= 0) errors.push("totalSqft: required, positive");
     if (isFinite(office) && isFinite(total) && office > total) {
@@ -110,29 +132,36 @@ export function validateAllocationRule(rule: Partial<AllocationRule>): {
     }
     if (errors.length === 0) percent = (office / total) * 100;
   } else {
-    if (!isFinite(percent) || percent < 0 || percent > 100) {
+    if (Number.isNaN(percent)) {
+      errors.push("percent: required (a number between 0 and 100)");
+    } else if (!isFinite(percent) || percent < 0 || percent > 100) {
       errors.push("percent: must be between 0 and 100");
     }
   }
 
   if (errors.length > 0) return { ok: false, errors };
+  const office = numericInput(rule.officeSqft);
+  const total = numericInput(rule.totalSqft);
   return {
     ok: true,
     errors: [],
     normalized: {
       method,
       percent: Math.round(percent * 100) / 100,
-      officeSqft: rule.officeSqft != null ? Number(rule.officeSqft) : null,
-      totalSqft: rule.totalSqft != null ? Number(rule.totalSqft) : null,
+      officeSqft: isFinite(office) ? office : null,
+      totalSqft: isFinite(total) ? total : null,
     },
   };
 }
 
 export interface ExpenseDraft {
   categoryKey: string;
-  amountCents: number;
-  currency?: string;
-  occurredOn: Date;
+  /** Whole cents, 1 … MAX_EXPENSE_CENTS. Anything else is a validation error. */
+  amountCents: unknown;
+  /** ISO-4217 code (default USD). Non-strings are a validation error. */
+  currency?: unknown;
+  /** A Date, or a string starting with a real calendar date YYYY-MM-DD. */
+  occurredOn: Date | string;
   allocation: AllocationRule;
   note?: string | null;
   receiptUrl?: string | null;
@@ -150,6 +179,63 @@ export interface ValidatedExpense {
   receiptUrl: string | null;
 }
 
+/** $1,000,000 — far above any home-office bill, far below the int4 column. */
+export const MAX_EXPENSE_CENTS = 100_000_000;
+/** Earliest plausible expense year (catches 1900 / two-digit-year typos). */
+export const MIN_EXPENSE_YEAR = 2000;
+
+const ISO_4217: ReadonlySet<string> | null = (() => {
+  try {
+    const list = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("currency");
+    // Only trust a full ICU list; small-icu builds fall back to the shape check.
+    return list && list.length > 100 ? new Set(list) : null;
+  } catch {
+    return null;
+  }
+})();
+
+const amountCentsSchema = z
+  .number({ error: "amountCents: must be a whole number of cents" })
+  .int("amountCents: must be a whole number of cents (no fractions)")
+  .min(1, "amountCents: must be positive")
+  .max(MAX_EXPENSE_CENTS, `amountCents: must be at most ${MAX_EXPENSE_CENTS} ($1,000,000)`);
+
+const currencySchema = z
+  .string({ error: "currency: must be a 3-letter ISO 4217 code" })
+  .transform((s) => s.trim().toUpperCase())
+  .refine((s) => /^[A-Z]{3}$/.test(s) && (!ISO_4217 || ISO_4217.has(s)), {
+    message: "currency: must be a 3-letter ISO 4217 code",
+  });
+
+/**
+ * Strict calendar date: the YYYY-MM-DD prefix must round-trip (so
+ * "2026-02-30" is rejected, not rolled to March 2), with a plausible year.
+ * A date-only string is stored at 12:00 UTC, the convention the UI uses.
+ */
+function parseOccurredOn(v: unknown): { date: Date } | { error: string } {
+  let date: Date;
+  if (v instanceof Date) {
+    date = v;
+  } else if (typeof v === "string") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})(T.+)?$/.exec(v.trim());
+    if (!m) return { error: "occurredOn: must be a YYYY-MM-DD date" };
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const day = new Date(Date.UTC(y, mo - 1, d));
+    if (day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) {
+      return { error: `occurredOn: ${m[1]}-${m[2]}-${m[3]} is not a real calendar date` };
+    }
+    date = m[4] ? new Date(v.trim()) : new Date(Date.UTC(y, mo - 1, d, 12));
+  } else {
+    return { error: "occurredOn: required" };
+  }
+  if (isNaN(date.getTime())) return { error: "occurredOn: must be a valid date" };
+  if (date.getUTCFullYear() < MIN_EXPENSE_YEAR) {
+    return { error: `occurredOn: year must be ${MIN_EXPENSE_YEAR} or later` };
+  }
+  if (date.getTime() > Date.now() + 24 * 3600 * 1000) return { error: "occurredOn: cannot be in the future" };
+  return { date };
+}
+
 export function validateExpense(draft: Partial<ExpenseDraft>): {
   ok: boolean;
   errors: string[];
@@ -160,25 +246,17 @@ export function validateExpense(draft: Partial<ExpenseDraft>): {
   const preset = EXPENSE_CATEGORY_PRESETS.find((p) => p.key === draft.categoryKey);
   if (!preset) errors.push(`categoryKey: must be one of ${EXPENSE_CATEGORY_PRESETS.map((p) => p.key).join(", ")}`);
 
-  const amountCents = Math.round(Number(draft.amountCents));
-  if (!isFinite(amountCents) || amountCents <= 0) {
-    errors.push("amountCents: must be a positive whole number of cents");
-  }
+  const amount = amountCentsSchema.safeParse(draft.amountCents);
+  if (!amount.success) errors.push(amount.error.issues[0]!.message);
+  const amountCents = amount.success ? amount.data : 0;
 
-  const currency = (draft.currency ?? "USD").toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) errors.push("currency: must be a 3-letter ISO code");
+  const cur = currencySchema.safeParse(draft.currency ?? "USD");
+  if (!cur.success) errors.push(cur.error.issues[0]!.message);
+  const currency = cur.success ? cur.data : "";
 
-  let occurredOn: Date | null = null;
-  if (draft.occurredOn instanceof Date && !isNaN(draft.occurredOn.getTime())) {
-    occurredOn = draft.occurredOn;
-  } else if (typeof draft.occurredOn === "string") {
-    const d = new Date(draft.occurredOn);
-    if (!isNaN(d.getTime())) occurredOn = d;
-  }
-  if (!occurredOn) errors.push("occurredOn: required");
-  else if (occurredOn.getTime() > Date.now() + 24 * 3600 * 1000) {
-    errors.push("occurredOn: cannot be in the future");
-  }
+  const when = parseOccurredOn(draft.occurredOn);
+  if ("error" in when) errors.push(when.error);
+  const occurredOn = "date" in when ? when.date : null;
 
   const alloc = validateAllocationRule(draft.allocation ?? {});
   if (!alloc.ok) errors.push(...alloc.errors.map((e) => `allocation.${e}`));

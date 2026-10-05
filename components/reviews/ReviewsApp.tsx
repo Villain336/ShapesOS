@@ -17,7 +17,6 @@ import {
   X,
   Sparkles,
   MessageSquareText,
-  ExternalLink,
   Loader2,
   Settings2,
   Inbox,
@@ -25,6 +24,7 @@ import {
   AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 // ---------------------------------------------------------------------------
 // Small primitives
@@ -469,7 +469,7 @@ function QrModal({ requestId, leadName, onClose }: { requestId: string; leadName
       .then((j) => { if (j.qrDataUrl) setData(j); });
   }, [requestId]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xs rounded-lg bg-paper p-5 text-center shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-[13px] font-semibold text-ink">Print QR — {leadName}</h3>
@@ -635,8 +635,8 @@ function IncomingReviews() {
         <MessageSquareText size={15} className="mt-0.5 shrink-0 text-muted" />
         <p className="text-[12.5px] leading-relaxed text-muted">
           Drafts are AI-written and <span className="font-semibold">never posted automatically</span>.
-          Each draft creates an approval item — approve it under{" "}
-          <a href="/api/messaging/approvals" className="font-medium text-ink underline">Messaging → Approvals</a>,
+          Each draft creates an approval item — approve it in{" "}
+          <a href="/dashboard/approvals?source=messaging" className="font-medium text-ink underline">Needs you</a>,
           then post the reply manually. Google auto-post requires GBP API approval, which is still pending.
         </p>
       </div>
@@ -676,7 +676,7 @@ function IncomingReviews() {
                   <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{d.body}</p>
                   <p className="mt-2 text-[11.5px] text-muted">
                     Approval <span className="font-mono">{d.approvalId.slice(0, 8)}…</span> pending —{" "}
-                    <a href="/api/messaging/approvals" className="font-medium text-ink underline">open approvals</a>
+                    <a href="/dashboard/approvals?source=messaging" className="font-medium text-ink underline">open approvals</a>
                   </p>
                 </div>
               ) : (
@@ -709,8 +709,8 @@ export function ReviewsApp() {
           <h1 className="aos-heading">Reviews</h1>
           <p className="text-sm text-muted">Review generation engine — requests, funnel, QR print, and AI reply drafts.</p>
         </div>
-        <a href="/api/messaging/approvals" className={btnGhost} title="Messaging approval queue">
-          <ExternalLink size={13} /> Approvals
+        <a href="/dashboard/approvals?source=messaging" className={btnGhost} title="Review and send approvals">
+          <Inbox size={13} /> Approvals
         </a>
       </header>
 

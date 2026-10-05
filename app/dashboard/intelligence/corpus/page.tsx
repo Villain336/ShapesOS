@@ -16,9 +16,9 @@ import type { CorpusManifest } from "@/lib/intelligence/corpus/types";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Expert corpus — Marketr",
+  title: "Expert corpus — ShapesOS",
   description:
-    "Marketr's expert knowledge base: licensed marketing sources, Tier 1S original syntheses, chunk counts, licenses, and eval precision.",
+    "ShapesOS's expert knowledge base: licensed marketing sources, Tier 1S original syntheses, chunk counts, licenses, and eval precision.",
 };
 
 function readManifest(): CorpusManifest | null {

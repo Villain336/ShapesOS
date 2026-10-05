@@ -16,7 +16,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     const { id } = await ctx.params;
     const clip = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clip.findUnique({
-        where: { id },
+        where: { id, workspaceId: workspace.id },
         select: { id: true, status: true, renderStatus: true },
       }),
     );

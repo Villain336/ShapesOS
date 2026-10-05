@@ -149,6 +149,33 @@ export function nextDueDate(
   return addMonthsUtc(anchor, RECURRENCE_MONTHS[recurrence]);
 }
 
+/**
+ * The next occurrence of a recurring SERIES after `after` (the occurrence
+ * just completed), anchored to the series' original due date:
+ * anchor + n×cadence for the smallest n landing after `after`. Never
+ * prev + cadence, so the day-of-month cannot erode through a short month:
+ * Jan 31 monthly → Feb 28 → Mar 31 → Apr 30 (not Mar 28, Apr 28).
+ *
+ * Leap day, deliberately: a Feb 29 annual anchor falls on Feb 28 in common
+ * years (the last day of February — the deadline is never pushed into
+ * March, so it is never late) and returns to Feb 29 in leap years.
+ */
+export function nextOccurrenceFromAnchor(
+  anchor: Date,
+  after: Date,
+  recurrence: DeadlineRecurrence,
+): Date | null {
+  if (recurrence === "none") return null;
+  const step = RECURRENCE_MONTHS[recurrence];
+  const monthsApart =
+    (after.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
+    (after.getUTCMonth() - anchor.getUTCMonth());
+  for (let n = Math.max(1, Math.floor(monthsApart / step)); ; n++) {
+    const candidate = addMonthsUtc(anchor, n * step);
+    if (candidate.getTime() > after.getTime()) return candidate;
+  }
+}
+
 export function isValidRecurrence(value: unknown): value is DeadlineRecurrence {
   return (
     typeof value === "string" &&

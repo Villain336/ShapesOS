@@ -34,6 +34,12 @@ export interface SitemapParseOpts {
   maxUrls?: number;
   /** Max sitemap-index recursion depth. Default 3. */
   maxDepth?: number;
+  /**
+   * Gate for every URL taken from the XML (child sitemaps and <loc>
+   * entries). Rejected URLs are neither fetched nor returned — keeps a
+   * hostile sitemap from steering the fleet off the watched domain.
+   */
+  allowUrl?: (url: string) => boolean;
 }
 
 /**
@@ -47,6 +53,7 @@ export async function fetchSitemapEntries(
 ): Promise<SitemapEntry[]> {
   const maxUrls = opts.maxUrls ?? 10000;
   const maxDepth = opts.maxDepth ?? 3;
+  const allowUrl = opts.allowUrl ?? (() => true);
   const entries: SitemapEntry[] = [];
   const seenLocs = new Set<string>();
 
@@ -65,7 +72,7 @@ export async function fetchSitemapEntries(
     if (/<sitemapindex[\s>]/i.test(xml)) {
       for (const block of extractBlocks(xml, "sitemap")) {
         const loc = extractTag(block, "loc");
-        if (loc && !seenLocs.has(loc)) {
+        if (loc && !seenLocs.has(loc) && allowUrl(loc)) {
           seenLocs.add(loc);
           await walk(loc, depth + 1);
           if (entries.length >= maxUrls) return;
@@ -76,7 +83,7 @@ export async function fetchSitemapEntries(
 
     for (const block of extractBlocks(xml, "url")) {
       const loc = extractTag(block, "loc");
-      if (!loc || seenLocs.has(loc)) continue;
+      if (!loc || seenLocs.has(loc) || !allowUrl(loc)) continue;
       seenLocs.add(loc);
       const lastmod = extractTag(block, "lastmod");
       entries.push(lastmod ? { url: loc, lastmod } : { url: loc });

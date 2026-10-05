@@ -7,7 +7,7 @@ import RecallClient from "./recall-client";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Recall playground — Growth Memory — Marketr",
+  title: "Recall playground — Growth Memory — ShapesOS",
   description: "Query the hybrid lexical+vector memory with provenance and freshness.",
 };
 

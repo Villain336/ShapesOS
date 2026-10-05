@@ -6,9 +6,10 @@
 // requireUser + getOrCreateWorkspace) and delegates to logCommand() from
 // lib/orchestrator/audit, which hashes templated prompts and stores free-form
 // ask prompts in full. The audit log is the source of truth for what the user
-// did via the bar (SPEC-PHASE9.md §P9B).
+// did via the bar (docs/specs/SPEC-PHASE9.md §P9B).
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { requireWorkspaceRole } from "@/lib/authz";
 import { logCommand, type CommandKindName } from "@/lib/orchestrator/audit";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export async function POST(req: Request) {
   if (!user || !user.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // Members (any role) may log their own command-bar usage.
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "viewer")))
+    return Response.json({ error: "Forbidden" }, { status: 403 });
 
   let body: AuditBody;
   try {

@@ -15,9 +15,9 @@
 import { missionsGuard, safetyError, missionDeps, readJson, badRequest } from "../../_lib";
 import { appendStepEvent } from "@/lib/missions/engine";
 import {
+  FlowNotBoundError,
   isActivepiecesConfigured,
-  triggerFlow,
-  latestFlowRun,
+  workspaceFlows,
 } from "@/lib/integrations/activepieces";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +58,15 @@ export async function POST(
     payload = body.payload as Record<string, unknown>;
   }
 
+  // Only flows bound to this workspace can run from its missions (H6).
+  const flows = workspaceFlows(gate.workspaceId);
+  try {
+    await flows.assertBound(flowId);
+  } catch (e) {
+    if (e instanceof FlowNotBoundError) return Response.json({ error: e.message }, { status: 404 });
+    throw e;
+  }
+
   const deps = missionDeps();
   try {
     // Record the request FIRST: appendStepEvent asserts the mission is
@@ -72,9 +81,9 @@ export async function POST(
       costCents: 0,
     });
 
-    const result = await triggerFlow(flowId, payload);
+    const result = await flows.trigger(flowId, payload);
     // Best-effort immediate status snapshot (webhook accept may not carry a run id).
-    const latest = await latestFlowRun(flowId).catch(() => null);
+    const latest = await flows.latestRun(flowId).catch(() => null);
 
     const observation: Record<string, unknown> = {
       flowId: result.flowId,

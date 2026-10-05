@@ -283,6 +283,23 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Link targets allowed in rendered page HTML: http(s), mailto, tel, and
+ * relative/fragment links. Anything else (javascript:, data:, vbscript:,
+ * obfuscated with whitespace/control chars or entities) becomes "#".
+ */
+export function safeLinkHref(raw: unknown): string {
+  if (typeof raw !== "string") return "#";
+  // Browsers ignore ASCII whitespace/control chars inside a scheme.
+  // eslint-disable-next-line no-control-regex
+  const compact = raw.replace(/[\u0000-\u0020\u007f-\u009f]+/g, "");
+  if (!compact) return "#";
+  if (/^(\/|#|\?|\.)/.test(compact) && !compact.startsWith("//")) return raw.trim();
+  const scheme = compact.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase();
+  if (!scheme) return raw.trim(); // relative path like "pricing"
+  return ["http", "https", "mailto", "tel"].includes(scheme) ? raw.trim() : "#";
+}
+
 function renderInline(node: TiptapNode): string {
   if (typeof node.text === "string") {
     let html = escapeHtml(node.text);
@@ -293,7 +310,7 @@ function renderInline(node: TiptapNode): string {
       else if (mark.type === "strike") html = `<s>${html}</s>`;
       else if (mark.type === "code") html = `<code>${html}</code>`;
       else if (mark.type === "link") {
-        const href = typeof mark.attrs?.href === "string" ? mark.attrs.href : "#";
+        const href = safeLinkHref(mark.attrs?.href);
         html = `<a href="${escapeHtml(href)}">${html}</a>`;
       }
     }

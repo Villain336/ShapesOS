@@ -2,16 +2,18 @@
 // No external services, no extra dependencies. CSV follows RFC 4180 quoting.
 // PDF is produced by a small embedded writer (Helvetica family only) with a
 // brand header and page-number footer, paginated onto A4.
+// Phase 11 (seotools): DOCX for docs and XLSX for sheets, through the shared
+// writers in lib/documents (docx / exceljs).
 
+import { csvCell } from "@/lib/csv";
 import type { IWorkbookData } from "@univerjs/core";
 import type { IDocumentData } from "@univerjs/core";
+import type { DocBlock, Inline } from "@/lib/documents/blocks";
+import { buildDocx } from "@/lib/documents/docx";
+import { buildXlsx, type CellValue, type SheetInput } from "@/lib/documents/xlsx";
 
 // ---------------------------------------------------------------- CSV ----
 
-function csvEscape(value: string): string {
-  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
 
 function cellText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -42,8 +44,10 @@ export function exportSheetCsv(snapshot: IWorkbookData, sheetName?: string): str
     for (const [c, cell] of Object.entries(cols ?? {})) {
       const ci = Number(c);
       if (!Number.isFinite(ci)) continue;
-      const t = cellText((cell as { v?: unknown })?.v);
-      grid.set(`${ri}:${ci}`, t);
+      const raw = (cell as { v?: unknown })?.v;
+      const t = cellText(raw);
+      // Encoded here: numbers stay numbers; text is formula-neutralized.
+      grid.set(`${ri}:${ci}`, typeof raw === "number" ? csvCell(raw) : csvCell(t));
       if (t !== "") {
         if (ri > maxRow) maxRow = ri;
         if (ci > maxCol) maxCol = ci;
@@ -55,7 +59,7 @@ export function exportSheetCsv(snapshot: IWorkbookData, sheetName?: string): str
   const lines: string[] = [];
   for (let r = 0; r <= maxRow; r++) {
     const cols: string[] = [];
-    for (let c = 0; c <= maxCol; c++) cols.push(csvEscape(grid.get(`${r}:${c}`) ?? ""));
+    for (let c = 0; c <= maxCol; c++) cols.push(grid.get(`${r}:${c}`) ?? "");
     lines.push(cols.join(","));
   }
   return lines.join("\r\n") + "\r\n";
@@ -181,7 +185,7 @@ interface PdfOpts {
 /** Minimal multi-object PDF builder (catalog/pages/font/contents + xref). */
 export function exportDocPdf(snapshot: IDocumentData, opts: PdfOpts = {}): Uint8Array {
   const brand = opts.brandColor ?? [0.486, 0.227, 0.929]; // #7c3aed
-  const brandName = opts.brandName ?? "Marketr";
+  const brandName = opts.brandName ?? "ShapesOS";
   const title = opts.title ?? "Document";
 
   const lines = paragraphsToLines(docSnapshotToParagraphs(snapshot));
@@ -281,4 +285,69 @@ export function exportDocPdf(snapshot: IDocumentData, opts: PdfOpts = {}): Uint8
 export function slugifyFilename(name: string, ext: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "export";
   return `${base}.${ext}`;
+}
+
+// ---------------------------------------------------- DOCX / XLSX (Phase 11) ----
+
+/** A doc snapshot as document blocks (headings + paragraphs with exact bold runs). */
+export function docSnapshotToBlocks(snapshot: IDocumentData): DocBlock[] {
+  return docSnapshotToParagraphs(snapshot).map((p): DocBlock => {
+    const text = p.text.replace(/[\r\n]+$/g, "");
+    if (p.headingLevel > 0) return { type: "heading", level: p.headingLevel as 1 | 2 | 3, text };
+    const runs: Inline[] = [];
+    let at = 0;
+    for (const [s, e] of p.boldRanges) {
+      if (s > at) runs.push({ text: text.slice(at, s) });
+      if (e > s) runs.push({ text: text.slice(s, e), bold: true });
+      at = Math.max(at, e);
+    }
+    if (at < text.length) runs.push({ text: text.slice(at) });
+    return { type: "paragraph", text, runs: runs.filter((r) => r.text.length > 0) };
+  });
+}
+
+/** Univer doc → .docx bytes. */
+export function exportDocDocx(snapshot: IDocumentData, opts: { title?: string } = {}): Promise<Buffer> {
+  return buildDocx({ title: opts.title, blocks: docSnapshotToBlocks(snapshot) });
+}
+
+/** Every worksheet (in sheet order) as typed rows: numbers stay numbers. */
+export function sheetSnapshotToSheets(snapshot: IWorkbookData): SheetInput[] {
+  const sheets = snapshot.sheets ?? {};
+  const order = (snapshot.sheetOrder ?? []).filter((id) => sheets[id]);
+  const ids = order.length ? order : Object.keys(sheets);
+  return ids.map((id) => {
+    const ws = sheets[id];
+    const cellData = ws?.cellData ?? {};
+    let maxRow = -1;
+    let maxCol = -1;
+    const grid = new Map<string, CellValue>();
+    for (const [r, cols] of Object.entries(cellData)) {
+      const ri = Number(r);
+      if (!Number.isFinite(ri)) continue;
+      for (const [c, cell] of Object.entries(cols ?? {})) {
+        const ci = Number(c);
+        if (!Number.isFinite(ci)) continue;
+        const raw = (cell as { v?: unknown })?.v;
+        const v: CellValue = typeof raw === "number" || typeof raw === "boolean" ? raw : raw === null || raw === undefined ? null : String(raw);
+        if (v === null || v === "") continue;
+        grid.set(`${ri}:${ci}`, v);
+        maxRow = Math.max(maxRow, ri);
+        maxCol = Math.max(maxCol, ci);
+      }
+    }
+    const rows: CellValue[][] = [];
+    for (let r = 0; r <= maxRow; r++) {
+      const row: CellValue[] = [];
+      for (let c = 0; c <= maxCol; c++) row.push(grid.get(`${r}:${c}`) ?? null);
+      rows.push(row);
+    }
+    return { name: ws?.name ?? "Sheet", rows, header: false };
+  });
+}
+
+/** Univer workbook → .xlsx bytes (all sheets). */
+export function exportSheetXlsx(snapshot: IWorkbookData, opts: { title?: string } = {}): Promise<Buffer> {
+  const sheets = sheetSnapshotToSheets(snapshot);
+  return buildXlsx({ title: opts.title, sheets: sheets.length ? sheets : [{ name: "Sheet1", rows: [], header: false }] });
 }

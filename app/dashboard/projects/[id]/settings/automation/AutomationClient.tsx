@@ -27,7 +27,7 @@ const MODES = [
     value: "supervised",
     label: "Supervised",
     description:
-      "Marketr drafts and prepares; nothing consequential runs without your approval.",
+      "ShapesOS drafts and prepares; nothing consequential runs without your approval.",
   },
   {
     value: "scheduled",
@@ -135,7 +135,7 @@ export default function AutomationClient({
         <h4 className="text-[13px] font-medium text-ink">The trust ladder</h4>
         <ol className="mt-2 flex list-none flex-col gap-1.5 text-[12.5px] text-ink-2">
           <li>
-            <span className="font-medium text-ink">Supervised.</span> Marketr
+            <span className="font-medium text-ink">Supervised.</span> ShapesOS
             proposes, you approve — drafts, publishes, and sends all wait for a
             click.
           </li>

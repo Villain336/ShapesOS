@@ -51,7 +51,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "DSP Readiness — Marketr",
+  title: "DSP Readiness — ShapesOS",
   description: "DSP adapter seats, volume tripwire, fee schedules, and margin ledger.",
 };
 
@@ -118,7 +118,7 @@ export default async function DspPage() {
         <h2 className="text-sm font-semibold tracking-tight text-ink">Zero custody — structural</h2>
         <p className="mt-1 text-[13px] text-muted">{ZERO_CUSTODY_COPY}</p>
         <p className="mt-2 text-[13px] text-muted">
-          Seat connection requires a vault reference only — Marketr never accepts raw seat
+          Seat connection requires a vault reference only — ShapesOS never accepts raw seat
           credentials, and no field anywhere in this track can hold a client payment
           instrument.
         </p>
@@ -153,7 +153,7 @@ export default async function DspPage() {
           </div>
           <p className="mt-3 text-xs text-muted">
             Without a seat, pause, cap, and report calls fail closed with “connect your agency
-            seat” guidance — they never pretend to act on a buy Marketr cannot reach.
+            seat” guidance — they never pretend to act on a buy ShapesOS cannot reach.
           </p>
         </section>
 
@@ -244,7 +244,7 @@ export default async function DspPage() {
                     ["Client billed", r.clientBilledCents],
                     ["Platform fees", r.platformFeesCents],
                     ["Passthrough (at cost)", r.passthroughCents],
-                    ["Marketr margin", r.marketrMarginCents],
+                    ["ShapesOS margin", r.marketrMarginCents],
                   ] as const
                 ).map(([label, cents]) => (
                   <tr key={`${r.id}-${label}`} className="border-b border-line last:border-0 hover:bg-hover-paper">

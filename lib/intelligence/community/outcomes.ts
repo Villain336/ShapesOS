@@ -96,7 +96,7 @@ export async function recordCommunityOutcome(
     // codebase's standard Prisma.Json cast (same as programmatic-service.ts).
     const outcomeJson = JSON.parse(JSON.stringify(outcome)) as unknown as Prisma.InputJsonValue;
     await tx.missionApproval.update({
-      where: { id: approval.id },
+      where: { id: approval.id, workspaceId },
       data: { bindingJson: { ...binding, outcome: outcomeJson } },
     });
     return { eventId: event.id, eventHash: event.eventHash };

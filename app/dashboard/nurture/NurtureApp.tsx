@@ -44,8 +44,10 @@ import {
   btnSecondary,
   inputCls,
 } from "./ui";
+import { confirmAction } from "@/lib/ui/feedback";
+import type { NurtureTab } from "./tabs";
 
-type Tab = "sequences" | "broadcasts" | "enrollments" | "approvals" | "log" | "consent";
+type Tab = NurtureTab;
 
 async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts?.headers ?? {}) } });
@@ -73,8 +75,9 @@ function delayLabel(min: number): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function NurtureApp() {
-  const [tab, setTab] = useState<Tab>("sequences");
+/** initialTab: deep links (e.g. the "needs you" inbox) open a tab via ?tab=approvals. */
+export function NurtureApp({ initialTab = "sequences" }: { initialTab?: Tab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [sequences, setSequences] = useState<NurtureSequence[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,7 +156,7 @@ export function NurtureApp() {
   };
 
   const archiveSequence = async (id: string) => {
-    if (!confirm("Archive this sequence? Enrollments stop advancing; the message ledger is kept.")) return;
+    if (!await confirmAction("Archive this sequence? Enrollments stop advancing; the message ledger is kept.")) return;
     await api(`/api/nurture/sequences/${id}`, { method: "DELETE" });
     await refreshSequences();
   };
@@ -828,7 +831,7 @@ function ConsentTab() {
                   {(["sms", "email", "voice", "mail"] as const).map((ch) => (
                     <td key={ch} className="px-3 py-2">
                       <select
-                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:outline-none"
+                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
                         value={r.consent[ch] ?? "unknown"}
                         onChange={(e) => setConsent(r.id, ch, e.target.value)}
                       >

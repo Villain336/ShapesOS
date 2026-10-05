@@ -1,167 +1,145 @@
-# Marketr
+# ShapesOS
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
-[![CI](https://github.com/marketr/marketr/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![CI](https://github.com/Villain336/ShapesOS/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
 [![Self-host quickstart](https://img.shields.io/badge/self--host-%3C10_min-green)](./docs/quickstart.md)
 
-> **Tagline:** the open-source marketing & SEO workspace/OS — keyword research, competitor gaps, an AI content engine, rank tracking, site audits with an auto-fix agent, and white-label client reporting, in one self-serve workspace.
+> **Tagline:** the open-source agentic business OS: grow, design and operate a business from one workspace, with agents that propose and humans that approve.
 
-- **Self-host it free** with your own API keys (DataForSEO, LLM) — or run the hosted version with data bundled in.
-- **Credential-light start:** [get running in under 10 minutes, no API keys needed](./docs/quickstart.md) — everything provider-backed degrades loudly to mock mode.
-- **Agencies:** white-label client reporting; **founders:** one workspace for the whole growth loop.
-- **Launch readiness (internal):** tracked live in the app at `/dashboard/flywheel/launch` — readiness only, no public flip until the open-core split is decided (see [docs/open-core-options.md](./docs/open-core-options.md)).
+- **Self-host it free** with your own provider keys, or run the hosted version with data bundled in.
+- **Credential-light start:** [running in under 10 minutes with no API keys](./docs/quickstart.md). Provider-backed features degrade loudly to mock mode instead of faking data.
+- **Agents with a leash:** every write that touches money, customers or the outside world goes through an approval. Autopilot never buys media or moves money.
+- **Launch readiness (internal):** tracked in the app at `/dashboard/flywheel/launch`. Readiness only; there is no public launch until the open-core split is decided (see [docs/open-core-options.md](./docs/open-core-options.md)).
+
+ShapesOS started life as Marketr, an SEO workspace. User-facing text now says ShapesOS everywhere. Internal identifiers keep the old name on purpose so existing installs keep working: `MARKETR_*` environment variables, `marketr_*` cookies, the `marketr_app` database role and the `marketr` compose volumes.
 
 ## Open vs. commercial
 
 | | Open (AGPLv3) | Commercial |
 |---|---|---|
-| Core marketing & SEO workspace | ✓ | ✓ |
+| Core workspace (Grow / Design / Operate / Agents) | ✓ | ✓ |
 | Self-hosting | ✓ | ✓ |
 | White-label / agency resale | — (see note) | ✓ |
 | Hosted SaaS with bundled data | — | ✓ |
 | SLA & priority support | — | ✓ |
 
-> **Note:** the exact open-vs-commercial boundary is **undecided** — options A–D
+> **Note:** the exact open-vs-commercial boundary is **undecided**. Options A–D
 > are staged neutrally in [docs/open-core-options.md](./docs/open-core-options.md)
 > with no recommendation. The table above is the *shape* of the answer, not the
 > answer. Commercial terms: [docs/commercial-license-terms.md](./docs/commercial-license-terms.md) (draft).
 
 ## Screenshots
 
-> Staged — 3–5 real-UI screenshots (hero + dashboard + keyword research +
-> content engine + launch tracker) to be captured from a current build before
-> any public launch. No mockups or staged pixels.
+> Staged — 3–5 real-UI screenshots (home + approvals inbox + CRM + Studio + launch tracker) to be captured from a current build before any public launch. No mockups or staged pixels.
 
-Full product spec: [SPEC.md](./SPEC.md)
+## What's in it
 
-## Self-host quickstart
+The dashboard is organized the way the sidebar is (`lib/nav/config.ts`). Everything below has a page under `app/dashboard/` and code under `lib/`. Items marked *mock-only* or *partial* are honest about where they stop.
 
-Requirements: Docker + Docker Compose.
+**Grow**
+- **CRM**: leads, pipelines, capture forms, scoring, forecast, CSV import/export. *Partial:* you can't yet email, text, call, enroll in nurture or invoice straight from a lead.
+- **Prospects** (enrichment, converts into leads), **Nurture** (email/SMS sequences with consent, quiet hours and speed-to-lead), **Reviews** (requests and AI-drafted replies behind approval).
+- **SEO projects**: keyword research, competitor gaps, content engine with live SEO score, rank tracking with AI Overview presence, site audits with a fix agent (snapshots + one-click revert), site IDE, landing pages, WordPress/Webflow publishing, Vercel/Cloudflare deploys.
+- **Intelligence**: market radar, AI-search visibility, competitor tracking, the Knowledge corpus.
+- **Social** (publishing through a Postiz sidecar), **Authority** (outreach, digital PR, listings, answer-engine optimization), **Media** and ad platforms (Amazon Ads, StackAdapt, ChatGPT Ads; guided Walmart Connect and Spotify), **Direct mail**, **Calls** (tracking + booking pages), **Flywheel** (budget reallocation proposals, creative recycling, test lab), **Attribution**, **Reports**.
+- **Analytics** is Umami pageviews only for now.
+
+**Design**
+- **Studio**: native canvas editor, AI design generation (draft-first), magic resize, batch fill, share/comment/approval links, branded PDF reports.
+- **Clips** (long video into short clips, draft-for-approval), **Voice** (voice agents, scripts and voiceovers; local VoiceStudio TTS by default), **CAD** (in-browser viewer and versioning, AI design assistant, prototype export, hardware projects; a derived BOM is still to come).
+
+**Operate**
+- **Office** (docs, sheets and decks), **Files**, **E-sign** (Documenso adapter, hash-chained audit), **Legal** (obligation map, deadline engine, document vault, change radar), **Insurance** (policy inventory, quoting, gated bind, renewals, COIs).
+- **Funding** (investor CRM, data room with expiring links and per-viewer analytics, round readiness) and **Network** (the connector agent: relationship graph, intro paths, double-opt-in intros for leads and investors).
+- **Datasets** (ingest, classify and compile versioned business datasets with lineage), **WFH mode**, **Alerts**.
+- Ops entities behind the agents: invoicing, inventory, projects/HR, with approval gates on anything that sends or spends.
+
+**Agents**
+- **Approvals**: one "needs you" inbox across the approval queues, with a sidebar badge and a notification center.
+- **Runs** (index and replays), **Assistant** (chat), **Missions** and **Playbooks** (goal → multi-agent plan), **Actions** (Composio app actions; reads run, writes need approval), **Substrate** (business graph and growth memory).
+- **MCP server** (`app/mcp`, OAuth 2.1 + PKCE, scoped API keys) so outside agents can drive ShapesOS.
+
+**Platform**
+- Workspaces with owner/admin/editor/viewer roles, invites by email, agency client workspaces, white-label.
+- SSO (OIDC; SAML via BoxyHQ), metering + Stripe billing with credit pools and spend caps, a hosted trial mode.
+- Postgres row-level security on tenant tables, enforced by running the app as a non-superuser role.
+- Expo mobile app in `mobile/` (agent chat + approvals; still carries the old bundle ids and has no push yet).
+
+**Known gaps** (see [docs/audit/FULL-AUDIT-2026-10-03.md](./docs/audit/FULL-AUDIT-2026-10-03.md) §7 and [docs/audit/REMEDIATION-PLAN.md](./docs/audit/REMEDIATION-PLAN.md)):
+- GA4, Search Console, Google Ads, Meta Ads, Google Drive, Notion, Google Business Profile and outreach sending (Smartlead / Instantly) have live code (Phase 4b, `lib/connectors/m21/live/*`, `lib/authority/outreach/sending.ts`), tested against recorded fixtures only — no real keys have exercised them yet. Without credentials every one stays in labeled mock mode.
+- No GDPR export, 2FA/passkeys, SCIM, OpenAPI spec, outbound webhooks or `/api/health` yet.
+
+## Quickstart (local dev)
+
+Requirements: Node 22 (see `.nvmrc`) and a Postgres 16 with the pgvector extension (for example the `pgvector/pgvector:pg16` image). For the full Docker stack instead, see [DEPLOY.md](./DEPLOY.md) and [docs/quickstart.md](./docs/quickstart.md).
 
 ```bash
+npm ci
 cp .env.example .env
-# Edit .env — at minimum set DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD,
-# and one LLM key (ANTHROPIC_API_KEY or OPENAI_API_KEY).
-docker compose up -d
 ```
 
-Open http://localhost:3000. Prisma migrations run automatically on container start.
-
-### Local dev (without Docker)
+The app must **not** connect as the schema owner or a superuser: superusers bypass `FORCE ROW LEVEL SECURITY`, which silently turns off tenant isolation. So there are two database roles:
 
 ```bash
-npm install
-cp .env.example .env   # point DATABASE_URL / REDIS_URL at local services
-npx prisma migrate dev
+# 1. Migrate as the role that owns the schema (the migrator).
+#    Setting APP_DB_PASSWORD also creates/refreshes the least-privilege app
+#    role (APP_DB_USER, default marketr_app) via scripts/db/create-app-role.sql
+#    (this step needs psql on your PATH).
+DATABASE_URL="postgresql://<owner>:<pw>@localhost:5432/<db>?schema=public" \
+APP_DB_PASSWORD="$(openssl rand -hex 32)" \
+npm run db:migrate
+
+#    Or create the app role yourself (re-run after new migrations):
+#    psql "postgresql://<owner>:<pw>@localhost:5432/<db>" \
+#      -v app_password='…' -f scripts/db/create-app-role.sql
+
+# 2. Point DATABASE_URL in .env at the app role, then run.
 npm run dev
 ```
 
-## Project layout
+Open http://localhost:3000 and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`. `npm run db:seed` loads a demo workspace.
 
-- `app/` — Next.js App Router UI: `/` landing, `/login`, `/dashboard` (projects CRUD), `/dashboard/projects/[id]/keywords` (keyword research)
-- `app/api/` — route handlers: auth, projects, keyword ideas/save/saved
-- `lib/providers/` — swappable SEO data-provider interface: DataForSEO (live when `DATAFORSEO_*` set) or clearly-marked mock fallback
-- `prisma/schema.prisma` — data model: Workspace, Project, Keyword, Ranking, Competitor, ContentItem, Client, Report, ApiUsage, Issue, FixRun
-- `prisma/migrations/` — SQL migrations (applied via `migrate deploy` on container start)
-- `prisma/seed.ts` — demo workspace/project/keywords (`npm run db:seed`)
-- `auth.ts` — Auth.js v5: Google OAuth + self-hosted admin credentials (`ADMIN_EMAIL`/`ADMIN_PASSWORD`)
-- `docker-compose.yml` — app + Postgres 16 + Redis 7
-- `Dockerfile` — production standalone image
-- `SPEC.md` — the full product spec (source of truth)
+## Testing
 
-## Milestones
-
-- **M1 (done):** scaffold, data model, Docker, license, README.
-- **M2 (done):** DB wiring + first migration + seed, Auth.js (Google + admin credentials), workspace/project CRUD, DataForSEO provider abstraction, keyword-research flow (seed → ideas with volume/difficulty/CPC/intent → filter → save to list).
-- **M3 (done):** competitor keyword-gap analysis — competitor domains per project, gap diff vs. saved keywords with opportunity scoring, one-click save.
-- **M4 (done):** content engine — SERP-informed brief → AI draft (swappable LLM provider) → editor with live, explainable SEO score; brief → draft → editing → published lifecycle.
-- **M5 (done):** rank tracking — tracked-keyword toggle, on-demand + scheduled rank checks, positions table with deltas, unified visibility score, AI Overview presence, movement alerts.
-- **M6 (done):** site IDE — SFTP site connections (AES-256-GCM encrypted at rest, never exposed to the client), file browser + Monaco code editor, AI assistant that proposes diffs the user must approve (supervised rung), append-only change audit log, demo mock site for credential-free tryout.
-- **M7 (done):** landing pages & websites — SiteConnector abstraction (GitHub + labeled mock + zip/file upload), Site model, AI landing-page builder with sandboxed preview, deploy to GitHub/SFTP/zip download, IDE wired to Sites.
-- **M8 (done):** WordPress + Webflow connectors — WP REST via app passwords (pages/posts/media CRUD), Webflow API v2 (CMS collections/items CRUD + site publish), labeled mocks, ContentBrowser UI, publish-to flow from landing pages.
-- **M9 (done):** hosting — DeployTarget abstraction, Vercel + Cloudflare Pages connectors (encrypted tokens, labeled mocks), HostingConnection + Deployment models, deploy-to-hosting flow with live URL + audit log.
-- **M10 (done):** fix-agent scheduled rung — site audits (broken links, missing title/meta/OG/alt, mixed content, oversized images, robots/sitemap, style bloat), issue inbox with per-issue approval, per-site safety settings (enabled, allowed categories, max fixes/run, dry-run default ON), scheduled execution via cron with pre-change snapshots + one-click revert, full audit logging.
-- **M11 (done):** enterprise security — generic OIDC SSO + SAML via BoxyHQ (both env-configured, buttons appear on /login only when set), domain-based SSO auto-provisioning, workspace RBAC (owner/admin/editor/viewer with API-level enforcement and a Members settings page), secrets-provider abstraction (`lib/secrets` — env AES-256-GCM default, documented AWS-KMS stub), security headers, 12h absolute session lifetime, workspace-scoped audit events for credential lifecycle + membership changes.
-
-### Scheduled rank checks
-
-Self-hosted Next.js has no built-in cron, so rank checks run through an
-authenticated endpoint you call on a schedule:
-
-1. Set a long random `CRON_SECRET` in `.env` (`openssl rand -hex 32`).
-2. Add a cron line (daily at 6am here; pick your own cadence):
-
-```cron
-0 6 * * * curl -s -X POST \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"projectId":"all"}' \
-  https://your-marketr-host/api/rankings/check
+```bash
+npm test                 # unit suites (node:test via tsx; DATABASE_URL is unset on purpose)
+npm run test:db          # DB-backed suites listed in scripts/test/db-tests.txt; needs a migrated
+                         # DATABASE_URL, ideally as the non-superuser app role (that's what CI does)
+NODE_OPTIONS=--max-old-space-size=8192 npm run typecheck   # next typegen + tsc; needs the bigger heap
+npx tsx scripts/verify-phase7-launch.mts                   # launch-readiness battery
+node scripts/verify-m11-security.mjs                       # security battery
 ```
 
-- `{"projectId":"<id>"}` checks one project; `{"projectId":"all"}` checks
-  every project (cron secret only — a signed-in session can't use `"all"`).
-- Each check runs one SERP call per tracked keyword and writes `Ranking`
-  rows, so schedule with your DataForSEO budget in mind.
+`mobile/` has its own package and vitest suite. CI (`.github/workflows/ci.yml`) runs install, Prisma validate, typecheck, a secret scan, unit tests, migrations on a fresh database, a schema-drift guard, DB tests as the app role, both batteries, a credential-free smoke test and a production build. Two more jobs run alongside: `e2e` (the Playwright suite in `tests/e2e` against a production build, as the app role) and `compose` (validates `docker-compose.yml` and runs its `db` + `migrate` + `minio-init` services).
 
-### Scheduled fix-agent runs
+## Deployment
 
-The fix agent's scheduled rung (M10) uses the same cron-secret pattern.
-Per-site settings live on the Sites page: enable the agent, choose which
-issue categories it may fix without asking, cap fixes per run, and keep
-dry-run mode on until you trust it (dry runs only store diff previews).
+[DEPLOY.md](./DEPLOY.md) is the runbook: compose services (a one-shot `migrate` service creates the app role; the app connects as it), required secrets, loopback-only ports, sidecars (Postiz, Listmonk, Umami, Activepieces), cron endpoints and rollback. Scheduled work runs through authenticated `POST /api/cron/*` endpoints you call with `Authorization: Bearer $CRON_SECRET`.
 
-```cron
-0 7 * * * curl -s -X POST \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  https://your-marketr-host/api/cron/fix-agent
-```
+## Key environment switches
 
-The endpoint runs every site with the agent enabled, applies eligible fixes
-(explicitly approved issues, or allow-listed non-destructive categories),
-snapshots every touched file before writing (`.data/fix-snapshots/`, or
-`FIX_SNAPSHOT_DIR`), audit-logs each change as actor `fix_agent`, and
-re-scans to verify. A signed-in session can hit the same endpoint to run all
-of *your* projects on demand. Revert any run from the Sites → Fix agent panel.
+All documented in [.env.example](./.env.example).
 
-## Data & costs
+| Variable | Default | What it does |
+|---|---|---|
+| `DEPLOYMENT_MODE` | `self_hosted` | `self_hosted`: bring your own keys, usage recorded but never blocked. `hosted`: a person's first workspace gets a 14-day, 500-credit trial behind a hard cap, then needs a plan. |
+| `SIGNUP_MODE` | `open` | `open`: any SSO sign-in or email signup without a workspace gets one. `invite`: new users need a pending invite. Email + password and magic-link sign-in need outgoing email (SMTP or Resend) and `APP_URL` in production; in development the links print to the server console. |
+| `TRUSTED_PROXY_HOPS` | `1` | How many reverse proxies append to `X-Forwarded-For`. Used for login lockouts and rate limits; `0` trusts no proxy header. |
+| `RATE_LIMIT_STORE` | `postgres` when `DATABASE_URL` is set, else `memory` | Where API rate limits and the login lockout count. `postgres` shares them across app replicas (falls back to in-memory if the database fails; the lockout never fails open). |
+| `MARKETR_STORAGE` | `local` (compose: `s3` on the bundled MinIO) | Where uploaded files live. Use `s3` (MinIO, S3, R2) whenever more than one app container runs. |
+| `MARKETR_PLATFORM_OPERATORS` | unset (nobody) | User ids or emails allowed to change host-wide resources (shared Knowledge corpus, Activepieces flow bindings). |
+| `ALLOW_FAKE_PROVIDERS` | `0` | Fake SMS/email/call/mail providers are the dev default but refused in production unless set to `1` for a demo install. |
 
-Self-hosted Marketr is bring-your-own-keys: a [DataForSEO](https://dataforseo.com) account (pay-as-you-go) for keyword/SERP data and an LLM provider key for the content engine and fix agent. No scraping, no bundled data markup — see SPEC.md §9 for the hosted unit economics.
+With `NODE_ENV=production`, features whose signing or encryption secret is unset refuse to run rather than fall back to a built-in value.
 
-## Enterprise security (M11)
+## Docs
 
-**SSO.** Set `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` for any
-OIDC-compliant IdP (Okta, Entra ID, Google Workspace, Keycloak, Authentik) —
-a "Continue with SSO" button appears on `/login` only when configured.
-SAML works through a BoxyHQ SAML Jackson bridge: `SAML_ENABLED=true` plus
-`BOXYHQ_SAML_ISSUER` (your Jackson URL), `BOXYHQ_SAML_CLIENT_ID`,
-`BOXYHQ_SAML_CLIENT_SECRET`. Optional domain-based auto-provisioning:
-`SSO_DOMAIN` + `SSO_WORKSPACE_ID` + `SSO_DEFAULT_ROLE` add matching SSO
-users to that workspace on first sign-in. SSO paths are config-complete but
-were not live-verified (no IdP in the build environment).
-
-**RBAC.** Workspace roles: `owner` > `admin` > `editor` > `viewer`.
-Viewers are read-only; editors write but can't manage members or stored
-credentials; admins can't delete the workspace; owners have full control.
-Enforced at the API layer (`lib/authz.ts` — `requireProjectRole` /
-`requireWorkspaceRole`, 403 on denial). Manage members at
-`/dashboard/settings/members` (admin+): invite by email (pending until first
-sign-in), change roles, remove. The last owner is protected. Membership and
-credential changes are audit-logged.
-
-**Secrets.** All credential encryption flows through `lib/secrets`
-(`SecretsProvider` interface). Default `SECRETS_PROVIDER=env` uses the
-existing AES-256-GCM `MARKETR_CREDENTIALS_KEY` scheme. For hosted production,
-implement the documented `AwsKmsSecretsProvider` stub against
-`@aws-sdk/client-kms` (per-workspace data keys, rotation) and set
-`SECRETS_PROVIDER=aws-kms`.
-
-**Hardening.** Security headers in `next.config.ts` (nosniff, SAMEORIGIN
-framing, strict referrer policy, locked-down permissions policy, HSTS on
-https). Sessions are JWT with an absolute 12h lifetime. CSP is intentionally
-deferred: Monaco loads editor assets from a CDN and needs `unsafe-eval` for
-workers, so a CSP today would be theater — self-host the editor assets first.
+- [docs/COMPLETE-VISION.md](./docs/COMPLETE-VISION.md): every module and its real status.
+- [docs/design/DESIGN.md](./docs/design/DESIGN.md): the Agentic OS design system all UI follows.
+- [docs/specs/](./docs/specs/): the original product spec and phase specs. [docs/phases/](./docs/phases/): later phase specs.
+- [docs/security/](./docs/security/): threat models. [docs/history/](./docs/history/): past audits, reports and design maps.
+- [CONTRIBUTING.md](./CONTRIBUTING.md), [SECURITY.md](./SECURITY.md), [CHANGELOG.md](./CHANGELOG.md), [THIRD_PARTY.md](./THIRD_PARTY.md).
 
 ## License
 
-Marketr core is licensed under the **GNU Affero General Public License v3.0** — see [LICENSE](./LICENSE). If you run a modified version on a public server, you must make the modified source available to its users (AGPL §13). A separate commercial license covers the white-label module for agencies.
+ShapesOS core is licensed under the **GNU Affero General Public License v3.0**; see [LICENSE](./LICENSE). If you run a modified version on a public server, you must make the modified source available to its users (AGPL §13). A separate commercial license covers the white-label module for agencies.

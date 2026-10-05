@@ -25,6 +25,7 @@ import { meter } from "@/lib/metering/service";
 import { domainMatches, computeAlerts, type RankAlert } from "@/lib/rankings";
 import { emitAlert, type TriggerInput } from "@/lib/alerts/evaluate";
 import { recordSnapshot } from "@/lib/retention/ai-visibility";
+import { bearerMatches } from "@/lib/security/constant-time";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ function cronAuthorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET ?? "").trim();
   if (!secret) return false;
   const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
+  return bearerMatches(header, secret);
 }
 
 async function checkProject(projectId: string): Promise<CheckResult> {

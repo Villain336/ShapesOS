@@ -4,6 +4,7 @@
 //   newest first, limit 200. (admin+)
 // &format=csv → text/csv attachment download.
 
+import { csvCell as sharedCsvCell } from "@/lib/csv";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -12,10 +13,8 @@ import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-function csvCell(v: string | null): string {
-  const s = v ?? "";
-  return `"${s.replace(/"/g, '""')}"`;
-}
+// Always-quoted, formula-neutralized (shared helper, lib/csv.ts).
+const csvCell = (v: string | null) => sharedCsvCell(v, { alwaysQuote: true });
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();

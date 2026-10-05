@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: human-gated ER decisions (SPEC-PHASE8.md B4).
+// Marketr — Phase 8 G1: human-gated ER decisions (docs/specs/SPEC-PHASE8.md B4).
 //
 // Approve → the absorbed node gets mergedIntoId + a SAME_AS provenance edge
 // back to its source records (auditable, reversible). Reject → a NOT_SAME
@@ -36,7 +36,7 @@ export async function resolveErItem(
 
     if (decision === "approved") {
       await tx.graphNode.update({
-        where: { id: second.id },
+        where: { id: second.id, workspaceId },
         data: { mergedIntoId: first.id, lastSeen: new Date() },
       });
       await tx.graphEdge.create({
@@ -72,7 +72,7 @@ export async function resolveErItem(
     }
 
     await tx.graphErQueue.update({
-      where: { id: item.id },
+      where: { id: item.id, workspaceId },
       data: { status: decision, decidedBy, decidedAt: new Date() },
     });
     await auditEvent({
@@ -121,7 +121,7 @@ export async function revertMerge(
       },
     });
     await tx.graphNode.update({
-      where: { id: absorbedNodeId },
+      where: { id: absorbedNodeId, workspaceId },
       data: { mergedIntoId: null, lastSeen: now },
     });
     await auditEvent({

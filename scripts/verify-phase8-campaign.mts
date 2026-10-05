@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G2 verification battery (SPEC-PHASE8.md §10 gate 2).
+// Marketr — Phase 8 G2 verification battery (docs/specs/SPEC-PHASE8.md §10 gate 2).
 //
 // Run: npx tsx scripts/verify-phase8-campaign.mts
 // Run 3x green before calling this done.

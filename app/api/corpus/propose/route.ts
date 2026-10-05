@@ -1,14 +1,18 @@
 // Marketr — Knowledge Brain: proposed-source management.
 // GET    /api/corpus/propose          → proposed sources (viewer+)
-// POST   /api/corpus/propose          → create proposal (editor+)
+// POST   /api/corpus/propose          → create proposal (platform operators)
 //   { title, pillar, kind: "url"|"upload"|"text", url?, text?, fileName?, fileBase64?, teaches?, note? }
 //   - url: validated http(s) URL, recorded only — never fetched automatically.
 //   - text: pasted text the user provides (theirs to give); stored as payload.
 //   - upload: fileBase64 (+ fileName); .md/.txt/.pdf only, ≤2MB.
-// DELETE /api/corpus/propose?id=…     → withdraw proposal (editor+)
+// DELETE /api/corpus/propose?id=…     → withdraw proposal (platform operators)
+//
+// The corpus is SHARED by every tenant on the install, so mutations are not
+// a workspace role: only MARKETR_PLATFORM_OPERATORS may change it (Phase 1).
 
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { requirePlatformOperator } from "@/lib/auth/require-platform-operator";
 import {
   listProposed,
   getProposed,
@@ -25,7 +29,7 @@ export const dynamic = "force-dynamic";
 const ALLOWED_EXT = new Set([".md", ".txt", ".pdf"]);
 const MAX_BYTES = 2 * 1024 * 1024;
 
-async function authed(min: "viewer" | "editor") {
+async function authed(min: "viewer") {
   const user = await requireUser();
   if (!user) return { err: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -41,9 +45,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const a = await authed("editor");
-  if (a.err) return a.err;
-  const user = a.user!;
+  const user = await requirePlatformOperator();
+  if (user instanceof Response) return user;
 
   let body: Record<string, unknown>;
   try {
@@ -119,8 +122,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const a = await authed("editor");
-  if (a.err) return a.err;
+  const op = await requirePlatformOperator();
+  if (op instanceof Response) return op;
   const id = sanitizeId(new URL(req.url).searchParams.get("id"));
   if (!id) return Response.json({ error: "id is required" }, { status: 400 });
   if (!deleteProposed(id)) return Response.json({ error: "proposal not found" }, { status: 404 });

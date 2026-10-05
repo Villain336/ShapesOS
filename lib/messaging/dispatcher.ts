@@ -16,14 +16,23 @@
 //       never suppress — mirrors lib/calls/reminders.ts). Direct mail
 //       (postcard|letter) skips this: timing is the date-based in-home
 //       window (mailDate + USPS transit) — see ./mail-channel.ts.
-//   (c) per-workspace daily cap → suppress "cap" (shared across channels,
-//       counting SMS/email/voice rows AND mail pieces).
+//   (c) per-workspace daily cap → suppress "cap". Pre-checked when queueing;
+//       enforced atomically when a row is claimed for sending (advisory lock
+//       per workspace-day, then count + conditional claim in one transaction
+//       — see claimWithinDailyCap). Mail pieces keep their own count check
+//       in ./mail-channel.ts (shared counter).
 //   (d) approval → Phase 3 is MANUAL-ONLY: without a valid approved
 //       ApprovalItem the message stays "queued" (a pending ApprovalItem is
 //       created when none was supplied). Nothing sends autonomously. Direct
 //       mail instead uses T1's MailApproval (binds creativeHash + pieceCount
 //       + maxSpendCents) via queueMailPiece — it is not an OutboundMessage.
-//   (e) provider send → "sent"; every send is meter()ed and audit-logged.
+//   (e) claim → meter → provider send → "sent". The row is claimed first
+//       (queued → sending, one winner — overlapping cron runs / approve
+//       clicks never double-send), credits are metered BEFORE the provider
+//       call (a cap_exceeded result suppresses "credit_cap"), and the
+//       provider gets the message id as its idempotency key. Every send is
+//       audit-logged. A "sending" claim older than SENDING_STALE_MS is
+//       recovered by dispatchDue (see recoverStaleSends).
 //       Mail provider calls are owned by T1's lib/mail/service.ts
 //       (executeCampaign = the money gate); dispatchDue sweeps due+approved
 //       nurture MailCampaigns through it.
@@ -36,7 +45,7 @@
 import { prisma } from "@/lib/prisma";
 import { meter } from "@/lib/metering/service";
 import { auditEvent } from "@/lib/auditlog";
-import type { OutboundMessage } from "@prisma/client";
+import type { OutboundMessage, Prisma } from "@prisma/client";
 import { getConsent, type ConsentChannel } from "./consent";
 import {
   getMessagingSettings,
@@ -52,6 +61,8 @@ import {
   ProviderNotConfiguredError,
 } from "./provider";
 import { signUnsubscribeToken } from "./consent";
+// Phase 4b: replies to outbound email route back to the CRM inbox.
+import { replyAddressForSend } from "./inbound-email";
 import { isMailChannel, dispatchDueNurtureMail } from "./mail-channel";
 
 import {
@@ -150,7 +161,7 @@ async function composeMarketingEmail(
   const token = signUnsubscribeToken({ workspaceId, messageId, leadId: leadId ?? undefined });
   const unsubUrl = `${publicOrigin()}/api/messaging/unsubscribe?token=${token}`;
   const host = unsubUrl.split("://")[1]?.split("/")[0] ?? "localhost";
-  const biz = settings.businessName?.trim() || "Marketr workspace";
+  const biz = settings.businessName?.trim() || "ShapesOS workspace";
   const addr = settings.physicalAddress?.trim() || PHYSICAL_ADDRESS_PLACEHOLDER;
   const html =
     `<div>${escapeHtml(body).replace(/\n/g, "<br>")}</div>` +
@@ -172,7 +183,13 @@ async function composeMarketingEmail(
 // queueMessage
 // ---------------------------------------------------------------------------
 
-type SuppressionReason = "opt_out" | "no_consent" | "cap" | "invalid_contact" | "invalid_address";
+type SuppressionReason =
+  | "opt_out"
+  | "no_consent"
+  | "cap"
+  | "credit_cap"
+  | "invalid_contact"
+  | "invalid_address";
 
 /** Consent ledger channel for a dispatch channel (mail → "mail"). */
 function consentChannelFor(channel: MessageChannel): ConsentChannel {
@@ -208,15 +225,62 @@ function utcDayStart(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-/** Sends (status sent/delivered) this UTC day — the daily-cap counter. */
+/**
+ * Sends this UTC day — the daily-cap counter: rows sent/delivered today plus
+ * rows claimed today and still "sending" (in flight to the provider). A
+ * failed or requeued send drops out of the count by itself, so the counter
+ * can never drift from the rows.
+ */
+function sentTodayWhere(workspaceId: string, now: Date): Prisma.OutboundMessageWhereInput {
+  const dayStart = utcDayStart(now);
+  return {
+    workspaceId,
+    OR: [
+      { status: { in: ["sent", "delivered"] }, sentAt: { gte: dayStart } },
+      { status: "sending", claimedAt: { gte: dayStart } },
+    ],
+  };
+}
+
+/** Pre-check only (queue time). The authority is claimWithinDailyCap. */
 async function sentTodayCount(workspaceId: string, now: Date): Promise<number> {
-  return prisma.outboundMessage.count({
-    where: {
-      workspaceId,
-      status: { in: ["sent", "delivered"] },
-      sentAt: { gte: utcDayStart(now) },
+  return prisma.outboundMessage.count({ where: sentTodayWhere(workspaceId, now) });
+}
+
+/**
+ * Claim one queued message for sending, atomically against the workspace's
+ * daily cap. A transaction-scoped advisory lock keyed on (workspace, UTC day)
+ * serializes every claim for that workspace-day; inside it the count and the
+ * conditional claim (queued → sending) run as one unit, so N concurrent
+ * claims can never all see headroom and overshoot the cap (the Phase 2
+ * check-then-act gap). Over the cap the row is suppressed "cap" instead.
+ */
+async function claimWithinDailyCap(
+  messageId: string,
+  workspaceId: string,
+  dailyCap: number,
+  now: Date = new Date(),
+): Promise<"claimed" | "cap" | "lost"> {
+  const lockKey = `outbound-daily-cap:${workspaceId}:${now.toISOString().slice(0, 10)}`;
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      const sentToday = await tx.outboundMessage.count({ where: sentTodayWhere(workspaceId, now) });
+      if (sentToday >= dailyCap) {
+        const res = await tx.outboundMessage.updateMany({
+          where: { id: messageId, status: "queued" },
+          data: { status: "suppressed", suppressionReason: "cap" },
+        });
+        return res.count === 1 ? "cap" : "lost";
+      }
+      const claim = await tx.outboundMessage.updateMany({
+        where: { id: messageId, status: "queued" },
+        data: { status: "sending", claimedAt: now },
+      });
+      return claim.count === 1 ? "claimed" : "lost";
     },
-  });
+    { maxWait: 15_000, timeout: 15_000 },
+  );
 }
 
 export async function queueMessage(input: QueueMessageInput): Promise<OutboundMessage> {
@@ -335,21 +399,100 @@ export async function queueMessage(input: QueueMessageInput): Promise<OutboundMe
 // attemptSend — one row through the provider, metered + audit-logged
 // ---------------------------------------------------------------------------
 
+/** A claim older than this is presumed abandoned (worker died mid-send). */
+export const SENDING_STALE_MS = 10 * 60 * 1000;
+
+/** Providers whose sends dedupe on the idempotency key (safe to retry). */
+function providerDedupes(provider: string): boolean {
+  return provider === "resend" || provider === "fake";
+}
+
+/** Update a row only while it is still queued (another run may own it now). */
+async function updateIfQueued(id: string, data: Prisma.OutboundMessageUpdateManyMutationInput) {
+  return prisma.outboundMessage.updateMany({ where: { id, status: "queued" }, data });
+}
+
 async function attemptSend(messageId: string): Promise<OutboundMessage> {
+  return (await claimAndSend(messageId)).row;
+}
+
+async function claimAndSend(messageId: string): Promise<{ row: OutboundMessage; claimed: boolean }> {
+  // Claim first: queued → sending, atomically within the daily cap. Exactly
+  // one concurrent caller flips the row; everyone else returns it untouched.
+  // Nothing below runs unclaimed.
+  const target = await prisma.outboundMessage.findUnique({
+    where: { id: messageId },
+    select: { workspaceId: true },
+  });
+  if (!target) throw new Error("message not found");
+  const settings = await getMessagingSettings(target.workspaceId);
+  const outcome = await claimWithinDailyCap(messageId, target.workspaceId, settings.dailyCap);
   const msg = await prisma.outboundMessage.findUnique({
     where: { id: messageId },
     include: { lead: { select: { id: true, phone: true, email: true } } },
   });
   if (!msg) throw new Error("message not found");
-  if (msg.status !== "queued") return msg;
+  // "cap": this caller suppressed the row (it reports it, like a send).
+  if (outcome === "cap") return { row: msg, claimed: true };
+  if (outcome !== "claimed") return { row: msg, claimed: false };
+  return { row: await sendClaimed(msg), claimed: true };
+}
+
+/** The provider leg for a row this caller has claimed (status "sending"). */
+async function sendClaimed(
+  msg: OutboundMessage & { lead: { id: string; phone: string | null; email: string | null } | null },
+): Promise<OutboundMessage> {
   const channel = msg.channel as "sms" | "email";
   const lead = msg.lead;
   const to = channel === "sms" ? lead?.phone : lead?.email;
   if (!to) {
     return prisma.outboundMessage.update({
       where: { id: msg.id },
-      data: { status: "suppressed", suppressionReason: "invalid_contact" },
+      data: { status: "suppressed", suppressionReason: "invalid_contact", claimedAt: null },
     });
+  }
+
+  // Meter BEFORE the provider call so the credit hard cap actually stops the
+  // send. Idempotency key = message id: a recovered/retried claim is never
+  // charged twice. (The ledger is append-only, so a send the provider then
+  // rejects keeps its one charge.)
+  let metered: Awaited<ReturnType<typeof meter>>;
+  try {
+    metered = await meter({
+      workspaceId: msg.workspaceId,
+      action: meterAction(channel),
+      credits: messageCredits(channel, msg.body),
+      idempotencyKey: `outbound-message:${msg.id}`,
+      evidenceRef: `outbound-message:${msg.id}`,
+    });
+  } catch (e) {
+    // Credits could not be confirmed — do not send; release the claim so the
+    // next sweep retries.
+    return prisma.outboundMessage.update({
+      where: { id: msg.id },
+      data: {
+        status: "queued",
+        claimedAt: null,
+        error: `metering error: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`,
+      },
+    });
+  }
+  if (!metered.ok) {
+    const suppressed = await prisma.outboundMessage.update({
+      where: { id: msg.id },
+      data:
+        metered.reason === "cap_exceeded"
+          ? { status: "suppressed", suppressionReason: "credit_cap", claimedAt: null, error: metered.message.slice(0, 500) }
+          : { status: "failed", claimedAt: null, error: `metering blocked: ${metered.reason} — ${metered.message}`.slice(0, 500) },
+    });
+    await auditEvent({
+      projectId: null,
+      workspaceId: msg.workspaceId,
+      action: "alert_failed",
+      summary: `R3 messaging: ${channel} ${msg.kind} NOT sent to lead ${msg.leadId} — metering ${metered.reason}`,
+      actor: "ai",
+    });
+    return suppressed;
   }
 
   const settings = await getMessagingSettings(msg.workspaceId);
@@ -362,7 +505,7 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
         settings.smsFromNumber?.trim() ||
         (process.env.MESSAGING_SMS_FROM ?? "").trim() ||
         undefined;
-      const res = await provider.sendSms({ to, from, body: msg.body });
+      const res = await provider.sendSms({ to, from, body: msg.body, idempotencyKey: msg.id });
       providerSid = res.providerSid;
       delivered = res.delivered ?? false;
     } else {
@@ -384,6 +527,8 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
         html: composed.html,
         text: composed.text,
         headers: composed.headers,
+        replyTo: replyAddressForSend(msg.workspaceId),
+        idempotencyKey: msg.id,
       });
       providerSid = res.providerSid;
       delivered = res.delivered ?? false;
@@ -399,36 +544,9 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
         deliveredAt: delivered ? new Date() : null,
         providerSid,
         costCents,
+        claimedAt: null,
       },
     });
-
-    // Meter every send. Idempotency key = message id: a retried dispatch
-    // never double-charges. Meter failure is audit-loud but does not unsend.
-    let meterNote = "";
-    try {
-      const metered = await meter({
-        workspaceId: msg.workspaceId,
-        action: meterAction(channel),
-        credits: messageCredits(channel, msg.body),
-        idempotencyKey: `outbound-message:${msg.id}`,
-        evidenceRef: providerSid,
-      });
-      if (!metered.ok) {
-        meterNote = ` [metering ${metered.reason}]`;
-        await prisma.outboundMessage.update({
-          where: { id: msg.id },
-          data: { error: `metering blocked: ${metered.reason} — ${metered.message}` },
-        });
-      }
-    } catch (e) {
-      meterNote = " [metering error]";
-      await prisma.outboundMessage.update({
-        where: { id: msg.id },
-        data: {
-          error: `metering error: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`,
-        },
-      });
-    }
 
     await auditEvent({
       projectId: null,
@@ -436,7 +554,7 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
       action: "alert_sent",
       summary:
         `R3 messaging: ${channel} ${msg.kind} sent to lead ${msg.leadId} ` +
-        `(sid ${providerSid}, ${costCents}¢)${meterNote}`,
+        `(sid ${providerSid}, ${costCents}¢, ${metered.charged}cr)`,
       actor: "ai",
     });
     return updated;
@@ -444,7 +562,7 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
     const message = e instanceof Error ? e.message : "provider send failed";
     const failed = await prisma.outboundMessage.update({
       where: { id: msg.id },
-      data: { status: "failed", error: message.slice(0, 500) },
+      data: { status: "failed", claimedAt: null, error: message.slice(0, 500) },
     });
     await auditEvent({
       projectId: null,
@@ -462,13 +580,59 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Recover "sending" claims older than SENDING_STALE_MS (the claiming worker
+ * died between claim and final write). When the provider dedupes on the
+ * idempotency key (Resend, fake) the row is requeued — a retry re-uses the
+ * same key, so at most one message reaches the lead, and metering is keyed
+ * the same way. Otherwise (Twilio) the outcome is unknown and a retry could
+ * double-text the lead, so the row is failed loudly instead.
+ */
+export async function recoverStaleSends(
+  workspaceId?: string,
+  now: Date = new Date(),
+): Promise<{ requeued: number; failed: number }> {
+  const cutoff = new Date(now.getTime() - SENDING_STALE_MS);
+  const stale = await prisma.outboundMessage.findMany({
+    where: {
+      status: "sending",
+      claimedAt: { lt: cutoff },
+      ...(workspaceId ? { workspaceId } : {}),
+    },
+    select: { id: true, provider: true },
+    take: 500,
+  });
+  const out = { requeued: 0, failed: 0 };
+  for (const row of stale) {
+    const retry = providerDedupes(row.provider);
+    const res = await prisma.outboundMessage.updateMany({
+      where: { id: row.id, status: "sending", claimedAt: { lt: cutoff } },
+      data: retry
+        ? { status: "queued", claimedAt: null, error: "stale send claim recovered; retried with the same idempotency key" }
+        : {
+            status: "failed",
+            claimedAt: null,
+            error:
+              `send outcome unknown: the send stalled after claiming and ${row.provider} has no ` +
+              `idempotency key, so it is not retried automatically (avoids a duplicate)`,
+          },
+    });
+    if (res.count === 1) out[retry ? "requeued" : "failed"] += 1;
+  }
+  return out;
+}
+
+/**
  * Send every queued message that is due and approved. Re-checks consent,
  * quiet hours, the daily cap, and approval status per row — an opt-out or a
- * rejection that landed after queueing is honored here.
+ * rejection that landed after queueing is honored here. Safe to run
+ * concurrently (cron + approve clicks): every write is guarded on
+ * status "queued" and attemptSend claims before sending.
  */
 export async function dispatchDue(workspaceId?: string): Promise<DispatchResult> {
   const now = new Date();
   const out: DispatchResult = { sent: 0, suppressed: 0, failed: 0 };
+  const recovered = await recoverStaleSends(workspaceId, now);
+  out.failed += recovered.failed;
   const due = await prisma.outboundMessage.findMany({
     where: {
       status: "queued",
@@ -484,25 +648,19 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
   for (const msg of due) {
     const channel = msg.channel as MessageChannel;
     if (channel === "voice" || !msg.leadId) {
-      await prisma.outboundMessage.update({
-        where: { id: msg.id },
-        data: { status: "suppressed", suppressionReason: "invalid_contact" },
-      });
-      out.suppressed += 1;
+      const res = await updateIfQueued(msg.id, { status: "suppressed", suppressionReason: "invalid_contact" });
+      out.suppressed += res.count;
       continue;
     }
 
     // (a) consent re-check.
     const consent = await getConsent(msg.workspaceId, msg.leadId, consentChannelFor(channel));
     if (consent !== "opted_in") {
-      await prisma.outboundMessage.update({
-        where: { id: msg.id },
-        data: {
-          status: "suppressed",
-          suppressionReason: consent === "opted_out" ? "opt_out" : "no_consent",
-        },
+      const res = await updateIfQueued(msg.id, {
+        status: "suppressed",
+        suppressionReason: consent === "opted_out" ? "opt_out" : "no_consent",
       });
-      out.suppressed += 1;
+      out.suppressed += res.count;
       continue;
     }
 
@@ -514,11 +672,8 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
       });
       if (!item || item.status === "pending") continue;
       if (item.status !== "approved") {
-        await prisma.outboundMessage.update({
-          where: { id: msg.id },
-          data: { status: "failed", error: `approval ${item.status}` },
-        });
-        out.failed += 1;
+        const res = await updateIfQueued(msg.id, { status: "failed", error: `approval ${item.status}` });
+        out.failed += res.count;
         continue;
       }
     }
@@ -527,27 +682,18 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
     const settings = await getMessagingSettings(msg.workspaceId);
     const tz = await resolveRecipientTimezone(msg.workspaceId, msg.lead);
     if (isQuietHour(now, tz, settings.quietStart, settings.quietEnd)) {
-      await prisma.outboundMessage.update({
-        where: { id: msg.id },
-        data: { scheduledFor: nextQuietEnd(now, tz, settings.quietEnd) },
-      });
+      await updateIfQueued(msg.id, { scheduledFor: nextQuietEnd(now, tz, settings.quietEnd) });
       continue;
     }
 
-    // (c) daily cap re-check.
-    if ((await sentTodayCount(msg.workspaceId, now)) >= settings.dailyCap) {
-      await prisma.outboundMessage.update({
-        where: { id: msg.id },
-        data: { status: "suppressed", suppressionReason: "cap" },
-      });
-      out.suppressed += 1;
-      continue;
-    }
-
-    const sent = await attemptSend(msg.id);
+    // (c) daily cap: enforced atomically by the claim (claimWithinDailyCap);
+    // an over-cap row comes back suppressed "cap".
+    const { row: sent, claimed } = await claimAndSend(msg.id);
+    // Another run claimed it first: that run sends and counts it.
+    if (!claimed) continue;
     if (sent.status === "sent" || sent.status === "delivered") out.sent += 1;
     else if (sent.status === "failed") out.failed += 1;
-    else out.suppressed += 1;
+    else if (sent.status === "suppressed") out.suppressed += 1;
   }
 
   // Direct mail: due + approved nurture MailCampaigns → T1 executeCampaign

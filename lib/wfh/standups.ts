@@ -11,6 +11,8 @@
 // video); team visibility is workspace-scoped through the existing
 // membership roles.
 
+import { DEFAULT_TIME_ZONE, resolveTimeZone, zonedParts } from "@/lib/time/zoned";
+
 export type StandupVisibility = "team" | "private";
 export type StandupCadence = "daily" | "weekdays" | "none";
 
@@ -46,7 +48,7 @@ export interface ValidatedStandup {
   visibility: StandupVisibility;
 }
 
-export function validateStandup(draft: Partial<StandupDraft>): {
+export function validateStandup(draft: Partial<StandupDraft>, timeZone: string = DEFAULT_TIME_ZONE): {
   ok: boolean;
   errors: string[];
   normalized?: ValidatedStandup;
@@ -63,17 +65,24 @@ export function validateStandup(draft: Partial<StandupDraft>): {
   if (blockers && blockers.length > 2000) errors.push("blockers: max 2000 characters");
 
   let date: Date | null = null;
-  if (draft.date instanceof Date && !isNaN(draft.date.getTime())) {
-    date = draft.date;
-  } else if (typeof draft.date === "string") {
-    const d = new Date(draft.date);
-    if (!isNaN(d.getTime())) date = d;
+  const ymd = typeof draft.date === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(draft.date) : null;
+  if (ymd) {
+    // A plain calendar date is the workday itself (must round-trip: no Feb 30).
+    const d = new Date(Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0));
+    if (d.toISOString().slice(0, 10) === draft.date) date = d;
+  } else {
+    let instant: Date | null = null;
+    if (draft.date instanceof Date && !isNaN(draft.date.getTime())) {
+      instant = draft.date;
+    } else if (typeof draft.date === "string") {
+      const d = new Date(draft.date);
+      if (!isNaN(d.getTime())) instant = d;
+    }
+    // Standups cover one workday: the user's local date, stored at noon UTC
+    // to avoid tz edge drift.
+    if (instant) date = standupDateFor(instant, timeZone);
   }
   if (!date) errors.push("date: required (the workday this standup covers)");
-  else {
-    // Standups cover one workday: normalize to noon UTC to avoid tz edge drift.
-    date = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
-  }
 
   const visibility = (draft.visibility ?? "team") as StandupVisibility;
   if (!(STANDUP_VISIBILITIES as readonly string[]).includes(visibility)) {
@@ -120,20 +129,30 @@ export function validateReaction(emoji: unknown): { ok: boolean; error?: string;
 // today is a workday under that cadence, and no standup exists for today.
 // The result is a NUDGE suggestion, never a gate — missing one is fine.
 
+// "Today", weekdays and the due hour are read in the user's IANA timezone
+// (WfhWorkMode.timezone, default UTC) — never the server's.
+
 export function isStandupDue(
   cadence: StandupCadence,
   now: Date,
   hasSubmittedToday: boolean,
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): boolean {
   if (hasSubmittedToday) return false;
   if (cadence === "none") return false;
-  const day = now.getDay();
+  const day = zonedParts(now, resolveTimeZone(timeZone)).weekday;
   if (cadence === "weekdays" && (day === 0 || day === 6)) return false;
   return true;
 }
 
-export function isStandupLate(now: Date, dueHourLocal = 10): boolean {
-  return now.getHours() >= dueHourLocal;
+export function isStandupLate(now: Date, dueHourLocal = 10, timeZone: string = DEFAULT_TIME_ZONE): boolean {
+  return zonedParts(now, resolveTimeZone(timeZone)).hour >= dueHourLocal;
+}
+
+/** The stored standup date (noon UTC) for the user's local workday containing `now`. */
+export function standupDateFor(now: Date, timeZone: string = DEFAULT_TIME_ZONE): Date {
+  const p = zonedParts(now, resolveTimeZone(timeZone));
+  return new Date(Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0));
 }
 
 export function nudgeCopy(due: boolean, late: boolean): string | null {

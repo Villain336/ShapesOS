@@ -9,6 +9,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { generateReport } from "@/lib/pdf/generate";
+import { errorResponse } from "@/lib/api/errors";
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();
@@ -62,7 +63,6 @@ export async function POST(req: NextRequest) {
     });
     return Response.json({ report }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: `Report generation failed: ${message}` }, { status: 500 });
+    return errorResponse(err, "POST /api/reports");
   }
 }

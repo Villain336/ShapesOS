@@ -1,6 +1,6 @@
 // Marketr — /api/automation shared guard (not a route: no HTTP exports).
 //
-// Phase 9 M6 (SPEC-PHASE9.md §P9E). Session → workspace; reads need viewer,
+// Phase 9 M6 (docs/specs/SPEC-PHASE9.md §P9E). Session → workspace; reads need viewer,
 // mutations need editor. Mirrors app/api/substrate/_lib.ts conventions:
 // every DB access goes through withWorkspaceScope() (tenant GUC via
 // SET LOCAL — fail-closed RLS) AND `where: { workspaceId }` as defense in
@@ -8,6 +8,7 @@
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, getMembership, forbidden } from "@/lib/authz";
+import { errorResponse } from "@/lib/api/errors";
 
 export interface AutomationGuard {
   userId: string;
@@ -49,6 +50,5 @@ export function decideError(err: unknown) {
   if (err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number") {
     return Response.json({ error: err instanceof Error ? err.message : "Decide failed" }, { status: (err as { status: number }).status });
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return Response.json({ error: message }, { status: 500 });
+  return errorResponse(err);
 }

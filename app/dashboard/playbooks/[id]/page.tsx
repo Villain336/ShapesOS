@@ -7,7 +7,7 @@ import { PlaybookDetail } from "./PlaybookDetail";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Playbook — Marketr",
+  title: "Playbook — ShapesOS",
   description: "Playbook versions, outcome evaluations, and community sharing.",
 };
 

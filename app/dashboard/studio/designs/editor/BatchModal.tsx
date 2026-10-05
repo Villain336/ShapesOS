@@ -29,6 +29,7 @@ import {
   extractVariables,
 } from "@/lib/design/variables";
 import { btnGhost, btnPrimary, inputCls, panelSectionLabel } from "./ui";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 type ValueTab = "table" | "csv" | "ai";
 
@@ -391,11 +392,16 @@ export function BatchModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4"
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Batch generate variants"
+      onKeyDown={closeOnEscape(onClose)}
+      role="presentation"
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Batch generate variants"
+        className="w-full max-w-3xl"
+      >
         {page ? (
           <BatchModalBody
             key={page.id}

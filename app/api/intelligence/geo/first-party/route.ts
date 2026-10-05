@@ -55,7 +55,7 @@ export async function GET(req: Request) {
       note: "GA4 connector is MOCK-ONLY today. Connect GA4 (official API) and this endpoint will report live AI-referrer sessions.",
     },
     crawlerLogs: {
-      note: "Ship your server logs to Marketr to track AI-crawler activity (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot, Bytespider) — the preceding indicator of citing.",
+      note: "Ship your server logs to ShapesOS to track AI-crawler activity (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot, Bytespider) — the preceding indicator of citing.",
       docs: "/docs/ai-visibility-log-shipping.md",
     },
     brandedMentions: mentions,

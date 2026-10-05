@@ -49,7 +49,7 @@ export async function POST(
       limitCents: pool.capCents,
       currency: pool.currency,
       providerAccountRef: parsed.data.providerAccountRef,
-      memo: `Marketr media pool ${pool.name} (${pool.id})`,
+      memo: `ShapesOS media pool ${pool.name} (${pool.id})`,
     });
     const updated = await pools.attachVirtualCard(id, gate.workspaceId, card.cardRef, card.provider);
     // Append-only audit: card issuance is money-adjacent. Only the ref is

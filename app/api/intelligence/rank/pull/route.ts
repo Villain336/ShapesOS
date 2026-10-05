@@ -4,6 +4,7 @@
 // stores gsc_snapshot rows. Requires the GSC connector bound to the project.
 
 import type { NextRequest } from "next/server";
+import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { pullSnapshots, type GscGranularity } from "@/lib/intelligence/gsc";
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // Pulls GSC data and writes snapshots — editor+, like the other paid pulls.
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "editor")))
+    return Response.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { projectId?: string; granularity?: GscGranularity };
   try {

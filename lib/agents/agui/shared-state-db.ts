@@ -53,7 +53,9 @@ export async function defaultLoadSharedState(
         updatedAt: true,
       },
     }),
-    prisma.mission.findFirst({
+    // missions is FORCE-RLS: read inside the workspace scope.
+    withWorkspaceScope(ctx.workspaceId, (tx) =>
+      tx.mission.findFirst({
       where: {
         workspaceId: ctx.workspaceId,
         status: { in: ["active", "paused", "planned"] },
@@ -72,7 +74,8 @@ export async function defaultLoadSharedState(
           select: { step: true, tool: true, ts: true },
         },
       },
-    }),
+      }),
+    ),
     prisma.autopilotItem.findMany({
       where: { projectId: ctx.projectId, status: "pending" },
       orderBy: { updatedAt: "desc" },

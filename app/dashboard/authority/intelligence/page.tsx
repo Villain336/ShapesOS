@@ -26,7 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Intelligence Report — Marketr",
+  title: "Intelligence Report — ShapesOS",
   description: "Twelve audits, ranked revenue opportunities, and the 90-day Growth Plan.",
 };
 
@@ -270,7 +270,7 @@ export default async function IntelligencePage({
           </span>
           <h2 className="mt-4 text-lg font-semibold text-ink">No intelligence report yet</h2>
           <p className="mt-2 text-sm text-muted">
-            Connect your stack, then compile: twelve audits run against the data Marketr already
+            Connect your stack, then compile: twelve audits run against the data ShapesOS already
             holds — from onboarding intake to paid media — plus ranked revenue opportunities and a
             90-day Growth Plan. Missing connections degrade to labeled partial, never fabricated.
           </p>
@@ -314,7 +314,7 @@ export default async function IntelligencePage({
           <section>
             <div className="mb-3 flex items-baseline justify-between">
               <h2 className="text-sm font-semibold tracking-tight text-ink">The twelve audits</h2>
-              <p className="text-xs text-muted">Each audit cites the Marketr module that produced it.</p>
+              <p className="text-xs text-muted">Each audit cites the ShapesOS module that produced it.</p>
             </div>
             <div className="overflow-x-auto rounded-lg border border-line bg-paper">
               <table className="w-full text-left text-[13px]">
@@ -407,7 +407,7 @@ export default async function IntelligencePage({
               <div>
                 <h2 className="text-sm font-semibold tracking-tight text-ink">90-day Growth Plan</h2>
                 <p className="mt-0.5 text-xs text-muted">
-                  Each initiative is mapped to the Marketr module that executes it.
+                  Each initiative is mapped to the ShapesOS module that executes it.
                   {canEdit && row.status === "draft"
                     ? " Adjust priority with the arrows — a human reviews before the plan becomes the baseline."
                     : " Priorities adjust during the draft review window."}

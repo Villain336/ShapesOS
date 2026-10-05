@@ -18,6 +18,7 @@
 //     the engine reads naturally (e.g. term "Marketr" → "marketer").
 
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { BadRequestError } from "@/lib/api/errors";
 
 export interface PronunciationEntryInput {
   term: string;
@@ -65,10 +66,10 @@ export async function upsertEntry(
 ): Promise<PronunciationEntryRow> {
   const term = normTerm(input.term);
   const phonetic = input.phonetic.trim();
-  if (!term) throw new Error("Pronunciation term is required.");
-  if (!phonetic) throw new Error("Phonetic respelling is required.");
+  if (!term) throw new BadRequestError("Pronunciation term is required.");
+  if (!phonetic) throw new BadRequestError("Phonetic respelling is required.");
   if (term.length > 120 || phonetic.length > 200) {
-    throw new Error("Term/phonetic too long.");
+    throw new BadRequestError("Term/phonetic too long.");
   }
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.pronunciationEntry.upsert({

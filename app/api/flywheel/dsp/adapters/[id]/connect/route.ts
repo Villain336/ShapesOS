@@ -33,7 +33,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
     return Response.json({
       adapter: { id: record.id, dsp: record.dsp, label: DSP_LABELS[record.dsp], seatStatus: record.seatStatus },
-      zeroCustody: "Seat connected with a vault reference only. Marketr never receives raw seat credentials.",
+      zeroCustody: "Seat connected with a vault reference only. ShapesOS never receives raw seat credentials.",
     });
   } catch (err) {
     return dspError(err);

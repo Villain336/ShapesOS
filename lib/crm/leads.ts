@@ -13,6 +13,7 @@ import { dedupKeyFor, recomputeScore, logActivity } from "./dedup";
 import { parseStages, CLOSED_STAGES } from "./stages";
 import { recordCaptureTouch, type UtmInput } from "@/lib/attribution/touches";
 import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
+import { emitLeadCreated } from "@/lib/webhooks/emit";
 
 export const LEAD_SOURCES = [
   "website_form",
@@ -176,5 +177,7 @@ export async function createLeadRecord(
   await recomputeScore(lead.id, workspaceId);
 
   const full = await prisma.lead.findUnique({ where: { id: lead.id } });
+  // Phase 4a: lead.created webhook (best-effort, never throws).
+  await emitLeadCreated(full ?? lead);
   return { ok: true, lead: full ?? lead };
 }

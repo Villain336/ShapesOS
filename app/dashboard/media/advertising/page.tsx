@@ -16,7 +16,7 @@ import ConnectButton from "./_components/ConnectButton";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Advertising — Marketr",
+  title: "Advertising — ShapesOS",
   description: "Buy everywhere, approve everything: one home for Amazon Ads, StackAdapt, Walmart Connect, and Spotify.",
 };
 
@@ -136,7 +136,7 @@ export default async function AdvertisingPage() {
       </div>
 
       <p className="rounded-lg bg-paper px-3 py-2 text-sm text-muted shadow-hairline">
-        Your ad accounts bill to you directly on each platform — Marketr never holds or moves ad spend.
+        Your ad accounts bill to you directly on each platform — ShapesOS never holds or moves ad spend.
         Campaign connectors (launch, reporting) land in the following Phase 18 slices; the proposal inbox
         below is live now.
       </p>

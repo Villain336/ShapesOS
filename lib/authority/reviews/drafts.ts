@@ -1,6 +1,6 @@
 // Marketr — R1 AI draft reply generator (fake LLM).
 //
-// SPEC-PHASE6.md §2/R1, §3/F2.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2.
 // Guardrails run pre-draft (./guardrails.ts) and are hard blocks: a flagged
 // review never gets an AI draft. Sentiment routing: positives → standard
 // queue; negatives → urgent flag for human eyes first.

@@ -78,9 +78,12 @@ export interface SpendProposalStore {
     proposedBy: string;
     expiresAt: Date;
   }): Promise<SpendProposal>;
-  get(id: string): Promise<SpendProposal | null>;
+  /** Workspace-scoped: a proposal in another workspace reads as not found. */
+  get(id: string, workspaceId: string): Promise<SpendProposal | null>;
+  /** Workspace-scoped: throws when no proposal with this id exists in the workspace. */
   setStatus(
     id: string,
+    workspaceId: string,
     status: SpendProposalStatus,
     decidedBy?: string,
   ): Promise<SpendProposal>;
@@ -93,7 +96,7 @@ export interface SpendApprovalStore {
     approver: string;
     scopeHash: string;
   }): Promise<SpendApproval>;
-  getByProposalId(proposalId: string): Promise<SpendApproval | null>;
+  getByProposalId(proposalId: string, workspaceId: string): Promise<SpendApproval | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,41 +159,47 @@ export async function proposeSpendAction(
 export async function approveSpendAction(
   proposals: SpendProposalStore,
   approvals: SpendApprovalStore,
+  workspaceId: string,
   proposalId: string,
   approver: string,
 ): Promise<{ proposal: SpendProposal; approval: SpendApproval }> {
-  const existing = await approvals.getByProposalId(proposalId);
+  if (!workspaceId) throw new AdsGateError("INVALID_INPUT", "workspaceId is required");
+  const existing = await approvals.getByProposalId(proposalId, workspaceId);
   if (existing) {
     throw new AdsGateError("ALREADY_DECIDED", `Proposal ${proposalId} already has an approval`);
   }
-  const proposal = await getActionableProposal(proposals, proposalId, "approve");
+  const proposal = await getActionableProposal(proposals, workspaceId, proposalId, "approve");
   const approval = await approvals.create({
     workspaceId: proposal.workspaceId,
     proposalId: proposal.id,
     approver,
     scopeHash: proposal.scopeHash,
   });
-  const updated = await proposals.setStatus(proposalId, "approved", approver);
+  const updated = await proposals.setStatus(proposal.id, workspaceId, "approved", approver);
   return { proposal: updated, approval };
 }
 
 /** Human rejects a pending proposal. Rejected proposals can never execute. */
 export async function rejectSpendAction(
   proposals: SpendProposalStore,
+  workspaceId: string,
   proposalId: string,
   decidedBy: string,
 ): Promise<SpendProposal> {
-  const proposal = await getActionableProposal(proposals, proposalId, "reject");
-  return proposals.setStatus(proposal.id, "rejected", decidedBy);
+  const proposal = await getActionableProposal(proposals, workspaceId, proposalId, "reject");
+  return proposals.setStatus(proposal.id, workspaceId, "rejected", decidedBy);
 }
 
 async function getActionableProposal(
   proposals: SpendProposalStore,
+  workspaceId: string,
   proposalId: string,
   verb: string,
 ): Promise<SpendProposal> {
-  const proposal = await proposals.get(proposalId);
-  if (!proposal) {
+  if (!workspaceId) throw new AdsGateError("INVALID_INPUT", "workspaceId is required");
+  const proposal = await proposals.get(proposalId, workspaceId);
+  // A proposal from another workspace is indistinguishable from a missing one.
+  if (!proposal || proposal.workspaceId !== workspaceId) {
     throw new AdsGateError("PROPOSAL_NOT_FOUND", `Cannot ${verb}: proposal ${proposalId} not found`);
   }
   if (proposal.status !== "pending") {
@@ -231,7 +240,7 @@ export async function executeSpendAction<T>(
     payload: Record<string, unknown>;
   }) => Promise<T>,
 ): Promise<T> {
-  const proposal = await proposals.get(input.proposalId);
+  const proposal = await proposals.get(input.proposalId, input.workspaceId);
   if (!proposal) {
     throw new AdsGateError("PROPOSAL_NOT_FOUND", "Execution refused: proposal not found");
   }
@@ -250,7 +259,7 @@ export async function executeSpendAction<T>(
   if (proposal.expiresAt.getTime() <= Date.now()) {
     throw new AdsGateError("PROPOSAL_EXPIRED", "Execution refused: proposal expired");
   }
-  const approval = await approvals.getByProposalId(proposal.id);
+  const approval = await approvals.getByProposalId(proposal.id, proposal.workspaceId);
   if (!approval) {
     throw new AdsGateError("APPROVAL_MISSING", "Execution refused: no SpendApproval for this proposal");
   }
@@ -267,7 +276,7 @@ export async function executeSpendAction<T>(
   }
 
   const result = await executor({ proposal, approval, payload: input.payload });
-  await proposals.setStatus(proposal.id, "executed");
+  await proposals.setStatus(proposal.id, proposal.workspaceId, "executed");
   return result;
 }
 

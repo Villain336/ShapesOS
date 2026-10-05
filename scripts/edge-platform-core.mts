@@ -770,7 +770,7 @@ check("validate email bad address rejected", validateChannelConfig("email", { to
 check("validate email bad cc rejected", validateChannelConfig("email", { to: "a@b.test", cc: "bad" }).ok === false);
 check("validate email trims", (() => { const r = validateChannelConfig("email", { to: "  a@b.test " }); return r.ok && (r as any).config.to === "a@b.test"; })());
 const sealed = sealChannelConfig("slack", { webhookUrl: "https://hooks.slack.com/services/X" });
-check("sealChannelConfig encrypts + hints", typeof sealed.configEnc === "string" && sealed.configEnc.startsWith("v1:") && sealed.hint.length > 0);
+check("sealChannelConfig encrypts + hints", typeof sealed.configEnc === "string" && sealed.configEnc.startsWith("v2:") && sealed.hint.length > 0);
 check("triggerDef known", triggerDef("rank_drop")?.key === "rank_drop");
 check("triggerDef unknown -> undefined", triggerDef("nope") === undefined);
 

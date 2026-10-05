@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: Prisma-backed MissionStore (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: Prisma-backed MissionStore (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // API-layer only — this module uses the @/ alias and the generated Prisma
 // client, so it is NOT imported by lib/missions/engine.ts or the tsx tests.
@@ -10,6 +10,7 @@ import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { appendMissionEvent } from "@/lib/orchestrator/audit";
 import { bindingHashOf } from "@/lib/authority/approvals";
 import { createId } from "@/lib/media/ids";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 import type {
   AppendEventInput,
   CreateApprovalInput,
@@ -170,7 +171,7 @@ export function createPrismaMissionStore(): MissionStore {
       const r = await withWorkspaceScope(workspaceId, async (tx) => {
         const existing = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
         if (!existing) throw new Error("Mission not found in workspace.");
-        return tx.mission.update({ where: { id: missionId }, data });
+        return tx.mission.update({ where: { id: missionId, workspaceId }, data });
       });
       return toMission(r as MissionRow);
     },
@@ -229,6 +230,15 @@ export function createPrismaMissionStore(): MissionStore {
           },
         }),
       );
+      // Phase 3 (J): best-effort "needs you" notification (never throws).
+      await notifyApprovalNeeded({
+        workspaceId: input.workspaceId,
+        source: "mission",
+        sourceId: r.id,
+        title: input.action.replace(/[_.]+/g, " "),
+        href: input.missionId ? `/dashboard/missions/${encodeURIComponent(input.missionId)}` : undefined,
+        requestedBy: input.createdBy,
+      });
       return toApproval(r as MissionApprovalRow);
     },
 
@@ -254,7 +264,7 @@ export function createPrismaMissionStore(): MissionStore {
         const existing = await tx.missionApproval.findFirst({ where: { id: approvalId, workspaceId } });
         if (!existing) throw new Error("Approval not found in workspace.");
         return tx.missionApproval.update({
-          where: { id: approvalId },
+          where: { id: approvalId, workspaceId },
           data: { status: decision, decidedBy, decidedAt },
         });
       });
@@ -265,7 +275,7 @@ export function createPrismaMissionStore(): MissionStore {
       const r = await withWorkspaceScope(workspaceId, async (tx) => {
         const existing = await tx.missionApproval.findFirst({ where: { id: approvalId, workspaceId } });
         if (!existing) throw new Error("Approval not found in workspace.");
-        return tx.missionApproval.update({ where: { id: approvalId }, data: { status: "expired" } });
+        return tx.missionApproval.update({ where: { id: approvalId, workspaceId }, data: { status: "expired" } });
       });
       return toApproval(r as MissionApprovalRow);
     },

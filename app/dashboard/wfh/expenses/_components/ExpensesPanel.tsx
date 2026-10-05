@@ -112,8 +112,13 @@ export default function ExpensesPanel() {
   }
 
   async function saveAllocation(c: Category) {
-    const pct = Number(editing[c.key]);
-    if (!isFinite(pct)) return;
+    // A blank field is "not set", never 0% (Number("") is 0).
+    const raw = String(editing[c.key] ?? "").trim();
+    const pct = raw === "" ? NaN : Number(raw);
+    if (!isFinite(pct) || pct < 0 || pct > 100) {
+      setError("Enter a percent between 0 and 100.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/wfh/expenses/categories/${c.key}`, {

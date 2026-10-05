@@ -25,7 +25,7 @@ import ReportPanel from "./_components/ReportPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "ChatGPT Ads — Marketr",
+  title: "ChatGPT Ads — ShapesOS",
   description: "Propose, approve, and measure conversational-intent campaigns bought through StackAdapt.",
 };
 
@@ -251,7 +251,7 @@ export default async function ChatGPTAdsPage() {
         <a href="https://ads.openai.com/" target="_blank" rel="noreferrer" className="font-semibold text-ink underline underline-offset-2">
           Ads Manager console
         </a>
-        . Marketr never holds ad spend; your StackAdapt account bills you directly.{" "}
+        . ShapesOS never holds ad spend; your StackAdapt account bills you directly.{" "}
         <Link href="/dashboard/media/advertising/proposals" className="font-semibold text-ink underline underline-offset-2">
           Open the proposal inbox
         </Link>

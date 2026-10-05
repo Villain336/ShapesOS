@@ -37,7 +37,7 @@ export default async function PublishingSettingsPage({
       <Card>
         <CardHeader
           title="Publishing controls"
-          description="Which destinations Marketr may publish to for this project"
+          description="Which destinations ShapesOS may publish to for this project"
         />
         <CardBody>
           <PublishingClient
