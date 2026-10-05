@@ -100,7 +100,7 @@ describe("Google Calendar events", () => {
     assert.equal(tools.find((t) => t.name === "update_event")?.mutating, true);
     assert.equal(tools.find((t) => t.name === "list_events")?.mutating, false);
     assert.equal(connectorGroup("google-calendar"), "calendar");
-    assert.equal(connectorAction("google-calendar", "create_event"), "connector_write");
+    assert.equal(connectorAction("google-calendar", "create_event"), "write_google_calendar");
     assert.ok(OAUTH_CONFIGS["google-calendar"].scopes.includes("https://www.googleapis.com/auth/calendar.events"));
   });
 });

@@ -10,21 +10,24 @@
 //   action — the automation action the tool stands for when it writes, so
 //            per-agent auto-approve rules (lib/automation/policy.ts) and the
 //            tier evaluator decide whether it may run without asking. No
-//            mapping → "connector_write", an unknown kind: Tier 2, ALWAYS
-//            asks (the default never widens). Read-only tools (server
-//            readOnlyHint or the admin allow-list) never ask.
+//            mapping → "mcp_write" (Phase 14; was "connector_write"): Tier 2,
+//            asks unless a rule switches mcp_write to Auto-run. Tool
+//            descriptions are still scanned for Tier-3 wording, and a tool
+//            the server marks destructiveHint=true never runs without asking.
+//            Read-only tools (server readOnlyHint or the admin allow-list)
+//            never ask.
 
 import { TOOL_GROUPS, type ToolGroup } from "@/lib/agents/grants";
 import { KNOWN_ACTION_DEFS } from "@/lib/automation/actions";
 
 export const DEFAULT_MCP_GROUP: ToolGroup = "connectors";
-export const DEFAULT_MCP_ACTION = "connector_write";
+export const DEFAULT_MCP_ACTION = "mcp_write";
 
 /** Groups an admin may put an MCP tool in (never the always-on / hand-off groups). */
 export const MCP_ASSIGNABLE_GROUPS: readonly ToolGroup[] = TOOL_GROUPS.filter((g) => g !== "workspace" && g !== "delegate");
 
 /** Actions an admin may map an MCP tool to (the catalog + the unknown-write default). */
-export const MCP_ASSIGNABLE_ACTIONS: readonly string[] = [DEFAULT_MCP_ACTION, ...KNOWN_ACTION_DEFS.map((d) => d.action)];
+export const MCP_ASSIGNABLE_ACTIONS: readonly string[] = [...new Set([DEFAULT_MCP_ACTION, ...KNOWN_ACTION_DEFS.map((d) => d.action)])];
 
 export interface McpToolPolicy {
   group: ToolGroup;

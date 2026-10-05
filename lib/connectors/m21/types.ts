@@ -12,6 +12,11 @@ export interface ConnectorToolDef {
   description: string;
   /** true when the tool writes/mutates/publishes something externally. */
   mutating: boolean;
+  /**
+   * Phase 14 (approvals): the tool may destroy data (MCP destructiveHint:
+   * true). A destructive tool never runs without asking, whatever a rule says.
+   */
+  destructive?: boolean;
   argsSchema: {
     type: "object";
     properties: Record<string, { type: string; description: string }>;

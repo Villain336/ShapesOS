@@ -202,10 +202,10 @@ describe("Airtable wiring", () => {
     assert.deepEqual(OAUTH_CONFIGS.airtable.scopes, ["data.records:read", "data.records:write", "schema.bases:read"]);
   });
 
-  it("grants: files group; record writes are Tier-2 connector_write", () => {
+  it("grants: files group; record writes are the Tier-2 write_airtable switch", () => {
     assert.equal(connectorGroup("airtable"), "files");
-    assert.equal(connectorAction("airtable", "create_records"), "connector_write");
-    assert.equal(connectorAction("airtable", "update_records"), "connector_write");
+    assert.equal(connectorAction("airtable", "create_records"), "write_airtable");
+    assert.equal(connectorAction("airtable", "update_records"), "write_airtable");
   });
 
   it("mock mode is labelled and writes nothing", async () => {

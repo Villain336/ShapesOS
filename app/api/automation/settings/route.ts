@@ -27,9 +27,9 @@ export const dynamic = "force-dynamic";
 
 function defaultsPayload() {
   return {
-    behaviors: Object.fromEntries(
-      KNOWN_ACTIONS.map((a) => [a.action, a.tier === 3 ? "never" : "ask"]),
-    ),
+    // Phase 14: the code default per action (ask; never for Tier 3; the
+    // explicit DEFAULT_BEHAVIORS such as slack_reply = auto).
+    behaviors: Object.fromEntries(KNOWN_ACTIONS.map((a) => [a.action, a.defaultBehavior])),
     tier1Kinds: [...TIER1_KINDS],
     thresholdCents: DEFAULT_SMALL_ACTION_THRESHOLD_CENTS,
     knownActions: KNOWN_ACTIONS,

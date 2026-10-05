@@ -106,7 +106,7 @@ describe("HubSpot adapter", () => {
     assert.deepEqual(tools.filter((x) => x.mutating).map((x) => x.name), ["sync_from_hubspot", "push_to_hubspot"]);
     assert.equal(connectorGroup("hubspot"), "ops");
     assert.equal(connectorAction("hubspot", "sync_from_hubspot"), "write_crm_record");
-    assert.equal(connectorAction("hubspot", "push_to_hubspot"), "connector_write");
+    assert.equal(connectorAction("hubspot", "push_to_hubspot"), "write_hubspot");
     process.env.HUBSPOT_CLIENT_ID = "hs-client";
     process.env.MARKETR_CREDENTIALS_KEY ||= "0".repeat(64);
     try {

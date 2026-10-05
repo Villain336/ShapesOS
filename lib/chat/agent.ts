@@ -35,8 +35,8 @@
 //     an in-flight model call, cancels the turn's pending proposals and
 //     expires the approvals it raised.
 //   * Auto-approve: a per-agent rule (lib/automation/policy.ts) may let a
-//     Tier 0/1 action run without the "yes" — Tier 2/3 and destructive tools
-//     always ask, whatever the rule says.
+//     Tier 0–2 action (Phase 14) run without the "yes" — Tier 3 (money and
+//     irreversible) and destructive tools always ask, whatever the rule says.
 //
 // PHASE 8 — durable runs: a turn still working after AGENT_INLINE_BUDGET_SECONDS
 // hands off to the agent worker at its next step boundary (the transcript is

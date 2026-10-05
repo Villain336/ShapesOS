@@ -10,7 +10,10 @@
 //   1 — Small actions: amount <= threshold AND kind in the small-action
 //       allowlist AND the user enabled the automation toggle.
 //   2 — Significant: everything else (external audience, publish, spend
-//       above threshold). Requires explicit human approval, every time.
+//       above threshold). Requires explicit human approval — unless (Phase 14,
+//       owner decision 2026-10-05) a per-agent automation rule says "auto"
+//       (lib/automation/policy.ts decideAutoApproval; amounts over the
+//       threshold still ask).
 //   3 — Never: hard deny list (move money, sign contracts, delete data).
 //       UN-OVERRIDABLE — no setting, toggle, or prompt text can widen it.
 //       The action's NATURE decides, not its label: adversarial phrasing in
@@ -190,7 +193,7 @@ export function normalizeForTier(text: string): string {
 // Phase 12 (mfgpos): + completing a manufacturing order (stock + costing to
 // the books) and closing a till session (the takings to the books).
 // Phase 12 (people): + approving and posting payroll.
-const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
+export const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "record payment",
   "post journal entry",
   "reverse journal entry",
@@ -200,11 +203,36 @@ const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "close pos session",
   "approve pay run",
   "post pay run",
+  // Phase 14 (approvals): auto-approve now reaches Tier 2, so money kinds
+  // whose names carry no Tier-3 verb are pinned here — they must never
+  // become auto-approvable. Sending an invoice and marking it paid are the
+  // ops money gates (OPS_INVOICE_SEND / _MARK_PAID); a campaign budget sets
+  // how much is spent; "money connector write" is the default action of an
+  // unmapped write on an accounting / payroll connector (lib/agents/grants.ts).
+  "send invoice",
+  "mark invoice paid",
+  "update campaign budget",
+  "money connector write",
+]);
+
+/**
+ * Phase 14 (approvals): drafting a purchase order moves no money (sending it
+ * is OPS_PO_SEND, gated). For that one exact kind the phrase "purchase
+ * order(s)" — and only that phrase — is ignored by the money scan; every
+ * other word (and every other kind) is scanned as before, so "purchase
+ * order sent", "buy media" or a draft PO whose text says "purchase the
+ * stock" still evaluate Tier 3.
+ */
+const TIER3_PHRASE_EXEMPTIONS: ReadonlyMap<string, RegExp> = new Map([
+  ["draft purchase order", /\bpurchase orders?\b/g],
 ]);
 
 function isTier3(kind: string, description: string): boolean {
-  if (TIER3_EXACT_KINDS.has(normalizeForTier(kind))) return true;
-  const hay = `${normalizeForTier(kind)} ${normalizeForTier(description)}`.trim();
+  const kindNorm = normalizeForTier(kind);
+  if (TIER3_EXACT_KINDS.has(kindNorm)) return true;
+  let hay = `${kindNorm} ${normalizeForTier(description)}`.trim();
+  const exempt = TIER3_PHRASE_EXEMPTIONS.get(kindNorm);
+  if (exempt) hay = hay.replace(exempt, " ").replace(/\s+/g, " ").trim();
   if (!hay) return false;
   return TIER3_PATTERNS.some((re) => re.test(hay));
 }

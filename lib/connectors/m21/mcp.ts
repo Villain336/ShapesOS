@@ -27,8 +27,8 @@ export interface McpServerInfo {
 interface RawTool {
   name: string;
   description?: string | null;
-  /** MCP tool annotations (spec 2025-03-26+); only readOnlyHint is used. */
-  annotations?: { readOnlyHint?: unknown } | null;
+  /** MCP tool annotations (spec 2025-03-26+): readOnlyHint, and (Phase 14) destructiveHint. */
+  annotations?: { readOnlyHint?: unknown; destructiveHint?: unknown } | null;
   inputSchema?: {
     type?: string;
     properties?: Record<string, { type?: string; description?: string }>;
@@ -63,6 +63,9 @@ export function mcpToolToDef(
     name: raw.name,
     description: raw.description ?? raw.name,
     mutating: !readOnly,
+    // Phase 14: an explicit destructiveHint makes the write never
+    // auto-approvable (lib/chat/connector-tools.ts).
+    ...(!readOnly && raw.annotations?.destructiveHint === true ? { destructive: true } : {}),
     argsSchema: {
       type: "object",
       properties: props,
