@@ -17,13 +17,16 @@
 // websockets); refused requests are aborted. Service workers are blocked.
 //
 // Each call starts from a fresh page: act / extract default to the last page
-// browser_open opened in this task (kept in memory per thread/run). Typed
-// values are never written to the timeline (only their length).
+// browser_open opened in this task. Deploy PR: that page is read back from
+// the run timeline (lastBrowserPageForTask) so it survives a hand-off to the
+// worker or a call landing on another replica; the in-process map is only a
+// cache in front of it. Typed values are never written to the timeline
+// (only their length).
 
 import { posix as path } from "node:path";
 import { TOOL_RECORDED_EVENT, registerExtraTool, type ToolContext, type ToolDef, type ToolResult } from "@/lib/chat/tools";
 import { assertSafeUrl, UnsafeUrlError } from "@/lib/safe-url";
-import { appendAgentRunEvent } from "./service";
+import { appendAgentRunEvent, lastBrowserPageForTask } from "./service";
 import { executeBrowserRun, RecorderBusyError, type BrowserRunRequest, type BrowserRunDeps, type BrowserRunResult } from "./lifecycle";
 import type { BrowserLauncher, RecorderPage, RequestGuard } from "./recorder";
 import type { AgentRunEventInput } from "./types";
@@ -36,6 +39,8 @@ export interface BrowserToolDeps {
   checkUrl: (url: string) => Promise<string>;
   launcher?: BrowserLauncher;
   recordEvent: (workspaceId: string, runId: string, event: AgentRunEventInput) => Promise<void>;
+  /** The task's last opened page from shared state (any instance). */
+  lastPage?: (workspaceId: string, task: { threadId?: string | null; runId?: string | null }) => Promise<string | null>;
 }
 
 export const defaultBrowserToolDeps: BrowserToolDeps = {
@@ -44,6 +49,7 @@ export const defaultBrowserToolDeps: BrowserToolDeps = {
   recordEvent: async (ws, runId, event) => {
     await appendAgentRunEvent(ws, runId, event);
   },
+  lastPage: lastBrowserPageForTask,
 };
 
 export const MAX_STEPS = 20;
@@ -73,7 +79,7 @@ export function makeRequestGuard(checkUrl: (url: string) => Promise<string>): Re
   };
 }
 
-/** Last page opened per task (thread, else run) — act / extract default to it. */
+/** Last page opened per task (thread, else run) — a cache in front of deps.lastPage. */
 const lastPage = new Map<string, string>();
 function taskKey(ctx: Ctx): string | null {
   return ctx.threadId ? `t:${ctx.threadId}` : ctx.runId ? `r:${ctx.runId}` : null;
@@ -135,7 +141,10 @@ async function pageText(page: RecorderPage): Promise<string> {
 async function resolveStartUrl(deps: BrowserToolDeps, ctx: Ctx, raw: unknown): Promise<string> {
   const given = typeof raw === "string" && raw.trim() ? raw.trim() : null;
   const key = taskKey(ctx);
-  const url = given ?? (key ? lastPage.get(key) : undefined);
+  let url = given ?? (key ? lastPage.get(key) : undefined);
+  if (!url && key && deps.lastPage) {
+    url = (await deps.lastPage(ctx.workspaceId, { threadId: ctx.threadId, runId: ctx.runId }).catch(() => null)) ?? undefined;
+  }
   if (!url) throw new Error("Say which page to use (url), or open one with browser_open first.");
   try {
     return await deps.checkUrl(url);

@@ -20,14 +20,30 @@
 // when saturated. Cross-process queuing is slice 7/8 scope.
 
 import { promises as fs } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { chromium } from "playwright";
 import type { Browser, BrowserContext, CDPSession, Page } from "playwright";
 import type { AgentRunEventInput } from "./types";
 import { attachWatch } from "./watch";
 
-/** Repo-local host-owned artifact root (gitignored). */
+/**
+ * Legacy artifact root (gitignored): recordings made before the deploy PR
+ * live here, and it is the "run-recordings" blob namespace's directory with
+ * MARKETR_STORAGE=local. New recordings are written to a scratch directory
+ * (scratchArtifactDir) and published to the shared blob store on stop
+ * (lib/agents/runs/artifacts.ts publishRecordingArtifacts).
+ */
 export const ARTIFACT_ROOT = path.join(process.cwd(), ".run-artifacts");
+
+/**
+ * Scratch directory for one live recording (class b: Playwright writes the
+ * WebM and trace here while the run works; the lifecycle uploads and removes
+ * it). Under os.tmpdir() so it never lands in an image layer or a shared path.
+ */
+export function scratchArtifactDir(runId: string): string {
+  return path.join(os.tmpdir(), "shapes-run-artifacts", runId.replace(/[^A-Za-z0-9_-]/g, "_"));
+}
 
 /** Recording video size (matches the dashboard viewer surface). */
 export const RECORDING_VIDEO_SIZE = { width: 1280, height: 800 } as const;
@@ -255,7 +271,7 @@ export function _activeRecordingCountForTests(): number {
 
 export interface RecorderOptions {
   runId: string;
-  /** Artifact directory override; defaults to .run-artifacts/<runId>. */
+  /** Artifact directory override; defaults to a scratch dir (scratchArtifactDir). */
   artifactDir?: string;
   /** Injected launcher (tests); production uses playwrightLauncher. */
   launcher?: BrowserLauncher;
@@ -309,7 +325,7 @@ export class AgentRunRecorder {
 
   constructor(options: RecorderOptions) {
     if (!options.runId) throw new Error("AgentRunRecorder: runId is required");
-    const artifactDir = options.artifactDir ?? path.join(ARTIFACT_ROOT, options.runId);
+    const artifactDir = options.artifactDir ?? scratchArtifactDir(options.runId);
     this.opts = { ...options, artifactDir };
     this.tracePath = path.join(artifactDir, "trace.zip");
   }

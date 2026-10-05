@@ -3,6 +3,7 @@
 # the RLS batteries are meaningful. Everything else runs in: npm test
 lib/adplatforms/__tests__/spend-store-scope.test.ts
 lib/agents/agui/__tests__/adapter.test.ts
+lib/agents/runs/__tests__/recording-blobs-db.test.ts
 lib/agents/runs/__tests__/retention-eval.test.ts
 lib/agents/runs/__tests__/retention-sweep.test.ts
 lib/agents/runs/__tests__/run-viewer.test.ts

@@ -19,6 +19,7 @@ import {
   type RecorderPage,
   type RequestGuard,
 } from "./recorder";
+import { publishRecordingArtifacts } from "./artifacts";
 import {
   createAgentRun,
   markAgentRunRunning,
@@ -70,12 +71,40 @@ export interface BrowserRunDeps {
 export interface BrowserRunResult {
   runId: string;
   status: "succeeded" | "failed";
+  /** Deploy PR: blob refs ("blob:run-recordings/…"), not filesystem paths. */
   videoPath: string | null;
-  tracePath: string;
+  tracePath: string | null;
   stepCount: number;
   sizeBytes: number;
   /** Phase 8: the structured result the execute callback returned. */
   result: Record<string, unknown>;
+}
+
+/**
+ * Deploy PR: upload the stopped recording to the shared blob store (so any
+ * replica can serve it) and note a failed upload on the run's timeline.
+ */
+async function publishStopped(
+  workspaceId: string,
+  runId: string,
+  artifactDir: string,
+  stopped: { videoPath: string | null; tracePath: string },
+) {
+  const published = await publishRecordingArtifacts({
+    workspaceId,
+    runId,
+    artifactDir,
+    videoPath: stopped.videoPath,
+    tracePath: stopped.tracePath || null,
+  });
+  if (published.errors.length) {
+    await appendAgentRunEvent(workspaceId, runId, {
+      type: "note",
+      summary: "The recording could not be saved to shared storage",
+      payload: { errors: published.errors.slice(0, 5) },
+    }).catch(() => undefined);
+  }
+  return published;
 }
 
 /**
@@ -130,11 +159,12 @@ export async function executeBrowserRun(
       recorder.recordAction(summary, payload);
     const outcome = await deps.execute({ page, recordAction, artifactDir: recorder.artifactDir, runId });
     const stopped = await recorder.stop();
+    const published = await publishStopped(workspaceId, runId, recorder.artifactDir, stopped);
     await attachAgentRunRecording(workspaceId, runId, {
-      videoPath: stopped.videoPath,
-      tracePath: stopped.tracePath,
+      videoPath: published.videoRef,
+      tracePath: published.traceRef,
       stepCount: stopped.stepCount,
-      sizeBytes: stopped.sizeBytes,
+      sizeBytes: published.sizeBytes,
       retentionUntil: recordingRetentionUntil(),
     });
     await appendAguiEvent(workspaceId, runId, "Browser run finished", {
@@ -146,27 +176,28 @@ export async function executeBrowserRun(
     return {
       runId,
       status: "succeeded",
-      videoPath: stopped.videoPath,
-      tracePath: stopped.tracePath,
+      videoPath: published.videoRef,
+      tracePath: published.traceRef,
       stepCount: stopped.stepCount,
-      sizeBytes: stopped.sizeBytes,
+      sizeBytes: published.sizeBytes,
       result: outcome.result,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Keep the artifacts: a failed run's trace is the most valuable one.
-    let stopped = { videoPath: null as string | null, tracePath: "", stepCount: 0, sizeBytes: 0 };
     try {
       const s = await recorder.stop();
-      stopped = { videoPath: s.videoPath, tracePath: s.tracePath, stepCount: s.stepCount, sizeBytes: s.sizeBytes };
       if (s.tracePath) {
-        await attachAgentRunRecording(workspaceId, runId, {
-          videoPath: s.videoPath,
-          tracePath: s.tracePath,
-          stepCount: s.stepCount,
-          sizeBytes: s.sizeBytes,
-          retentionUntil: recordingRetentionUntil(),
-        });
+        const published = await publishStopped(workspaceId, runId, recorder.artifactDir, s);
+        if (published.traceRef || published.videoRef) {
+          await attachAgentRunRecording(workspaceId, runId, {
+            videoPath: published.videoRef,
+            tracePath: published.traceRef,
+            stepCount: s.stepCount,
+            sizeBytes: published.sizeBytes,
+            retentionUntil: recordingRetentionUntil(),
+          });
+        }
       }
     } catch {
       // Recorder teardown already best-effort; never mask the run error.

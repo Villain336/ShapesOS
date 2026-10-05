@@ -975,10 +975,17 @@ export type StoredLocation =
  * (fail closed). Legacy paths are served while the file exists on this disk
  * (single-box installs); a one-time log line names the namespace.
  */
+export interface StoredRefOptions {
+  /** Extra directories a legacy path may live in (besides the namespace dir). */
+  legacyRoots?: string[];
+  /** Base for RELATIVE legacy paths (default: the app directory). */
+  relativeTo?: string;
+}
+
 export function resolveStoredRef(
   ref: string | null | undefined,
   ns: BlobNamespace,
-  legacyRoots: string[] = [],
+  opts: StoredRefOptions = {},
 ): StoredLocation | null {
   if (!ref || typeof ref !== "string") return null;
   if (isBlobRef(ref)) {
@@ -986,8 +993,8 @@ export function resolveStoredRef(
     if (!parsed || parsed.namespace !== ns) return null;
     return { kind: "blob", namespace: parsed.namespace, path: parsed.path };
   }
-  const abs = resolve(isAbsolute(ref) ? ref : join(process.cwd(), ref));
-  const roots = [localBlobDir(ns), ...legacyRoots].map((r) => resolve(r));
+  const abs = resolve(isAbsolute(ref) ? ref : join(opts.relativeTo ?? process.cwd(), ref));
+  const roots = [localBlobDir(ns), ...(opts.legacyRoots ?? [])].map((r) => resolve(r));
   if (!roots.some((r) => abs.startsWith(r + sep))) return null;
   if (!legacyWarned.has(ns)) {
     legacyWarned.add(ns);
@@ -1003,9 +1010,9 @@ export function resolveStoredRef(
 export async function readStoredRef(
   ref: string | null | undefined,
   ns: BlobNamespace,
-  opts: { legacyRoots?: string[]; range?: BlobRange } = {},
+  opts: StoredRefOptions & { range?: BlobRange } = {},
 ): Promise<Buffer | null> {
-  const loc = resolveStoredRef(ref, ns, opts.legacyRoots);
+  const loc = resolveStoredRef(ref, ns, opts);
   if (!loc) return null;
   if (loc.kind === "blob") return blobGet(loc.namespace, loc.path, opts.range);
   return new LocalFileReader(loc.absPath).read(opts.range);
@@ -1015,9 +1022,9 @@ export async function readStoredRef(
 export async function headStoredRef(
   ref: string | null | undefined,
   ns: BlobNamespace,
-  opts: { legacyRoots?: string[] } = {},
+  opts: StoredRefOptions = {},
 ): Promise<BlobHead | null> {
-  const loc = resolveStoredRef(ref, ns, opts.legacyRoots);
+  const loc = resolveStoredRef(ref, ns, opts);
   if (!loc) return null;
   if (loc.kind === "blob") return blobHead(loc.namespace, loc.path);
   try {
@@ -1032,9 +1039,9 @@ export async function headStoredRef(
 export async function deleteStoredRef(
   ref: string | null | undefined,
   ns: BlobNamespace,
-  opts: { legacyRoots?: string[] } = {},
+  opts: StoredRefOptions = {},
 ): Promise<boolean> {
-  const loc = resolveStoredRef(ref, ns, opts.legacyRoots);
+  const loc = resolveStoredRef(ref, ns, opts);
   if (!loc) return false;
   if (loc.kind === "blob") {
     await blobDelete(loc.namespace, loc.path);
