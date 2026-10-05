@@ -97,15 +97,9 @@ export async function errorText(res: Response, fallback: string): Promise<string
   return fallback;
 }
 
-/** The data side's object route (TWIN_API.object once it lands in the contract; same path either way). */
-export function objectPath(id: string): string {
-  const fromContract = (TWIN_API as unknown as { object?: (id: string) => string }).object;
-  return fromContract ? fromContract(id) : `/api/twin/objects/${encodeURIComponent(id)}`;
-}
-
 /** Remove a layout object (DELETE /api/twin/objects/[id], editor+; 409 for busy equipment or a dock with an active booking). */
 export async function deleteObject(id: string): Promise<void> {
-  const res = await fetch(objectPath(id), { method: "DELETE" });
+  const res = await fetch(TWIN_API.object(id), { method: "DELETE" });
   if (!res.ok) throw new Error(await errorText(res, "Could not delete the object."));
 }
 
