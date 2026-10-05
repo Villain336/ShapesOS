@@ -10,6 +10,11 @@
 //   Every request also gets an x-request-id (Phase 4a), echoed on the
 //   response and used by the structured error log (lib/observability/log.ts).
 //
+// Page requests only — host routing (deploy PR): with WEBSITE_HOST and
+//   APP_HOST set, website pages live on the website host and the OS on the
+//   app host; a page asked for on the wrong one gets a redirect (which still
+//   carries the CSP and request id). lib/hosting/host-routing.ts.
+//
 // API requests only — single choke point for Fix 6 (Phase A hardening):
 //   1. Oversize-body guard: declared Content-Length past the cap → 400
 //      (kept at 400 per the Fix 6 adversarial contract: malformed/oversize
@@ -42,6 +47,7 @@ import {
 } from "./lib/api/rate-limit";
 import { contentSecurityPolicyFor, generateCspNonce } from "./lib/security/headers";
 import { REQUEST_ID_HEADER, newRequestId, sanitizeRequestId } from "./lib/observability/log";
+import { decideHostRoute, hostRoutingConfig } from "./lib/hosting/host-routing";
 
 export const config = {
   matcher: [
@@ -95,6 +101,24 @@ export async function proxy(req: NextRequest) {
   };
 
   if (!isApiPath(req.nextUrl.pathname)) {
+    // Deploy PR: the website (WEBSITE_HOST) and the OS (APP_HOST) share this
+    // server; a page asked for on the wrong host is redirected to the right
+    // one. Off unless both are set; tenant domains and /api are never touched
+    // (lib/hosting/host-routing.ts has the rules).
+    const hostRoute = decideHostRoute(
+      {
+        method: req.method,
+        host: req.headers.get("host"),
+        pathname: req.nextUrl.pathname,
+        search: req.nextUrl.search,
+        forwardedProto: req.headers.get("x-forwarded-proto"),
+        protocol: req.nextUrl.protocol,
+      },
+      hostRoutingConfig({ WEBSITE_HOST: process.env.WEBSITE_HOST, APP_HOST: process.env.APP_HOST }),
+    );
+    if (hostRoute.action === "redirect") {
+      return withCsp(NextResponse.redirect(hostRoute.location, hostRoute.status));
+    }
     // Phase 4a: a sign-in waiting on its second factor never reaches the app
     // shell — send it back to /login to finish (the session itself already
     // exposes no user, so every server guard denies it regardless).
