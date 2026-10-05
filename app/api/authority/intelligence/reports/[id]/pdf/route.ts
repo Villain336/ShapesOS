@@ -1,13 +1,12 @@
 // Marketr — GET /api/authority/intelligence/reports/:id/pdf
 // Renders the Intelligence Report PDF on demand with the house takumi stack
 // (@/lib/authority/intelligence/pdf.tsx) and streams the bytes. Renders are
-// cached on disk (.data/reports/intelligence-<id>.pdf) and the row's pdfUrl
-// is updated; every GET re-renders so the PDF always matches the stored
-// bundle (including any human reprioritization of the 90-day plan).
+// kept in the shared blob store (namespace "reports") and the row's pdfUrl
+// holds the ref; every GET re-renders so the PDF always matches the stored
+// bundle (including any human reprioritization of the 90-day plan), and the
+// response streams the bytes just rendered (no read-back from storage).
 
 import type { NextRequest } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { authorityGuard, safetyError } from "@/app/api/authority/_lib";
 import { getReport, getReportBundle } from "@/lib/authority/intelligence/reports";
 import { renderIntelligencePdf } from "@/lib/authority/intelligence/pdf";
@@ -41,7 +40,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       select: { domain: true },
     });
 
-    const pdfUrl = await renderIntelligencePdf({
+    const { bytes } = await renderIntelligencePdf({
+      workspaceId: gate.workspaceId,
       reportId: row.id,
       brandName: client?.name ?? workspace?.name ?? "Intelligence Report",
       domain: project?.domain ?? null,
@@ -50,14 +50,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       plan: bundle.plan,
       generatedAt: bundle.generatedAt,
     });
-
-    const abs = path.join(process.cwd(), pdfUrl);
-    let bytes: Buffer;
-    try {
-      bytes = await fs.readFile(abs);
-    } catch {
-      return Response.json({ error: "PDF render failed: output file missing" }, { status: 500 });
-    }
 
     const safe = `intelligence-report-${row.version}.pdf`;
     return new Response(new Uint8Array(bytes), {

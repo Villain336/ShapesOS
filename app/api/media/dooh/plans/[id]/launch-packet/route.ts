@@ -13,7 +13,6 @@ import { mediaGuard, badRequest } from "../../../../_lib";
 import { prisma } from "@/lib/prisma";
 import {
   compileLaunchPacket,
-  launchPacketStorageDir,
   type DoohPlanRecord,
   type PacketCreative,
   type PlacementTracking,
@@ -24,6 +23,7 @@ import {
   buyingTablesReady,
 } from "@/lib/media/buying-store";
 import { SqlApprovalStore } from "@/lib/media/db";
+import { storageMode } from "@/lib/filesystem/storage";
 import { appendBuyingEvent } from "@/lib/media/buying-store";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,9 @@ export async function GET(
   if (!plan) return Response.json({ error: "Plan not found" }, { status: 404 });
   const packetStore = new SqlLaunchPacketStore();
   const packets = await packetStore.listForPlan(id, gate.workspaceId);
-  return Response.json({ packets, storageDir: launchPacketStorageDir() });
+  // Deploy PR: no server filesystem path is exposed; the PDFs live in the
+  // storage MARKETR_STORAGE selects (shared bucket on hosted installs).
+  return Response.json({ packets, storage: storageMode() });
 }
 
 export async function POST(

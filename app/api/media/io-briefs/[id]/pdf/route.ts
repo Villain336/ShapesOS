@@ -1,11 +1,9 @@
 // Marketr — GET /api/media/io-briefs/[id]/pdf (B3). Serves the IO-brief PDF.
 
 import type { NextRequest } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { mediaGuard } from "../../../_lib";
 import { SqlIoBriefStore, buyingTablesReady } from "@/lib/media/buying-store";
-import { ioBriefStorageDir } from "@/lib/media/io-briefs";
+import { readIoBriefPdf } from "@/lib/media/io-briefs";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +20,9 @@ export async function GET(
   const store = new SqlIoBriefStore();
   const brief = await store.get(id, gate.workspaceId);
   if (!brief || !brief.briefPdfUrl) return new Response("Brief not found", { status: 404 });
-  let bytes: Buffer;
-  try {
-    bytes = await fs.readFile(path.join(ioBriefStorageDir(), `${brief.id}.pdf`));
-  } catch {
-    return new Response("Brief PDF not found on disk", { status: 404 });
-  }
+  // Shared blob store (deploy PR); older briefs resolve by their legacy key.
+  const bytes = await readIoBriefPdf(gate.workspaceId, brief.id).catch(() => null);
+  if (!bytes) return new Response("Brief PDF not found in storage", { status: 404 });
   return new Response(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/pdf",

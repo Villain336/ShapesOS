@@ -2,14 +2,18 @@
 //
 // generateReport(): template Tiptap JSON + brand kit + project data
 //   → placeholder context → pdfcn React tree → Takumi PDF buffer
-//   → .data/reports/<id>.pdf → Report row + audit log.
+//   → shared blob store → Report row + audit log.
 //
-// Storage: REPORT_STORAGE_DIR env, default <repo>/.data/reports
-// (durable volume in production — see DEPLOY.md §1a).
+// Storage (deploy PR): blob namespace "reports", key <workspaceId>/<id>.pdf;
+// Report.pdfPath holds the blob ref ("blob:reports/…"). With
+// MARKETR_STORAGE=local that is REPORT_STORAGE_DIR (default .data/reports);
+// with s3 it is the shared bucket every replica reads. Rows written before
+// the deploy PR hold ".data/reports/<id>.pdf" and are still served by
+// readStoredRef(pdfPath, "reports") while that file exists on this disk.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { prisma } from "@/lib/prisma";
+import { blobPath, blobPut, encodeBlobSegment, localBlobDir } from "@/lib/filesystem/storage";
+import { loadBrandKitLogoFile } from "@/lib/brand-logo";
 import { renderPdf } from "@/lib/pdf/renderer";
 import { brandKitTheme, DEFAULT_BRAND_COLORS, DEFAULT_BRAND_FONTS } from "@/lib/pdf/brand-theme";
 import {
@@ -19,11 +23,11 @@ import {
   type TiptapNode,
 } from "@/lib/pdf/report-document";
 
+/** Local directory of the "reports" namespace (MARKETR_STORAGE=local). */
 export function reportStorageDir(): string {
-  const override = (process.env.REPORT_STORAGE_DIR ?? "").trim();
-  if (override) return override;
-  return path.join(process.cwd(), ".data", "reports");
+  return localBlobDir("reports");
 }
+
 
 function periodOf(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -68,17 +72,9 @@ function summarize(rows: RankingRow[]): PlaceholderContext["summary"] {
 }
 
 async function logoDataUri(logoPath: string | null): Promise<string | undefined> {
-  if (!logoPath) return undefined;
-  try {
-    const abs = path.isAbsolute(logoPath) ? logoPath : path.join(process.cwd(), logoPath);
-    const buf = await fs.readFile(abs);
-    const ext = path.extname(abs).toLowerCase();
-    const mime =
-      ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
-    return `data:${mime};base64,${buf.toString("base64")}`;
-  } catch {
-    return undefined;
-  }
+  // Same resolver the logo routes serve from (blob ref or legacy file name).
+  const file = await loadBrandKitLogoFile(logoPath).catch(() => null);
+  return file ? `data:${file.mime};base64,${file.bytes.toString("base64")}` : undefined;
 }
 
 export interface GenerateReportInput {
@@ -151,16 +147,18 @@ export async function generateReport(input: GenerateReportInput) {
     });
     const pdf = await renderPdf(element);
 
-    const dir = reportStorageDir();
-    await fs.mkdir(dir, { recursive: true });
-    const pdfPath = path.join(dir, `${report.id}.pdf`);
-    await fs.writeFile(pdfPath, pdf);
+    const pdfPath = await blobPut(
+      "reports",
+      blobPath(encodeBlobSegment(workspaceId), `${encodeBlobSegment(report.id)}.pdf`),
+      Buffer.from(pdf),
+      "application/pdf",
+    );
 
     const updated = await prisma.report.update({
       where: { id: report.id },
       data: {
         status: "ready",
-        pdfPath: path.relative(process.cwd(), pdfPath),
+        pdfPath,
       },
     });
 

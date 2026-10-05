@@ -8,15 +8,17 @@
 //
 //  1. Defines SchedulerOutputStore — the interface the scheduler engine codes
 //     against (mirrors the contract's call shape exactly).
-//  2. Ships FallbackOutputStore — a local, workspace-scoped `.data/` writer
-//     used until the sibling service is wired. Same logical paths, traversal
-//     guarded, never crossing workspaces.
+//  2. Ships FallbackOutputStore — a workspace-scoped writer used when the
+//     filesystem service cannot be loaded. Same logical paths, traversal
+//     guarded, never crossing workspaces. Deploy PR: it writes through the
+//     shared blob layer (namespace "scheduler-runs", <workspaceId>/<logical
+//     path>), so outputs survive on every replica; with MARKETR_STORAGE=local
+//     that is .data/scheduler-runs as before.
 //  3. Ships FilesystemServiceStore — an adapter that takes the real service
 //     module (injected, no static import) so wiring it later is a one-line
 //     change in getOutputStore() without breaking the build now.
 
-import { mkdir, writeFile as fsWriteFile, readFile as fsReadFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { blobGet, blobPut, workspaceBlobPath } from "@/lib/filesystem/storage";
 
 export interface OutputWrite {
   logicalPath: string;
@@ -91,33 +93,30 @@ export class FilesystemServiceStore implements SchedulerOutputStore {
 }
 
 /**
- * Local fallback: workspace-scoped writes under .data/scheduler-runs/.
- * Used until lib/filesystem/service.ts is wired. Traversal-guarded.
+ * Fallback: workspace-scoped writes in the shared blob store (namespace
+ * "scheduler-runs"). Traversal-guarded: every logical-path segment is
+ * validated by the blob layer ("..", "." and empty segments are refused) and
+ * the workspace id is always the first key segment.
  */
 export class FallbackOutputStore implements SchedulerOutputStore {
-  constructor(private baseDir = join(process.cwd(), ".data", "scheduler-runs")) {}
-
-  private resolvePath(workspaceId: string, logicalPath: string): string {
-    const cleanWorkspace = String(workspaceId).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const cleanLogical = String(logicalPath).replace(/^\/+/, "");
-    const full = resolve(join(this.baseDir, cleanWorkspace, cleanLogical));
-    const root = resolve(join(this.baseDir, cleanWorkspace)) + sep;
-    if (!full.startsWith(root)) throw new Error("output path escapes workspace root");
-    return full;
+  private key(workspaceId: string, logicalPath: string): string {
+    const segs = String(logicalPath).split("/").filter(Boolean);
+    if (segs.length === 0 || segs.some((s) => s === "." || s === "..")) {
+      throw new Error("output path escapes workspace root");
+    }
+    return workspaceBlobPath(String(workspaceId), ...segs);
   }
 
   async writeReport(workspaceId: string, runId: string, filename: string, content: string) {
     const logicalPath = runOutputPath(runId, filename);
-    const full = this.resolvePath(workspaceId, logicalPath);
-    await mkdir(join(full, ".."), { recursive: true });
-    await fsWriteFile(full, content, "utf8");
+    await blobPut("scheduler-runs", this.key(workspaceId, logicalPath), content, "text/markdown");
     return { logicalPath };
   }
 
   async readReport(workspaceId: string, logicalPath: string): Promise<string | null> {
     try {
-      const full = this.resolvePath(workspaceId, logicalPath);
-      return await fsReadFile(full, "utf8");
+      const bytes = await blobGet("scheduler-runs", this.key(workspaceId, logicalPath));
+      return bytes ? bytes.toString("utf8") : null;
     } catch {
       return null;
     }

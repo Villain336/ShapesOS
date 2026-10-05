@@ -10,8 +10,7 @@
 // capture closes the loop. Magazines are planning-only (6–8 week lead
 // times, heaviest rep dependence).
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { blobGetFirst, blobPath, blobPut, encodeBlobSegment, localBlobDir, workspaceBlobPath } from "@/lib/filesystem/storage";
 import { createHash } from "node:crypto";
 import type { ReactElement } from "react";
 import { Document, Page, View, Text as SpanText } from "@/lib/pdf-primitives";
@@ -139,10 +138,18 @@ export function buildIoTerms(input: IoBriefInput["terms"]): IoTerms {
 // PDF
 // ---------------------------------------------------------------------------
 
+/**
+ * Local directory of the "io-briefs" blob namespace (MARKETR_STORAGE=local;
+ * IO_BRIEF_STORAGE_DIR, default .data/io-briefs). Deploy PR: briefs are
+ * stored through the shared blob layer as <workspaceId>/<briefId>.pdf.
+ */
 export function ioBriefStorageDir(): string {
-  const override = (process.env.IO_BRIEF_STORAGE_DIR ?? "").trim();
-  if (override) return override;
-  return path.join(process.cwd(), ".data", "io-briefs");
+  return localBlobDir("io-briefs");
+}
+
+/** The stored IO brief PDF (new workspace-scoped key, then the legacy one). */
+export async function readIoBriefPdf(workspaceId: string, briefId: string): Promise<Buffer | null> {
+  return blobGetFirst("io-briefs", [workspaceBlobPath(workspaceId, `${briefId}.pdf`), blobPath(`${encodeBlobSegment(briefId)}.pdf`)]);
 }
 
 function SectionTitle({ children }: { children: string }) {
@@ -423,10 +430,7 @@ export async function generateIoBriefPdf(opts: {
   });
   const pdf = await renderPdf(element);
   const briefSha256 = createHash("sha256").update(pdf).digest("hex");
-  const dir = ioBriefStorageDir();
-  await fs.mkdir(dir, { recursive: true });
-  const pdfPath = path.join(dir, `${opts.brief.id}.pdf`);
-  await fs.writeFile(pdfPath, pdf);
+  const pdfPath = await blobPut("io-briefs", workspaceBlobPath(opts.brief.workspaceId, `${opts.brief.id}.pdf`), Buffer.from(pdf), "application/pdf");
   const pdfUrl = `/api/media/io-briefs/${opts.brief.id}/pdf`;
   return { pdfBytes: Buffer.from(pdf), pdfPath, pdfUrl, briefSha256 };
 }

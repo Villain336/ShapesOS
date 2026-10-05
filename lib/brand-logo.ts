@@ -1,16 +1,17 @@
 // Marketr — brand-kit logo file serving (Phase 13 Wave A, white-label ops).
-// Logos live on disk at <REPORT_STORAGE_DIR>/logos/<kitId>.<ext> (see
-// POST /api/brand-kits/[id]/logo); nothing in the app served them until now.
+// Logos live in the shared blob store, namespace "logos" (deploy PR): new
+// uploads are stored as <workspaceId>/<kitId>.<ext> and the row holds the
+// blob ref; rows from before hold ".data/reports/logos/<file>" and resolve
+// by file name inside the namespace (with MARKETR_STORAGE=local that is
+// <REPORT_STORAGE_DIR>/logos, where those files always lived).
 // This helper resolves a workspace's DEFAULT brand kit logo to bytes + MIME,
 // used by the authed dashboard GET (/api/brand-kits/[id]/logo) and the
 // public white-label URL (/api/public/workspaces/[id]/logo) the review
 // landing page renders.
 
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { prisma } from "./prisma";
-import { reportStorageDir } from "./pdf/generate";
-import { resolveWithinDir } from "./security/upload-safety";
+import { assertBlobSegment, blobGet, blobPath, blobPut, deleteStoredRef, encodeBlobSegment, parseBlobRef } from "./filesystem/storage";
 import { USER_CONTENT_CSP } from "./security/headers";
 import { effectiveWhiteLabel } from "./billing/entitlements";
 
@@ -77,26 +78,42 @@ export function brandLogoHeaders(file: BrandLogoFile, cacheControl: string): Rec
   };
 }
 
-/** Resolve one brand kit's logoPath (repo-root-relative) to bytes. */
+/** Where a stored logo ref lives in the "logos" namespace (null = not servable). */
+export function logoBlobPathFor(logoPath: string | null | undefined): string | null {
+  const stored = logoPath?.trim();
+  if (!stored) return null;
+  const ref = parseBlobRef(stored);
+  if (stored.startsWith("blob:")) return ref && ref.namespace === "logos" ? ref.path : null;
+  // Legacy rows: only the file name counts — never trust the stored directory.
+  try {
+    return assertBlobSegment(path.basename(stored));
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve one brand kit's (or white-label) logo ref to bytes. */
 export async function loadBrandKitLogoFile(logoPath: string | null): Promise<BrandLogoFile | null> {
-  if (!logoPath?.trim()) return null;
-  const dir = path.join(reportStorageDir(), "logos");
-  const filename = path.basename(logoPath.trim());
-  // Never trust the stored name: confine reads to the logos dir and only
-  // serve known image extensions (magic-byte-validated at upload).
+  const key = logoBlobPathFor(logoPath);
+  if (!key) return null;
+  const filename = key.split("/").pop()!;
+  // Only serve known image extensions (magic-byte-validated at upload).
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
   const mime = EXT_MIME[ext];
   if (!mime) return null;
-  let abs: string;
-  try {
-    abs = resolveWithinDir(dir, filename);
-  } catch {
-    return null;
-  }
-  try {
-    const bytes = await fs.readFile(abs);
-    return { bytes: Buffer.from(bytes), mime, filename };
-  } catch {
-    return null;
-  }
+  const bytes = await blobGet("logos", key).catch(() => null);
+  return bytes ? { bytes, mime, filename } : null;
+}
+
+/** Store an uploaded (already validated + screened) logo; returns the ref to keep on the row. */
+export async function storeLogo(workspaceId: string, filename: string, bytes: Buffer): Promise<string> {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return blobPut("logos", blobPath(encodeBlobSegment(workspaceId), assertBlobSegment(filename)), bytes, EXT_MIME[ext] ?? "application/octet-stream");
+}
+
+/** Remove a stored logo (blob ref or legacy file name). Missing is fine. */
+export async function deleteLogo(logoPath: string | null | undefined): Promise<void> {
+  const key = logoBlobPathFor(logoPath);
+  if (!key) return;
+  await deleteStoredRef(`blob:logos/${key}`, "logos").catch(() => undefined);
 }

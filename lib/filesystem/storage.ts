@@ -572,6 +572,11 @@ export function blobPath(...segments: string[]): string {
   return assertBlobPath(segments.map(assertBlobSegment).join("/"));
 }
 
+/** "<workspaceId>/<file>" — the key shape for workspace-scoped files. */
+export function workspaceBlobPath(workspaceId: string, ...rest: string[]): string {
+  return blobPath(encodeBlobSegment(workspaceId), ...rest.map(encodeBlobSegment));
+}
+
 /**
  * Encode an arbitrary name (a site file name, which may contain spaces or
  * unicode) into one blob segment, reversibly: names already in the safe

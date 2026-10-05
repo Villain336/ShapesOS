@@ -2,9 +2,8 @@
 // GET /api/reports/[id]/download → application/pdf stream (any member).
 
 import type { NextRequest } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { prisma } from "@/lib/prisma";
+import { readStoredRef } from "@/lib/filesystem/storage";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -26,13 +25,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return Response.json({ error: `Report is ${report.status}` }, { status: 409 });
   }
 
-  const abs = path.isAbsolute(report.pdfPath)
-    ? report.pdfPath
-    : path.join(process.cwd(), report.pdfPath);
-  let bytes: Buffer;
-  try {
-    bytes = await fs.readFile(abs);
-  } catch {
+  // Shared blob store (deploy PR) or, for older rows, the local file.
+  const bytes = await readStoredRef(report.pdfPath, "reports").catch(() => null);
+  if (!bytes) {
     return Response.json({ error: "PDF file missing from storage" }, { status: 410 });
   }
 

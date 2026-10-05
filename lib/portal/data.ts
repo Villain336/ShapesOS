@@ -15,9 +15,8 @@
 //   - pay → the finance tenant Stripe Checkout (createInvoiceCheckout)
 //   - PDFs → the finance PDF renderers (renderInvoicePdf / renderQuotePdf)
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { Prisma } from "@prisma/client";
+import { readStoredRef } from "@/lib/filesystem/storage";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { OPS_ENTITY_MAP } from "@/lib/ops/entities";
 import { OpsError, auditOpsEvent, opsPatch, type OpsActor } from "@/lib/ops/doctype";
@@ -442,13 +441,8 @@ export async function portalReportPdf(p: PortalPrincipal, id: string): Promise<{
     }),
   );
   if (!r?.pdfPath) throw new PortalNotFoundError("Report");
-  const abs = path.isAbsolute(r.pdfPath) ? r.pdfPath : path.join(process.cwd(), r.pdfPath);
-  let pdf: Buffer;
-  try {
-    pdf = await fs.readFile(abs);
-  } catch {
-    throw new OpsError(410, "This report's file is no longer available. Ask us to send it again.");
-  }
+  const pdf = await readStoredRef(r.pdfPath, "reports").catch(() => null);
+  if (!pdf) throw new OpsError(410, "This report's file is no longer available. Ask us to send it again.");
   const filename = `${(r.template?.name ?? "report").replace(/[^a-z0-9-_]+/gi, "-")}-${r.period.replace(/[^a-z0-9-_]+/gi, "-")}.pdf`;
   return { pdf, filename };
 }
