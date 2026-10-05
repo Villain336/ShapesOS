@@ -22,6 +22,7 @@ import { claimExportSlot, releaseExportSlot } from "@/lib/gdpr/limit";
 import { checkReplay, memoryReplayStore } from "@/lib/substrate/graph/connectors/hmac";
 import { confirmDomainPurchase, previewDomainPurchase, saveRegistrant } from "@/lib/studio/service";
 import { createMockPorkbunPort } from "@/lib/studio/porkbun";
+import { readRetrievalUsage, recordRetrievalHits } from "@/lib/intelligence/corpus/activity";
 
 const RUN = `deploy-ss-${Date.now().toString(36)}`;
 const WS_A = `${RUN}-a`;
@@ -40,6 +41,7 @@ before(async () => {
 
 after(async () => {
   await prisma.rateLimitBucket.deleteMany({ where: { key: { contains: RUN } } });
+  await prisma.corpusRetrievalUsage.deleteMany({ where: { sourceId: { startsWith: RUN } } });
   for (const id of [WS_A, WS_B]) await prisma.workspace.deleteMany({ where: { id } });
   await prisma.$disconnect();
 });
@@ -173,5 +175,18 @@ describe("limiters count across instances (shared counter store)", () => {
   it("a shared window reports where it was counted", async () => {
     const hit = await sharedWindowHit(`${RUN}:probe`, { limit: 1, windowMs: 60_000 });
     assert.equal(hit.source, "shared");
+  });
+});
+
+describe("knowledge-corpus retrieval counters (global table)", () => {
+  it("count exactly across concurrent instances", async () => {
+    const a = `${RUN}-src-a`;
+    const b = `${RUN}-src-b`;
+    // Two "instances" recording at the same time: no lost updates.
+    await Promise.all([recordRetrievalHits([a, b, a]), recordRetrievalHits([a]), recordRetrievalHits([b])]);
+    const usage = await readRetrievalUsage();
+    assert.equal(usage.get(a)?.hits, 3);
+    assert.equal(usage.get(b)?.hits, 2);
+    assert.ok(Date.parse(usage.get(a)!.lastHit) > Date.now() - 60_000);
   });
 });

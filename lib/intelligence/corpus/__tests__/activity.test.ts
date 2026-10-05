@@ -67,22 +67,22 @@ describe("loadEvalSummary", () => {
 });
 
 describe("retrieval usage counter", () => {
-  it("starts empty — zero hits is the honest default", () => {
-    assert.equal(readRetrievalUsage().size, 0);
+  it("starts empty — zero hits is the honest default", async () => {
+    assert.equal((await readRetrievalUsage()).size, 0);
   });
 
-  it("counts real retrieval hits per source", () => {
-    recordRetrievalHits(["a", "b", "a"]);
-    const u = readRetrievalUsage();
+  it("counts real retrieval hits per source", async () => {
+    await recordRetrievalHits(["a", "b", "a"]);
+    const u = await readRetrievalUsage();
     assert.equal(u.get("a")!.hits, 2);
     assert.equal(u.get("b")!.hits, 1);
     assert.ok(u.get("a")!.lastHit.length > 0);
   });
 
-  it("never throws, even on corrupt data — the counter recovers", () => {
+  it("never throws, even on corrupt data — the counter recovers", async () => {
     fs.writeFileSync(path.join(dir, "retrieval-usage.json"), "not json{");
-    assert.doesNotThrow(() => recordRetrievalHits(["a"]));
-    assert.equal(readRetrievalUsage().get("a")!.hits, 1);
+    await assert.doesNotReject(() => recordRetrievalHits(["a"]));
+    assert.equal((await readRetrievalUsage()).get("a")!.hits, 1);
   });
 });
 

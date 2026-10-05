@@ -14,6 +14,7 @@ import type { CorpusChunk, ExpertHit } from "./types";
 import { loadChunks } from "./store";
 import { embedCorpusText, cosineSimilarity } from "./embed";
 import { recordRetrievalHits } from "./activity";
+import { ensureCorpusFresh } from "./sync";
 
 export interface RetrieveOptions {
   topK?: number;
@@ -34,6 +35,9 @@ async function retrieveWith(
   const topK = Math.min(Math.max(opts?.topK ?? DEFAULT_TOP_K, 1), MAX_TOP_K);
 
   const queryVec = await embed(q.slice(0, 2000));
+  // Deploy PR: on a shared (multi-instance) install, refresh this instance's
+  // read cache of the published corpus first (no-op on a single box).
+  await ensureCorpusFresh();
 
   const scored: Array<{ chunk: CorpusChunk; score: number }> = [];
   for (const asset of ["main", "by-sa"] as const) {
@@ -48,7 +52,7 @@ async function retrieveWith(
   const hits = scored.slice(0, topK);
   // Audit trail: per-source retrieval counters (best-effort, never throws).
   // The public ExpertHit shape is unchanged — sourceIds stay internal.
-  recordRetrievalHits(hits.map(({ chunk }) => chunk.provenance.sourceId));
+  void recordRetrievalHits(hits.map(({ chunk }) => chunk.provenance.sourceId));
   return hits.map(({ chunk }) => ({
     text: chunk.text,
     sourceTitle: chunk.provenance.sourceTitle,
