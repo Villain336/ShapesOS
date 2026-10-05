@@ -82,7 +82,7 @@ export async function ensureZernioConnection(
   if (existing) {
     const m = (existing.meta ?? {}) as Record<string, unknown>;
     if (m.profileId !== profileId || m.mode !== mode || existing.status !== "active") {
-      await db.connectorConnection.update({ where: { id: existing.id }, data: { meta, status: "active" } });
+      await db.connectorConnection.update({ where: { id: existing.id, workspaceId }, data: { meta, status: "active" } });
     }
     return existing.id;
   }
@@ -288,7 +288,7 @@ export async function requireOwnedAccount(
   const live = await liveProfileAccounts(scope);
   if (!live.some((d) => d._id === id && d.isActive)) {
     await withWorkspaceScope(scope.workspaceId, (tx) =>
-      tx.zernioAccount.update({ where: { id: row.id }, data: { status: "disconnected", disconnectedAt: new Date() } }),
+      tx.zernioAccount.update({ where: { id: row.id, workspaceId: scope.workspaceId }, data: { status: "disconnected", disconnectedAt: new Date() } }),
     );
     throw new ZernioScopeError(`Zernio account "${id}" is no longer connected to this workspace's profile — refusing.`);
   }
@@ -301,7 +301,7 @@ export async function requireOwnedAdAccount(scope: ZernioScope, account: ZernioA
   if (!id || id.length > 64 || !/^[\w-]+$/.test(id)) throw new ZernioScopeError("A platform ad account id is required.");
   const listed = (await scope.client.listAdAccounts({ accountId: account.accountId })).map((a) => a.id);
   await withWorkspaceScope(scope.workspaceId, (tx) =>
-    tx.zernioAccount.update({ where: { id: account.id }, data: { adAccountIds: listed } }),
+    tx.zernioAccount.update({ where: { id: account.id, workspaceId: scope.workspaceId }, data: { adAccountIds: listed } }),
   );
   if (!listed.includes(id)) {
     throw new ZernioScopeError(`Ad account "${id}" is not under this workspace's Zernio ads connection — refusing.`);

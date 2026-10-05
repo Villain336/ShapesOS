@@ -251,10 +251,10 @@ export async function createAd(scope: ZernioScope, args: Record<string, unknown>
     if (!receipt) {
       const dry = await runDryRun(scope, plan, tx);
       if (dry.status === "failed" || !dry.validationId) throw new ZernioScopeError(dry.message);
-      receipt = await tx.zernioAdValidation.findUniqueOrThrow({ where: { id: dry.validationId } });
+      receipt = await tx.zernioAdValidation.findUniqueOrThrow({ where: { id: dry.validationId, workspaceId: scope.workspaceId } });
     }
     validation = receipt.status as DryRunStatus;
-    const claimed = await tx.zernioAdValidation.updateMany({ where: { id: receipt.id, consumedAt: null }, data: { consumedAt: new Date() } });
+    const claimed = await tx.zernioAdValidation.updateMany({ where: { id: receipt.id, workspaceId: scope.workspaceId, consumedAt: null }, data: { consumedAt: new Date() } });
     if (claimed.count !== 1) throw new ZernioScopeError("This ad was already created from its dry run.");
     const r = await scope.client.createStandaloneAd(plan.body, { idempotencyKey: `shapesos-ad-${receipt.id}` });
     return { created: true as const, validation, ad: r.data, summary: plan.summary };
@@ -412,7 +412,7 @@ export async function listAdAccountsForWorkspace(scope: ZernioScope, args: Recor
   const out = [];
   for (const r of rows) {
     const adAccounts = await scope.client.listAdAccounts({ accountId: r.accountId });
-    await withWorkspaceScope(scope.workspaceId, (tx) => tx.zernioAccount.update({ where: { id: r.id }, data: { adAccountIds: adAccounts.map((a) => a.id) } }));
+    await withWorkspaceScope(scope.workspaceId, (tx) => tx.zernioAccount.update({ where: { id: r.id, workspaceId: scope.workspaceId }, data: { adAccountIds: adAccounts.map((a) => a.id) } }));
     out.push({ accountId: r.accountId, platform: r.platform, adAccounts });
   }
   return out;

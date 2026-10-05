@@ -81,7 +81,7 @@ export default async function ZernioUsageSection({ workspaceId }: { workspaceId:
             <tbody>
               {history.map((h) => (
                 <tr key={h.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                  <td className="px-3 py-2 font-mono text-xs text-ink">{h.month}</td>
+                  <td className="px-3 py-2 text-ink">{h.month}</td>
                   <td className="px-3 py-2 text-right text-ink">{h.connectedAccounts}</td>
                   <td className="px-3 py-2 text-right text-muted">{h.includedAccounts}</td>
                   <td className="px-3 py-2 text-right text-muted">{h.billableAccounts}</td>
