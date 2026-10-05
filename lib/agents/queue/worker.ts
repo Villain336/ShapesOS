@@ -52,6 +52,11 @@ export interface AgentWorkerOptions extends Partial<AgentWorkerConfig> {
   log?: AgentWorkerLogger;
   /** Test seam: is the job's run asked to stop? */
   isRunCancelRequested?: (workspaceId: string, runId: string) => Promise<boolean>;
+  /**
+   * Phase 16 (deleg): claim only these job kinds (default every kind) — the
+   * delegation-only worker AGENT_WORKER=off starts (lib/agents/delegation/local-worker.ts).
+   */
+  kinds?: readonly string[];
 }
 
 export interface JobOutcome {
@@ -71,6 +76,7 @@ export class AgentWorker {
   private readonly log: AgentWorkerLogger;
   private readonly isRunCancelRequested: (workspaceId: string, runId: string) => Promise<boolean>;
   private readonly active = new Map<string, Promise<JobOutcome>>();
+  private readonly kinds: readonly string[] | null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopping = false;
   private ticking = false;
@@ -86,6 +92,7 @@ export class AgentWorker {
     };
     this.workerId = opts.workerId ?? `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
     this.handlers = opts.handlers ?? defaultAgentJobHandlers;
+    this.kinds = opts.kinds?.length ? [...opts.kinds] : null;
     this.log = opts.log ?? consoleLog;
     this.isRunCancelRequested =
       opts.isRunCancelRequested ??
@@ -135,12 +142,12 @@ export class AgentWorker {
     try {
       let free = this.cfg.concurrency - this.active.size;
       if (free <= 0) return 0;
-      const workspaces = await discoverDueWorkspaces();
+      const workspaces = await discoverDueWorkspaces(50, this.kinds);
       let started = 0;
       for (const ws of workspaces) {
         if (free <= 0) break;
         await this.reap(ws);
-        const jobs = await claimAgentJobs(ws, this.workerId, this.cfg.leaseMs, free);
+        const jobs = await claimAgentJobs(ws, this.workerId, this.cfg.leaseMs, free, this.kinds);
         for (const job of jobs) {
           const p = this.execute(job).finally(() => this.active.delete(job.id));
           this.active.set(job.id, p);
@@ -173,6 +180,12 @@ export class AgentWorker {
         const run = await getAgentRun(workspaceId, d.runId).catch(() => null);
         if (run && (run.status === "running" || run.status === "queued")) {
           await finishAgentRun(workspaceId, d.runId, "failed").catch(() => undefined);
+        }
+        // Phase 16 (deleg): a delegated child that died with its worker is a
+        // failed task — its parent must hear about it (or it waits forever).
+        if (d.kind === "subagent_run") {
+          const { settleDeadChild } = await import("@/lib/chat/delegation");
+          await settleDeadChild(workspaceId, d.runId, "Its worker stopped responding on every attempt.").catch(() => undefined);
         }
       }
     }
@@ -210,7 +223,7 @@ export class AgentWorker {
     };
     const hb = setInterval(() => void beat(), this.cfg.heartbeatMs);
     try {
-      const result = await handler(job, { signal: ac.signal, workerId: this.workerId });
+      const result = await handler(job, { signal: ac.signal, workerId: this.workerId, lastAttempt: job.attempts >= job.maxAttempts });
       if (ac.signal.aborted) return { jobId: job.id, status: "lease_lost" };
       const ok = await completeAgentJob(job.workspaceId, job.id, this.workerId, result ?? null);
       return { jobId: job.id, status: ok ? "succeeded" : "lease_lost" };

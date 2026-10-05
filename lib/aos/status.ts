@@ -128,6 +128,9 @@ export function fromAgentRunStatus(s: string): AosStatus | null {
       return "queued";
     case "running":
       return "running";
+    // Phase 16: a run waiting for the user's OK (a sub-agent's proposal).
+    case "awaiting_confirmation":
+      return "needs";
     case "succeeded":
       return "done";
     case "failed":

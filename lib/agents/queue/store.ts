@@ -23,7 +23,9 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { claimRows, SQL_NOW_UTC } from "@/lib/jobs/claim";
 import { agentWorkerConfig } from "./config";
 
-export type AgentJobKind = "chat_turn" | "mission" | (string & {});
+// Phase 16 (deleg): subagent_run (one delegated child), delegation_tick (start
+// held-back tasks / arm a plan), delegation_join (the parent's continuation).
+export type AgentJobKind = "chat_turn" | "mission" | "subagent_run" | "delegation_tick" | "delegation_join" | (string & {});
 
 export interface EnqueueAgentJobInput {
   workspaceId: string;
@@ -67,12 +69,16 @@ const ms = (n: number) => Prisma.sql`(${Math.max(0, Math.round(n))}::int * inter
 const DUE = Prisma.sql`(("status" = 'queued' AND "run_after" <= ${SQL_NOW_UTC})
   OR ("status" = 'running' AND "lease_until" < ${SQL_NOW_UTC}))`;
 
+/** Phase 16 (deleg): restrict to some job kinds (null = every kind). */
+const kindFilter = (kinds?: readonly string[] | null) =>
+  kinds && kinds.length ? Prisma.sql` AND "kind" IN (${Prisma.join([...kinds])})` : Prisma.empty;
+
 /** Workspaces that have due jobs (one read-only discovery query). */
-export async function discoverDueWorkspaces(limit = 50): Promise<string[]> {
+export async function discoverDueWorkspaces(limit = 50, kinds?: readonly string[] | null): Promise<string[]> {
   const rows = await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.agent_worker = 'discover'`);
     return tx.$queryRaw<Array<{ workspace_id: string }>>`
-      SELECT DISTINCT "workspace_id" FROM "agent_jobs" WHERE ${DUE} LIMIT ${Math.max(1, limit)}`;
+      SELECT DISTINCT "workspace_id" FROM "agent_jobs" WHERE ${DUE}${kindFilter(kinds)} LIMIT ${Math.max(1, limit)}`;
   });
   return rows.map((r) => r.workspace_id);
 }
@@ -87,12 +93,13 @@ export async function claimAgentJobs(
   workerId: string,
   leaseMs: number,
   limit = 1,
+  kinds?: readonly string[] | null,
 ): Promise<ClaimedAgentJob[]> {
   return claimRows<ClaimedAgentJob>({
     workspaceId,
     table: "agent_jobs",
     where: Prisma.sql`(("status" = 'queued' AND "run_after" <= ${SQL_NOW_UTC})
-      OR ("status" = 'running' AND "lease_until" < ${SQL_NOW_UTC} AND "attempts" < "max_attempts"))`,
+      OR ("status" = 'running' AND "lease_until" < ${SQL_NOW_UTC} AND "attempts" < "max_attempts"))${kindFilter(kinds)}`,
     orderBy: Prisma.sql`"run_after" ASC, "created_at" ASC`,
     set: Prisma.sql`"status" = 'running', "attempts" = "attempts" + 1, "locked_by" = ${workerId},
       "heartbeat_at" = ${SQL_NOW_UTC}, "lease_until" = ${SQL_NOW_UTC} + ${ms(leaseMs)}, "updated_at" = ${SQL_NOW_UTC}`,

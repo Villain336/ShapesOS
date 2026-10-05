@@ -128,6 +128,10 @@ export interface AgentRunInput {
   agentKey?: string | null;
   /** Phase 5: the task it was given (chat runs). */
   task?: string | null;
+  /** Phase 16: the run that handed this one its work (the tree nests it there). */
+  parentRunId?: string | null;
+  /** Phase 16: this run's delegation plan progress (sub-agents done of total). */
+  delegation?: { done: number; total: number } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +154,8 @@ export interface AgentNode {
   progress: { done: number; total: number } | null;
   description: string;
   tools: string[];
+  /** Phase 16: the sub-agents this run handed work to (chat delegation), in order. */
+  children?: AgentNode[];
 }
 
 export interface MissionView {
@@ -359,8 +365,22 @@ function runNode(r: AgentRunInput, status: AosStatus): AgentNode {
         ? SUB_AGENTS[r.agentKey].name
         : (RUN_KIND_NAMES[r.kind] ?? "Agent run");
   const state =
-    status === "running" ? "In progress" : status === "queued" ? "Waiting to start" : status === "failed" ? "Run failed" : "Finished";
-  const line = r.task ? `${state} · ${oneLine(r.task, 48)}` : state;
+    status === "running"
+      ? "In progress"
+      : status === "needs"
+        ? "Waiting for your OK"
+        : status === "queued"
+          ? "Waiting to start"
+          : status === "failed"
+            ? "Run failed"
+            : "Finished";
+  // Phase 16: a run working with sub-agents says how far they are.
+  const d = r.delegation && r.delegation.total > 0 ? r.delegation : null;
+  const line = d
+    ? `${state} · ${d.done} of ${d.total} sub-agent${d.total === 1 ? "" : "s"} done`
+    : r.task
+      ? `${state} · ${oneLine(r.task, 48)}`
+      : state;
   return {
     key: `run:${r.id}`,
     name,
@@ -372,7 +392,7 @@ function runNode(r: AgentRunInput, status: AosStatus): AgentNode {
     updatedAt: r.endedAt ?? r.createdAt,
     missionId: r.missionId,
     missionName: null,
-    progress: null,
+    progress: d ? { done: d.done, total: d.total } : null,
     description: "",
     tools: [],
   };
@@ -393,12 +413,25 @@ export function deriveAgentTree(input: DeriveTreeInput): AgentTree | null {
 
   const listed = new Set(missions.map((m) => m.id));
   const standalone: AgentNode[] = [];
+  // Phase 16: chat delegation nests — a sub-agent's run hangs under the run
+  // that handed it the work (when that run is listed too).
+  const nodeByRun = new Map<string, AgentNode>();
+  const childRuns: Array<{ r: AgentRunInput; node: AgentNode }> = [];
   for (const r of input.runs) {
     if (r.missionId && listed.has(r.missionId)) continue;
     const s = fromAgentRunStatus(r.status);
     if (!s) continue;
     if ((s === "done" || s === "failed") && !isRecent(r.endedAt ?? r.createdAt, now, recentMs)) continue;
-    standalone.push(runNode(r, s));
+    const node = runNode(r, s);
+    nodeByRun.set(r.id, node);
+    if (r.parentRunId) childRuns.push({ r, node });
+    else standalone.push(node);
+  }
+  // Oldest first: the order the lead handed the work out.
+  for (const { r, node } of childRuns.sort((a, b) => a.r.createdAt.localeCompare(b.r.createdAt))) {
+    const parent = nodeByRun.get(r.parentRunId!);
+    if (parent) (parent.children ??= []).push(node);
+    else standalone.push(node);
   }
 
   if (missions.length === 0 && standalone.length === 0) return null;
@@ -431,7 +464,9 @@ export function deriveAgentTree(input: DeriveTreeInput): AgentTree | null {
   const branches = [...subBranches, ...standalone];
 
   const primary = missions[0] ?? null;
-  const leadStatus = rollupStatus([...missions.map((m) => m.status), ...standalone.map((s) => s.status)]) ?? "done";
+  // Phase 16: a sub-agent waiting on the human surfaces on the lead too.
+  const leadStatus =
+    rollupStatus([...missions.map((m) => m.status), ...standalone.flatMap((s) => [s.status, ...(s.children ?? []).map((c) => c.status)])]) ?? "done";
   const pending = missions.reduce((n, m) => n + m.pendingApprovals, 0);
   const failedCount = missions.filter((m) => m.status === "failed").length + standalone.filter((s) => s.status === "failed").length;
   const liveMissions = missions.filter((m) => m.status === "running" || m.status === "needs").length;
@@ -473,11 +508,12 @@ export function deriveAgentTree(input: DeriveTreeInput): AgentTree | null {
     tools: LEAD_AGENT.tools,
   };
 
+  const all = branches.flatMap((b) => [b, ...(b.children ?? [])]);
   return {
     lead,
     branches,
     missions,
-    counts: countStatuses(branches.length ? branches.map((b) => b.status) : [lead.status]),
+    counts: countStatuses(all.length ? all.map((b) => b.status) : [lead.status]),
   };
 }
 

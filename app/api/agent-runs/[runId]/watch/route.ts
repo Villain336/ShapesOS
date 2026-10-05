@@ -14,6 +14,12 @@
 // A foreign runId, a finished run, or a run with no stream all answer 404
 // with the same body — the client cannot distinguish which.
 //
+// Phase 16: GET …/watch?view=delegation streams a delegating run's plan
+// instead — `event: delegation` with the DelegationView (lib/aos/delegation.ts)
+// on connect and whenever a sub-agent's state changes, `event: end` when the
+// run finishes or waits for the user. Access: signed in + the run visible in
+// the caller's workspace (RLS-scoped read); no browser stream is needed.
+//
 // Transport notes: frames are latest-wins (a slow client skips to the
 // newest frame, never queues stale ones). Heartbeat comments keep proxies
 // from idling the connection out. One SSE connection is capped at
@@ -27,14 +33,74 @@ import {
   WATCH_SSE_MAX_MS,
 } from "@/lib/agents/runs/watch";
 import { TERMINAL_RUN_STATUSES } from "@/lib/agents/runs/types";
+import { loadDelegationView } from "@/lib/agents/delegation/store";
 
 export const dynamic = "force-dynamic";
 
 const HEARTBEAT_MS = 15_000;
 const FRAME_POLL_MS = 2_000;
 
+const DELEGATION_POLL_MS = 1_500;
+
+/** Phase 16: stream a delegating run's plan (sub-agent states) until it settles. */
+function delegationStream(workspaceId: string, runId: string, first: NonNullable<Awaited<ReturnType<typeof loadDelegationView>>>): Response {
+  const encoder = new TextEncoder();
+  let closed = false;
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: string) => {
+        if (!closed) controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
+      };
+      let last = JSON.stringify(first);
+      send("delegation", last);
+      const deadline = Date.now() + WATCH_SSE_MAX_MS;
+      let beat = Date.now();
+      try {
+        let view = first;
+        while (!closed && view.live && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, DELEGATION_POLL_MS));
+          if (closed) break;
+          const next = await loadDelegationView(workspaceId, runId).catch(() => null);
+          if (!next) {
+            send("end", JSON.stringify({ reason: "stream-ended" }));
+            break;
+          }
+          view = next;
+          const json = JSON.stringify(next);
+          if (json !== last) {
+            last = json;
+            send("delegation", json);
+          } else if (Date.now() - beat > HEARTBEAT_MS && !closed) {
+            controller.enqueue(encoder.encode(": ping\n\n"));
+            beat = Date.now();
+          }
+          if (next.runStatus === "awaiting_confirmation") {
+            send("end", JSON.stringify({ reason: "needs-you" }));
+            break;
+          }
+        }
+        if (!closed && !view.live) send("end", JSON.stringify({ reason: "run-finished" }));
+        else if (!closed && Date.now() >= deadline) send("end", JSON.stringify({ reason: "watch-timeout" }));
+      } finally {
+        closed = true;
+        try {
+          controller.close();
+        } catch {
+          // Client already gone.
+        }
+      }
+    },
+    cancel() {
+      closed = true;
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" },
+  });
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ runId: string }> },
 ) {
   const user = await requireUser();
@@ -42,6 +108,11 @@ export async function GET(
 
   const { runId } = await params;
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  if (new URL(req.url).searchParams.get("view") === "delegation") {
+    const view = await loadDelegationView(workspace.id, runId).catch(() => null);
+    if (!view || view.plans.length === 0) return Response.json({ error: "No delegation plan for this run" }, { status: 404 });
+    return delegationStream(workspace.id, runId, view);
+  }
   const access = await getWatchStreamAccess(workspace.id, runId);
   if (!access) {
     return Response.json({ error: "No live stream for this run" }, { status: 404 });

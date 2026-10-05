@@ -110,6 +110,14 @@ export const AGENT_MAX_GROUPS: Readonly<Record<AgentKey, readonly ToolGroup[]>> 
   actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code", "ship"],
 };
 
+/**
+ * Phase 16 (deleg): groups a SUB-AGENT may have only when they are asked for
+ * by name — never part of its defaults. "delegate" lets a sub-agent hand
+ * work one level further down (depth 2); it is OFF unless the plan (or the
+ * user) explicitly grants it, and still never wider than the parent's grant.
+ */
+export const SUB_AGENT_OPT_IN_GROUPS: readonly ToolGroup[] = ["delegate"];
+
 export interface GrantInput {
   agentKey: AgentKey;
   /** Groups the user asked for. Empty / omitted = the agent's defaults. */
@@ -142,11 +150,13 @@ export function computeGrant(input: GrantInput): Grant {
     // The lead keeps its hand-off ability: a narrowed lead can still pass
     // work to a sub-agent, and the child inherits the narrowed grant.
     if (input.agentKey === "lead") groups.add("delegate");
+    // Phase 16: a sub-agent's opt-in groups count only when asked for by name.
+    const optIn = new Set<ToolGroup>(input.agentKey === "lead" ? [] : SUB_AGENT_OPT_IN_GROUPS);
     for (const r of requested) {
-      if (isToolGroup(r) && max.has(r)) groups.add(r);
+      if (isToolGroup(r) && (max.has(r) || optIn.has(r))) groups.add(r);
       else dropped.push(r);
     }
-    for (const g of [...groups]) if (!max.has(g)) groups.delete(g);
+    for (const g of [...groups]) if (!max.has(g) && !(optIn.has(g) && requested.includes(g))) groups.delete(g);
   }
   if (input.parentGrant) {
     const parent = new Set(input.parentGrant);

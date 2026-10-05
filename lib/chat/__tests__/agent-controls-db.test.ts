@@ -10,6 +10,8 @@
 //      nothing) and the approvals the run raised are expired.
 //   4. Hand a task to one sub-agent: the lead's delegate call runs the
 //      sub-agent as a child run whose grant never exceeds its parent's.
+//      Phase 16: the child runs on the agent queue (a `subagent_run` job), not
+//      inline — these tests drive an AgentWorker until the lead's join is done.
 //   5. RLS: another workspace can't see or stop the run.
 //
 // The model is a local fake of the OpenAI Responses API (POST /v1/responses,
@@ -197,6 +199,28 @@ function turn(threadId: string, userContent: string) {
   });
 }
 
+const quietLog = { info: () => undefined, warn: () => undefined, error: () => undefined };
+
+/** Phase 16: run queued agent jobs (sub-agents, joins) until nothing is due. */
+async function pump(worker: AgentWorker, rounds = 40): Promise<void> {
+  for (let i = 0; i < rounds; i++) {
+    const started = await worker.tick();
+    if (worker.busy > 0) await worker.drain();
+    if (started === 0 && worker.busy === 0) {
+      const due = await withWorkspaceScope(WS_A, (tx) =>
+        tx.agentJob.count({ where: { workspaceId: WS_A, status: "queued", runAfter: { lte: new Date() } } }),
+      );
+      if (due === 0) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+}
+
+async function lastAssistantText(threadId: string): Promise<string | undefined> {
+  const m = await prisma.aiChatMessage.findFirst({ where: { threadId, role: "assistant" }, orderBy: { createdAt: "desc" } });
+  return m?.content;
+}
+
 function byTool(calls: ChatToolCall[], tool: string): ChatToolCall {
   const c = calls.find((x) => x.tool === tool);
   assert.ok(c, `expected a ${tool} call`);
@@ -381,32 +405,40 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
         : { calls: [{ tool: "delegate_to_subagent", args: { agent: "researcher", task: "Look into competitors", tools: "web" } }] };
     };
     const out = await turn(t.id, "Find out what competitors are doing");
-
+    // Phase 16: the lead waits on its sub-agent (queued), the worker runs it.
+    assert.equal(out.queued, true);
     const d = byTool(out.toolCalls, "delegate_to_subagent");
     assert.equal(d.status, "executed");
-    assert.equal(d.delegated?.[0]?.tool, "research_question");
-    assert.equal(d.delegated?.[0]?.status, "denied", "web was asked for but the parent never had it");
-    assert.equal(d.delegated?.[0]?.agentKey, "researcher");
+    assert.ok(d.delegation?.planId, "the call carries the plan it started");
+    await pump(new AgentWorker({ log: quietLog, leaseMs: 60_000, heartbeatMs: 10_000, concurrency: 4 }));
 
     const sub = bodies.find((b) => (b.instructions ?? "").includes("Researcher sub-agent"));
     assert.ok(sub, "the sub-agent ran with its own role prompt");
     assert.ok(!offered(sub!).includes("research_question"));
     assert.ok(!offered(sub!).includes("delegate_to_subagent"), "sub-agents can't hand work off");
+    assert.ok(!offered(sub!).includes("delegate_tasks"), "sub-agents can't hand work off (parallel form either)");
 
     const children = await withWorkspaceScope(WS_A, (tx) =>
       tx.agentRun.findMany({ where: { workspaceId: WS_A, parentRunId: out.runId } }),
     );
     assert.equal(children.length, 1);
     assert.equal(children[0]!.agentKey, "researcher");
-    assert.deepEqual(children[0]!.allowedTools, ["workspace"]);
+    assert.deepEqual(children[0]!.allowedTools, ["workspace"], "web was asked for but the parent never had it");
     assert.equal(children[0]!.status, "succeeded");
     assert.equal(children[0]!.threadId, t.id);
+    const childEvents = await withWorkspaceScope(WS_A, (tx) =>
+      tx.agentRunEvent.findMany({ where: { workspaceId: WS_A, runId: children[0]!.id }, orderBy: { seq: "asc" } }),
+    );
+    assert.ok(childEvents.some((e) => e.type === "gate" && /Refused research_question/.test(e.summary)), "the named-anyway tool was refused");
+    assert.equal(await lastAssistantText(t.id), "The Researcher reported back.");
+    assert.equal((await getAgentRun(WS_A, out.runId))?.status, "succeeded");
   });
 
   it("stopping only a sub-agent ends that sub-agent; the lead carries on", async () => {
     const t = await thread("lead");
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));
+    bodies.length = 0;
     script = async (b) => {
       if ((b.instructions ?? "").includes("Analyst sub-agent")) {
         await gate; // hold the sub-agent's first model call until the test stops it
@@ -416,10 +448,15 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
         ? { text: "The lead finished without the Analyst." }
         : { calls: [{ tool: "delegate_to_subagent", args: { agent: "analyst", task: "Read the numbers" } }] };
     };
-    const pending = turn(t.id, "What worked last month?");
+    const out = await turn(t.id, "What worked last month?");
+    assert.ok(!out.cancelled);
+    assert.equal(out.queued, true, "the lead waits on its sub-agent");
+    // The worker heartbeats every second: it sees the stop and aborts the call.
+    const worker = new AgentWorker({ log: quietLog, leaseMs: 5_000, heartbeatMs: 1_000, concurrency: 4 });
 
     let child: { id: string } | null = null;
     for (let i = 0; i < 100 && !child; i++) {
+      await worker.tick();
       child = await withWorkspaceScope(WS_A, (tx) =>
         tx.agentRun.findFirst({ where: { workspaceId: WS_A, threadId: t.id, agentKey: "analyst", status: "running" }, select: { id: true } }),
       );
@@ -428,20 +465,19 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
     assert.ok(child, "the sub-agent run should be live");
     const res = await requestAgentRunCancel(WS_A, child!.id, USER);
     assert.deepEqual(res?.runIds, [child!.id], "stopping a child never reaches its parent");
+    await worker.drain();
     release();
+    await pump(worker);
 
-    const out = await pending;
-    assert.equal(out.cancelled, false);
-    assert.equal(out.assistantText, "The lead finished without the Analyst.");
-    const d = byTool(out.toolCalls, "delegate_to_subagent");
-    assert.equal(d.status, "executed");
-    assert.match(d.resultSummary ?? "", /Analyst was stopped before it finished/);
-    // The stop lands either while the sub-agent's model call is in flight (it
-    // is aborted, so no tool is ever proposed) or just after it returns (the
-    // proposed tool is cancelled before it runs) — both are a correct stop.
-    // What must hold: nothing the sub-agent asked for ran.
-    const childCalls = d.delegated ?? [];
-    assert.ok(childCalls.every((c) => c.status === "cancelled"), `the sub-agent's next tool never ran (${JSON.stringify(childCalls.map((c) => [c.tool, c.status]))})`);
+    assert.equal(await lastAssistantText(t.id), "The lead finished without the Analyst.");
+    // The lead was told, honestly, that its sub-agent was stopped.
+    const merge = bodies.filter((b) => !(b.instructions ?? "").includes("Analyst sub-agent") && toolOutputs(b).length > 0).at(-1);
+    assert.ok(merge && toolOutputs(merge).some((o) => /Analyst — STOPPED/.test(o)), "the join reports the stopped sub-agent");
+    // Nothing the sub-agent asked for ran.
+    const ran = await withWorkspaceScope(WS_A, (tx) =>
+      tx.agentRunEvent.findMany({ where: { workspaceId: WS_A, runId: child!.id } }),
+    );
+    assert.ok(!ran.some((e) => (e.payload as { status?: unknown } | null)?.status === "executed"), "the sub-agent's next tool never ran");
     assert.equal((await getAgentRun(WS_A, child!.id))?.status, "cancelled");
     assert.equal((await getAgentRun(WS_A, out.runId))?.status, "succeeded");
   });

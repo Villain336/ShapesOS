@@ -7,6 +7,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import AutomationSettingsForm from "@/components/settings/AutomationSettingsForm";
+import DelegationSettingsForm from "@/components/settings/DelegationSettingsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,8 @@ export default async function AutomationSettingsPage() {
       </div>
       <SettingsNav />
       <AutomationSettingsForm />
+      {/* Phase 16: automatic parallel delegation (switch + limits). */}
+      <DelegationSettingsForm />
     </div>
   );
 }

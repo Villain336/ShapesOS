@@ -11,7 +11,10 @@
 //   AGENT_INLINE_BUDGET_SECONDS  45 — a chat turn still working after this
 //                  hands off to the worker at its next step boundary
 //                  (0 = enqueue every turn before its first step).
-//   AGENT_WORKER_CONCURRENCY     2  — jobs one worker runs at once.
+//   AGENT_WORKER_CONCURRENCY     6  — jobs one worker runs at once (Phase 16:
+//                  raised from 2 so one worker can run a plan's sub-agents
+//                  side by side — up to the 6 live sub-agents a workspace may
+//                  have by default; agent jobs mostly wait on model calls).
 //   AGENT_WORKER_POLL_MS         1000 — idle poll interval.
 //   AGENT_JOB_LEASE_SECONDS      60 — a running job whose lease passes is
 //                  presumed orphaned and claimed again.
@@ -55,7 +58,7 @@ export function agentWorkerConfig(env: EnvLike = process.env): AgentWorkerConfig
   const leaseMs = Math.max(5_000, Math.round((num(env.AGENT_JOB_LEASE_SECONDS) ?? 60) * 1000));
   const heartbeatMs = Math.max(1_000, Math.round((num(env.AGENT_JOB_HEARTBEAT_SECONDS) ?? 10) * 1000));
   return {
-    concurrency: Math.max(1, Math.min(32, Math.floor(num(env.AGENT_WORKER_CONCURRENCY) ?? 2))),
+    concurrency: Math.max(1, Math.min(32, Math.floor(num(env.AGENT_WORKER_CONCURRENCY) ?? 6))),
     pollMs: Math.max(100, Math.floor(num(env.AGENT_WORKER_POLL_MS) ?? 1000)),
     leaseMs,
     // A heartbeat must land well inside the lease.

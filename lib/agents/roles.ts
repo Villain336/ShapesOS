@@ -68,3 +68,18 @@ export function buildModeSystemPrompt(fixCycles: number): string {
     "Work only on the task's branch (shapes/<run id>). When you continue from pull-request feedback, read it with read_pr_feedback first and push to the same branch.",
   ].join("\n");
 }
+
+/**
+ * Phase 16: when (and when not) to split work across sub-agents — the lead's
+ * system prompt carries this while "Automatic delegation" is on (and a
+ * sub-agent's, when its grant opted into the delegate group). The tool
+ * itself is lib/chat/delegation.ts delegate_tasks; the cheap per-request
+ * nudge is lib/agents/delegation/plan.ts delegationNudge().
+ */
+export const DELEGATION_GUIDANCE = [
+  "## Working with sub-agents",
+  "You can split work across sub-agents that run IN PARALLEL with delegate_tasks: a goal, one task per sub-agent (agent, a self-contained brief, the deliverable you need back, optional narrower tools, optional dependsOn), and how you will merge the results.",
+  "Split when the work has independent parts, needs different tools or specialists, or would take more than about a third of this run's budget. Keep small tasks inline. Never delegate a single tool call.",
+  "Each sub-agent works only from its brief — include the context it needs. Its actions still ask the user first unless a rule allows them; money and irreversible actions always ask.",
+  "When the results come back, check each one against its task, retry a failed task at most once, then merge into one answer. Say plainly what failed or is missing.",
+].join("\n");

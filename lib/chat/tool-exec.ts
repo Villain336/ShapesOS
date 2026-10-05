@@ -37,6 +37,13 @@ import { abortRun, isRunStopped } from "@/lib/agents/runs/abort";
 import { resolveConnectorTool } from "./connector-tools";
 
 export const DELEGATE_TOOL = "delegate_to_subagent";
+/** Phase 16: hand a whole plan to sub-agents that run in parallel (lib/chat/delegation.ts). */
+export const DELEGATE_TASKS_TOOL = "delegate_tasks";
+
+/** Both delegation tools (the one-task form is a one-task plan). */
+export function isDelegationTool(name: string): boolean {
+  return name === DELEGATE_TOOL || name === DELEGATE_TASKS_TOOL;
+}
 
 export interface ChatToolCall {
   tool: string;
@@ -65,6 +72,11 @@ export interface ChatToolCall {
   /** Phase 8: the model's tool_use id and the run whose transcript holds it. */
   toolUseId?: string;
   runId?: string;
+  /**
+   * Phase 16: on a delegate_tasks / delegate_to_subagent call — the plan it
+   * started (the chat's "Working with N sub-agents" card reads it live).
+   */
+  delegation?: { parentRunId: string; planId: string; tasks: number; goal: string };
 }
 
 /** ToolContext plus the thread a delegated sub-agent writes its tool rows to. */
@@ -75,6 +87,10 @@ export type LoopContext = ToolContext & {
   costLeftMicroUsd?: number;
   /** Phase 8: the tool_use id of the call being executed (delegation resumes by it). */
   toolUseId?: string;
+  /** Phase 16: model calls left in this run (delegation splits them). */
+  stepsLeft?: number;
+  /** Phase 16: 0 for the lead / a thread's own agent, 1 for its sub-agents, 2 below. */
+  delegationDepth?: number;
 };
 
 export async function auditToolExecution(
@@ -138,12 +154,13 @@ function approvalRef(result: ToolResult): Record<string, unknown> {
   return d && typeof d.approvalId === "string" ? { approvalId: d.approvalId } : {};
 }
 
-/** delegate_to_subagent returns the sub-agent's own calls; keep them on the call. */
+/** A delegation tool returns the plan it started; keep it on the call (Phase 16). */
 function collectDelegated(call: ChatToolCall, result: ToolResult): void {
-  const d = result.details as { calls?: unknown } | undefined;
-  if (call.tool === DELEGATE_TOOL && d && Array.isArray(d.calls)) {
-    call.delegated = d.calls as ChatToolCall[];
-  }
+  const d = result.details as { calls?: unknown; delegation?: unknown } | undefined;
+  if (!isDelegationTool(call.tool) || !d) return;
+  if (Array.isArray(d.calls)) call.delegated = d.calls as ChatToolCall[];
+  const plan = d.delegation as ChatToolCall["delegation"] | undefined;
+  if (plan && typeof plan.planId === "string" && typeof plan.parentRunId === "string") call.delegation = plan;
 }
 
 /**
@@ -277,5 +294,20 @@ export function proposalText(call: ChatToolCall): string {
     `${who} to run **${call.tool}** (${kind} action)${args ? ` with ${args}` : ""}.`,
     `${tool?.description ?? ""}`,
     `Reply **yes** to confirm, or send a new message to cancel.`,
+  ].join("\n");
+}
+
+/**
+ * Phase 16: the chat text for every action a step left waiting (all of them
+ * are listed and all stay pending — none is dropped; "yes" confirms them all).
+ */
+export function proposalsText(calls: readonly ChatToolCall[]): string {
+  if (calls.length <= 1) return calls[0] ? proposalText(calls[0]) : "";
+  return [
+    `${calls.length} actions are waiting for your OK:`,
+    "",
+    ...calls.map((c, i) => `${i + 1}. ${proposalText(c).split("\n")[0]}`),
+    "",
+    `Reply **yes** to confirm all ${calls.length}, or send a new message to cancel.`,
   ].join("\n");
 }

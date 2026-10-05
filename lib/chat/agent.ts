@@ -48,18 +48,16 @@ import type { WorkspaceRole } from "@prisma/client";
 import { getLlmProviderFor } from "@/lib/llm";
 import { workloadForAgent } from "@/lib/llm/router";
 import type { ChatMessage, ChatToolResultBlock } from "@/lib/llm/types";
-import { getTool, registerExtraTool, type ToolContext, type ToolDef } from "./tools";
+import { getTool, type ToolContext } from "./tools";
 import {
-  DELEGATE_TOOL,
   executeTool,
   proposalText as proposalTextFor,
-  runEvent,
+  proposalsText,
   stopRequested,
   type ChatToolCall,
   type LoopContext,
 } from "./tool-exec";
 import {
-  AGENT_MAX_GROUPS,
   TOOL_GROUP_LABELS,
   agentDisplayName,
   computeGrant,
@@ -85,7 +83,6 @@ import {
   LeaseLostError,
   registerRunAbort,
   releaseRunAbort,
-  RunStoppedError,
 } from "@/lib/agents/runs/abort";
 import { expireApprovalsForStoppedRun } from "@/lib/integrations/actions/gate";
 import { getEnabledProjectSkills } from "@/lib/skills/service";
@@ -107,6 +104,20 @@ import {
 import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
 import { cancelAgentJobsForRun, enqueueAgentJob } from "@/lib/agents/queue/store";
 import { inlineBudgetMs } from "@/lib/agents/queue/config";
+// Phase 16: automatic parallel delegation. delegate_tasks and
+// delegate_to_subagent register themselves on import (./delegation).
+import {
+  classifyProposalRuns,
+  delegationPromptSection,
+  delegationToolFilter,
+  finishIdleStoppedRuns,
+  patchRunWithDecisions,
+  resumeChildAfterDecision,
+  type ProposalDecision,
+} from "./delegation";
+import { armDelegation, getDelegation, loadDelegationSettings, type DelegationSettings } from "@/lib/agents/delegation/store";
+import { applyJoinToState } from "@/lib/agents/delegation/join";
+import { DELIVERABLE_INSTRUCTIONS, delegationNudge } from "@/lib/agents/delegation/plan";
 // Phase 8: ship tools (git in the sandbox → push → PR) and recorded browser
 // tools register themselves with the tool registry on import.
 import "@/lib/ship/tools";
@@ -148,7 +159,7 @@ import {
   type PersonaId,
 } from "@/lib/expert/personas";
 
-export { DELEGATE_TOOL, type ChatToolCall } from "./tool-exec";
+export { DELEGATE_TOOL, DELEGATE_TASKS_TOOL, type ChatToolCall } from "./tool-exec";
 
 /** Thread messages (user + assistant text) a live turn sees as history. */
 const HISTORY_MESSAGES = 20;
@@ -269,6 +280,8 @@ function systemPrompt(
   intelligenceSection = "",
   agentKey: AgentKey = "lead",
   grant: readonly ToolGroup[] | null = null,
+  /** Phase 16: delegation guidance / the request's nudge / a child's deliverable contract. */
+  delegationSection = "",
 ): string {
   const isLead = agentKey === "lead";
   return [
@@ -284,7 +297,7 @@ function systemPrompt(
     // constraints, verbatim) so they always win on conflict.
     intelligenceSection,
     isLead
-      ? "You are ShapesOS, the lead agent (Strategist) embedded in the user's workspace. You can hand focused work to a sub-agent with delegate_to_subagent."
+      ? "You are ShapesOS, the lead agent (Strategist) embedded in the user's workspace. You can hand focused work to a sub-agent with delegate_to_subagent, or split bigger work across sub-agents working in parallel with delegate_tasks."
       : `You are the ${agentDisplayName(agentKey)} sub-agent of ShapesOS, working inside the user's workspace.`,
     "You can ACT on the user's project with your tools. Use read tools to ground your answers in real data; prefer a tool call over guessing. Independent reads can be called together in one turn.",
     grant
@@ -292,6 +305,7 @@ function systemPrompt(
       : "",
     // Phase 9 (repos): the Operator in build mode follows the test-fix loop.
     turnMode(agentKey, grant) === "build" ? buildModeSystemPrompt(loopLimitsFromEnv().fixCycles) : "",
+    delegationSection,
     "",
     "PROJECT CONTEXT:",
     projectContext,
@@ -548,6 +562,11 @@ export interface AgentTurnOutput {
   queued?: boolean;
   /** Phase 8: the turn ended in an error (the run finishes `failed`). */
   failed?: boolean;
+  /**
+   * Phase 16: the run handed a plan to sub-agents and waits for them (with
+   * queued: true). Its run stays `running`; the join continues it.
+   */
+  waiting?: boolean;
 }
 
 /** Phase 8: the Operator with the code group works in build mode (code workload). */
@@ -581,7 +600,7 @@ async function threadHistory(threadId: string, current: string): Promise<ChatMes
  * stream (require / disclaimer rules can only be judged on the final text,
  * which enforceStyleRules checks before delivery).
  */
-async function styleStreamGuard(workspaceId: string): Promise<StreamGuard | undefined> {
+export async function styleStreamGuard(workspaceId: string): Promise<StreamGuard | undefined> {
   const rules = await loadActiveStyleRules(workspaceId).catch(() => []);
   const bans = rules.filter((r) => r.kind === "ban" && r.severity === "block");
   if (bans.length === 0) return undefined;
@@ -628,21 +647,51 @@ async function finishLiveTurn(
   if (loop.status === "handoff") {
     return { assistantText: "", toolCalls: [...extraCalls, ...loop.calls], threadTitle: null, queued: true };
   }
+  // Phase 16: calls already put on the thread while the run waited on its
+  // sub-agents are not saved twice.
+  const from = Math.min(loop.state.rowsSaved ?? 0, loop.calls.length);
+  const newCalls = loop.calls.slice(from);
+  if (loop.status === "waiting_on_children") {
+    const plans = newCalls.filter((c) => c.delegation).map((c) => c.delegation!);
+    const n = plans.reduce((k, p) => k + p.tasks, 0);
+    const pending = loop.proposals ?? [];
+    const text = [
+      n
+        ? `Working with ${n} sub-agent${n === 1 ? "" : "s"}${plans[0] ? ` on "${plans[0].goal.slice(0, 160)}"` : ""}. I'll check their results and answer here when they finish.`
+        : "Working with sub-agents. I'll answer here when they finish.",
+      pending.length ? `\n\nMeanwhile: ${proposalsText(pending)}` : "",
+    ].join("");
+    const calls = [...extraCalls, ...newCalls];
+    await saveToolRows(input.threadId, newCalls);
+    await saveMessage(input.threadId, "assistant", text, calls);
+    loop.state.rowsSaved = loop.calls.length;
+    if (input.runId) {
+      await prismaTranscriptStore.save(input.workspaceId, input.runId, loop.state, loop.state.steps).catch(() => undefined);
+      // The waiting state is saved: the children may start now.
+      await armDelegation(input.workspaceId, input.runId);
+    }
+    return { assistantText: text, toolCalls: calls, threadTitle: null, queued: true, waiting: true };
+  }
   const cancelled = loop.status === "cancelled";
   let finalText = loop.finalText;
   if (!finalText) finalText = "I checked everything I could. Let me know if you'd like me to dig deeper.";
   if (!cancelled && loop.status !== "awaiting_confirmation") {
     finalText = await enforceFinalText(finalText, input.workspaceId);
   }
-  const calls = [...extraCalls, ...loop.calls];
-  await saveToolRows(input.threadId, loop.calls);
+  // Phase 16: an action this run proposed in the step that started its
+  // sub-agents, still waiting for the user's OK, moves to this (now last)
+  // message — so "yes" still finds it once the merged answer is in.
+  const carried = cancelled ? [] : loop.calls.slice(0, from).filter((c) => c.status === "pending_confirmation");
+  if (carried.length && loop.status !== "awaiting_confirmation") finalText = `${finalText}\n\nStill waiting for your OK: ${proposalsText(carried)}`;
+  const calls = [...extraCalls, ...newCalls, ...carried];
+  await saveToolRows(input.threadId, newCalls);
   await saveMessage(input.threadId, "assistant", finalText, calls);
   return {
     assistantText: finalText,
     toolCalls: calls,
     threadTitle: null,
     cancelled,
-    awaitingConfirmation: loop.status === "awaiting_confirmation",
+    awaitingConfirmation: loop.status === "awaiting_confirmation" || carried.length > 0,
     failed: loop.status === "error",
   };
 }
@@ -662,16 +711,52 @@ function loopContext(input: AgentTurnInput, confirmed = false): LoopContext {
     runId: input.runId,
     signal: input.signal,
     threadId: input.threadId,
+    // Phase 16: a chat thread's own agent sits at the top of any delegation.
+    delegationDepth: 0,
   };
 }
 
 /** Is a live model routed for this agent's workload? (else: mock mode) */
-function agentIsLive(agentKey: AgentKey, mode: "build" | "default"): boolean {
+export function agentIsLive(agentKey: AgentKey, mode: "build" | "default"): boolean {
   return getLlmProviderFor(workloadForAgent(agentKey, { mode })).isLive;
 }
 
+/** Phase 16: may this grant hand work to sub-agents at all? */
+function grantCanDelegate(grant: readonly ToolGroup[] | null): boolean {
+  return !grant || grant.includes("delegate");
+}
+
+/**
+ * Phase 16: a delegated sub-agent's system prompt — its role layer, the
+ * project context, its grant, and the deliverable contract it must end with
+ * (plus how to delegate further when its grant opted into "delegate").
+ */
+export async function delegatedChildSystemPrompt(
+  projectId: string,
+  workspaceId: string,
+  agentKey: AgentKey,
+  grant: readonly ToolGroup[],
+): Promise<string> {
+  const [projectContext, supplements, deleg] = await Promise.all([
+    buildProjectContext(projectId, workspaceId),
+    buildAgentSupplements(projectId),
+    loadDelegationSettings(workspaceId).catch(() => null),
+  ]);
+  const section = [
+    DELIVERABLE_INSTRUCTIONS,
+    delegationPromptSection({ autoDelegation: deleg?.autoDelegation ?? true, canDelegate: grant.includes("delegate") }),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return systemPrompt(projectContext, supplements, "", agentKey, grant, section);
+}
+
 /** The system prompt + opening messages of a fresh live turn. */
-async function freshTurnPrompt(input: AgentTurnInput, trimmed: string): Promise<{ system: string; messages: ChatMessage[] }> {
+async function freshTurnPrompt(
+  input: AgentTurnInput,
+  trimmed: string,
+  deleg: DelegationSettings | null = null,
+): Promise<{ system: string; messages: ChatMessage[] }> {
   const agentKey = input.agentKey ?? "lead";
   const grant = input.grant ?? null;
   const [projectContext, supplements, attachmentSection, intelligenceSection, history] = await Promise.all([
@@ -683,12 +768,21 @@ async function freshTurnPrompt(input: AgentTurnInput, trimmed: string): Promise<
     buildIntelligenceContext(input.workspaceId, trimmed).catch(() => ""),
     threadHistory(input.threadId, trimmed),
   ]);
+  // Phase 16: delegation guidance, and the cheap pre-check's nudge for this
+  // request (the model decides; nothing is split for it).
+  const autoDelegation = deleg?.autoDelegation ?? true;
+  const delegationSection = delegationPromptSection({
+    autoDelegation,
+    canDelegate: grantCanDelegate(grant),
+    nudge: autoDelegation ? delegationNudge(trimmed) : null,
+  });
   const system = systemPrompt(
     projectContext,
     [supplements, attachmentSection].filter(Boolean).join("\n\n"),
     intelligenceSection,
     agentKey,
     grant,
+    delegationSection,
   );
   return { system, messages: [...history, { role: "user", content: trimmed }] };
 }
@@ -699,12 +793,14 @@ async function freshTurnPrompt(input: AgentTurnInput, trimmed: string): Promise<
  * model carries on from there. Null when that transcript is gone (or the
  * proposal came from a sub-agent, whose transcript is its own).
  */
-async function continuationState(
-  input: AgentTurnInput,
-  done: Array<{ call: ChatToolCall; exec: ChatToolCall; result: Awaited<ReturnType<typeof executeTool>> }>,
-): Promise<LoopState | null> {
+async function continuationState(input: AgentTurnInput, done: readonly ProposalDecision[]): Promise<LoopState | null> {
   const runId = done[0]?.call.runId;
   if (!runId || done.some((d) => d.call.runId !== runId || !d.call.toolUseId)) return null;
+  // Phase 16 (BUG 2): a sub-agent's transcript is never continued as this
+  // turn's agent — that would hand the sub-agent's work the lead's tools and
+  // run. Sub-agents resume on their own runs (lib/chat/delegation.ts).
+  const origin = await getAgentRun(input.workspaceId, runId).catch(() => null);
+  if (!origin || origin.parentRunId || (origin.agentKey ?? "lead") !== (input.agentKey ?? "lead")) return null;
   const saved = await prismaTranscriptStore.load(input.workspaceId, runId).catch(() => null);
   if (!isLoopState(saved)) return null;
   const last = saved.messages[saved.messages.length - 1];
@@ -742,14 +838,25 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   const mode = input.mode ?? turnMode(agentKey, grant);
   const turn: AgentTurnInput = { ...input, agentKey, grant, mode };
   const baseCtx = loopContext(turn);
+  // Phase 16: whether delegate_tasks is offered (Settings → Automation) and how deep.
+  const deleg = await loadDelegationSettings(input.workspaceId).catch(() => null);
+  const toolFilter = delegationToolFilter({
+    autoDelegation: deleg?.autoDelegation ?? true,
+    depth: 0,
+    maxDepth: deleg?.limits.maxDepth ?? 2,
+  });
 
   // 0. Phase 8: a worker picking the run up again continues its transcript.
+  //    Phase 16: at a delegation join, the sub-agents' results go in first.
   if (input.resume && input.runId) {
     const saved = await prismaTranscriptStore.load(input.workspaceId, input.runId).catch(() => null);
     if (isLoopState(saved)) {
+      const d = await getDelegation(input.workspaceId, input.runId).catch(() => null);
+      if (d?.state) applyJoinToState(saved, d.state.plans, { now: Date.now(), maxMs: loopLimitsFromEnv().maxMs });
       const loop = await runAgentLoop({
         ctx: baseCtx,
         state: saved,
+        toolFilter,
         streamGuard: await styleStreamGuard(input.workspaceId),
         deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
       });
@@ -760,49 +867,12 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   // 1. Confirmation path: "yes" + a pending proposal → execute it.
   if (CONFIRM_RE.test(trimmed)) {
     const pending = await pendingProposal(threadId);
-    if (pending?.length) {
-      const executed: ChatToolCall[] = [];
-      const done: Array<{ call: ChatToolCall; exec: ChatToolCall; result: Awaited<ReturnType<typeof executeTool>> }> = [];
-      for (const call of pending) {
-        // Phase 5: run as the agent that proposed it, inside the grant it
-        // was proposed under — never wider than the thread's grant now.
-        const callAgent = call.agentKey && isAgentKey(call.agentKey) ? call.agentKey : agentKey;
-        const callGrant = call.grant
-          ? (call.grant.filter((g) => !grant || grant.includes(g as ToolGroup)) as ToolGroup[])
-          : grant;
-        const ctx: LoopContext = { ...baseCtx, confirmed: true, agentKey: callAgent, grant: callGrant };
-        const exec: ChatToolCall = { tool: call.tool, args: call.args, confirmed: true, status: "executed", agentKey: callAgent };
-        const result = await executeTool(ctx, call.tool, call.args, exec);
-        executed.push(exec);
-        done.push({ call, exec, result });
-        await saveMessage(threadId, "tool", exec.resultSummary ?? "", [exec]);
-      }
-      const cancelled = executed.some((c) => c.status === "cancelled");
-      // Phase 8: the model carries on from the transcript that proposed it.
-      if (!cancelled && agentIsLive(agentKey, mode)) {
-        const state = await continuationState(turn, done).catch(() => null);
-        if (state) {
-          const loop = await runAgentLoop({
-            ctx: baseCtx,
-            state,
-            handoffAt: input.handoffAt,
-            streamGuard: await styleStreamGuard(input.workspaceId),
-            deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
-          });
-          // The confirmed calls (already saved as tool rows) lead the reply's calls.
-          return finishLiveTurn(turn, loop, executed);
-        }
-      }
-      const failures = executed.filter((c) => c.status !== "executed");
-      const text = cancelled
-        ? STOPPED_TEXT
-        : failures.length === 0
-          ? `Done. ${executed.map((c) => c.resultSummary).join(" ")}`
-          : `Partially done. ${executed.map((c) => (c.status === "executed" ? `✔ ${c.resultSummary}` : `✘ ${c.tool}: ${c.resultSummary}`)).join("\n")}`;
-      await saveMessage(threadId, "assistant", text, executed);
-      return { assistantText: text, toolCalls: executed, threadTitle: null, cancelled };
-    }
+    if (pending?.length) return confirmPending(turn, baseCtx, pending, toolFilter);
     // "yes" with nothing pending — fall through to a normal turn.
+  } else {
+    // Phase 16: a new message declines what sub-agents were waiting on (they
+    // carry on without it, as the proposal said).
+    await declineWaitingProposals(turn).catch(() => 0);
   }
 
   // 2. Mock mode: deterministic rule-based router.
@@ -833,161 +903,168 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     await saveMessage(threadId, "assistant", STOPPED_TEXT, []);
     return { assistantText: STOPPED_TEXT, toolCalls: [], threadTitle: null, cancelled: true };
   }
-  const prompt = await freshTurnPrompt(turn, trimmed);
+  const prompt = await freshTurnPrompt(turn, trimmed, deleg);
   const loop = await runAgentLoop({
     ctx: baseCtx,
     system: prompt.system,
     messages: prompt.messages,
     mode,
     handoffAt: input.handoffAt,
+    toolFilter,
     streamGuard: await styleStreamGuard(input.workspaceId),
     deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
   });
   return finishLiveTurn(turn, loop);
 }
 
-// ---------------------------------------------------------------------------
-// Phase 5: hand a task to one sub-agent (the lead's delegate tool).
-// ---------------------------------------------------------------------------
+/**
+ * "yes" on the pending proposals: run each as the agent that proposed it,
+ * inside the grant it was proposed under (never wider than the thread's
+ * grant now). Then (Phase 16) each goes back to the run that proposed it:
+ *   * a delegated sub-agent's → that sub-agent resumes from ITS transcript,
+ *     on its own run, as its own agent (BUG 2: never under the lead);
+ *   * a run that is waiting on sub-agents → its transcript gets the result
+ *     (the join carries on from it);
+ *   * this thread's own earlier turn → the model carries on inline (Phase 8).
+ */
+async function confirmPending(
+  turn: AgentTurnInput,
+  baseCtx: LoopContext,
+  pending: ChatToolCall[],
+  toolFilter: ((canonical: string) => boolean) | undefined,
+): Promise<AgentTurnOutput> {
+  const { workspaceId, threadId, projectId } = turn;
+  const agentKey = turn.agentKey ?? "lead";
+  const grant = turn.grant ?? null;
+  const mode = turn.mode ?? "default";
+  const runInfo = await classifyProposalRuns(
+    workspaceId,
+    pending.map((c) => c.runId).filter((x): x is string => !!x),
+  ).catch(() => new Map<string, { child: boolean; waitingOnChildren: boolean; status: string }>());
+  const executed: ChatToolCall[] = [];
+  const done: ProposalDecision[] = [];
+  for (const call of pending) {
+    // Phase 5: run as the agent that proposed it, inside the grant it
+    // was proposed under — never wider than the thread's grant now.
+    const callAgent = call.agentKey && isAgentKey(call.agentKey) ? call.agentKey : agentKey;
+    const callGrant = call.grant
+      ? (call.grant.filter((g) => !grant || grant.includes(g as ToolGroup)) as ToolGroup[])
+      : grant;
+    // Phase 16: a sub-agent's action is recorded on the sub-agent's own run.
+    const info = call.runId ? runInfo.get(call.runId) : undefined;
+    const ctx: LoopContext = {
+      ...baseCtx,
+      confirmed: true,
+      agentKey: callAgent,
+      grant: callGrant,
+      runId: info?.child ? call.runId : baseCtx.runId,
+    };
+    const exec: ChatToolCall = { tool: call.tool, args: call.args, confirmed: true, status: "executed", agentKey: callAgent };
+    const result = await executeTool(ctx, call.tool, call.args, exec);
+    executed.push(exec);
+    done.push({ call, exec, result });
+    await saveMessage(threadId, "tool", exec.resultSummary ?? "", [exec]);
+  }
+  const cancelled = executed.some((c) => c.status === "cancelled");
 
-/** A child run already started for this tool call (a resumed parent reuses it). */
-async function existingChildRun(workspaceId: string, parentRunId: string, toolUseId: string) {
-  const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
-  return withWorkspaceScope(workspaceId, (tx) =>
-    tx.agentRun.findFirst({
-      where: { workspaceId, parentRunId, agentState: { path: ["toolUseId"], equals: toolUseId } },
-      select: { id: true, status: true },
-    }),
-  ).catch(() => null);
+  // Phase 16: back to the run that proposed each one.
+  const byRun = new Map<string, ProposalDecision[]>();
+  const inline: ProposalDecision[] = [];
+  for (const d of done) {
+    const info = d.call.runId ? runInfo.get(d.call.runId) : undefined;
+    if (d.call.runId && info && (info.child || info.waitingOnChildren)) {
+      byRun.set(d.call.runId, [...(byRun.get(d.call.runId) ?? []), d]);
+    } else {
+      inline.push(d);
+    }
+  }
+  let resumed = 0;
+  if (!cancelled) {
+    for (const [runId, list] of byRun) {
+      if (runInfo.get(runId)!.child) {
+        if (await resumeChildAfterDecision(workspaceId, runId, list)) resumed++;
+      } else {
+        await patchRunWithDecisions(workspaceId, runId, list);
+      }
+    }
+  }
+
+  // Phase 8: the model carries on from the transcript that proposed it.
+  if (inline.length && byRun.size === 0 && !cancelled && agentIsLive(agentKey, mode)) {
+    const state = await continuationState(turn, inline).catch(() => null);
+    if (state) {
+      const loop = await runAgentLoop({
+        ctx: baseCtx,
+        state,
+        handoffAt: turn.handoffAt,
+        toolFilter,
+        streamGuard: await styleStreamGuard(workspaceId),
+        deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
+      });
+      // The confirmed calls (already saved as tool rows) lead the reply's calls.
+      return finishLiveTurn(turn, loop, executed);
+    }
+  }
+  const failures = executed.filter((c) => c.status !== "executed");
+  let text = cancelled
+    ? STOPPED_TEXT
+    : failures.length === 0
+      ? `Done. ${executed.map((c) => c.resultSummary).join(" ")}`
+      : `Partially done. ${executed.map((c) => (c.status === "executed" ? `✔ ${c.resultSummary}` : `✘ ${c.tool}: ${c.resultSummary}`)).join("\n")}`;
+  if (resumed > 0) {
+    text += `\n\n${resumed === 1 ? "The sub-agent carries on" : `${resumed} sub-agents carry on`}; I'll check the results and answer here when the work is done.`;
+  }
+  await saveMessage(threadId, "assistant", text, executed);
+  return { assistantText: text, toolCalls: executed, threadTitle: null, cancelled };
 }
 
-const delegate_to_subagent: ToolDef = {
-  name: DELEGATE_TOOL,
-  description:
-    "Hand one focused piece of work to a sub-agent and get its result back. Use it when a task needs a specialist: agent is one of researcher, planner, drafter (Writer), analyst, scheduler, actor (Operator). The sub-agent works inside this task's tools (optionally fewer) and its write actions still wait for the user's OK.",
-  // Safe to call: the sub-agent's own tools go through every gate.
-  kind: "safe",
-  minRole: "editor",
-  argsSchema: {
-    type: "object",
-    properties: {
-      agent: { type: "string", description: "Sub-agent key: researcher | planner | drafter | analyst | scheduler | actor (required)." },
-      task: { type: "string", description: "What the sub-agent should do, with the context it needs (required)." },
-      tools: { type: "string", description: 'Optional comma-separated tool groups to narrow it further (e.g. "web,files").' },
+/**
+ * Phase 16: the user sent a new message instead of "yes" while sub-agents
+ * (or a run waiting on them) had proposals pending. Those are declined —
+ * marked so on the message, and each waiting sub-agent resumes knowing it
+ * was not run. Proposals of an ordinary turn are left as they always were.
+ */
+async function declineWaitingProposals(turn: AgentTurnInput): Promise<number> {
+  const last = await prisma.aiChatMessage.findFirst({
+    where: { threadId: turn.threadId, role: "assistant" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, toolCalls: true },
+  });
+  if (!last?.toolCalls || !Array.isArray(last.toolCalls)) return 0;
+  const calls = last.toolCalls as unknown as ChatToolCall[];
+  const pending = calls.filter((c) => c.status === "pending_confirmation" && c.runId);
+  if (pending.length === 0) return 0;
+  const info = await classifyProposalRuns(turn.workspaceId, pending.map((c) => c.runId!));
+  const declined = pending.filter((c) => {
+    const i = info.get(c.runId!);
+    return !!i && (i.child || i.waitingOnChildren);
+  });
+  if (declined.length === 0) return 0;
+  const summary = "Declined — you sent a new message instead of approving it.";
+  await prisma.aiChatMessage.update({
+    where: { id: last.id },
+    data: {
+      toolCalls: calls.map((c) => (declined.includes(c) ? { ...c, status: "cancelled" as const, resultSummary: summary } : c)) as unknown as object,
     },
-    required: ["agent", "task"],
-  },
-  async execute(ctx, args) {
-    const sub = typeof args.agent === "string" ? args.agent.trim() : "";
-    const task = typeof args.task === "string" ? args.task.trim().slice(0, 4000) : "";
-    if (!isAgentKey(sub) || sub === "lead") {
-      throw new Error(`Unknown sub-agent "${sub}". Use one of: researcher, planner, drafter, analyst, scheduler, actor.`);
-    }
-    if ((ctx.agentKey ?? "lead") !== "lead") {
-      throw new Error("Only the lead agent can hand work to a sub-agent.");
-    }
-    if (!task) throw new Error("Say what the sub-agent should do (task).");
-    const requested =
-      typeof args.tools === "string" && args.tools.trim()
-        ? args.tools.split(",").map((t) => t.trim()).filter(Boolean)
-        : null;
-    const parentGrant = ctx.grant ?? AGENT_MAX_GROUPS.lead;
-    const childGrant = computeGrant({ agentKey: sub, requested, parentGrant });
-    const name = agentDisplayName(sub);
-    const lctx = ctx as LoopContext;
-    const threadId = lctx.threadId;
+  });
+  const byRun = new Map<string, ProposalDecision[]>();
+  for (const c of declined) {
+    const exec: ChatToolCall = { tool: c.tool, args: c.args, status: "cancelled", resultSummary: "the user declined it", agentKey: c.agentKey };
+    byRun.set(c.runId!, [...(byRun.get(c.runId!) ?? []), { call: c, exec, result: null }]);
+  }
+  for (const [runId, list] of byRun) {
+    if (info.get(runId)!.child) await resumeChildAfterDecision(turn.workspaceId, runId, list);
+    else await patchRunWithDecisions(turn.workspaceId, runId, list);
+  }
+  return declined.length;
+}
 
-    // The child run: same workspace and thread, pointing at the lead's run.
-    // A resumed lead (worker restart) picks up the child it already started.
-    let childRunId: string | undefined;
-    let resumeChild = false;
-    if (ctx.runId) {
-      const prior = lctx.toolUseId ? await existingChildRun(ctx.workspaceId, ctx.runId, lctx.toolUseId) : null;
-      if (prior) {
-        childRunId = prior.id;
-        resumeChild = true;
-      } else {
-        const child = await createAgentRun({
-          workspaceId: ctx.workspaceId,
-          kind: "chat",
-          startedBy: ctx.userId,
-          threadId,
-          agentKey: sub,
-          parentRunId: ctx.runId,
-          allowedTools: childGrant.groups,
-          agentState: { task: task.slice(0, 500), projectId: ctx.projectId, ...(lctx.toolUseId ? { toolUseId: lctx.toolUseId } : {}) },
-        });
-        childRunId = child.id;
-        await markAgentRunRunning(ctx.workspaceId, child.id);
-        await runEvent(ctx, `Handed to ${name}: ${task.slice(0, 200)}`, { childRunId, agent: sub, grant: childGrant.groups }, "note");
-      }
-    }
-    const childCtx: LoopContext = {
-      ...lctx,
-      confirmed: false,
-      agentKey: sub,
-      grant: childGrant.groups,
-      runId: childRunId ?? ctx.runId,
-      threadId,
-      toolUseId: undefined,
-    };
+// ---------------------------------------------------------------------------
+// Phase 5 → Phase 16: handing work to sub-agents. delegate_to_subagent (one
+// task) and delegate_tasks (a parallel plan) live in ./delegation and run
+// every sub-agent as its own child run on the agent queue (not inline).
+// ---------------------------------------------------------------------------
 
-    let loop: AgentLoopResult | null = null;
-    let finalText: string;
-    try {
-      if (!agentIsLive(sub, "default")) {
-        finalText = `${name} needs a live model to work on its own; the hand-off was recorded.`;
-      } else {
-        const connectorTools = await connectorChatTools(ctx.projectId, childGrant.groups).catch(() => []);
-        if (resumeChild && childRunId) {
-          loop = await runAgentLoop({ ctx: childCtx, deps: { connectorTools } });
-        } else {
-          const [projectContext, supplements] = await Promise.all([
-            buildProjectContext(ctx.projectId, ctx.workspaceId),
-            buildAgentSupplements(ctx.projectId),
-          ]);
-          loop = await runAgentLoop({
-            ctx: childCtx,
-            system: systemPrompt(projectContext, supplements, "", sub, childGrant.groups),
-            messages: [{ role: "user", content: task }],
-            deps: { connectorTools },
-          });
-        }
-        finalText = loop.finalText;
-      }
-    } catch (err) {
-      if (childRunId) await finishAgentRun(ctx.workspaceId, childRunId, "failed").catch(() => undefined);
-      throw err;
-    }
-    const cancelled = loop?.status === "cancelled";
-    if (childRunId) {
-      await finishAgentRun(
-        ctx.workspaceId,
-        childRunId,
-        cancelled ? "cancelled" : loop?.status === "error" ? "failed" : "succeeded",
-      ).catch(() => undefined);
-    }
-    const calls = (loop?.calls ?? []).map((c) => ({ ...c, agentKey: c.agentKey ?? sub }));
-    const costMicroUsd = loop?.state.costMicroUsd ?? 0;
-    if (cancelled) {
-      // The whole task was stopped: stop the lead too.
-      // (ctx is the lead's context here, so this asks about the lead's run.)
-      if (await stopRequested(ctx)) throw new RunStoppedError();
-      // Only this sub-agent was stopped (Runs page): the lead carries on.
-      return {
-        summary: `${name} was stopped before it finished.`,
-        details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls, stopped: true, costMicroUsd },
-      };
-    }
-    const dropped = childGrant.dropped.length ? ` (not allowed: ${childGrant.dropped.join(", ")})` : "";
-    return {
-      summary: `${name}: ${finalText || "done"}${dropped}`.slice(0, 2000),
-      details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls, costMicroUsd },
-    };
-  },
-};
-
-registerExtraTool(delegate_to_subagent);
 // Phase 8: the code tools (group "code"), run in the run's sandbox.
 registerCodeTools();
 
@@ -1040,7 +1117,7 @@ async function expireRunApprovals(workspaceId: string, runIds: string[], stopped
  * Mark the thread's still-pending proposals cancelled, so a "yes" sent after
  * Stop finds nothing to run.
  */
-async function cancelPendingProposals(threadId: string): Promise<void> {
+async function cancelPendingProposals(threadId: string, onlyRuns: readonly string[] | null = null): Promise<void> {
   const last = await prisma.aiChatMessage.findFirst({
     where: { threadId, role: "assistant" },
     orderBy: { createdAt: "desc" },
@@ -1048,9 +1125,10 @@ async function cancelPendingProposals(threadId: string): Promise<void> {
   });
   if (!last?.toolCalls || !Array.isArray(last.toolCalls)) return;
   const calls = last.toolCalls as unknown as ChatToolCall[];
-  if (!calls.some((c) => c.status === "pending_confirmation")) return;
+  const drop = (c: ChatToolCall) => c.status === "pending_confirmation" && (!onlyRuns || !c.runId || onlyRuns.includes(c.runId));
+  if (!calls.some(drop)) return;
   const next = calls.map((c) =>
-    c.status === "pending_confirmation" ? { ...c, status: "cancelled" as const, resultSummary: "Dropped — the task was stopped." } : c,
+    drop(c) ? { ...c, status: "cancelled" as const, resultSummary: "Dropped — the task was stopped." } : c,
   );
   await prisma.aiChatMessage.update({ where: { id: last.id }, data: { toolCalls: next as unknown as object } });
 }
@@ -1083,7 +1161,12 @@ export async function stopThreadRuns(input: {
     const n = await cancelAgentJobsForRun(input.workspaceId, id).catch(() => 0);
     if (n > 0) await finishAgentRun(input.workspaceId, id, "cancelled").catch(() => undefined);
   }
-  await cancelPendingProposals(input.threadId).catch(() => undefined);
+  // Phase 16: runs nothing is executing — waiting for the user's OK, or for
+  // their sub-agents — end here; their parents' plans record the stop.
+  if (stopped.length) await finishIdleStoppedRuns(input.workspaceId, stopped).catch(() => undefined);
+  // Stopping ONE run (e.g. one sub-agent) drops only its own proposals and
+  // its sub-agents'; its siblings' stay pending.
+  await cancelPendingProposals(input.threadId, input.runId ? [input.runId, ...stopped] : null).catch(() => undefined);
   if (stopped.length) await expireRunApprovals(input.workspaceId, stopped, input.userId);
   return stopped;
 }
@@ -1202,6 +1285,9 @@ export async function runTrackedAgentTurn(
       opts,
     );
     if (out.queued) {
+      // Phase 16: waiting on sub-agents — nothing to hand off; the join
+      // continues this run (its children run on the queue).
+      if (out.waiting) return { ...out, runId: run.id };
       const q = await queued();
       return { ...q, toolCalls: out.toolCalls };
     }
@@ -1238,6 +1324,8 @@ export async function continueTrackedAgentTurn(
   opts.signal?.addEventListener("abort", onLeaseLost, { once: true });
   try {
     const out = await runAgentTurnWithCapture({ ...tracked, signal }, opts);
+    // Phase 16: the run handed a plan to sub-agents: this job is done; the join resumes the run.
+    if (out.waiting && !isLeaseLost(signal)) return { ...out, runId: job.runId };
     if (out.queued || isLeaseLost(signal)) throw new LeaseLostError();
     await settleTrackedRun(tracked, out);
     return { ...out, runId: job.runId };

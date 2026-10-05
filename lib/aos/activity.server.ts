@@ -15,6 +15,16 @@ import { checkCap } from "@/lib/metering/service";
 import { deriveAgentTree, type AgentRunInput, type AgentTree, type MissionInput } from "./agents";
 import { runPrompt } from "./runs";
 import { fromSkillRunStatus, type AosStatus } from "./status";
+import { readDelegation } from "@/lib/agents/delegation/store";
+import { delegationProgress } from "@/lib/agents/delegation/plan";
+
+/** Phase 16: "done of total" across a run's delegation plans (null = it delegated nothing). */
+export function delegationSummary(agentState: unknown): { done: number; total: number } | null {
+  const d = readDelegation(agentState);
+  if (!d || d.plans.length === 0) return null;
+  const p = delegationProgress(d.plans.flatMap((x) => x.tasks));
+  return { done: p.done, total: p.total };
+}
 
 const DAY_MS = 86_400_000;
 const MAX_MISSIONS = 12;
@@ -117,11 +127,11 @@ export async function loadAgentActivity(workspaceId: string, now = new Date()): 
       tx.agentRun.findMany({
         where: {
           workspaceId,
-          OR: [{ status: { in: ["queued", "running"] } }, { createdAt: { gte: since } }],
+          OR: [{ status: { in: ["queued", "running", "awaiting_confirmation"] } }, { createdAt: { gte: since } }],
         },
         orderBy: { createdAt: "desc" },
         take: MAX_RUNS,
-        select: { id: true, kind: true, status: true, missionId: true, createdAt: true, endedAt: true, agentKey: true, agentState: true },
+        select: { id: true, kind: true, status: true, missionId: true, createdAt: true, endedAt: true, agentKey: true, agentState: true, parentRunId: true },
       }),
       tx.skillRun.findMany({
         where: {
@@ -171,6 +181,9 @@ export async function loadAgentActivity(workspaceId: string, now = new Date()): 
       endedAt: iso(r.endedAt),
       agentKey: r.agentKey,
       task: runPrompt(r.agentState),
+      // Phase 16: nest chat delegation and say how far the sub-agents are.
+      parentRunId: r.parentRunId,
+      delegation: delegationSummary(r.agentState),
     }));
 
     // One card per schedule: its latest run.

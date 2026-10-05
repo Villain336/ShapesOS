@@ -7,8 +7,15 @@
  *  "chat" (Phase 5) = one assistant / task turn by the lead or a sub-agent. */
 export type AgentRunKind = "mission" | "playbook" | "browser" | "follow_up" | "chat";
 
-/** Run lifecycle status. Terminal: succeeded | failed | cancelled. */
-export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+/**
+ * Run lifecycle status. Terminal: succeeded | failed | cancelled.
+ * Phase 16: awaiting_confirmation — waiting for the user's OK (a delegated
+ * sub-agent with pending proposals, or a lead waiting on them); not terminal.
+ */
+export type AgentRunStatus = "queued" | "running" | "awaiting_confirmation" | "succeeded" | "failed" | "cancelled";
+
+/** Phase 16: statuses of a run that is not over (Stop reaches these). */
+export const LIVE_RUN_STATUSES = ["queued", "running", "awaiting_confirmation"] as const;
 
 /** Timeline event types (spec §4) — agui = protocol events, gate = Phase 14
  *  gate decisions, browser = Playwright actions, note = freeform, usage =

@@ -9,7 +9,7 @@ describe("agent worker config", () => {
   it("defaults: internal worker, 45 s inline budget, 2 jobs, 60 s lease, 10 s heartbeat, 3 attempts", () => {
     assert.equal(agentWorkerMode({}), "internal");
     assert.equal(inlineBudgetMs({}), 45_000);
-    assert.deepEqual(agentWorkerConfig({}), { concurrency: 2, pollMs: 1000, leaseMs: 60_000, heartbeatMs: 10_000, maxAttempts: 3 });
+    assert.deepEqual(agentWorkerConfig({}), { concurrency: 6, pollMs: 1000, leaseMs: 60_000, heartbeatMs: 10_000, maxAttempts: 3 });
   });
 
   it("AGENT_WORKER=off never hands off; 0 queues every turn", () => {

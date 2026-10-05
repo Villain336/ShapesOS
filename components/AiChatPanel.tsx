@@ -28,6 +28,7 @@ import { useChat } from "./chat/ChatContext";
 import AttachmentMenu from "./chat/AttachmentMenu";
 import FeedbackButtons from "@/components/agents/FeedbackButtons";
 import { AutoApproveRow, TaskBar } from "./chat/TaskControls";
+import { DelegationCard } from "./chat/DelegationCard";
 
 /** Pick a vault tool icon from the tool name. */
 function stepIcon(tool: string): ToolStep["icon"] {
@@ -155,6 +156,18 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                                   />
                                 </div>
                               )}
+                              {/* Phase 16: "Working with N sub-agents" — one card per plan the lead started. */}
+                              {(m.toolCalls ?? [])
+                                .filter((c) => c.delegation)
+                                .map((c) => (
+                                  <DelegationCard
+                                    key={c.delegation!.planId}
+                                    runId={c.delegation!.parentRunId}
+                                    planId={c.delegation!.planId}
+                                    tasks={c.delegation!.tasks}
+                                    goal={c.delegation!.goal}
+                                  />
+                                ))}
                               {m.id === lastAssistantId && autoOffer && canEdit ? (
                                 <AutoApproveRow agentKey={autoOffer.agentKey} action={autoOffer.action} />
                               ) : null}

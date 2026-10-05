@@ -603,6 +603,8 @@ model Workspace {
   agentRuns                   AgentRun[]
   // Phase 8: durable agent work queue + per-run transcripts (resume).
   agentJobs                   AgentJob[]
+  // Phase 16 (deleg): the workspace's automatic-delegation switch and limits.
+  agentDelegationSetting      AgentDelegationSetting?
   agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
@@ -9289,6 +9291,10 @@ enum AgentRunStatus {
   succeeded
   failed
   cancelled
+  // Phase 16 (deleg): waiting for the user's OK (a delegated sub-agent with
+  // pending proposals, or a lead waiting on them). Not terminal: "yes"
+  // resumes it; Stop cancels it.
+  awaiting_confirmation
 
   @@map("AgentRunStatus")
 }
@@ -16731,4 +16737,23 @@ model OpsDockBooking {
   @@index([workspaceId, siteId, status])
   @@index([workspaceId, dockLocationId, eta])
   @@map("ops_dock_bookings")
+}
+
+// Phase 16 (deleg): automatic delegation settings, one row per workspace
+// (absent = the code defaults in lib/agents/delegation/plan.ts:
+// DEFAULT_DELEGATION_LIMITS, automatic delegation ON). A null limit means the
+// code default; the settings API bounds every value (DELEGATION_LIMIT_BOUNDS).
+model AgentDelegationSetting {
+  workspaceId         String    @id @map("workspace_id")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Offer delegate_tasks to the lead (the explicit one-task hand-off stays).
+  autoDelegation      Boolean   @default(true) @map("auto_delegation")
+  maxParallelPerRun   Int?      @map("max_parallel_per_run")
+  maxLivePerWorkspace Int?      @map("max_live_per_workspace")
+  maxWidth            Int?      @map("max_width")
+  maxDepth            Int?      @map("max_depth")
+  updatedBy           String    @map("updated_by")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@map("agent_delegation_settings")
 }

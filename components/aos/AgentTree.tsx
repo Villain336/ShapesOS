@@ -7,6 +7,9 @@
 //   tone "paper": Overview / gallery — monogram tiles, status words at right.
 //   tone "night": sidebar "Running now" — compact rows on black.
 // Data comes from lib/aos/agents.ts deriveAgentTree().
+// Phase 16: a run working with sub-agents shows "3 of 5 sub-agents done" with
+// a progress bar, and its sub-agents hang under it, each with its own state
+// shape (sub-agent states are agent states).
 
 import Link from "next/link";
 import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
@@ -93,6 +96,9 @@ function Branch({
           </span>
           <span className={cn("block truncate", night ? "text-xs text-night-muted" : "text-md text-muted")}>{node.line}</span>
         </span>
+        {node.progress && (node.status === "running" || node.status === "needs") ? (
+          <MiniProgress done={node.progress.done} total={node.progress.total} night={night} />
+        ) : null}
         {night ? null : (
           <span className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-ink sm:inline-flex">
             <StatusShape status={node.status} size={9} live={false} />
@@ -100,8 +106,40 @@ function Branch({
           </span>
         )}
       </MaybeLink>
+      {node.children?.length ? <SubAgentRows nodes={node.children} tone={tone} onNavigate={onNavigate} /> : null}
       {content ? <div className="pt-1 pb-3 pl-2.5">{content}</div> : null}
     </li>
+  );
+}
+
+/** Phase 16: the sub-agents a run handed work to — compact rows, state shape first. */
+function SubAgentRows({ nodes, tone, onNavigate }: { nodes: AgentNode[]; tone: "paper" | "night"; onNavigate?: () => void }) {
+  const night = tone === "night";
+  return (
+    <ul aria-label="Sub-agents" className={cn("ml-5 border-l-2 pl-2", night ? "border-night-line" : "border-line")}>
+      {nodes.map((c) => {
+        const m = STATUS_META[c.status];
+        return (
+          <li key={c.key}>
+            <MaybeLink
+              href={c.href}
+              onNavigate={onNavigate}
+              label={`${c.name}: ${m.label}. ${c.line}`}
+              className={cn(
+                "flex min-h-9 items-center gap-2 rounded-sm px-2 py-1 transition-[background-color] duration-150",
+                night ? "hover:bg-night-hover" : "hover:bg-hover-paper",
+              )}
+            >
+              <StatusShape status={c.status} size={night ? 9 : 8} tone={night ? "night" : "paper"} label={m.label} />
+              <span className={cn("min-w-0 flex-1 truncate", night ? "text-xs text-paper" : "text-sm text-ink")}>
+                <span className="font-semibold">{c.name}</span>
+                <span className={night ? "text-night-muted" : "text-muted"}> · {c.line}</span>
+              </span>
+            </MaybeLink>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
