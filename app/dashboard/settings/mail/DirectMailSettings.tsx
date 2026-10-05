@@ -16,6 +16,7 @@ import {
   FlaskConical,
   BadgeCheck,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -185,7 +186,7 @@ export default function DirectMailSettings() {
   }
 
   async function disconnect(id: string, name: string) {
-    if (!window.confirm(`Disconnect ${name}? Campaigns will fall back to the fake (test) provider.`)) return;
+    if (!await confirmAction(`Disconnect ${name}? Campaigns will fall back to the fake (test) provider.`)) return;
     setBusy(`disconnect-${id}`);
     try {
       const res = await fetch(`/api/mail/providers/${id}`, { method: "DELETE" });

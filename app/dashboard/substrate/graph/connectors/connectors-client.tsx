@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plug, RefreshCw, Unplug, AlertTriangle } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface SyncJob {
   id: string;
@@ -119,7 +120,7 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
   }
 
   async function revoke(id: string, platform: string) {
-    if (!confirm(`Revoke the ${platform} connector? Sync stops; graph history is kept.`)) return;
+    if (!await confirmAction(`Revoke the ${platform} connector? Sync stops; graph history is kept.`)) return;
     setBusy(`revoke:${id}`);
     try {
       const res = await fetch(

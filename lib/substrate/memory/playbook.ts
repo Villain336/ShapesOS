@@ -45,8 +45,8 @@ export async function proposePlaybookPattern(
   input: ProposalInput,
 ): Promise<ProposalResult> {
   const learning = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.memoryLearning.findUnique({
-      where: { id: input.learningId },
+    tx.memoryLearning.findFirst({
+      where: { id: input.learningId, workspaceId },
       select: { id: true, workspaceId: true, hypothesis: true, action: true, result: true },
     }),
   );

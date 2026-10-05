@@ -19,6 +19,24 @@ import {
 
 const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
 
+
+// Minimal Prisma `where` matcher for the fake updateMany (equality, Date
+// equality, null, { in }, { notIn }) — the guarded writes the module uses.
+function matchesWhere(row: any, where: any): boolean {
+  for (const [k, v] of Object.entries(where ?? {})) {
+    if (v instanceof Date) {
+      if (!(row[k] instanceof Date) || row[k].getTime() !== v.getTime()) return false;
+    } else if (v && typeof v === "object") {
+      const c = v as { in?: unknown[]; notIn?: unknown[] };
+      if (c.in && !c.in.includes(row[k])) return false;
+      if (c.notIn && c.notIn.includes(row[k])) return false;
+    } else if (v === null ? row[k] != null : row[k] !== v) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function makeDb() {
   const envelopes = new Map<string, any>();
   const templates = new Map<string, any>();
@@ -101,6 +119,15 @@ function makeDb() {
         const e = envelopes.get(where.id);
         Object.assign(e, data, { updatedAt: new Date() });
         return e;
+      },
+      async updateMany({ where, data }: any) {
+        let count = 0;
+        for (const e of envelopes.values()) {
+          if (!matchesWhere(e, where)) continue;
+          Object.assign(e, data, { updatedAt: new Date() });
+          count++;
+        }
+        return { count };
       },
     },
     esignTemplate: {

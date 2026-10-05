@@ -5,8 +5,8 @@
 //   - Twilio: X-Twilio-Signature (HMAC-SHA1 of url + sorted params).
 //   - Fake:   X-Fake-Signature (HMAC-SHA256 of url + JSON(params)), or
 //             Authorization: Bearer <FAKE_MESSAGING_SECRET>.
-// Workspace resolution: the To number → callNumber (same as inbound voice);
-// the fake provider may also pass workspaceId explicitly for tests.
+// Workspace resolution: ONLY the To number → callNumber (same as inbound
+// voice). A request parameter is never trusted to pick the tenant.
 //
 // STOP/HELP/START keywords update ContactConsent; HELP gets a compliance
 // reply sent directly (a mandated response to an inbound message, not a
@@ -46,18 +46,15 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Missing From/To" }, { status: 400 });
   }
 
-  // Workspace: explicit (fake/test) or the tracking number the SMS hit.
-  let workspaceId = (params.workspaceId ?? "").trim() || null;
-  if (!workspaceId) {
-    const number = await prisma.callNumber.findUnique({
-      where: { e164: to },
-      select: { workspaceId: true, status: true },
-    });
-    if (!number || number.status !== "active") {
-      return Response.json({ error: "Unknown destination number" }, { status: 400 });
-    }
-    workspaceId = number.workspaceId;
+  // Workspace: the tracking number the SMS hit (never a request param).
+  const number = await prisma.callNumber.findUnique({
+    where: { e164: to },
+    select: { workspaceId: true, status: true },
+  });
+  if (!number || number.status !== "active") {
+    return Response.json({ error: "Unknown destination number" }, { status: 400 });
   }
+  const workspaceId = number.workspaceId;
 
   const result = await handleInboundSms({
     workspaceId,

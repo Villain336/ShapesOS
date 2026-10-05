@@ -239,7 +239,7 @@ export async function preflightTrigger(flowId: string): Promise<TriggerPreflight
       ok: false,
       reason:
         `Flow "${flow.displayName}" cannot be triggered externally: its trigger is "${what}", ` +
-        "not a webhook. Publish the flow with a “Catch Webhook” trigger to make it runnable from Marketr.",
+        "not a webhook. Publish the flow with a “Catch Webhook” trigger to make it runnable from ShapesOS.",
       flow,
     };
   }

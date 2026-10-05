@@ -13,7 +13,7 @@
 
 import { guardWorkspace, httpErrorResponse } from "../../../integrations/_lib";
 import { claimNextPendingJob, executeClaimedJob } from "../../../clipper/_pipeline";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 export async function POST() {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
-    const rl = checkRateLimit(`clipper-process:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`clipper-process:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const job = await claimNextPendingJob(workspace.id);

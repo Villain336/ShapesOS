@@ -57,10 +57,11 @@ function stubStores() {
       proposals.set(p.id, p);
       return p;
     },
-    async get(id) {
-      return proposals.get(id) ?? null;
+    async get(id, ws) {
+      const p = proposals.get(id);
+      return p && p.workspaceId === ws ? p : null;
     },
-    async setStatus(id, status: SpendProposalStatus, decidedBy?: string) {
+    async setStatus(id, _ws: string, status: SpendProposalStatus, decidedBy?: string) {
       const p = proposals.get(id)!;
       const next = { ...p, status, decidedBy: decidedBy ?? null, decidedAt: new Date() };
       proposals.set(id, next);
@@ -80,8 +81,9 @@ function stubStores() {
       approvals.set(input.proposalId, a);
       return a;
     },
-    async getByProposalId(proposalId) {
-      return approvals.get(proposalId) ?? null;
+    async getByProposalId(proposalId, ws) {
+      const a = approvals.get(proposalId);
+      return a && a.workspaceId === ws ? a : null;
     },
   };
   return { proposalStore, approvalStore };
@@ -105,6 +107,7 @@ describe("spend gate lifecycle", () => {
     const { proposal: approved, approval } = await approveSpendAction(
       proposalStore,
       approvalStore,
+      WS,
       proposal.id,
       "approver_1",
     );
@@ -124,7 +127,7 @@ describe("spend gate lifecycle", () => {
     );
     assert.equal(runs, 1);
     assert.match(receipt.platformReceiptId, /^amz-prop_/);
-    const done = await proposalStore.get(proposal.id);
+    const done = await proposalStore.get(proposal.id, WS);
     assert.equal(done!.status, "executed");
   });
 
@@ -139,7 +142,7 @@ describe("spend gate lifecycle", () => {
       payload: PAYLOAD,
       proposedBy: ACTOR,
     });
-    const rejected = await rejectSpendAction(proposalStore, proposal.id, ACTOR);
+    const rejected = await rejectSpendAction(proposalStore, WS, proposal.id, ACTOR);
     assert.equal(rejected.status, "rejected");
     assert.equal(rejected.decidedBy, ACTOR);
   });

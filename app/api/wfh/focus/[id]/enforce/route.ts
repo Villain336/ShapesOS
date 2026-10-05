@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { resolveTimeZone } from "@/lib/time/zoned";
 import {
   enforceFocusBlock,
   WfhFocusError,
@@ -78,6 +79,10 @@ export async function POST(
   const connection = await prisma.wfhCalendarConnection.findUnique({
     where: { workspaceId_userId_provider: { workspaceId: workspace.id, userId: user.id, provider } },
   });
+  const mode = await prisma.wfhWorkMode.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+    select: { timezone: true },
+  });
 
   try {
     const result = await enforceFocusBlock(
@@ -95,6 +100,7 @@ export async function POST(
             autoDeclineConsentAt: connection.autoDeclineConsentAt,
           }
         : null,
+      resolveTimeZone(mode?.timezone),
     );
 
     const updated = await prisma.wfhFocusBlock.update({

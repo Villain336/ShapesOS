@@ -13,6 +13,7 @@ import {
   resolveActiveShare,
   sanitizeReplayBatch,
 } from "@/lib/integrations/replay";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +50,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     );
     return Response.json(result, { status: 202 });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Ingest failed." },
-      { status: 500 },
-    );
+    return errorResponse(e, "POST /api/s/[token]/replay");
   }
 }
 

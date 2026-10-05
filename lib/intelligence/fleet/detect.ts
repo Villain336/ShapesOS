@@ -20,7 +20,7 @@ import {
   saveSnapshots,
 } from "./snapshots";
 import { classifyChange } from "./classify";
-import { PoliteFetcher } from "./polite-fetch";
+import { PoliteFetcher, isOnWatchedDomain } from "./polite-fetch";
 import {
   FLEET_BOT_TOKEN,
   crawlDelayFor,
@@ -108,6 +108,12 @@ export async function runChangeDetection(deps: DetectDeps): Promise<DetectionRes
       domain = new URL(url).hostname.toLowerCase();
     } catch {
       result.errors.push({ url, error: "malformed URL" });
+      continue;
+    }
+    if (!isOnWatchedDomain(url, watch.competitorDomain)) {
+      // H8: tracked URLs come from competitor-controlled sitemaps; never
+      // fetch anything off the watched domain.
+      result.errors.push({ url, error: "off-domain URL refused" });
       continue;
     }
     if (!robotsByDomain.has(domain)) {

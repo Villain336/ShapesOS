@@ -24,6 +24,7 @@ import {
 import { rulesForPublisher, getPublisherRule } from "@/lib/flywheel/ctv/publisher-rules";
 import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import { readFile as readWorkspaceFile } from "@/lib/filesystem/service";
+import { readDevVideoPath } from "@/lib/flywheel/ctv/dev-video-path";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -45,13 +46,10 @@ async function resolveBytes(
     if (!got) throw new Error("File not found in workspace");
     return { bytes: got.bytes, label: got.meta.filename };
   }
-  // videoPath: restricted to /tmp ingestion (dev/test). Never arbitrary paths.
-  const p = d.videoPath!;
-  if (!p.startsWith(tmpdir() + "/")) {
-    throw new Error("videoPath is restricted to the OS temp dir (use fileId for workspace files)");
-  }
-  const { readFile } = await import("node:fs/promises");
-  return { bytes: await readFile(p), label: p };
+  // videoPath: dev/test-only local ingestion, confined to the real temp dir
+  // (realpath + containment + regular file + size cap). Refused in production.
+  const { bytes, realPath } = await readDevVideoPath(d.videoPath!);
+  return { bytes, label: realPath };
 }
 
 export async function POST(req: NextRequest) {

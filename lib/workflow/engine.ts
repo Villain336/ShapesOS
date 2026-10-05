@@ -259,6 +259,12 @@ interface WalkArgs {
   context: RunContext;
   /** Trigger nodes already treated as the run start (don't re-run them). */
   startNodeIds?: Set<string>;
+  /**
+   * Data the trigger carried (the inbound webhook's JSON body). Recorded on
+   * the trigger step's output as `trigger`, so it is in the run context —
+   * conditions read it as "trigger.<field>" — and survives a resume.
+   */
+  triggerPayload?: unknown;
 }
 
 const MAX_VISITS = 100;
@@ -294,7 +300,12 @@ async function walk(args: WalkArgs): Promise<void> {
 
     if (node.kind === "trigger") {
       if (startNodeIds.has(node.id)) {
-        await recordStep(run.id, node, "succeeded", { output: { triggerKind: node.type } });
+        const output: Record<string, unknown> = { triggerKind: node.type };
+        if (args.triggerPayload !== undefined && node.id === args.fromNodeId) {
+          output.trigger = args.triggerPayload;
+          ctx = { ...ctx, trigger: args.triggerPayload };
+        }
+        await recordStep(run.id, node, "succeeded", { output });
       } else {
         await recordStep(run.id, node, "skipped", {
           error: "Trigger nodes only fire at run start",
@@ -404,7 +415,12 @@ export interface StartRunArgs {
   /** Defaults to createdBy. */
   actorUserId?: string | null;
   triggerNodeId?: string;
+  /** Trigger data (webhook JSON body), exposed to nodes as `trigger`. */
+  payload?: unknown;
 }
+
+/** Non-user creators: audit entries for their runs use the system actor. */
+const SYSTEM_CREATORS = new Set(["system", "cron", "webhook"]);
 
 /**
  * Start a workflow run: kill-switch check, 5-minute dedupe, then inline
@@ -453,7 +469,7 @@ export async function startWorkflowRun(
     args.projectId,
     "workflow_run_started",
     `Workflow "${workflow.name}" run started (${args.triggerKind})`,
-    args.createdBy && args.createdBy !== "system" && args.createdBy !== "cron" ? "user" : "system",
+    args.createdBy && !SYSTEM_CREATORS.has(args.createdBy) ? "user" : "system",
   );
 
   try {
@@ -474,6 +490,7 @@ export async function startWorkflowRun(
       actor,
       fromNodeId: startNode.id,
       context: {},
+      triggerPayload: args.payload,
     });
     await finishRunIfRunning(run.id, args.workspaceId, args.projectId, workflow.name);
   } catch (err) {

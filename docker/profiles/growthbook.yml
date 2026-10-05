@@ -36,7 +36,7 @@ services:
       growthbook-mongo:
         condition: service_healthy
     ports:
-      - "${GROWTHBOOK_PORT:-3003}:3000"
+      - "127.0.0.1:${GROWTHBOOK_PORT:-3003}:3000"
     environment:
       MONGODB_URI: mongodb://growthbook-mongo:27017/growthbook
     healthcheck:

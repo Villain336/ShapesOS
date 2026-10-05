@@ -23,7 +23,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Outreach — Marketr",
+  title: "Outreach — ShapesOS",
   description: "Guest-post outreach engine: 3-depth ladder, depth-3 gating, deliverability.",
 };
 

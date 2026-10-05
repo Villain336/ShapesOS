@@ -28,6 +28,8 @@ import {
 import { FontPicker } from "../FontPicker";
 import { PANEL_FONTS } from "@/lib/design/fonts";
 
+// Legit literal hex: default fills written into the user's design document
+// (Konva canvas, exported to PNG/PDF), not UI chrome.
 const PRESETS = [
   { label: "Heading", fontSize: 64, fontStyle: "bold" as const, fill: "#1c1917" },
   { label: "Subheading", fontSize: 36, fontStyle: "bold" as const, fill: "#1c1917" },
@@ -93,7 +95,7 @@ function RichTextControls({ el }: { el: TextElement }) {
           <span className="font-medium text-ink">“{preview}”</span>
         </p>
       ) : (
-        <p className="mt-1 text-[11px] leading-snug text-subtle">
+        <p className="mt-1 text-[11px] leading-snug text-muted">
           Drag across the text above to select a range, then style just that range.
         </p>
       )}
@@ -195,7 +197,7 @@ function RangeStyleForm({
         type="color"
         value={fill}
         onChange={(e) => setFill(e.target.value)}
-        className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
+        className="h-7 w-8 cursor-pointer rounded-key border border-control bg-paper p-0.5"
         title="Range color"
         aria-label="Range color"
       />
@@ -369,7 +371,7 @@ export function TextPanel() {
         >
           CTA button
         </button>
-        <p className="pt-1 text-[11px] leading-snug text-subtle">
+        <p className="pt-1 text-[11px] leading-snug text-muted">
           Adds a black pill with a centered label as two elements. Select the label to edit its text in the toolbar.
         </p>
       </div>

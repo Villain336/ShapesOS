@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { btnGhost, btnPrimary, inputCls, labelCls } from "../ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // Local decision idioms (not in ../ui): approve → done, reject → deny,
 // backfill scan → running.
@@ -178,7 +179,7 @@ export function UnlinkButton({ campaignId, linkId, label }: { campaignId: string
   const [error, setError] = useState<string | null>(null);
 
   async function unlink() {
-    if (!window.confirm(`Unlink "${label}"? The fragment itself is untouched — only the link row is removed.`)) return;
+    if (!await confirmAction(`Unlink "${label}"? The fragment itself is untouched — only the link row is removed.`)) return;
     setBusy(true);
     setError(null);
     try {

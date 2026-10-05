@@ -1,6 +1,6 @@
 // Marketr — Phase 10 M2: Platform-change radar — shared types.
 //
-// Official sources ONLY (SPEC-PHASE10.md §M2 + §2): Google Search Status
+// Official sources ONLY (docs/specs/SPEC-PHASE10.md §M2 + §2): Google Search Status
 // Dashboard (incidents.json), Google Search Central documentation changelog
 // RSS, Bing Webmaster blog RSS. No SEO-Twitter/blog scraping — ever.
 //

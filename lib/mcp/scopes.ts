@@ -2,6 +2,10 @@
 //
 // Scopes are per-tool fixed constants ("tools:<name>"). No wildcards, no
 // prefix matching, no "*". A key/token holds exactly the tools it was granted.
+// (Kept dependency-free apart from the Prisma role type: the client-side key
+// manager imports it.)
+
+import type { WorkspaceRole } from "@prisma/client";
 
 /** Every v1 MCP tool. The scope for a tool is `tools:<name>`. */
 export const MCP_TOOL_NAMES = [
@@ -19,6 +23,9 @@ export const MCP_TOOL_NAMES = [
   "automation_trigger_flow",
   "automation_flow_status",
   /* END */
+  // Phase 4b: Dataset Builder activation (BriefNow live pull + OS grounding).
+  "ask_business_data",
+  "get_dataset_adapter",
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
@@ -32,6 +39,47 @@ export function isKnownScope(scope: string): boolean {
   if (!scope.startsWith("tools:")) return false;
   const name = scope.slice("tools:".length);
   return (MCP_TOOL_NAMES as readonly string[]).includes(name);
+}
+
+/**
+ * Minimum workspace role per tool (Phase 1). A token or key can never carry
+ * more than its user's CURRENT role allows: scopes are capped at consent /
+ * key creation and re-capped on every MCP call (lib/mcp/auth.ts), so a
+ * demoted or removed member's credentials shrink or stop working at once.
+ * Read-only free tools are viewer-level; anything that burns credits or
+ * fires an automation is editor-level (the in-app equivalents are too).
+ */
+export const TOOL_MIN_ROLE: Record<McpToolName, WorkspaceRole> = {
+  list_projects: "viewer",
+  get_rank_report: "editor",
+  run_seo_audit: "editor",
+  get_keyword_ideas: "editor",
+  draft_content_brief: "editor",
+  get_site_health: "editor",
+  list_scheduled_skills: "viewer",
+  get_usage_summary: "viewer",
+  analyze_serp: "editor",
+  research_keywords: "editor",
+  /* INTEGRATION:activepieces */
+  automation_trigger_flow: "editor",
+  automation_flow_status: "viewer",
+  /* END */
+  ask_business_data: "viewer",
+  get_dataset_adapter: "viewer",
+};
+
+const ROLE_ORDER: Record<WorkspaceRole, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 };
+
+/** True when `role` may hold the scope (unknown scopes → false). */
+export function scopeAllowedForRole(scope: string, role: WorkspaceRole): boolean {
+  if (!isKnownScope(scope)) return false;
+  const min = TOOL_MIN_ROLE[scope.slice("tools:".length) as McpToolName];
+  return ROLE_ORDER[role] >= ROLE_ORDER[min];
+}
+
+/** The subset of `scopes` that `role` may hold. */
+export function capScopesToRole(scopes: readonly string[], role: WorkspaceRole): string[] {
+  return scopes.filter((s) => scopeAllowedForRole(s, role));
 }
 
 /**
@@ -56,6 +104,8 @@ export const TOOL_CREDIT_PASSTHROUGH: Record<McpToolName, { action: string; cred
   automation_trigger_flow: { action: "automation_flow_trigger", credits: 0 },
   automation_flow_status: { action: "automation_flow_status", credits: 0 },
   /* END */
+  ask_business_data: { action: "dataset_ask", credits: 0 },
+  get_dataset_adapter: { action: "dataset_adapter_pull", credits: 0 },
 };
 
 /** Human-readable scope labels for the consent screen and key UI. */
@@ -110,4 +160,12 @@ export const SCOPE_LABELS: Record<McpToolName, { title: string; description: str
     description: "Read the status of an Activepieces flow run (read-only, free).",
   },
   /* END */
+  ask_business_data: {
+    title: "Ask business data",
+    description: "Answer a question from the datasets this workspace published to RAG + Feed, with source citations (read-only, free).",
+  },
+  get_dataset_adapter: {
+    title: "Dataset adapter (BriefNow)",
+    description: "Read the live BriefNow adapter package for a published dataset — every entry with its source lineage (read-only, free).",
+  },
 };

@@ -10,6 +10,7 @@ import { NewMemberModal } from "./NewMemberModal";
 import { LeaveRequestModal } from "./LeaveRequestModal";
 import { LeaveDetail } from "./LeaveDetail";
 import { btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export interface OpsTeamMember {
   id: string;
@@ -271,7 +272,7 @@ export function TeamTab() {
                   {leaves.map((l) => {
                     const meta = LEAVE_STATUS_META[l.status] ?? LEAVE_STATUS_META.requested!;
                     return (
-                      <tr key={l.id} onClick={() => setSelectedLeaveId(l.id)} className={trClickableCls}>
+                      <tr key={l.id} onClick={() => setSelectedLeaveId(l.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedLeaveId(l.id))} className={trClickableCls}>
                         <td className="font-semibold text-ink">{memberLabel(l.memberId)}</td>
                         <td className="text-ink">{LEAVE_TYPE_LABEL[l.type] ?? l.type}</td>
                         <td className="text-ink tabular-nums">

@@ -11,9 +11,9 @@ export function googleAlertsGuidance(competitorDomain: string): string {
   return [
     `### Google Alerts baseline — ${domain}`,
     ``,
-    `Marketr's fleet watches **sitemaps** (what competitors publish). Google Alerts watches **Google's index** (what Google actually picked up). The two disagree usefully — a page in the sitemap that never gets indexed is a signal in itself.`,
+    `ShapesOS's fleet watches **sitemaps** (what competitors publish). Google Alerts watches **Google's index** (what Google actually picked up). The two disagree usefully — a page in the sitemap that never gets indexed is a signal in itself.`,
     ``,
-    `**30-second setup** (do this in your own Google account — Marketr never touches Google Alerts):`,
+    `**30-second setup** (do this in your own Google account — ShapesOS never touches Google Alerts):`,
     ``,
     `1. Go to google.com/alerts while signed in.`,
     `2. Create an alert for: \`site:${domain}\``,

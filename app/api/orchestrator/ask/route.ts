@@ -6,9 +6,9 @@
 
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/lib/prisma";
 import { orchestratorGuard, badRequest, readJson } from "../_lib";
 import { answerAsk } from "@/lib/orchestrator/ask";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 
 export async function POST(req: Request) {
   const guard = await orchestratorGuard("viewer");
@@ -21,10 +21,13 @@ export async function POST(req: Request) {
 
   const missionId = typeof body.missionId === "string" && body.missionId.trim() ? body.missionId.trim() : null;
   if (missionId) {
-    const mission = await prisma.mission.findFirst({
-      where: { id: missionId, workspaceId: guard.workspaceId },
-      select: { id: true },
-    });
+    // missions is FORCE-RLS: read inside the workspace scope.
+    const mission = await withWorkspaceScope(guard.workspaceId, (tx) =>
+      tx.mission.findFirst({
+        where: { id: missionId, workspaceId: guard.workspaceId },
+        select: { id: true },
+      }),
+    );
     if (!mission) {
       return Response.json({ error: "Mission not found in workspace." }, { status: 404 });
     }

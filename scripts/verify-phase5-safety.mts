@@ -399,7 +399,7 @@ async function main() {
     });
     const pending = await submitApproval(approvalStore, draft.id, WS, BUYER);
     const otpStore = new OtpChallengeStore();
-    const { challengeId } = otpStore.mint(10);
+    const { challengeId } = otpStore.mint({ approvalId: pending.id, approverId: OWNER }, 10);
     await expectThrow(
       "wrong OTP → approval rejected",
       () => approveApproval(approvalStore, {
@@ -412,8 +412,7 @@ async function main() {
     if (events.some((e) => e.action === "approval_rejected")) ok("OTP failure logged");
     else bad("OTP failure logged", "no approval_rejected event");
     // Correct OTP: first approver of a $2K buy records a decision, stays pending.
-    const { challengeId: c2 } = otpStore.mint(10);
-    const code = otpStore.testPeekCode(c2)!;
+    const { challengeId: c2, code } = otpStore.mint({ approvalId: pending.id, approverId: OWNER }, 10);
     const first = await approveApproval(approvalStore, {
       id: pending.id, workspaceId: WS, approverId: OWNER, approverMediaRole: "owner",
       method: "otp", otpChallengeId: c2, otpCode: code, otpStore,
@@ -424,8 +423,7 @@ async function main() {
       bad("first approver of $2K buy stays pending (awaiting second approver)", `status=${first.status}`);
     }
     // Second distinct approver with OTP → approved.
-    const { challengeId: c3 } = otpStore.mint(10);
-    const code3 = otpStore.testPeekCode(c3)!;
+    const { challengeId: c3, code: code3 } = otpStore.mint({ approvalId: pending.id, approverId: OWNER2 }, 10);
     const final = await approveApproval(approvalStore, {
       id: pending.id, workspaceId: WS, approverId: OWNER2, approverMediaRole: "owner",
       method: "otp", otpChallengeId: c3, otpCode: code3, otpStore,

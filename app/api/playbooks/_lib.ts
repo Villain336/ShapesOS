@@ -5,6 +5,7 @@
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, getMembership, forbidden } from "@/lib/authz";
+import { errorResponse } from "@/lib/api/errors";
 
 export interface PlaybooksGuard {
   userId: string;
@@ -52,5 +53,5 @@ export function storeError(err: unknown) {
   ) {
     return Response.json({ error: message }, { status: 422 });
   }
-  return Response.json({ error: message }, { status: 500 });
+  return errorResponse(err);
 }

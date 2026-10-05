@@ -44,7 +44,15 @@ if (mode === "unit") {
 console.log(`[test:${mode}] ${files.length} files`);
 const res = spawnSync(
   "npx",
-  ["tsx", "--test", `--test-concurrency=${mode === "db" ? 1 : 4}`, ...extra, ...files],
+  [
+    "tsx",
+    "--test",
+    // Route-handler tests stub the session with node:test mock.module().
+    "--experimental-test-module-mocks",
+    `--test-concurrency=${mode === "db" ? 1 : 4}`,
+    ...extra,
+    ...files,
+  ],
   { stdio: "inherit", env },
 );
 process.exit(res.status ?? 1);

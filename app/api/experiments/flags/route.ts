@@ -41,7 +41,7 @@ export async function GET() {
         id,
         valueType: "boolean" as const,
         defaultValue,
-        description: "Marketr built-in flag (GrowthBook not connected)",
+        description: "ShapesOS built-in flag (GrowthBook not connected)",
         rulesCount: 0,
       }));
       return Response.json({

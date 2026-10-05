@@ -127,8 +127,132 @@ coverage, length) — it explicitly does NOT measure copy quality. The script's
 header and output both state this so a passing score is never presented as
 "Qwen is good enough for client copy."
 
+## Phase 6 additions (2026-10-04): reliability, failover, single-key mode
+
+### Adapter reliability (`openai.ts`, `anthropic.ts`, `errors.ts`)
+- Every adapter error is an `LlmProviderError` with a `kind`:
+  `rate_limit` (429) / `server` (5xx, unreadable body) / `timeout` /
+  `network` are **retryable**; `client` (other 4xx) and `empty` are not.
+  Messages carry provider, HTTP status and a whitelisted machine code only —
+  never the key and never the response body (OpenAI echoes partial keys in
+  auth-error text) (T3).
+- OpenAI-compatible: per-attempt timeout (120 s; 15 min for `:flex`;
+  `LLM_TIMEOUT_MS` overrides), the caller's AbortSignal (Phase 5 Stop) is
+  combined with it and surfaces as the abort itself. ONE bounded retry with
+  backoff, honouring `Retry-After` / `retry-after-ms` up to 30 s — a longer
+  wait hands over to failover instead of stalling a run.
+- GPT-5 family / o-series: no `temperature`, `max_completion_tokens` instead
+  of `max_tokens`. `gpt-5-nano:flex` is sent as `gpt-5-nano` with
+  `service_tier: "flex"`. Self-host keeps `max_tokens` + `temperature` and
+  never strips a `:tag` (Ollama names use one).
+- Anthropic: SDK retries bounded to 1 (it honours Retry-After), 120 s
+  timeout, errors classified the same way.
+
+### T9 — Cross-vendor failover sends the prompt to a second vendor (MEDIUM)
+Abuse: a failover silently routes client data to a vendor the operator did
+not choose, or to a blocked / non-ZDR model.
+
+Mitigations (`router.ts`, `failover.ts`):
+- Fallback model = the other family's default for the same workload
+  (`FAMILY_WORKLOAD_DEFAULTS`), and it must pass `isRoutableHostedModel`:
+  the hard block-list AND the ZDR allow-list. A blocked or unlisted model is
+  never a fallback (battery asserts every family default is routable).
+- Armed only when that family's key is configured — both vendors were
+  deliberately configured by the operator.
+- Fires only on retryable errors, after the adapter's own retry; never on
+  the caller's abort and never on other 4xx (a rejected request is not
+  re-sent to anyone).
+- Every failover logs `[llm-router] workload=… model="…" failed: <kind>
+  (HTTP n) → failing over to "…"` (no key material); the last event per
+  workload is kept in-process (`lastFailover`). `llmRoutingStatus()`
+  shows the armed failover model per workload in Settings → Providers.
+- Off with `LLM_FAILOVER=0`, and never with `LLM_SELF_HOST=1` (a self-host
+  operator chose to keep prompts on-box; see SELF-HOST.md).
+
+### T10 — Single-key mode substitutes a model (LOW)
+With one key, workloads whose model came from the **default** use the other
+family's default instead of mock (e.g. only `OPENAI_API_KEY`: copy runs on
+`gpt-5.4-nano`). Bounds:
+- Applies to `source: "default"` only. An explicit `LLM_MODEL_*` (or legacy
+  `LLM_MODEL`) is never swapped — it still falls back to mock, loudly (T2).
+- The substitute passes the same block-list + ZDR allow-list check.
+- Not applied with `LLM_SELF_HOST=1`.
+- Visible: `llmRoutingStatus()[w].singleKey` explains the swap, and the
+  Settings → Providers "What's running on mock data" list is built from the
+  same status plus real env checks (`lib/providers/mock-inventory.ts`).
+- Key lookup uses the first NON-EMPTY of `LLM_API_KEY` / `OPENAI_API_KEY`:
+  an empty `LLM_API_KEY=""` copied from `.env.example` used to mask
+  `OPENAI_API_KEY` (`??`), silently putting every OpenAI workload on mock.
+
+## Phase 7 additions (2026-10-04): chat(), agent workloads, metering
+
+### Surface
+- `LlmProvider.chat()` / `chatStream()` (`types.ts`): system prompt, a
+  transcript of content blocks, native tool definitions, effort, thinking,
+  prompt caching, Anthropic server tools (`web_search_20260209`,
+  `web_fetch_20260209`), `signal`, and a metering context. `generate()` is
+  unchanged for every existing caller.
+- Anthropic (`anthropic.ts`, official SDK) and OpenAI (`openai.ts`,
+  Responses API over fetch) adapters; `MockLlmProvider.chat()` is labelled
+  and scriptable; `FailoverLlmProvider` applies the T9 rules to `chat()` and
+  to `chatStream()` (the latter only before the first event is yielded).
+- Agent workloads `lead` / `subagent` / `code` / `code_max`
+  (`LLM_MODEL_LEAD|SUBAGENT|CODE|CODE_MAX`); `AGENT_WORKLOADS` maps agent keys.
+
+### T11 — Model output drives tool calls (HIGH)
+Abuse: a tool input that is truncated (max_tokens), cut by a refusal, not
+valid JSON, or off-schema reaches a tool with side effects. Eager input
+streaming turns off the API's own validation, and the SDK's tolerant
+partial-JSON parser can silently truncate malformed input.
+Mitigations (`tool-input.ts`): every tool input is strictly re-parsed from the
+raw fragments and validated against the tool's JSON schema (zod
+`fromJSONSchema`; a schema that cannot be compiled fails closed); tool calls
+of a `max_tokens` / `refusal` turn are marked `invalid`; `invalidToolResult()`
+builds the documented INVALID_JSON error result. Input values are never echoed
+in validation messages. Unparseable streamed JSON is a non-retryable
+`tool_input` error (never a failover). T5 still holds: output is data.
+
+### T12 — Covered (30-day-retention) models (HIGH)
+`claude-fable-5-1` requires 30-day retention (a ZDR org gets HTTP 400 on
+every request). It is NOT on `ANTHROPIC_ZDR_MODELS`; it lives on
+`ANTHROPIC_RETENTION_MODELS` and routes only with
+`LLM_ALLOW_RETENTION_MODELS=1` (an explicit operator acceptance). Without it,
+the `code_max` default is swapped to `claude-opus-5-5` at effort max (shown in
+status); an explicit `LLM_MODEL_CODE_MAX=claude-fable-5-1` falls back to mock,
+loudly. The opt-in never opens other covered models (`claude-fable-5`).
+New ZDR entries `claude-opus-5-5`, `claude-sonnet-5-5` (not covered models per
+the Claude API docs) and `gpt-5.5` (Phase 7 plan; re-check with OpenAI when
+the ZDR request is filed). OpenAI requests send `store: false`.
+
+### T13 — Request shapes that 400 (MEDIUM, availability)
+A forced `tool_choice` on Claude Opus 5.5 / Sonnet 5.5 / Fable 5.1,
+`thinking.disabled` on Opus 5.5 / Fable 5.1 / Sonnet 5.5, `between_tools` at
+effort max, effort on Haiku 4.5, or more than 4 cache breakpoints would 400 —
+an outage that failover cannot fix (4xx). `buildAnthropicParams` never builds
+them (per-model `anthropicModelCaps`; unknown models get the most
+conservative surface) and reports what it adjusted in `meta.notes`.
+
+### T14 — Cross-provider transcript leakage (LOW)
+Anthropic thinking blocks / server-tool results are echoed back only to
+Anthropic; the OpenAI adapter drops provider-specific blocks (and says so),
+so encrypted or signed content is never sent to the other vendor on failover.
+
+### T4 (update) — token metering
+Every live `chat()` / `chatStream()` call with a usage context is recorded
+through the existing `meter()` as an `llm_tokens` UsageEvent (zero credits
+today) carrying model, workload, input / output / cache-read / cache-write
+tokens and the estimated cost (`pricing.ts`, micro-USD; unknown prices stay
+null — never guessed). With a runId, a `usage` event lands on the AgentRun
+timeline (RLS-scoped) and the run viewer shows the run's cost. Recording is
+best-effort and never fails the model call; mock calls are never metered.
+Charging credits for tokens and a per-run cost cap are Phase 8 decisions.
+
 ## Out of scope (documented, not built)
 
-- Token-level metering against the Phase C ledger.
 - Per-workspace model allow-lists / admin UI for routing config.
 - Live adapter testing (Tico's separate track; this phase is offline/mock-only).
+  Phase 6 and Phase 7 adapter behaviour is proven against stub fetches, a
+  stubbed SDK client and fake providers only (`lib/llm/__tests__`); it is
+  UNVERIFIED against the live APIs.
+- Server-side refusal fallbacks (`fallbacks` beta), compaction and task
+  budgets: Phase 8, with the agent loop that needs them.

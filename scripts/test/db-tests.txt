@@ -1,6 +1,7 @@
 # Test files that need a live, fully migrated Postgres (DATABASE_URL).
 # Run with: npm run test:db  — CI runs them as a NON-superuser app role so
 # the RLS batteries are meaningful. Everything else runs in: npm test
+lib/adplatforms/__tests__/spend-store-scope.test.ts
 lib/agents/agui/__tests__/adapter.test.ts
 lib/agents/runs/__tests__/retention-eval.test.ts
 lib/agents/runs/__tests__/retention-sweep.test.ts
@@ -8,6 +9,14 @@ lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/approvals/__tests__/inbox-db.test.ts
+lib/auth/__tests__/member-roles.test.ts
+lib/auth/__tests__/signup-mode.test.ts
+lib/auth/email/__tests__/email-auth-db.test.ts
+lib/auth/mfa/__tests__/mfa-db.test.ts
+lib/auth/mfa/__tests__/security-settings-db.test.ts
+lib/authority/outreach/__tests__/webhook-tenant-db.test.ts
+lib/cad/__tests__/cad-derived-bom-db.test.ts
 lib/cad/__tests__/cad-slice1.test.ts
 lib/cad/__tests__/cad-slice2.test.ts
 lib/cad/__tests__/cad-slice3.test.ts
@@ -18,11 +27,35 @@ lib/connector/__tests__/connector-slice3.test.ts
 lib/connector/__tests__/connector-slice4.test.ts
 lib/connector/__tests__/connector-slice5.test.ts
 lib/connector/__tests__/connector-slice6.test.ts
+lib/connector/__tests__/intro-actor.test.ts
+lib/connector/__tests__/intro-integrity.test.ts
+lib/crm/__tests__/inbox-db.test.ts
+lib/datasetbuilder/__tests__/datasets-activate-db.test.ts
 lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
 lib/funding/__tests__/funding.test.ts
+lib/gdpr/__tests__/gdpr-db.test.ts
+lib/images/__tests__/generate-image-db.test.ts
+lib/integrations/actions/__tests__/separation-of-duties.test.ts
+lib/integrations/activepieces/__tests__/bindings-db.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
+lib/legal/__tests__/deadline-done.test.ts
+lib/llm/__tests__/usage-metering-db.test.ts
+lib/mcp/__tests__/mcp-auth-roles.test.ts
+lib/mcp/__tests__/mcp-vendor-tools-db.test.ts
+lib/messaging/__tests__/dispatch-claim.test.ts
+lib/messaging/__tests__/inbound-email-db.test.ts
+lib/messaging/__tests__/inbound-sms-workspace.test.ts
+lib/messaging/__tests__/mail-cap-db.test.ts
+lib/metering/__tests__/billing-least-privilege-db.test.ts
+lib/metering/__tests__/credits-integrity-db.test.ts
+lib/metering/__tests__/self-hosted-cap-db.test.ts
+lib/metering/__tests__/trial-db.test.ts
+lib/notifications/__tests__/decided-producers-db.test.ts
+lib/notifications/__tests__/notifications-db.test.ts
+lib/observability/__tests__/health-db.test.ts
+lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
 lib/orchestrator/__tests__/orchestrator.test.ts
@@ -34,6 +67,88 @@ lib/phase13b/evals/05-no-ghost-recall.test.ts
 lib/phase13b/evals/06-stop-asking.test.ts
 lib/phase13b/evals/07-feedback-diff.test.ts
 lib/playbooks/__tests__/store.test.ts
+lib/push/__tests__/push-devices-db.test.ts
+lib/scheduler/__tests__/tick-db.test.ts
+lib/scim/__tests__/scim-db.test.ts
+lib/search/__tests__/records-db.test.ts
+lib/social/__tests__/social-db.test.ts
+lib/substrate/memory/__tests__/accepted-only.test.ts
 lib/substrate/memory/__tests__/learning-pass.test.ts
+lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts
+lib/webhooks/__tests__/webhooks-db.test.ts
+lib/workspace/__tests__/lifecycle-db.test.ts
+lib/workspace/__tests__/workspace-orphans-db.test.ts
+lib/chat/__tests__/agent-controls-db.test.ts
+lib/cron/__tests__/runner-db.test.ts
+lib/workflow/__tests__/webhook-trigger-db.test.ts
+lib/api/__tests__/rate-limit-store-db.test.ts
+lib/workspace/__tests__/settings-default-db.test.ts
+lib/agents/queue/__tests__/agent-queue-db.test.ts
+lib/ship/__tests__/ship-db.test.ts
+lib/sandbox/__tests__/sandbox-db.test.ts
+# Phase 9 (sites): agent site drafts, apply/backup, rollback gate.
+lib/sites/__tests__/site-revisions-db.test.ts
+# Phase 9 (repos): GitHub PR feedback → agent job → same thread / branch.
+lib/ship/__tests__/pr-feedback-db.test.ts
+lib/apps/__tests__/apps-db.test.ts
+# Phase 10 (finance)
+lib/ops/__tests__/accounting-db.test.ts
+lib/ops/__tests__/finance-invoicing-db.test.ts
+lib/ops/__tests__/finance-purchasing-db.test.ts
+lib/ops/__tests__/finance-expenses-db.test.ts
+lib/ops/__tests__/p10-inventory-db.test.ts
+lib/ops/__tests__/p10-crm-db.test.ts
+lib/ops/__tests__/p10-projects-db.test.ts
+lib/ops/__tests__/p10-helpdesk-db.test.ts
+lib/ops/__tests__/p10-hr-db.test.ts
+lib/chat/__tests__/p10-ops-tools-db.test.ts
+# Phase 10 (store): storefront — published-only routing, RLS, checkout, paid webhook once.
+lib/ops/__tests__/p10-store-db.test.ts
+# Phase 10 (portal): client portal sign-in, scoping, routes; portal session never grants workspace access.
+lib/portal/__tests__/portal-db.test.ts
+lib/portal/__tests__/portal-isolation-db.test.ts
+# Phase 11 (conncore)
+lib/slack/__tests__/slack-db.test.ts
+lib/hubspot/__tests__/hubspot-sync-db.test.ts
+lib/webhooks/__tests__/ops-events-db.test.ts
+# Phase 11 (seotools): live-URL audit storage, supersede-by-kind, live start URL, fix-agent exclusion.
+lib/audit/__tests__/live-audit-db.test.ts
+# Phase 11 (seotools): JSON-LD only through site draft revisions; apply is human; RLS; validation before save.
+lib/seo/__tests__/jsonld-draft-db.test.ts
+# Phase 11 (seotools): site sitemaps (rebuild on apply, hand-written kept), submissions recorded with real status + RLS.
+lib/seo/__tests__/sitemap-db.test.ts
+# Phase 11 (seotools): create_document / create_spreadsheet save real WorkspaceFiles, workspace-scoped.
+lib/documents/__tests__/document-tools-db.test.ts
+# Phase 11 (seotools): analyze_data — workspace files in, sandbox outputs saved back through the upload gate.
+lib/sandbox/__tests__/analyze-tool-db.test.ts
+# Phase 11 (seotools): web_scrape / web_crawl — vault key, daily budget, SSRF refusal, sitemap filtering (Context.dev stubbed).
+lib/knowledge/contextdev/__tests__/web-tools-db.test.ts
+# Phase 11 (devtools): Netlify connector reuses a hosting connection by reference — workspace-scoped, Netlify-only, token never copied into the vault.
+lib/connectors/m21/live/__tests__/netlify-hosting-db.test.ts
+# Phase 11 (bizsync): Shopify ↔ Ops (fake Shopify GraphQL): catalogue/inventory/orders/customers idempotent, conflict rules, gated stock push, webhook apply, journal untouched, FORCE RLS.
+lib/bizsync/__tests__/shopify-sync-db.test.ts
+# Phase 14 (connectors): Shopify single store (fake Shopify): client-credentials connect stored encrypted + used by the adapter, per-connection webhook secret (never the hosted app secret), 24 h token renewal, app/uninstalled revokes + stops ingest once.
+lib/bizsync/__tests__/shopify-single-store-db.test.ts
+# Phase 11 (bizsync): QuickBooks (fake QBO honouring requestid): mapping confirm, export once per source (re-export no-op, interrupted → same key, concurrent → once, 400 → new attempt), contacts import, ledger untouched, FORCE RLS.
+lib/bizsync/__tests__/accounting-db.test.ts
+# Phase 11 (bizsync): Xero (fake Xero honouring Idempotency-Key): tenant discovery/selection, mapping shared with QuickBooks, export once, contacts (customer/supplier), ledger untouched, FORCE RLS.
+lib/bizsync/__tests__/xero-db.test.ts
+# Phase 12 (mfgpos): manufacturing — CAD BOM via part↔product link, gated confirm/complete, completion consumes/produces/scraps through the ledger once (ledger balances, second completion no-op), WIP/finish entries balance, gated scrap, work-order timer + capacity, FORCE RLS.
+lib/ops/__tests__/p12-mfg-db.test.ts
+# Phase 12 (mfgpos): point of sale — one open session per register, till sales priced server-side (promo + tax), client-order-id replay no-op (incl. concurrent), single-use card refs, cash count, gated close posts ONE balanced entry, receipt PDF, FORCE RLS.
+lib/ops/__tests__/p12-pos-db.test.ts
+# Phase 12 (people): payroll — compute from salary + approved time, Tier-3 approve/post through the real Phase 14 gate, DB lifecycle guards, one balanced journal entry, YTD bases, FORCE RLS.
+lib/ops/__tests__/p12-payroll-db.test.ts
+# Phase 14 (connectors): Gusto payroll (fake Gusto, documented shapes): employee links suggested → confirmed by a person (FORCE RLS), Tier 3 send through the chat gate (never auto) and the ops gate (person approves), send idempotent per run + figures, approve/post wait for sync, sync-back reconciliation (payslips + totals), posted entry untouched, net-pay clearing balanced and once-only.
+lib/bizsync/__tests__/gusto-payroll-db.test.ts
+# Phase 12 (people): events — published-only routing, free/paid registration (paid pending until the signed Stripe webhook), concurrent capacity, once-only QR check-in, reminders, FORCE RLS.
+lib/ops/__tests__/p12-events-db.test.ts
+# Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.
+lib/twin/__tests__/twin-db.test.ts
+# Phase 14 (approvals): ops gate automatable slug auto-approves (audited) / money slug never; twin live for viewers (published only, draft refused, stream ends when it goes back to draft; generic route editor+); missions read the rules (drafter auto-approval, executor tier settings).
+lib/twin/__tests__/twin-viewer-db.test.ts
+lib/automation/__tests__/p14-approvals-db.test.ts
+# Phase 14: the connector refresh sweep never marks an API key or a non-expiring token needs_reauth; renewable credentials still refresh, expiring ones without a refresh token still ask.
+lib/vault/__tests__/refresh-due-db.test.ts

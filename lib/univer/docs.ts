@@ -12,6 +12,7 @@ import {
   validateSnapshot,
   type UniverDocKind,
 } from "@/lib/univer/snapshots";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 export const UNIVER_SHARE_STATES = ["private", "workspace", "link"] as const;
 export type UniverShareState = (typeof UNIVER_SHARE_STATES)[number];
@@ -60,13 +61,13 @@ export async function createUniverDoc(
   workspaceId: string,
   input: CreateUniverDocInput,
 ): Promise<UniverDocRecord> {
-  if (!isUniverDocKind(input.kind)) throw new Error(`invalid kind: ${String(input.kind)}`);
+  if (!isUniverDocKind(input.kind)) throw new BadRequestError(`invalid kind: ${String(input.kind)}`);
   const title = input.title.trim();
-  if (!title) throw new Error("title is required");
-  if (title.length > 200) throw new Error("title exceeds 200 chars");
+  if (!title) throw new BadRequestError("title is required");
+  if (title.length > 200) throw new BadRequestError("title exceeds 200 chars");
   const validation = validateSnapshot(input.kind, input.snapshot);
   if (!validation.ok) {
-    throw new Error(`invalid ${input.kind} snapshot: ${validation.errors.join("; ")}`);
+    throw new BadRequestError(`invalid ${input.kind} snapshot: ${validation.errors.join("; ")}`);
   }
   const shareState: UniverShareState =
     input.shareState && (UNIVER_SHARE_STATES as readonly string[]).includes(input.shareState)
@@ -94,7 +95,7 @@ export async function getUniverDoc(
   id: string,
 ): Promise<UniverDocRecord | null> {
   const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.findUnique({ where: { id } }),
+    tx.univerDoc.findFirst({ where: { id, workspaceId } }),
   );
   return row ? toRecord(row) : null;
 }
@@ -136,19 +137,19 @@ export async function saveUniverDocSnapshot(
   opts: { expectedVersion?: number } = {},
 ): Promise<UniverDocRecord> {
   const existing = await getUniverDoc(workspaceId, id);
-  if (!existing) throw new Error("doc not found");
+  if (!existing) throw new NotFoundError("doc not found");
   const validation = validateSnapshot(existing.kind, snapshot);
   if (!validation.ok) {
-    throw new Error(`invalid ${existing.kind} snapshot: ${validation.errors.join("; ")}`);
+    throw new BadRequestError(`invalid ${existing.kind} snapshot: ${validation.errors.join("; ")}`);
   }
   if (opts.expectedVersion !== undefined && opts.expectedVersion !== existing.version) {
-    throw new Error(
+    throw new ConflictError(
       `version conflict: expected ${opts.expectedVersion}, current ${existing.version}`,
     );
   }
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.univerDoc.update({
-      where: { id },
+      where: { id, workspaceId },
       data: { snapshot: snapshot as object, version: { increment: 1 } },
     }),
   );
@@ -161,18 +162,18 @@ export async function renameUniverDoc(
   title: string,
 ): Promise<UniverDocRecord> {
   const clean = title.trim();
-  if (!clean) throw new Error("title is required");
-  if (clean.length > 200) throw new Error("title exceeds 200 chars");
+  if (!clean) throw new BadRequestError("title is required");
+  if (clean.length > 200) throw new BadRequestError("title exceeds 200 chars");
   const existing = await getUniverDoc(workspaceId, id);
-  if (!existing) throw new Error("doc not found");
+  if (!existing) throw new NotFoundError("doc not found");
   const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.update({ where: { id }, data: { title: clean } }),
+    tx.univerDoc.update({ where: { id, workspaceId }, data: { title: clean } }),
   );
   return toRecord(row);
 }
 
 export async function deleteUniverDoc(workspaceId: string, id: string): Promise<void> {
   const existing = await getUniverDoc(workspaceId, id);
-  if (!existing) throw new Error("doc not found");
-  await withWorkspaceScope(workspaceId, (tx) => tx.univerDoc.delete({ where: { id } }));
+  if (!existing) throw new NotFoundError("doc not found");
+  await withWorkspaceScope(workspaceId, (tx) => tx.univerDoc.delete({ where: { id, workspaceId } }));
 }

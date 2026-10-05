@@ -10,12 +10,22 @@ import { DatasetsApp } from "./DatasetsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Datasets — Marketr",
+  title: "Datasets — ShapesOS",
   description:
     "Ingest business knowledge from files, Google Drive, websites, and pasted text — every chunk traced to its source.",
 };
 
-export default async function DatasetsPage() {
+
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+function one(v: string | string[] | undefined): string | null {
+  const s = Array.isArray(v) ? v[0] : v;
+  return typeof s === "string" && s.length <= 64 ? s : null;
+}
+
+export default async function DatasetsPage({ searchParams }: { searchParams: SearchParams }) {
+  // Deep link (record search, stale-dataset notifications): ?tab=build|activate|…
+  const initialTab = one((await searchParams).tab);
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -32,7 +42,7 @@ export default async function DatasetsPage() {
           text, ever.
         </p>
       </div>
-      <DatasetsApp />
+      <DatasetsApp initialTab={initialTab} />
     </div>
   );
 }

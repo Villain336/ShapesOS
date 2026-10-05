@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Tier-S scheduled pull framework (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Tier-S scheduled pull framework (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // Google Ads (GAQL), Meta Insights (async jobs), TikTok (nightly batched),
 // LinkedIn. Per-platform rate budgets enforced in the job runner; failure →
@@ -266,7 +266,7 @@ export async function runScheduledPull(opts: {
       // Budget exhausted → back off with jitter instead of blowing the budget.
       const waitMs = backoffWithJitter(job.errorCount + 1);
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: {
           status: "backing_off",
           backoffUntil: new Date(now.getTime() + waitMs),
@@ -287,7 +287,7 @@ export async function runScheduledPull(opts: {
     const adapter = adapterFor(platform, mode);
     const cursor = (job.cursorState ?? {}) as PullCursor;
     await tx.graphSyncJob.update({
-      where: { id: job.id },
+      where: { id: job.id, workspaceId },
       data: { status: "running", lastRunAt: now },
     });
 
@@ -314,7 +314,7 @@ export async function runScheduledPull(opts: {
       }
       const budget = recordUsage(budgetCheck.budget, result.opsUsed);
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: {
           status: "succeeded",
           cursorState: result.nextCursor as unknown as object,
@@ -336,7 +336,7 @@ export async function runScheduledPull(opts: {
       const waitMs = backoffWithJitter(errorCount);
       const dead = errorCount >= 10;
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: {
           status: dead ? "dead" : "failed",
           errorCount,

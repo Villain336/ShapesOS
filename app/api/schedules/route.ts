@@ -1,6 +1,6 @@
 // Marketr — schedules API (Phase B, W2).
 // GET  /api/schedules?workspaceId=&projectId=&status=   → { schedules } (viewer+)
-// POST /api/schedules { workspaceId, projectId?, skillId, triggerType, ... }
+// POST /api/schedules { workspaceId, projectId?, skillId, triggerType, cronExpr?, timezone?, ... }
 //   → { schedule } (skills.install grant or admin+ for workspace scope;
 //      project editors for project scope). Audited.
 
@@ -25,6 +25,8 @@ const CreateScheduleSchema = z.object({
   skillId: z.string().trim().min(1).max(120),
   triggerType: z.enum(["cron", "event"]),
   cronExpr: z.string().trim().max(100).nullable().optional(),
+  // IANA zone the cron is read in (default UTC); validated by the service.
+  timezone: z.string().trim().max(64).nullable().optional(),
   eventSource: z.string().trim().max(60).nullable().optional(),
   eventConfig: z.record(z.string(), z.unknown()).nullable().optional(),
   approvalMode: z.enum(["supervised", "scheduled", "autopilot"]).optional(),
@@ -38,6 +40,7 @@ function serialize(s: {
   skillId: string;
   triggerType: string;
   cronExpr: string | null;
+  timezone: string;
   eventSource: string | null;
   eventConfigJson: unknown;
   approvalMode: string;
@@ -54,6 +57,7 @@ function serialize(s: {
     skillId: s.skillId,
     triggerType: s.triggerType,
     cronExpr: s.cronExpr,
+    timezone: s.timezone,
     eventSource: s.eventSource,
     eventConfig: s.eventConfigJson,
     approvalMode: s.approvalMode,
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
         skillId: input.skillId,
         triggerType: input.triggerType,
         cronExpr: input.cronExpr,
+        timezone: input.timezone,
         eventSource: input.eventSource,
         eventConfig: (input.eventConfig ?? undefined) as Record<string, unknown> | undefined,
         createdBy: user.id,

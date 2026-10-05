@@ -3,7 +3,7 @@
 // Run: npx tsx scripts/verify-m21-connectors.mts
 // Run 3x green before calling this done.
 //
-// Part 1 (no DB, no network): all 12 native adapters resolve; listTools()
+// Part 1 (no DB, no network): all 27 native adapters resolve; listTools()
 // non-empty with unique names and honest mutating flags; mock invoke on 3+
 // adapters returns mock:true; secrets() encrypt→decrypt round-trip; OAuth
 // state sign/verify + tamper rejection + expiry rejection.
@@ -56,10 +56,18 @@ async function main() {
   const { isStdioAllowed, mcpToolToDef } = await import("@/lib/connectors/m21/mcp");
 
   const metas = listBuiltinConnectors();
-  check("11 built-in connectors registered", metas.length === 11);
+  // 11 original + Gmail/Calendar (Connector Agent slice 2) + Google Business Profile (Phase 4b).
+  check("27 built-in connectors registered", metas.length === 27); // Phase 11: +5 devtools, +3 bizsync; Phase 14: +gusto
   const expectedKeys = [
     "google-search-console", "ga4", "wordpress", "webflow", "google-drive",
     "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads",
+    "gmail", "google-calendar", "google-business-profile",
+    // Phase 11 (conncore).
+    "outlook", "outlook-calendar", "slack", "hubspot",
+    // Phase 11 (devtools).
+    "linear", "jira", "airtable", "supabase", "netlify",
+    // Phase 11 (bizsync).
+    "shopify", "quickbooks", "xero",
   ];
   for (const k of expectedKeys) {
     check(`registry has ${k}`, metas.some((m) => m.key === k));
@@ -72,6 +80,7 @@ async function main() {
     webflow: ["publish_site"],
     buffer: ["create_post", "schedule_post", "delete_post"],
     resend: ["send_test_email"],
+    "google-business-profile": ["reply_to_review", "create_post"],
   };
   const adapters: Record<string, { listTools(): unknown[]; key: string; authType: string }> = {};
 
@@ -171,7 +180,10 @@ async function main() {
 
   // MCP tool schema conversion.
   const def = mcpToolToDef({ name: "do_thing", description: "Does a thing", inputSchema: { type: "object", properties: { q: { type: "string", description: "query" } }, required: ["q"] } });
-  check("mcpToolToDef converts schema", def.name === "do_thing" && def.mutating === false && (def.argsSchema.required ?? []).includes("q"));
+  // Phase 1 (H5): MCP tools are mutating unless annotated readOnlyHint (or admin allow-listed).
+  check("mcpToolToDef converts schema", def.name === "do_thing" && def.mutating === true && (def.argsSchema.required ?? []).includes("q"));
+  const ro = mcpToolToDef({ name: "read_thing", description: "Reads", inputSchema: { type: "object", properties: {} }, annotations: { readOnlyHint: true } });
+  check("mcpToolToDef honours readOnlyHint", ro.mutating === false);
 
   // secrets() round-trip.
   const blob = secrets().encrypt("super-secret-token");
@@ -244,6 +256,8 @@ async function main() {
   check("postgres started", startOut.status === 0);
   const dbUrl = `postgresql://postgres@localhost:${port}/m21test?host=${sockDir}`;
   asPostgres(`psql -h ${sockDir} -p ${port} -U postgres -c "CREATE DATABASE m21test;"`);
+  // The schema uses pgvector + pg_trgm columns/indexes; db push doesn't create extensions.
+  asPostgres(`psql -h ${sockDir} -p ${port} -U postgres -d m21test -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm;"`);
   execSync("npx prisma db push --skip-generate --accept-data-loss", {
     cwd: join(process.cwd()),
     env: { ...process.env, DATABASE_URL: dbUrl },

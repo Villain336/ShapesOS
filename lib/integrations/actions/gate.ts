@@ -30,6 +30,8 @@ import {
   isToolkitEnabled,
   resolveToolkitForTool,
 } from "@/lib/integrations/actions/toolkits";
+import { ConflictError, ForbiddenError, HttpError, NotFoundError } from "@/lib/api/errors";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
@@ -66,6 +68,14 @@ export interface ProposeInput {
   proposedBy: string;
   plainSummary?: string;
   ttlMs?: number;
+  /**
+   * Phase 14 (approvals): store the approval already APPROVED by this
+   * automation rule (the reason names it; it lands in the audit trail and
+   * decisionReason). Passed only by lib/ops/gate.ts requestOpsApproval for
+   * its automatable (no-money) slugs. Ignored for a high tier — destructive
+   * actions always wait for a person.
+   */
+  autoApprovedReason?: string;
 }
 
 /**
@@ -114,13 +124,20 @@ export async function proposeAction(input: ProposeInput) {
       status: "denied",
       executedBy: `gate:${input.proposedBy}`,
     });
-    throw new Error(
+    throw new ForbiddenError(
       `Refused by toolkit gate: ${reason}. No approval was created and nothing executed.`,
     );
   }
   const redacted = redactArgs(input.args);
   const summary = input.plainSummary ?? summarizeAction(input.appKey, input.toolName, redacted);
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? APPROVAL_TTL_MS));
+  const autoReason = input.autoApprovedReason?.trim() && classified.tier !== "high" ? input.autoApprovedReason.trim().slice(0, 500) : null;
+  const proposed: AuditEvent = {
+    at: nowIso(),
+    actor: input.proposedBy,
+    event: "proposed",
+    detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
+  };
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.create({
       data: {
@@ -130,19 +147,76 @@ export async function proposeAction(input: ProposeInput) {
         riskTier: classified.tier,
         proposedArgs: toJson(redacted),
         plainSummary: summary,
-        status: "pending",
+        status: autoReason ? "approved" : "pending",
         expiresAt,
-        auditTrail: toJson(trail([], {
-          at: nowIso(),
-          actor: input.proposedBy,
-          event: "proposed",
-          detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
-        })),
+        // Phase 14: an automation rule approved it — no person decided.
+        ...(autoReason ? { decidedBy: "automation", decidedAt: new Date(), decisionReason: autoReason } : {}),
+        auditTrail: toJson(
+          autoReason
+            ? [proposed, { at: nowIso(), actor: "automation", event: "approved", detail: autoReason }]
+            : [proposed],
+        ),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true, expiresAt: true },
     }),
   );
+  // Phase 3 (J): gated actions land in the "needs you" inbox — tell the
+  // approvers (best-effort, after the write committed). Phase 14: an
+  // approval a rule already approved needs nobody.
+  if (!classified.autoExecutable && !autoReason) {
+    await notifyApprovalNeeded({
+      workspaceId: input.workspaceId,
+      source: "integration",
+      sourceId: approval.id,
+      title: approval.plainSummary,
+      href: "/dashboard/actions",
+      requestedBy: input.proposedBy,
+    });
+  }
   return { approval, classified };
+}
+
+/**
+ * Who requested an approval: the actor of its server-written "proposed"
+ * audit event (proposeAction sets it from the session user or the agent
+ * identity — never from the client body).
+ */
+export function requesterOf(auditTrail: unknown): string | null {
+  const arr = Array.isArray(auditTrail) ? (auditTrail as AuditEvent[]) : [];
+  return arr.find((e) => e?.event === "proposed")?.actor ?? null;
+}
+
+/** True when `userId` is the requester (also "<userId> (playbook:…)" forms). */
+export function isRequester(requester: string | null, userId: string): boolean {
+  if (!requester || !userId) return false;
+  return requester === userId || requester.startsWith(`${userId} `);
+}
+
+/**
+ * Separation of duties: is there an editor+ member other than the requester
+ * who could approve instead? A solo workspace (nobody else can approve) may
+ * self-approve — recorded as such in the audit trail.
+ */
+async function hasOtherApprover(tx: Prisma.TransactionClient, workspaceId: string, requesterId: string) {
+  const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } });
+  if (ws?.ownerUserId && ws.ownerUserId !== requesterId) return true;
+  const other = await tx.workspaceMember.findFirst({
+    where: {
+      workspaceId,
+      userId: { not: null, notIn: [requesterId] },
+      role: { in: ["editor", "admin", "owner"] },
+    },
+    select: { id: true },
+  });
+  return other !== null;
+}
+
+export class SeparationOfDutiesError extends Error {
+  readonly status = 403;
+  constructor() {
+    super("You requested this action, so another editor must approve it (separation of duties).");
+    this.name = "SeparationOfDutiesError";
+  }
 }
 
 export interface DecideInput {
@@ -169,27 +243,37 @@ export async function decideApproval(input: DecideInput) {
         select: { toolName: true },
       }),
     );
-    if (!lite) throw new Error("Approval not found");
+    if (!lite) throw new NotFoundError("Approval not found");
     reclassToolkitSlug = await resolveToolkitForTool(input.workspaceId, lite.toolName);
   }
-  return withWorkspaceScope(input.workspaceId, async (tx) => {
+  let requestedBy: string | null = null;
+  const decided = await withWorkspaceScope(input.workspaceId, async (tx) => {
     const approval = await tx.composioActionApproval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
     });
-    if (!approval) throw new Error("Approval not found");
+    if (!approval) throw new NotFoundError("Approval not found");
+    requestedBy = requesterOf(approval.auditTrail);
     if (approval.status !== "pending") {
-      throw new Error(`Approval is ${approval.status}, not pending`);
+      throw new ConflictError(`Approval is ${approval.status}, not pending`);
     }
     if (approval.expiresAt.getTime() < Date.now()) {
       const expired = await tx.composioActionApproval.update({
-        where: { id: approval.id },
+        where: { id: approval.id, workspaceId: input.workspaceId },
         data: {
           status: "expired",
           auditTrail: toJson(trail(approval.auditTrail, { at: nowIso(), actor: "system", event: "expired" })),
         },
         select: { id: true, status: true },
       });
-      throw new Error("Approval expired before decision");
+      throw new ConflictError("Approval expired before decision");
+    }
+    // Separation of duties (Phase 1): the requester cannot approve their own
+    // action unless nobody else in the workspace can. Denying (withdrawing)
+    // your own request is always allowed.
+    let selfApproved = false;
+    if (input.decision === "approved" && isRequester(requesterOf(approval.auditTrail), input.decidedBy)) {
+      if (await hasOtherApprover(tx, input.workspaceId, input.decidedBy)) throw new SeparationOfDutiesError();
+      selfApproved = true;
     }
     const redacted = input.editedArgs ? redactArgs(input.editedArgs) : undefined;
     // Edit-before-approve reclassifies with FRESH overrides (slice 5): the
@@ -200,7 +284,7 @@ export async function decideApproval(input: DecideInput) {
       : null;
     const tierChanged = reclassified !== null && reclassified.tier !== approval.riskTier;
     const updated = await tx.composioActionApproval.update({
-      where: { id: approval.id },
+      where: { id: approval.id, workspaceId: input.workspaceId },
       data: {
         status: input.decision === "approved" ? "approved" : "denied",
         decidedBy: input.decidedBy,
@@ -218,16 +302,32 @@ export async function decideApproval(input: DecideInput) {
           actor: input.decidedBy,
           event: input.decision,
           detail:
-            input.reason?.trim() ||
-            (redacted
-              ? `args edited before approve${tierChanged ? ` — tier ${approval.riskTier} -> ${(reclassified as { tier: RiskTier }).tier}` : ""}`
-              : undefined),
+            [
+              input.reason?.trim() ||
+                (redacted
+                  ? `args edited before approve${tierChanged ? ` — tier ${approval.riskTier} -> ${(reclassified as { tier: RiskTier }).tier}` : ""}`
+                  : undefined),
+              selfApproved ? "self-approved: no other approver in this workspace" : undefined,
+            ]
+              .filter(Boolean)
+              .join(" — ") || undefined,
         })),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true },
     });
     return updated;
   });
+  await notifyApprovalDecided({
+    workspaceId: input.workspaceId,
+    source: "integration",
+    sourceId: decided.id,
+    title: decided.plainSummary,
+    decision: input.decision === "approved" ? "approved" : "denied",
+    decidedBy: input.decidedBy,
+    requestedBy,
+    href: "/dashboard/actions",
+  });
+  return decided;
 }
 
 export async function listApprovals(
@@ -267,7 +367,7 @@ export async function getApproval(workspaceId: string, id: string) {
       where: { id, workspaceId },
     }),
   );
-  if (!approval) throw new Error("Approval not found");
+  if (!approval) throw new NotFoundError("Approval not found");
   return approval;
 }
 
@@ -281,7 +381,7 @@ export async function expireStaleApprovals(workspaceId?: string) {
       });
       for (const row of stale) {
         await tx.composioActionApproval.update({
-          where: { id: row.id },
+          where: { id: row.id, workspaceId: wsId },
           data: {
             status: "expired",
             auditTrail: toJson(trail(row.auditTrail, { at: nowIso(), actor: "system", event: "expired" })),
@@ -301,6 +401,38 @@ export async function expireStaleApprovals(workspaceId?: string) {
   let total = 0;
   for (const r of rows) total += await sweep(r.workspace_id);
   return total;
+}
+
+/**
+ * Phase 5: expire the still-pending approvals a stopped agent run raised.
+ * Only `pending` rows move (an approval a human already decided is left
+ * alone); each gets an "expired" audit entry naming the stop. Returns the
+ * count expired.
+ */
+export async function expireApprovalsForStoppedRun(
+  workspaceId: string,
+  approvalIds: readonly string[],
+  stoppedBy: string,
+): Promise<number> {
+  if (approvalIds.length === 0) return 0;
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const rows = await tx.composioActionApproval.findMany({
+      where: { workspaceId, id: { in: [...approvalIds] }, status: "pending" },
+      select: { id: true, auditTrail: true },
+    });
+    for (const row of rows) {
+      await tx.composioActionApproval.updateMany({
+        where: { id: row.id, workspaceId, status: "pending" },
+        data: {
+          status: "expired",
+          auditTrail: toJson(
+            trail(row.auditTrail, { at: nowIso(), actor: stoppedBy, event: "expired", detail: "the agent run that asked was stopped" }),
+          ),
+        },
+      });
+    }
+    return rows.length;
+  });
 }
 
 export interface ExecuteApprovedInput {
@@ -329,26 +461,40 @@ export interface ExecuteApprovedInput {
  *  - failed execution reverts to "approved" (retry allowed) with an audit
  *    event; the failure is still logged.
  */
+/** appKeys whose approvals run from their own surface, never via Composio. */
+const INTERNAL_APPROVAL_HOMES: Record<string, string> = {
+  hosting: "run this rollback from the site's deployment list (Sites → Hosting).",
+  ops: "this operations action runs from where it was proposed (Ops, or the agent that asked).",
+  apps: "run this mini-app action again from the app (or the agent that asked).",
+};
+
 export async function executeApproved(input: ExecuteApprovedInput) {
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
     }),
   );
-  if (!approval) throw new Error("Approval not found");
+  if (!approval) throw new NotFoundError("Approval not found");
+  // Phase 9: approvals raised by ShapesOS's own gates share this table but
+  // are not Composio tools — they run where they were proposed. Refuse
+  // BEFORE the claim so the approval stays usable there.
+  const internal = INTERNAL_APPROVAL_HOMES[approval.appKey];
+  if (internal) {
+    throw new ConflictError(`Cannot execute here: ${internal}`);
+  }
   if (approval.status === "executed") {
-    throw new Error("Cannot execute: approval already executed (replay blocked)");
+    throw new ConflictError("Cannot execute: approval already executed (replay blocked)");
   }
   if (approval.status !== "approved") {
-    throw new Error(`Cannot execute: approval is ${approval.status} (must be approved)`);
+    throw new ConflictError(`Cannot execute: approval is ${approval.status} (must be approved)`);
   }
   if (approval.expiresAt.getTime() < Date.now()) {
     await expireStaleApprovals(input.workspaceId);
-    throw new Error("Cannot execute: approval expired");
+    throw new ConflictError("Cannot execute: approval expired");
   }
   const tier = approval.riskTier as RiskTier;
   if (tier === "high" && input.destructiveConfirm !== true) {
-    throw new Error(
+    throw new ConflictError(
       "Cannot execute: destructive (high-tier) actions require an explicit second confirmation",
     );
   }
@@ -360,7 +506,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
   // "approved" and can be fixed via edit-before-approve (or denied).
   // Credential-bearing tools need the encrypted-secrets path (planned).
   if (containsRedactedPlaceholder(proposedArgs)) {
-    throw new Error(
+    throw new ConflictError(
       `Cannot execute: stored arguments contain the ${REDACTED_PLACEHOLDER} placeholder — ` +
         "the gate stores secrets redacted and will not run a tool with placeholder values. " +
         "Use edit-before-approve to remove the secret-bearing argument, or deny this approval. " +
@@ -369,7 +515,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
   }
   const bulk = extractBulkItems(proposedArgs);
   if (bulk && input.confirmedBulkCount !== bulk.count) {
-    throw new Error(
+    throw new ConflictError(
       `Cannot execute: bulk action targets ${bulk.count} items via "${bulk.field}" — ` +
         `the confirmed count (${input.confirmedBulkCount ?? "none"}) must match what was reviewed`,
     );
@@ -397,7 +543,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
       status: "denied",
       executedBy: `gate:${input.executedBy}`,
     });
-    throw new Error(`Cannot execute: ${reason}`);
+    throw new ConflictError(`Cannot execute: ${reason}`);
   }
   // Atomic claim: approved -> executed. Concurrent/second attempts affect
   // 0 rows and fail closed.
@@ -421,7 +567,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (claimed.count !== 1) {
-    throw new Error("Cannot execute: approval was already claimed (replay blocked)");
+    throw new ConflictError("Cannot execute: approval was already claimed (replay blocked)");
   }
 
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, approval.appKey);
@@ -500,7 +646,8 @@ export async function executeApproved(input: ExecuteApprovedInput) {
         },
       }),
     );
-    throw new Error(`Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
+    // Upstream (Composio/app) failure: 502 with the truncated result summary.
+    throw new HttpError(502, `Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
   }
   return { ok: true, latencyMs: Date.now() - started };
 }

@@ -25,6 +25,7 @@ import {
   applyPronunciation,
   type AppliedPronunciation,
 } from "./pronunciation";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 const adapter = new LocalDiskAdapter();
 
@@ -81,17 +82,17 @@ export async function createVoiceoverJob(
   input: CreateVoiceoverInput,
 ): Promise<VoiceoverJobRow> {
   const script = (input.script ?? "").trim();
-  if (!script) throw new Error("Voiceover script is empty — nothing to render.");
-  if (!input.voiceId?.trim()) throw new Error("A VoiceStudio voice id is required.");
+  if (!script) throw new BadRequestError("Voiceover script is empty — nothing to render.");
+  if (!input.voiceId?.trim()) throw new BadRequestError("A VoiceStudio voice id is required.");
   if (script.length > 20_000) {
-    throw new Error("Script exceeds the 20,000 character limit.");
+    throw new BadRequestError("Script exceeds the 20,000 character limit.");
   }
   if (input.clipId) {
     // Tenant-scoped attach target: the clip must exist in this workspace.
     const clip = await withWorkspaceScope(workspaceId, (tx) =>
       tx.clip.findFirst({ where: { id: input.clipId, workspaceId } }),
     );
-    if (!clip) throw new Error("Clip not found in this workspace.");
+    if (!clip) throw new NotFoundError("Clip not found in this workspace.");
   }
   if (input.agentId) {
     const agent = await withWorkspaceScope(workspaceId, (tx) =>
@@ -99,7 +100,7 @@ export async function createVoiceoverJob(
         where: { id: input.agentId, workspaceId, purpose: "voiceover" },
       }),
     );
-    if (!agent) throw new Error("Voiceover agent not found in this workspace.");
+    if (!agent) throw new NotFoundError("Voiceover agent not found in this workspace.");
   }
   const job = await withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceoverJob.create({
@@ -189,10 +190,10 @@ export async function processVoiceoverJob(
   jobId: string,
 ): Promise<VoiceoverJobRow> {
   const job = await getVoiceoverJob(workspaceId, jobId);
-  if (!job) throw new Error("Voiceover job not found.");
+  if (!job) throw new NotFoundError("Voiceover job not found.");
   if (job.status === "ready") return job;
   if (job.status === "processing") {
-    throw new Error("Job is already processing.");
+    throw new ConflictError("Job is already processing.");
   }
 
   await setJob(workspaceId, jobId, { status: "processing", progress: 0.05, error: null });
@@ -200,7 +201,7 @@ export async function processVoiceoverJob(
   const fail = async (error: string): Promise<VoiceoverJobRow> => {
     await setJob(workspaceId, jobId, { status: "failed", error, progress: 0 });
     const j = await getVoiceoverJob(workspaceId, jobId);
-    if (!j) throw new Error("Voiceover job disappeared.");
+    if (!j) throw new NotFoundError("Voiceover job disappeared.");
     return j;
   };
 
@@ -235,7 +236,7 @@ export async function processVoiceoverJob(
       durationSec,
     });
     const done = await getVoiceoverJob(workspaceId, jobId);
-    if (!done) throw new Error("Voiceover job disappeared.");
+    if (!done) throw new NotFoundError("Voiceover job disappeared.");
     return done;
   } catch (e) {
     const msg =
@@ -257,14 +258,14 @@ export async function attachJobToClip(
   clipId: string,
 ): Promise<VoiceoverJobRow> {
   const job = await getVoiceoverJob(workspaceId, jobId);
-  if (!job) throw new Error("Voiceover job not found.");
+  if (!job) throw new NotFoundError("Voiceover job not found.");
   const clip = await withWorkspaceScope(workspaceId, (tx) =>
     tx.clip.findFirst({ where: { id: clipId, workspaceId } }),
   );
-  if (!clip) throw new Error("Clip not found in this workspace.");
+  if (!clip) throw new NotFoundError("Clip not found in this workspace.");
   await setJob(workspaceId, jobId, { clipId });
   const updated = await getVoiceoverJob(workspaceId, jobId);
-  if (!updated) throw new Error("Voiceover job disappeared.");
+  if (!updated) throw new NotFoundError("Voiceover job disappeared.");
   return updated;
 }
 

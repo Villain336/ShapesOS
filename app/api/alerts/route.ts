@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import type { AlertEventStatus } from "@prisma/client";
 import { triggerDef } from "@/lib/alerts/triggers";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 const STATUSES: AlertEventStatus[] = ["queued", "sent", "failed", "suppressed"];
 
@@ -53,7 +54,9 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const ruleId = url.searchParams.get("ruleId")?.trim() || undefined;
   const status = url.searchParams.get("status")?.trim() as AlertEventStatus | undefined;
-  const take = Math.min(Math.max(Number(url.searchParams.get("take") ?? "50") || 50, 1), 200);
+  const takeQuery = parseQuery(z.object({ take: intQuery(50, 1, 200) }), url.searchParams);
+  if (!takeQuery.ok) return takeQuery.error;
+  const take = takeQuery.data.take;
 
   if (ruleId) {
     const rule = await prisma.alertRule.findFirst({ where: { id: ruleId, workspaceId: workspace.id }, select: { id: true } });

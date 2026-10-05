@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../_lib";
 import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
-import { signPixelToken, pixelUrl } from "@/lib/flywheel/ctv/attribution";
+import { signPixelToken, pixelUrl, pixelSigningSecret } from "@/lib/flywheel/ctv/attribution";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,8 @@ const MintPixelSchema = z.object({
 });
 
 function pixelSecret(): string {
-  // Pixel signing secret. Falls back to a dev-only value — production must
-  // set PIXEL_SIGNING_SECRET; without it tokens are forgeable in theory.
-  return process.env.PIXEL_SIGNING_SECRET ?? "dev-only-pixel-secret";
+  // Production must set PIXEL_SIGNING_SECRET (throws otherwise — fail closed).
+  return pixelSigningSecret();
 }
 
 export async function POST(req: NextRequest) {

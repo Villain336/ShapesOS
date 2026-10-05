@@ -64,6 +64,9 @@ export function channelFor(leadSource: string, utm: UtmInput | null | undefined)
   if (med === "qr" || src === "qr" || src === "qr_code") return "qr_code";
   if (med === "promo" || src === "promo" || src === "promo_code") return "promo_code";
   if (med === "social-paid" || med === "paid_social") return "paid_social";
+  // Phase 4b: ShapesOS tags every outbound social link with
+  // utm_medium=social (lib/social/utm.ts), whatever the platform.
+  if (med === "social" || med === "organic_social" || med === "social-organic") return "social_organic";
 
   const ALIASES: Record<string, string> = {
     google: "organic_search",

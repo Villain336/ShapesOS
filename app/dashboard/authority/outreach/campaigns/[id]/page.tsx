@@ -23,7 +23,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Outreach campaign — Marketr",
+  title: "Outreach campaign — ShapesOS",
   description: "Prospects, sequences, replies, and placement verification for one campaign.",
 };
 

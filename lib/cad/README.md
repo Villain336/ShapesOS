@@ -131,3 +131,48 @@ review → approve/reject with confirmation, parse editor, change-requested
 banner on the model), and Manufacturing (run analysis, findings with the
 cited measurements, dismiss-with-reason, run history with per-check details
 and process-limit source links). Agentic OS design system throughout.
+
+## Phase 4b — derived BOM
+
+`bom-derive.ts` (pure) + `PrismaCadPipelineStore.deriveBomFromGeometry`.
+
+- **Parts** = bodies in the version's mesh: OBJ `o`/`g` groups and
+  multi-solid ASCII STL blocks are named parts; otherwise triangles are split
+  into connected shells (exact-position vertex welding). More than 500 shells
+  is treated as a triangle soup → one body (with a warning).
+- **Quantities**: identical bodies (triangle count, volume to 4 significant
+  digits, sorted bbox size to 0.01 mm; for named groups also the same base
+  name, e.g. `screw_1`/`screw_2`) collapse into one line. Unnamed shells are
+  named by size (`Quad part 20 × 20 × 20 mm`), so a part keeps its name
+  across revisions and the cross-version diff can match it.
+- **Volume** only for closed bodies (every edge shared by exactly two
+  non-degenerate triangles); open / non-manifold / zero-volume / non-finite
+  bodies get `volumeMm3 = null` and the reason. NaN/Infinity triangles (and
+  OBJ faces using a non-finite vertex) are dropped and counted. Inverted
+  normals use the magnitude, flagged.
+- **Mass** = volume × the density of a tenant-picked material
+  (`bom-materials.ts`: typical handbook densities, each with its source; or
+  a custom material + density). No material → no mass. **Cost** only when
+  the tenant enters a raw-material $/kg (warning about double-counting with
+  per-cm³ print rates). Fasteners/electronics stay manual lines.
+- The stored bytes are re-hashed against the version's sha256 before
+  deriving (`FILE_INTEGRITY` on mismatch); the BOM version records
+  `origin: "derived"` and `derivation` (method + version, source file +
+  checksum, unit assumption, material + density source, warnings).
+  STEP / unreadable → `DERIVE_UNAVAILABLE` (422), nothing written.
+- Derived lines (`source: derived:mesh_bodies`, `volumeMm3`, `massG`,
+  `measurement`) can't be typed in by hand (`DERIVED_LINE_NOT_MANUAL`); their
+  quantity is locked (`DERIVED_QTY_IMMUTABLE`), name/supplier/cost stay
+  editable.
+- Rollups: `computeBomRollup` carries mass totals; `compareBomRollups` diffs
+  two BOMs by part + material; `getBomHistory` lists every BOM of a model by
+  model version with the change vs the previous one.
+- CSV: `bomCsvRows` + `lib/csv.ts` (formula-injection-safe), unknowns empty.
+- Routes: `POST /api/cad/models/[id]/bom/derive` (editor; emits
+  `cad.bom_derived`), `GET /api/cad/models/[id]/bom/history`,
+  `GET /api/cad/bom/compare?from=&to=`, `GET /api/cad/bom/[id]/export` (CSV).
+- UI: Prototype tab → Bill of materials: "Derive from geometry" (material,
+  custom density, $/kg), volume/mass columns, derivation notes, Export CSV,
+  "Across revisions" history + part compare. Record search kind `bom_line`
+  deep-links to `/dashboard/cad?project=…&model=…&tab=prototype`.
+- Tests: `bom-derive.test.ts` (unit), `cad-derived-bom-db.test.ts` (DB).

@@ -57,8 +57,7 @@ export async function POST(req: Request) {
     });
     return Response.json({ entry }, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Internal error";
-    return Response.json({ error: message }, { status: 400 });
+    return httpErrorResponse(e);
   }
 }
 
@@ -84,8 +83,7 @@ export async function PUT(req: Request) {
     void body.id;
     return Response.json({ entry });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Internal error";
-    return Response.json({ error: message }, { status: 400 });
+    return httpErrorResponse(e);
   }
 }
 

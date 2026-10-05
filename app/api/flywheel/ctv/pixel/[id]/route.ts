@@ -6,12 +6,17 @@
 // Vibe/vendor as the impression tracker.
 
 import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
-import { pixelGifBuffer, verifyPixelToken } from "@/lib/flywheel/ctv/attribution";
+import { pixelGifBuffer, pixelSigningSecret, verifyPixelToken } from "@/lib/flywheel/ctv/attribution";
 
 export const dynamic = "force-dynamic";
 
-function pixelSecret(): string {
-  return process.env.PIXEL_SIGNING_SECRET ?? "dev-only-pixel-secret";
+/** Unset secret in production → no hit is ever counted (the GIF still serves). */
+function pixelSecret(): string | null {
+  try {
+    return pixelSigningSecret();
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -22,8 +27,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const store = await resolveCtvStore();
   // Public tag: no workspace hint, so lookup is id-only; the HMAC proves
   // the tag is ours and binds it to its campaign.
-  const pixel = await store.getPixelAny(id);
-  if (pixel && verifyPixelToken(pixel.campaignId, token, pixelSecret())) {
+  const secret = pixelSecret();
+  const pixel = secret ? await store.getPixelAny(id) : null;
+  if (pixel && secret && verifyPixelToken(pixel.campaignId, token, secret)) {
     await store.incrementImpressions(pixel.id);
     await store.audit({
       workspaceId: pixel.workspaceId, actor: "pixel",

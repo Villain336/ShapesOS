@@ -24,6 +24,8 @@ type Params = { params: Promise<{ id: string }> };
 const UpdateScheduleSchema = z.object({
   workspaceId: z.string().trim().max(120).optional(),
   cronExpr: z.string().trim().max(100).nullable().optional(),
+  // IANA zone (cron schedules); null/blank resets to UTC; validated by the service.
+  timezone: z.string().trim().max(64).nullable().optional(),
   eventSource: z.string().trim().max(60).nullable().optional(),
   eventConfig: z.record(z.string(), z.unknown()).nullable().optional(),
   approvalMode: z.enum(["supervised", "scheduled", "autopilot"]).optional(),
@@ -91,6 +93,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const schedule = await updateSchedule(prisma, id, access.workspaceId, {
       cronExpr: validated.data.cronExpr ?? undefined,
+      timezone: validated.data.timezone,
       eventSource: validated.data.eventSource ?? undefined,
       eventConfig: (validated.data.eventConfig ?? undefined) as Record<string, unknown> | undefined,
       approvalMode: validated.data.approvalMode,

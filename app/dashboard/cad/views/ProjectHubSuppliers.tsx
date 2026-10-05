@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Loader2, Trash2 } from "lucide-react";
 import { ErrorNote, LoadingNote, StatusPill } from "./ProjectHubTab";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface SupplierRow {
   id: string;
@@ -186,7 +187,7 @@ function SupplierDetailView({ supplierId, onChanged }: { supplierId: string; onC
   }, [load]);
 
   const deleteSupplier = async () => {
-    if (!window.confirm("Delete this supplier? Linked parts must be unlinked first.")) return;
+    if (!await confirmAction("Delete this supplier? Linked parts must be unlinked first.")) return;
     setBusy(true);
     setError(null);
     try {

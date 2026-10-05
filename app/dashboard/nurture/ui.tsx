@@ -96,7 +96,7 @@ export function RunningBadge({ children }: { children: ReactNode }) {
     <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-running px-3 text-xs font-semibold text-white">
       <span
         className="aos-shape aos-shape--running aos-is-live"
-        style={{ color: "#fff" }}
+        style={{ color: "var(--aos-on-running)" }}
         role="img"
         aria-label="Running"
       />
@@ -119,7 +119,7 @@ export function NeedsBadge({ children }: { children: ReactNode }) {
 export function DoneBadge({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-done px-3 text-xs font-semibold text-white">
-      <span className="aos-shape aos-shape--done" style={{ color: "#fff" }} role="img" aria-label="Done" />
+      <span className="aos-shape aos-shape--done" style={{ color: "var(--aos-on-done)" }} role="img" aria-label="Done" />
       {children}
     </span>
   );

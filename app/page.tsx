@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 
 export const metadata = {
-  title: "Marketr — open-source marketing & SEO workspace",
+  title: "ShapesOS — open-source marketing & SEO workspace",
   description:
-    "Marketr is the open-source marketing and SEO workspace: keyword research, competitor gaps, content engine, and rank tracking.",
+    "ShapesOS is the open-source marketing and SEO workspace: keyword research, competitor gaps, content engine, and rank tracking.",
 };
 
 const primaryCta =
@@ -63,7 +63,7 @@ export default function Home() {
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-xl font-heading stretch-heading text-ink">
-            Marketr
+            ShapesOS
           </span>
           <div className="flex items-center gap-2">
             <Link href="/login" className={quietNav}>
@@ -120,7 +120,7 @@ export default function Home() {
                   {h.body}
                 </p>
                 <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-ink">
-                  Open in Marketr
+                  Open in ShapesOS
                   <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                 </span>
               </Link>
@@ -168,7 +168,7 @@ export default function Home() {
             </ul>
             <div className="mt-8">
               <Link href="/login" className={primaryCta}>
-                Sign in to Marketr
+                Sign in to ShapesOS
                 <ArrowRight className="size-4" />
               </Link>
             </div>
@@ -178,7 +178,7 @@ export default function Home() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 text-xs text-muted">
-          <span>Marketr — open-source marketing &amp; SEO workspace</span>
+          <span>ShapesOS — open-source marketing &amp; SEO workspace</span>
           <Link href="/login" className="hover:text-ink">
             Sign in
           </Link>

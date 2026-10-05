@@ -78,9 +78,9 @@ function stubStores(opts: {
       campaign.status = "paused";
       marks.push("paused");
     },
-    async markApproved() {
+    async markApproved(_id, workspaceId) {
       campaign.status = "approved";
-      marks.push("approved");
+      marks.push(`approved:${workspaceId}`);
     },
     async getTodaySpendCents() {
       return opts.todaySpendCents ?? 0;
@@ -110,7 +110,7 @@ function stubStores(opts: {
     async get(id) {
       return id === proposal.id ? proposal : null;
     },
-    async setStatus(id, status) {
+    async setStatus(id, _ws, status) {
       if (id === proposal.id) proposal.status = status;
       return proposal;
     },
@@ -312,14 +312,14 @@ describe("autoPauseOnSpendBreach", () => {
 describe("onChatGPTProposalApproved", () => {
   it("moves the ChatGPT campaign to approved on inbox approval", async () => {
     const { ctx, marks } = stubStores({ campaign: { status: "proposed" } });
-    const synced = await onChatGPTProposalApproved(ctx, ctx.proposals ? await ctx.proposals.get("prop_1") as SpendProposal : null as never);
+    const synced = await onChatGPTProposalApproved(ctx, ctx.proposals ? await ctx.proposals.get("prop_1", WS) as SpendProposal : null as never);
     assert.equal(synced, true);
-    assert.deepEqual(marks, ["approved"]);
+    assert.deepEqual(marks, [`approved:${WS}`], "scoped to the proposal's workspace");
   });
 
   it("ignores proposals that are not ChatGPT launches", async () => {
     const { ctx, marks } = stubStores();
-    const base = (await ctx.proposals!.get("prop_1")) as SpendProposal;
+    const base = (await ctx.proposals!.get("prop_1", WS)) as SpendProposal;
     const other: SpendProposal = { ...base, payload: { channel: "display" } };
     const synced = await onChatGPTProposalApproved(ctx, other);
     assert.equal(synced, false);

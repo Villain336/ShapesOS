@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { isError, requireWorkflow } from "@/lib/workflow/http";
-import { parseCron } from "@/lib/workflow/cron";
+import { parseCron, parseTimeZone } from "@/lib/workflow/cron";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +38,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     description?: string | null;
     status?: string;
     schedule?: string | null;
+    /** IANA timezone the schedule is read in (default UTC). */
+    timezone?: string | null;
     enabled?: boolean;
   };
   try {
@@ -72,6 +74,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data.schedule = schedule;
     } else {
       data.schedule = null;
+    }
+  }
+  if (body.timezone !== undefined) {
+    try {
+      data.timezone = parseTimeZone(typeof body.timezone === "string" ? body.timezone.trim() : body.timezone);
+    } catch (err) {
+      return Response.json({ error: err instanceof Error ? err.message : "Invalid timezone" }, { status: 400 });
     }
   }
   if (body.enabled !== undefined) data.enabled = !!body.enabled;

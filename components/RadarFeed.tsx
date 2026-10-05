@@ -14,11 +14,12 @@ interface RadarEventItem {
   read: boolean;
 }
 
+// Event types are categories, not agent states: neutral chips only.
 const TYPE_STYLE: Record<string, string> = {
-  lost_to_competitor: "bg-red-500/15 text-red-700 border-red-200/30",
-  new_keyword: "bg-accent/15 text-violet-700 border-violet-500/30",
-  keyword_gain: "bg-amber-500/15 text-amber-700 border-amber-200/30",
-  new_page: "bg-sky-100/15 text-sky-700 border-sky-200/30",
+  lost_to_competitor: "bg-ink text-white",
+  new_keyword: "bg-paper text-ink shadow-control",
+  keyword_gain: "bg-paper text-ink shadow-control",
+  new_page: "bg-canvas text-ink",
 };
 
 function detailLine(e: RadarEventItem): string {
@@ -68,7 +69,7 @@ export default function RadarFeed({
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-800"
+          className="rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 text-sm text-ink"
         >
           <option value="all">All competitors</option>
           {competitors.map((c) => (
@@ -77,32 +78,32 @@ export default function RadarFeed({
         </select>
         <button
           onClick={markAllRead}
-          className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 hover:border-zinc-400"
+          className="rounded-full bg-paper px-4 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50"
         >
           Mark visible as read
         </button>
       </div>
 
       {visible.length === 0 ? (
-        <div className="rounded-lg border border-zinc-300 bg-white p-8 text-center">
-          <Radio className="mx-auto h-6 w-6 text-stone-400" />
-          <p className="mt-2 text-sm text-zinc-500">
+        <div className="rounded-lg bg-paper shadow-hairline p-8 text-center">
+          <Radio className="mx-auto h-6 w-6 text-muted" />
+          <p className="mt-2 text-sm text-muted">
             No radar events yet. The weekly radar needs at least two competitor snapshots — add competitors and wait for two runs.
           </p>
         </div>
       ) : (
         visible.map((e) => (
-          <div key={e.id} className={`rounded-lg border p-4 ${e.read ? "border-zinc-200 bg-white/60" : "border-zinc-200 bg-white"}`}>
+          <div key={e.id} className={`rounded-lg border p-4 ${e.read ? "border-line bg-canvas" : "border-line bg-paper"}`}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded border px-2 py-0.5 text-xs font-medium ${TYPE_STYLE[e.eventType] ?? "border-zinc-200 text-zinc-500"}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TYPE_STYLE[e.eventType] ?? "bg-canvas text-muted"}`}>
                 {e.eventType.replace(/_/g, " ")}
               </span>
-              {!e.read && <span className="text-xs text-sky-600">● new</span>}
-              <span className="text-sm text-zinc-500">{e.competitorDomain}</span>
-              <span className="ml-auto text-xs text-zinc-500">{e.detectedAt.slice(0, 10)}</span>
+              {!e.read && <span className="text-xs font-semibold text-ink">● new</span>}
+              <span className="text-sm text-muted">{e.competitorDomain}</span>
+              <span className="ml-auto text-xs text-muted">{e.detectedAt.slice(0, 10)}</span>
             </div>
-            <p className="mt-2 text-sm font-medium text-zinc-900">
-              {e.keywordPhrase ? `"${e.keywordPhrase}"` : "New ranking page"} <span className="font-normal text-zinc-500">— {detailLine(e)}</span>
+            <p className="mt-2 text-sm font-medium text-ink">
+              {e.keywordPhrase ? `"${e.keywordPhrase}"` : "New ranking page"} <span className="font-normal text-muted">— {detailLine(e)}</span>
             </p>
           </div>
         ))

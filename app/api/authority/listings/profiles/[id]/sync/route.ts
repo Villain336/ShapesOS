@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     // Tier honesty: manual and guided-claim tiers are never auto-synced.
     if (info.tier === "manual" || info.tier === "guided_claim") {
       return Response.json({
-        error: `${info.displayName} is ${info.tierLabel.toLowerCase()} — Marketr never auto-submits this tier. ${info.capabilityNote}`,
+        error: `${info.displayName} is ${info.tierLabel.toLowerCase()} — ShapesOS never auto-submits this tier. ${info.capabilityNote}`,
         tier: info.tier, tierLabel: info.tierLabel,
       }, { status: 422 });
     }

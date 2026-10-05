@@ -19,14 +19,18 @@ npx playwright install chromium
 ./scripts/e2e/run.sh
 ```
 
-`run.sh` is the single entry point. It:
+`run.sh` is the single entry point (CI's `e2e` job in `.github/workflows/ci.yml`
+runs it too). It:
 
 1. Sets an isolated E2E environment (`marketr_e2e` database, `e2e-admin@…` /
    `e2e-editor@…` accounts, throwaway `MARKETR_CREDENTIALS_KEY`).
-2. Applies all Prisma migrations (`prisma migrate deploy`).
-3. Builds the production bundle (`npm run build`).
+2. Applies all migrations (`scripts/db/migrate.sh`).
+3. Builds the production bundle (`npm run build`; `E2E_SKIP_BUILD=1` reuses an
+   existing `.next`).
 4. Seeds via `npx tsx scripts/e2e/seed.mts`.
-5. Starts `next start -p 3000` (background, killed on exit).
+5. Starts `next start -p 3000` (background, killed on exit), connected as
+   `E2E_APP_DATABASE_URL` when set (the least-privilege app role, as in CI;
+   create it with `scripts/db/create-app-role.sql`), else as the owner.
 6. Runs `npx playwright test` headless.
 
 ### PostgreSQL

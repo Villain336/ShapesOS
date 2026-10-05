@@ -389,7 +389,7 @@ export async function markSent(input: {
       approvalId: executed.id,
       bindingHash: executed.bindingHash,
       humanExecuted: true,
-      note: "Marketr did not send this email — the human sent it from their own client. This record is the audit trail.",
+      note: "ShapesOS did not send this email — the human sent it from their own client. This record is the audit trail.",
     },
   });
   return { draftId: draft.id, approvalId: executed.id, status: "sent" };

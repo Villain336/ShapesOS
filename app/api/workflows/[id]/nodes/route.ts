@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { isError, requireWorkflow } from "@/lib/workflow/http";
 import { CONDITION_LABELS, nodeTypeDef } from "@/lib/workflow/catalog";
-import { parseCron } from "@/lib/workflow/cron";
+import { parseCron, parseTimeZone } from "@/lib/workflow/cron";
 
 export const dynamic = "force-dynamic";
 
@@ -76,9 +76,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     // Validate schedule-trigger cron expressions at save time.
     if (n.kind === "trigger" && n.type === "schedule") {
-      const cron = ((n.config ?? {}) as Record<string, unknown>).cron;
+      const cfg = (n.config ?? {}) as Record<string, unknown>;
       try {
-        parseCron(String(cron ?? ""));
+        parseCron(String(cfg.cron ?? ""));
+        parseTimeZone(cfg.timezone);
       } catch (err) {
         return bad(`Schedule node "${label}": ${err instanceof Error ? err.message : "invalid cron"}`);
       }

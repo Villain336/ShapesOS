@@ -171,7 +171,7 @@ Code / Cursor / Copilot.
 
 **Caveat:** these are persona *prompt* files, not executable agents. Their value is system-prompt structure
 — identity, mission, rules, deliverables, workflow, success metrics — which maps cleanly onto Marketr's
-EXPERT-CONSTITUTION.md prompt-layer pattern. Treat as seeds to adapt, not drop-in prompts. Quality varies
+docs/specs/EXPERT-CONSTITUTION.md prompt-layer pattern. Treat as seeds to adapt, not drop-in prompts. Quality varies
 (community-contributed). Full 285-agent catalog (name + one-line purpose, grouped by division) lives in
 `docs/phase12/scratch/batch-infra-agents.md`.
 

@@ -45,6 +45,9 @@ export function engineError(err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : "";
   if (name === "ActivepiecesNotConfiguredError") return notConnected();
+  // Phase 1 (H6): unbound / foreign flows and runs are "not found".
+  if (name === "FlowNotBoundError") return Response.json({ configured: true, error: message }, { status: 404 });
+  if (name === "FlowBindingConflictError") return Response.json({ configured: true, error: message }, { status: 409 });
   const status = name === "ActivepiecesApiError" && (err as { status?: number }).status === 404 ? 404 : 502;
   return Response.json({ configured: true, error: message }, { status });
 }

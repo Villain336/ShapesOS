@@ -10,6 +10,7 @@ import { FolderKanban, Loader2, Plus, Search } from "lucide-react";
 import { ProjectDetail } from "./ProjectDetail";
 import { NewProjectModal } from "./NewProjectModal";
 import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export interface OpsProject {
   id: string;
@@ -199,7 +200,7 @@ export function ProjectsTab() {
                 const meta = PROJECT_STATUS_META[p.status];
                 const prog = projectProgressOf(p.milestones);
                 return (
-                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className={trClickableCls}>
+                  <tr key={p.id} onClick={() => setSelectedId(p.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedId(p.id))} className={trClickableCls}>
                     <td className="font-semibold text-ink">{p.name}</td>
                     <td className="text-ink">{customerLabel(p)}</td>
                     <td>

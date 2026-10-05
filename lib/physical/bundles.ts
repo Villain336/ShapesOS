@@ -43,6 +43,7 @@ import { getAttributionReport, type ReportWindow } from "@/lib/attribution/repor
 import { ATTRIBUTION_MODELS, type AttributionModel } from "@/lib/attribution/models";
 import { createLeadRecord } from "@/lib/crm/leads";
 import { normalizePhone } from "@/lib/calls/inbound";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 export type BundleWithNumber = AttributionBundle & {
   number: { id: string; e164: string; status: string } | null;
@@ -122,7 +123,7 @@ export interface CreateBundleInput {
 export async function createBundle(input: CreateBundleInput): Promise<BundleWithNumber> {
   const url = new URL(input.destinationUrl); // throws on invalid
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Destination URL must be http(s)");
+    throw new BadRequestError("Destination URL must be http(s)");
   }
   const trimmed = {
     name: input.name.trim(),
@@ -228,7 +229,7 @@ export async function setBundleStatus(
   status: "active" | "disabled",
 ): Promise<BundleWithNumber> {
   const existing = await getBundle(workspaceId, id);
-  if (!existing) throw new Error("Bundle not found");
+  if (!existing) throw new NotFoundError("Bundle not found");
   return prisma.attributionBundle.update({
     where: { id },
     data: { status },
@@ -243,7 +244,7 @@ export async function regenerateQrStyle(
   id: string,
 ): Promise<BundleWithNumber> {
   const existing = await getBundle(workspaceId, id);
-  if (!existing) throw new Error("Bundle not found");
+  if (!existing) throw new NotFoundError("Bundle not found");
   return prisma.attributionBundle.update({
     where: { id },
     data: { qrStyle: existing.qrStyle + 1 },
@@ -489,9 +490,9 @@ export interface RedeemResult {
  */
 export async function redeemPromoCode(input: RedeemInput): Promise<RedeemResult> {
   const bundle = await findActiveBundleByCode(input.code);
-  if (!bundle) throw new Error("Invalid or expired promo code");
+  if (!bundle) throw new BadRequestError("Invalid or expired promo code");
   if (!input.email?.trim() && !input.phone?.trim()) {
-    throw new Error("Email or phone is required to redeem");
+    throw new BadRequestError("Email or phone is required to redeem");
   }
 
   let leadId = await matchLeadByContact(bundle.workspaceId, input.email, input.phone);
@@ -502,7 +503,7 @@ export async function redeemPromoCode(input: RedeemInput): Promise<RedeemResult>
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
-    if (!pipeline) throw new Error("No pipeline in workspace");
+    if (!pipeline) throw new ConflictError("No pipeline in workspace");
     const res = await createLeadRecord(bundle.workspaceId, "promo-redeem", {
       pipelineId: pipeline.id,
       name: input.name?.trim() || "Promo redemption",

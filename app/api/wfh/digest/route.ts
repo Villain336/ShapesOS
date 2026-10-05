@@ -11,6 +11,7 @@ import {
   dueWindowsFor,
   assembleDigest,
 } from "@/lib/wfh/notifications";
+import { resolveTimeZone } from "@/lib/time/zoned";
 
 export async function GET() {
   const user = await requireUser();
@@ -45,7 +46,7 @@ export async function GET() {
     }
   }
 
-  const due = dueWindowsFor(windows, now, lastFlushedAt);
+  const due = dueWindowsFor(windows, now, lastFlushedAt, resolveTimeZone(row?.timezone));
   const previews = due.map((windowMin) => {
     const items = queued
       .filter((q) => q.windowMin === windowMin)

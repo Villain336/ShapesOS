@@ -1,6 +1,7 @@
 // Marketr — workspace members API (milestone 11: RBAC; day-1 hardening M5).
 // GET  /api/workspace/members            → { members, myRole } (any member)
-// POST /api/workspace/members { email, role } → invite (admin+). Creates a
+// POST /api/workspace/members { email, role } → invite (admin+; never above
+//   the inviter's own role, so only owners invite owners). Creates a
 //   pending membership with a single-use token; the invitee claims it via the
 //   token link at /invite?token=… (see app/api/workspace/invites/accept).
 // All mutations are audit-logged (workspace-scoped).
@@ -13,9 +14,13 @@ import {
   mintInviteToken,
   requireWorkspaceRole,
   forbidden,
+  memberChangeError,
 } from "@/lib/authz";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import type { WorkspaceRole } from "@prisma/client";
+import { inviteMailChannel, sendInviteEmail } from "@/lib/workspace/invite-mail";
+import { entitlementDenied, EntitlementError, requireWithinLimit, seatsUsed } from "@/lib/billing/entitlements-server";
+import { entitlementSummary } from "@/lib/billing/entitlements";
 
 const VALID_ROLES: WorkspaceRole[] = ["owner", "admin", "editor", "viewer"];
 
@@ -70,6 +75,10 @@ export async function GET() {
   return Response.json({
     workspace: { id: workspace.id, name: workspace.name },
     myRole: me.role,
+    // Phase 3: whether invites go out by email on this deployment.
+    inviteEmail: inviteMailChannel() !== null,
+    // Phase 4a: the plan's seat limit (null = unlimited).
+    seatLimit: entitlementSummary(workspace.plan).limits.seats,
     members: members.map(publicMember),
   });
 }
@@ -78,8 +87,8 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "admin")))
-    return forbidden("Member management requires the admin role.");
+  const me = await requireWorkspaceRole(user.id, workspace.id, "admin");
+  if (!me) return forbidden("Member management requires the admin role.");
 
   const body = await readJsonBody<{ email?: string; role?: string }>(req);
   const email = (body?.email ?? "").trim().toLowerCase();
@@ -88,12 +97,22 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "A valid email is required." }, { status: 400 });
   if (!VALID_ROLES.includes(role))
     return Response.json({ error: "Invalid role." }, { status: 400 });
+  // Phase 1: no inviting above your own role (admins can't invite owners).
+  const denial = memberChangeError(me.role, { nextRole: role });
+  if (denial) return forbidden(denial);
 
   const existing = await prisma.workspaceMember.findFirst({
     where: { workspaceId: workspace.id, email },
   });
   if (existing)
     return Response.json({ error: "That email is already a member." }, { status: 409 });
+  // Phase 4a: seats are a plan limit (a pending invite reserves a seat).
+  try {
+    await requireWithinLimit(workspace.id, "seats", await seatsUsed(workspace.id));
+  } catch (err) {
+    if (err instanceof EntitlementError) return entitlementDenied(err);
+    throw err;
+  }
 
   const member = await prisma.workspaceMember.create({
     data: { workspaceId: workspace.id, email, role, ...mintInviteToken() },
@@ -105,7 +124,23 @@ export async function POST(req: NextRequest) {
     `${user.email ?? user.id} invited ${email} as ${role}`,
   );
   // Day-1 hardening (M5): invites are claimed via a single-use token link,
-  // never by bare email match. Share this link with the invitee directly.
+  // never by bare email match. Phase 3: the link is emailed when the
+  // deployment has mail set up; the admin can always copy it as a fallback.
   const inviteUrl = `/invite?token=${member.inviteToken}`;
-  return Response.json({ ok: true, member: publicMember(member), inviteUrl });
+  const mail = await sendInviteEmail({
+    to: email,
+    workspaceName: workspace.name,
+    inviterName: user.name || user.email || "A teammate",
+    role,
+    inviteUrl,
+    expiresAt: member.inviteExpiresAt ?? new Date(Date.now() + 7 * 86_400_000),
+    requestOrigin: new URL(req.url).origin,
+  });
+  return Response.json({
+    ok: true,
+    member: publicMember(member),
+    inviteUrl,
+    emailed: mail.sent,
+    ...(mail.sent ? {} : { emailNote: mail.message }),
+  });
 }

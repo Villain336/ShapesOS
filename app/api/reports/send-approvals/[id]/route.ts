@@ -1,8 +1,8 @@
 // Marketr — Phase 16 slice 9: branded report engine API.
 // GET /api/reports/send-approvals/[id]  → one send approval (any member)
 
-import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -10,10 +10,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   const { id } = await params;
 
-  const approval = await prisma.reportSendApproval.findFirst({
-    where: { id, workspaceId: workspace.id },
-    include: { brandKit: { select: { id: true, name: true } } },
-  });
+  // report_send_approvals is FORCE-RLS: read inside the workspace scope.
+  const approval = await withWorkspaceScope(workspace.id, (tx) =>
+    tx.reportSendApproval.findFirst({
+      where: { id, workspaceId: workspace.id },
+      include: { brandKit: { select: { id: true, name: true } } },
+    }),
+  );
   if (!approval) return Response.json({ error: "Report approval not found" }, { status: 404 });
   return Response.json({ approval });
 }

@@ -7,6 +7,7 @@ import { RevokeSchema } from "../../../_schemas";
 import { mediaStores, safetyTablesReady } from "@/lib/media/db";
 import { revokeApproval } from "@/lib/media/approvals";
 import { releaseEncumbrance } from "@/lib/media/pools";
+import { mediaDecisionOf, notifyMediaApprovalDecided } from "@/lib/media/decision-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export async function POST(
   try {
     const { id } = await params;
     const { approvals, pools } = mediaStores();
+    const before = await approvals.get(id, gate.workspaceId);
     const approval = await revokeApproval(
       approvals,
       id,
@@ -53,6 +55,10 @@ export async function POST(
         }
       },
     );
+    // Phase 4a: revoking a buy that was still waiting is the "denied"
+    // decision (best-effort notification, never throws).
+    const decision = mediaDecisionOf(before?.status, approval.status);
+    if (decision) await notifyMediaApprovalDecided(approval, decision, gate.userId);
     return Response.json({ approval });
   } catch (err) {
     return safetyError(err);

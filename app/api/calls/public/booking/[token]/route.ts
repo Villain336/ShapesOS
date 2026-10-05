@@ -8,6 +8,7 @@
 // are ever queued.
 
 import { findBookingPageByToken, getAvailability, handleBookingSubmit } from "@/lib/calls/booking";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 const BODY_LIMIT = 4096;
 
@@ -50,7 +51,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   if (rawBody.length > BODY_LIMIT) {
     return Response.json({ error: "Request too large" }, { status: 413 });
   }
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIpFromHeaders(req.headers) ?? "unknown";
   const res = await handleBookingSubmit({ token, rawBody, ip });
   return Response.json(res.json, { status: res.status, headers: res.headers });
 }

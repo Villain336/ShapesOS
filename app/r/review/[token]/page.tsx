@@ -8,8 +8,10 @@ import { notFound } from "next/navigation";
 import { getRequestByToken, markViewedByToken } from "@/lib/reviews/engine";
 import { checkReviewPageRateLimit } from "@/lib/reviews/rate-limit";
 import { ReviewLandingClient } from "./ReviewLandingClient";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
+import { effectiveWhiteLabel } from "@/lib/billing/entitlements";
 
-export const metadata = { title: "Leave a review — Marketr" };
+export const metadata = { title: "Leave a review — ShapesOS" };
 
 export default async function ReviewLandingPage({
   params,
@@ -22,14 +24,11 @@ export default async function ReviewLandingPage({
   // next/headers gives us the real client IP behind the proxy.
   const { headers } = await import("next/headers");
   const h = await headers();
-  const ip =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip")?.trim() ||
-    "unknown";
+  const ip = clientIpFromHeaders(h) ?? "unknown";
   if (!checkReviewPageRateLimit(clean, ip)) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6">
-        <p className="text-sm text-stone-500">Too many requests — please try again in a minute.</p>
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
+        <p className="text-sm text-muted">Too many requests — please try again in a minute.</p>
       </main>
     );
   }
@@ -39,10 +38,10 @@ export default async function ReviewLandingPage({
 
   if (req.status === "expired") {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6">
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
         <div className="max-w-sm text-center">
-          <h1 className="text-lg font-semibold text-stone-900">This link has expired</h1>
-          <p className="mt-2 text-sm text-stone-500">
+          <h1 className="text-lg font-heading tracking-heading stretch-heading text-ink">This link has expired</h1>
+          <p className="mt-2 text-sm text-muted">
             This review invitation is no longer active. You can still find{" "}
             {req.workspace.name} on Google to leave a review.
           </p>
@@ -52,16 +51,18 @@ export default async function ReviewLandingPage({
   }
 
   await markViewedByToken(clean);
+  const wl = effectiveWhiteLabel(req.workspace);
 
   return (
     <ReviewLandingClient
       token={clean}
       businessName={req.workspace.name}
       reviewUrl={req.reviewUrl ?? "https://www.google.com/maps"}
-      brandColor={req.workspace.whiteLabelBrandColor}
-      // Logo + domain are white-label fields set under Settings → White-label.
-      logoUrl={req.workspace.whiteLabelLogoUrl ? `/api/public/workspaces/${req.workspace.id}/logo` : null}
-      customDomain={req.workspace.whiteLabelCustomDomain}
+      brandColor={wl.brandColor}
+      // Logo + domain are white-label fields set under Settings → White-label;
+      // effectiveWhiteLabel drops them on plans without white-label (Phase 4a).
+      logoUrl={wl.logoUrl ? `/api/public/workspaces/${req.workspace.id}/logo` : null}
+      customDomain={wl.customDomain}
     />
   );
 }

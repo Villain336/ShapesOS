@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M1: orchestrator audit helpers (SPEC-PHASE9.md §3.6).
+// Marketr — Phase 9 M1: orchestrator audit helpers (docs/specs/SPEC-PHASE9.md §3.6).
 //
 // Two append-only writers. Both set the app.workspace_id tenant GUC per
 // transaction (same contract as lib/substrate/graph/rls.ts) — sessions

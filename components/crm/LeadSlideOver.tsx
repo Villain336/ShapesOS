@@ -1,13 +1,16 @@
 // Marketr CRM — lead detail slide-over (reference: right detail panel).
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Star, SquareArrowOutUpRight, Pencil, Phone, Mail,
-  MessageSquareText, Calendar, NotebookPen, Flag,
+  MessageSquareText, MessagesSquare, Calendar, NotebookPen, Flag,
 } from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
+import { LeadActions } from "./LeadActions";
+import { ConvertLeadStrip } from "@/components/ops/CrmAccounts";
+import { feedback } from "@/lib/ui/feedback";
 import { Avatar, MiniBars, ScoreBar, StageBadge, backdropCls, btnGhostSm, btnPrimarySm, errorBoxCls, inputCls, labelCls, sectionTitleCls, selectCls, slideoverCls } from "./ui";
 
 const ACT_META: Record<string, { label: string; icon: typeof Phone; tint: string }> = {
@@ -52,6 +55,13 @@ export function LeadSlideOver({
   const [newAct, setNewAct] = useState({ type: "note", body: "" });
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const logInputRef = useRef<HTMLInputElement>(null);
+  // LeadActions registers a handler so Escape closes its open sub-panel
+  // (composer, enroll, invoice) before the whole slide-over.
+  const escapeRef = useRef<(() => boolean) | null>(null);
+  const registerEscape = useCallback((fn: (() => boolean) | null) => {
+    escapeRef.current = fn;
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -78,7 +88,13 @@ export function LeadSlideOver({
 
   useEffect(() => { load(); }, [leadId]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // A confirm dialog handles its own Escape (cancel).
+      if (feedback.getState().confirm) return;
+      if (escapeRef.current?.()) return;
+      onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -93,7 +109,7 @@ export function LeadSlideOver({
   if (loading || !lead) {
     return (
       <>
-        <div className={backdropCls} onClick={onClose} />
+        <div className={backdropCls} onClick={onClose} aria-hidden />
         <div className={`${slideoverCls} items-center justify-center`}>
           <p className="text-sm text-muted">{loading ? "Loading lead…" : error || "Not found"}</p>
         </div>
@@ -180,8 +196,8 @@ export function LeadSlideOver({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
-      <div className={slideoverCls}>
+      <div className={backdropCls} onClick={onClose} aria-hidden />
+      <div className={slideoverCls} role="dialog" aria-label={`Lead: ${lead.name}`}>
         {/* Header */}
         <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <Avatar name={lead.name} size={44} />
@@ -201,6 +217,14 @@ export function LeadSlideOver({
               <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
             <a
+              href={`/dashboard/crm/inbox?lead=${encodeURIComponent(lead.id)}`}
+              className={btnGhostSm}
+              title="Open the conversation with this lead"
+            >
+              <MessagesSquare size={15} />
+              <span className="hidden sm:inline text-[12.5px]">Conversation</span>
+            </a>
+            <a
               href={`/dashboard/crm?lead=${lead.id}`}
               className={btnGhostSm}
               title="Open full view"
@@ -208,11 +232,30 @@ export function LeadSlideOver({
               <SquareArrowOutUpRight size={15} />
               <span className="hidden sm:inline text-[12.5px]">Open</span>
             </a>
-            <button onClick={onClose} className="rounded-md p-2 text-subtle hover:bg-hover-paper hover:text-ink">
+            <button type="button" onClick={onClose} aria-label="Close lead panel" className="rounded-full p-2 text-subtle hover:bg-hover-paper hover:text-ink">
               <X size={17} />
             </button>
           </div>
         </div>
+
+        <LeadActions
+          lead={lead}
+          onChanged={() => {
+            void load();
+            onChanged();
+          }}
+          onDeleted={() => {
+            onChanged();
+            onClose();
+          }}
+          onCallStarted={() => {
+            setNewAct({ type: "call", body: "" });
+            requestAnimationFrame(() => logInputRef.current?.focus());
+          }}
+          registerEscape={registerEscape}
+        />
+        {/* Phase 10 (ops-core): lead → contact / company / deal. */}
+        <ConvertLeadStrip leadId={lead.id} hasValue={lead.valueCents != null} onConverted={() => void load()} />
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
@@ -369,6 +412,7 @@ export function LeadSlideOver({
           <h3 className={sectionTitleCls}>Timeline</h3>
           <div className="mb-3 flex gap-2">
             <select
+              aria-label="Touchpoint type"
               className={`${selectCls} py-[6px]! text-[12.5px]!`}
               value={newAct.type}
               onChange={(e) => setNewAct({ ...newAct, type: e.target.value })}
@@ -380,8 +424,10 @@ export function LeadSlideOver({
               <option value="meeting">Meeting</option>
             </select>
             <input
+              ref={logInputRef}
+              aria-label="Touchpoint note"
               className={`${inputCls} flex-1 py-[6px]! text-[12.5px]!`}
-              placeholder="Log a touchpoint…"
+              placeholder={newAct.type === "call" ? "How did the call go?" : "Log a touchpoint…"}
               value={newAct.body}
               onChange={(e) => setNewAct({ ...newAct, body: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") postActivity(); }}

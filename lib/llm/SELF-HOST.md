@@ -32,18 +32,43 @@ pointed at the hosted default (`claude-haiku-4-5`).
 ## API fallback for chained tool sequences
 
 The self-host model is validated for single-shot tool calling, not long
-chained agentic sequences. For the agent loop / skill runs, keep an API
-fallback available: if `getLlmProviderFor("bulk").generate()` throws on the
-self-hosted endpoint, callers may retry once against the hosted bulk default
-(`gpt-5-nano`) before failing. This is a caller-side pattern, intentionally
-not built into the router — the router never silently substitutes vendors
-(T2). Implement the retry where the loop lives (`lib/chat/agent.ts`,
-`lib/seo/autopilot-service.ts`) when self-host is adopted.
+chained agentic sequences. The router's automatic failover (Phase 6) is
+**off under `LLM_SELF_HOST=1`**: choosing self-host means prompts stay on
+your box, so the router never sends them to a hosted vendor on its own.
+Single-key mode is off too — name every workload's model explicitly.
+
+If you want a hosted safety net for the agent loop, opt in at the caller:
+retry once against the hosted bulk default (`gpt-5-nano`) where the loop
+lives (`lib/chat/agent.ts`, `lib/seo/autopilot-service.ts`).
+
+## Request shape and timeouts
+
+With `LLM_SELF_HOST=1` the OpenAI-compatible adapter sends the classic
+shape vLLM and Ollama accept (`max_tokens`, `temperature`) and keeps any
+`:tag` in the model name (Ollama: `qwen3:27b`). Hosted OpenAI gets
+`max_completion_tokens` and no `temperature` for GPT-5 / o-series. Each
+attempt times out after 120 s; CPU-only servers are slower — set
+`LLM_TIMEOUT_MS` (e.g. `600000`). Timeouts, 429 and 5xx get one retry with
+backoff.
+
+## chat() on self-host (Phase 7)
+
+`chat()` / `chatStream()` on the OpenAI-compatible adapter use the Responses
+API (`{LLM_BASE_URL}/responses`, function tools). Recent vLLM and Ollama
+releases serve it, but that path is UNVERIFIED here — test tool calling
+against your endpoint before pointing an agent workload
+(`LLM_MODEL_LEAD` / `SUBAGENT` / `CODE` / `CODE_MAX`) at it. Effort and
+Anthropic server tools are not sent to self-hosted models.
 
 ## ZDR posture
 
 - Code routes hosted traffic **only** to ZDR-eligible models
   (`lib/llm/router.ts`: `ANTHROPIC_ZDR_MODELS`, `OPENAI_ZDR_MODELS`).
+- Exception, opt-in only: `LLM_ALLOW_RETENTION_MODELS=1` also allows
+  Anthropic's covered model `claude-fable-5-1`, which REQUIRES 30-day
+  retention (a ZDR org gets HTTP 400 on every request). Leave it off for a
+  zero-retention deployment; the code-escalation workload then runs on
+  `claude-opus-5-5` at effort max.
 - "ZDR-eligible" ≠ "ZDR active". OpenAI ZDR requires an approved ZDR request
   on the API org — **that is a process step for Tico, not code.** Anthropic
   ZDR requires a qualified commercial org. Until those approvals land, API

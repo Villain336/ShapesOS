@@ -3,7 +3,7 @@
 // The engine's webhook path needs no key — Marketr still gates on role and
 // runs the trigger pre-flight (only webhook triggers can fire externally).
 
-import { triggerFlow } from "@/lib/integrations/activepieces";
+import { workspaceFlows } from "@/lib/integrations/activepieces";
 import { integrationsGuard, badRequest, engineError } from "../../../_lib";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,8 @@ export async function POST(
   }
 
   try {
-    const result = await triggerFlow(flowId, payload);
+    // Only flows bound to the caller's workspace can fire (H6).
+    const result = await workspaceFlows(gate.workspaceId).trigger(flowId, payload);
     return Response.json({
       accepted: true,
       flowId: result.flowId,

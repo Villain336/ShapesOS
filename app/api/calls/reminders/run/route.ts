@@ -11,11 +11,12 @@ import { sendDueReminders } from "@/lib/calls/reminders";
 import { resolveBookingMailPort } from "@/lib/calls/resendMail";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
+import { bearerMatches } from "@/lib/security/constant-time";
 
 async function authorized(req: Request): Promise<boolean> {
   const secret = process.env.REMINDERS_CRON_SECRET;
   const authHeader = req.headers.get("authorization") ?? "";
-  if (secret && authHeader === `Bearer ${secret}`) return true;
+  if (bearerMatches(authHeader, secret)) return true; // constant-time (Phase 1)
   if (!secret) {
     // Dev fallback: any signed-in editor may run it manually.
     const user = await requireUser();

@@ -22,6 +22,9 @@ import {
 import { btnPrimary, inputCls, panelTitle } from "../ui";
 
 const PAGE_SIZE = 32;
+// Fill baked into the inserted icon's SVG (design document data + its data-URL
+// preview). It must be a literal color — CSS variables don't resolve inside an
+// <img> data URL or an exported design.
 const FILL = "#1c1917";
 
 const PREFIX_LABELS: Record<string, string> = {
@@ -170,7 +173,7 @@ export function IconsPanel() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={iconDataUrl(icon.body, icon.viewBox, "#1c1917")}
+                    src={iconDataUrl(icon.body, icon.viewBox, FILL)}
                     alt={icon.ref}
                     loading="lazy"
                     className="h-full w-full"

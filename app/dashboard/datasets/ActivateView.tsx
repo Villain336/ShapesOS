@@ -1,4 +1,6 @@
 // Marketr — Dataset Builder slice 4 UI: activate tab.
+// Phase 4b: pick which compiled version is live per target (rollback /
+// roll-forward, confirmed), and BriefNow is a live MCP pull.
 // One-click publish of compiled datasets into the BriefNow connector
 // (real business-data adapter) and the OS RAG/Feed layer, plus a grounded
 // "ask your data" test panel where every answer cites its sources.
@@ -13,9 +15,12 @@ import {
   FileText,
   Loader2,
   MessageCircleQuestion,
+  Plug,
   Rocket,
+  RotateCcw,
   TriangleAlert,
 } from "lucide-react";
+import { confirmAction, toast } from "@/lib/ui/feedback";
 
 interface PublishTargetState {
   target: "briefnow" | "rag";
@@ -75,6 +80,8 @@ export function ActivateView() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Selected version per dataset:target (default: latest compile).
+  const [chosen, setChosen] = useState<Record<string, number>>({});
 
   const [askDatasetId, setAskDatasetId] = useState("");
   const [question, setQuestion] = useState("");
@@ -109,18 +116,39 @@ export function ActivateView() {
     void refresh();
   }, [refresh]);
 
-  async function publish(datasetId: string, target: "briefnow" | "rag") {
+  async function publish(
+    datasetId: string,
+    target: "briefnow" | "rag",
+    version: number,
+    latest: number,
+    label: string,
+  ) {
+    if (version < latest) {
+      const ok = await confirmAction({
+        title: `Roll ${label} back to v${version}?`,
+        description: `v${version} becomes the live version on this target. v${latest} stays compiled, and you can switch back at any time.`,
+        confirmLabel: `Make v${version} live`,
+      });
+      if (!ok) return;
+    }
     setPublishing(`${datasetId}:${target}`);
     setError(null);
     try {
       const res = await fetch(`/api/datasets/${datasetId}/publish`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targets: [target] }),
+        body: JSON.stringify({ targets: [target], version }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(json?.error ?? `Publish failed (${res.status})`);
+      }
+      const p = json?.published?.[0];
+      if (p) {
+        toast({
+          title: p.alreadyLive ? `v${p.version} is already live` : `v${p.version} is live on ${p.label}`,
+          status: "done",
+        });
       }
       await refresh();
     } catch (e) {
@@ -195,7 +223,13 @@ export function ActivateView() {
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-3">
-              {targets.map((t) => (
+              {targets.map((t) => {
+                const key = `${d.id}:${t.target}`;
+                const latest = d.latestVersion ?? 0;
+                const pick = chosen[key] ?? latest;
+                const isLive = t.published && t.version === pick;
+                const versionOptions = Array.from({ length: latest }, (_, i) => latest - i);
+                return (
                 <div
                   key={t.target}
                   className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-3"
@@ -220,30 +254,61 @@ export function ActivateView() {
                     {t.stale && (
                       <p className="mt-1 flex items-center gap-1.5 text-[13px] text-muted">
                         <TriangleAlert size={13} />
-                        v{t.latestVersion} compiled — republish to refresh
+                        v{t.latestVersion} compiled — publish it to refresh
+                      </p>
+                    )}
+                    {t.target === "briefnow" && t.published && t.artifactRef?.startsWith("mcp://") && (
+                      <p className="mt-1 flex items-start gap-1.5 text-[13px] text-muted">
+                        <Plug size={13} className="mt-0.5 shrink-0" />
+                        <span>
+                          Live pull: your BriefNow connector calls the ShapesOS MCP tool{" "}
+                          <span className="font-mono text-[12px]">get_dataset_adapter</span> with{" "}
+                          <span className="font-mono text-[12px]">type={d.type}</span>, using a workspace MCP key
+                          (Settings → Developers).
+                        </span>
                       </p>
                     )}
                   </div>
+                  {latest > 1 && (
+                    <select
+                      value={pick}
+                      onChange={(e) => setChosen((c) => ({ ...c, [key]: Number(e.target.value) }))}
+                      className="h-10 rounded-full border border-control bg-paper px-3 text-[14px]"
+                      aria-label={`Version to make live on ${t.label}`}
+                    >
+                      {versionOptions.map((v) => (
+                        <option key={v} value={v}>
+                          v{v}
+                          {v === latest ? " (latest)" : ""}
+                          {t.published && v === t.version ? " · live" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
-                    disabled={
-                      d.latestVersion === null ||
-                      publishing === `${d.id}:${t.target}`
-                    }
-                    onClick={() =>
-                      void publish(d.id as string, t.target)
-                    }
+                    disabled={d.latestVersion === null || isLive || publishing === key}
+                    onClick={() => void publish(d.id as string, t.target, pick, latest, d.label)}
                     className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
-                    {publishing === `${d.id}:${t.target}` ? (
+                    {publishing === key ? (
                       <Loader2 size={14} className="animate-spin" />
+                    ) : pick < latest ? (
+                      <RotateCcw size={14} />
                     ) : (
                       <ArrowUpRight size={14} />
                     )}
-                    {t.published ? "Republish" : `Publish to ${t.label}`}
+                    {isLive
+                      ? `v${pick} is live`
+                      : pick < latest
+                        ? `Roll back to v${pick}`
+                        : t.published
+                          ? `Publish v${pick}`
+                          : `Publish to ${t.label}`}
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );

@@ -19,6 +19,8 @@ import type {
   AgentRunEventInput,
 } from "./types";
 import { TERMINAL_RUN_STATUSES } from "./types";
+import { notifyAgentRunFailed } from "@/lib/notifications/producers";
+import { emitWebhookEvent } from "@/lib/webhooks/emit";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -47,6 +49,9 @@ export async function createAgentRun(input: CreateAgentRunInput) {
         startedBy: input.startedBy,
         threadId: input.threadId ?? null,
         missionId: input.missionId ?? null,
+        agentKey: input.agentKey ?? null,
+        parentRunId: input.parentRunId ?? null,
+        allowedTools: input.allowedTools ? [...input.allowedTools] : [],
         agentState: (input.agentState ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     }),
@@ -113,7 +118,7 @@ export async function attachAgentRunRecording(
 ) {
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.agentRunRecording.upsert({
-      where: { runId },
+      where: { runId, workspaceId },
       create: {
         workspaceId,
         runId,
@@ -139,12 +144,37 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
   if (!TERMINAL_RUN_STATUSES.has(status)) {
     throw new Error(`finishAgentRun: ${status} is not a terminal status`);
   }
-  return withWorkspaceScope(workspaceId, (tx) =>
+  const run = await withWorkspaceScope(workspaceId, (tx) =>
     tx.agentRun.update({
       where: { id: runId, workspaceId },
       data: { status, endedAt: new Date() },
     }),
   );
+  // Phase 4a: agent_run.finished / agent_run.failed webhook (never throws).
+  await emitWebhookEvent({
+    workspaceId,
+    type: status === "failed" ? "agent_run.failed" : "agent_run.finished",
+    data: {
+      id: run.id,
+      kind: run.kind ?? null,
+      status: String(run.status),
+      startedBy: run.startedBy ?? null,
+      endedAt: run.endedAt?.toISOString() ?? null,
+    },
+    dedupKey: `agent_run:${run.id}`,
+  });
+  // Phase 8: the run's code sandbox goes with it (never throws).
+  await releaseSandboxesQuietly(workspaceId, [runId], `run ${status}`);
+  if (status === "failed") {
+    // Phase 3 (J): best-effort notification (never throws).
+    await notifyAgentRunFailed({
+      workspaceId,
+      runId: run.id,
+      kind: run.kind,
+      startedBy: run.startedBy,
+    });
+  }
+  return run;
 }
 
 /** Read a run (workspace-scoped; null when outside scope). */
@@ -167,6 +197,22 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
   );
 }
 
+/**
+ * Phase 8: the run's events after a sequence number, in order (bounded) —
+ * how the AG-UI SSE route tails a run as it works, in this process or on a
+ * worker.
+ */
+export async function listAgentRunEventsAfter(workspaceId: string, runId: string, afterSeq: number, limit = 500) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: { runId, workspaceId, seq: { gt: afterSeq } },
+      orderBy: { seq: "asc" },
+      take: Math.min(Math.max(limit, 1), 2000),
+      select: { seq: true, type: true, summary: true, payload: true },
+    }),
+  );
+}
+
 /** List runs for a workspace, newest first (bounded). */
 export async function listAgentRuns(workspaceId: string, limit = 50) {
   return withWorkspaceScope(workspaceId, (tx) =>
@@ -175,6 +221,110 @@ export async function listAgentRuns(workspaceId: string, limit = 50) {
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(limit, 1), 200),
       include: { recording: true },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: a real Stop. Cancellation is cooperative: the request is recorded
+// here (and cascades to every run the stopped run handed work to); the agent
+// loop checks isAgentRunCancelRequested() before every model call and every
+// tool call, and an in-flight model call in this process is aborted through
+// lib/agents/runs/abort.ts. The loop then finishes the run as `cancelled`.
+// ---------------------------------------------------------------------------
+
+export interface CancelRequestResult {
+  /** Runs that were asked to stop (the run itself and its live descendants). */
+  runIds: string[];
+  /** False when the run had already finished — nothing to stop. */
+  stopped: boolean;
+}
+
+/**
+ * Ask a run (and its sub-agent runs) to stop. Idempotent: asking twice keeps
+ * the first request time. Already-finished runs are left alone. Returns the
+ * ids that were asked; null when the run is not in this workspace.
+ */
+export async function requestAgentRunCancel(
+  workspaceId: string,
+  runId: string,
+  userId: string,
+): Promise<CancelRequestResult | null> {
+  const res = await withWorkspaceScope(workspaceId, async (tx) => {
+    const root = await tx.agentRun.findFirst({
+      where: { id: runId, workspaceId },
+      select: { id: true, status: true },
+    });
+    if (!root) return null;
+    // Walk the sub-agent tree (bounded: delegation is one level deep today,
+    // the bound keeps a malformed tree from looping).
+    const ids = [root.id];
+    let frontier = [root.id];
+    for (let depth = 0; depth < 8 && frontier.length > 0; depth++) {
+      const kids = await tx.agentRun.findMany({
+        where: { workspaceId, parentRunId: { in: frontier } },
+        select: { id: true },
+      });
+      frontier = kids.map((k) => k.id).filter((id) => !ids.includes(id));
+      ids.push(...frontier);
+    }
+    const now = new Date();
+    const live = await tx.agentRun.findMany({
+      where: { workspaceId, id: { in: ids }, status: { in: ["queued", "running"] } },
+      select: { id: true },
+    });
+    if (live.length === 0) return { runIds: [], stopped: false };
+    await tx.agentRun.updateMany({
+      where: { workspaceId, id: { in: live.map((r) => r.id) }, cancelRequestedAt: null },
+      data: { cancelRequestedAt: now, cancelRequestedBy: userId },
+    });
+    // A queued run never started: it is cancelled right away.
+    await tx.agentRun.updateMany({
+      where: { workspaceId, id: { in: live.map((r) => r.id) }, status: "queued" },
+      data: { status: "cancelled", endedAt: now },
+    });
+    return { runIds: live.map((r) => r.id), stopped: true };
+  });
+  // Phase 8: Stop destroys the stopped runs' code sandboxes right away.
+  if (res?.stopped) await releaseSandboxesQuietly(workspaceId, res.runIds, "stopped", true);
+  return res;
+}
+
+/**
+ * Phase 8: destroy the code sandboxes these runs own (lib/sandbox) — on
+ * Stop always; at a normal end only when not bound to a chat thread (the
+ * thread's next turn reuses it; it ends on its idle timeout). Loaded
+ * lazily so the run service doesn't pull the providers in until needed;
+ * never throws — a run ends even when its provider is unreachable (the
+ * sandbox then idles out on its own).
+ */
+async function releaseSandboxesQuietly(workspaceId: string, runIds: readonly string[], reason: string, force = false): Promise<void> {
+  try {
+    const { releaseRunSandbox } = await import("@/lib/sandbox");
+    for (const id of runIds) await releaseRunSandbox(workspaceId, id, reason, { force });
+  } catch {
+    // best effort
+  }
+}
+
+/** Has anyone asked this run to stop? (cheap; called between steps). */
+export async function isAgentRunCancelRequested(workspaceId: string, runId: string): Promise<boolean> {
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findFirst({
+      where: { id: runId, workspaceId },
+      select: { cancelRequestedAt: true, status: true },
+    }),
+  );
+  return !!row && (row.cancelRequestedAt !== null || row.status === "cancelled");
+}
+
+/** The live (queued/running) runs of a chat thread, newest first. */
+export async function listLiveThreadRuns(workspaceId: string, threadId: string) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findMany({
+      where: { workspaceId, threadId, status: { in: ["queued", "running"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, agentKey: true, parentRunId: true },
     }),
   );
 }

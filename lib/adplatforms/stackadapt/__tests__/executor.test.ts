@@ -57,10 +57,11 @@ function stubStores() {
       proposals.set(p.id, p);
       return p;
     },
-    async get(id) {
-      return proposals.get(id) ?? null;
+    async get(id, ws) {
+      const p = proposals.get(id);
+      return p && p.workspaceId === ws ? p : null;
     },
-    async setStatus(id, status: SpendProposalStatus, decidedBy?: string) {
+    async setStatus(id, _ws: string, status: SpendProposalStatus, decidedBy?: string) {
       const p = proposals.get(id)!;
       const next = { ...p, status, decidedBy: decidedBy ?? null, decidedAt: new Date() };
       proposals.set(id, next);
@@ -80,8 +81,9 @@ function stubStores() {
       approvals.set(a.proposalId, a);
       return a;
     },
-    async getByProposalId(proposalId) {
-      return approvals.get(proposalId) ?? null;
+    async getByProposalId(proposalId, ws) {
+      const a = approvals.get(proposalId);
+      return a && a.workspaceId === ws ? a : null;
     },
   };
   return { proposalStore, approvalStore };
@@ -223,7 +225,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload: LAUNCH_PAYLOAD,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
 
     const result = (await runAdsAction(ctx, "launch", {
       platformKey: "stackadapt",
@@ -250,7 +252,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
     assert.equal(stored.status, "live");
     assert.equal(stored.budgetCents, 30000);
 
-    const executed = await proposalStore.get(proposal.id);
+    const executed = await proposalStore.get(proposal.id, WS);
     assert.equal(executed!.status, "executed");
   });
 
@@ -287,7 +289,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload: LAUNCH_PAYLOAD,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const tampered = { ...LAUNCH_PAYLOAD, dailyBudgetCents: 99999 };
     const err = await runAdsAction(ctx, "launch", {
       platformKey: "stackadapt",
@@ -311,7 +313,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const err = await runAdsAction(ctx, "launch", {
       platformKey: "stackadapt",
       proposalId: proposal.id,
@@ -334,7 +336,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const err = await runAdsAction(ctx, "launch", {
       platformKey: "stackadapt",
       proposalId: proposal.id,
@@ -362,7 +364,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const result = (await runAdsAction(ctx, "pause", {
       platformKey: "stackadapt",
       proposalId: proposal.id,
@@ -392,7 +394,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       proposedBy: ACTOR,
     });
     assert.equal(proposal.action, "adjust_budget");
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const result = (await runAdsAction(ctx, "adjust_budget", {
       platformKey: "stackadapt",
       proposalId: proposal.id,
@@ -438,7 +440,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, WS, proposal.id, ACTOR);
     const err = await runAdsAction(ctx, "adjust_budget", {
       platformKey: "stackadapt",
       proposalId: proposal.id,
@@ -461,7 +463,7 @@ describe("stackadapt executor: propose → approve → execute", () => {
       payload,
       proposedBy: ACTOR,
     });
-    await approveSpendAction(proposalStore, approvalStore, proposal.id, ACTOR);
+    await approveSpendAction(proposalStore, approvalStore, "ws_evil", proposal.id, ACTOR);
     const err = await runAdsAction(evilCtx, "launch", {
       platformKey: "stackadapt",
       proposalId: proposal.id,

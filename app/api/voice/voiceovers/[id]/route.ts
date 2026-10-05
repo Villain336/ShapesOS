@@ -82,9 +82,7 @@ export async function POST(
       { status: 400 },
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Internal error";
-    const status = /not found/i.test(message) ? 404 : 500;
-    return Response.json({ error: message }, { status });
+    return httpErrorResponse(e);
   }
 }
 

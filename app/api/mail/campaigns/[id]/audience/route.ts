@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { mailGuard, badRequest } from "../../../_lib";
 import { buildPieces, extractAddressFromLead, type AudienceSpec } from "@/lib/mail/service";
+import { errorResponse } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,7 @@ export async function POST(
     const result = await buildPieces(gate.workspaceId, id, audience);
     return Response.json({ ...result, campaignId: id }, { status: 201 });
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : "Audience build failed");
+    return errorResponse(e);
   }
 }
 

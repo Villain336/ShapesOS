@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M5: Agent Playbooks versioning store (SPEC-PHASE9.md §P9D, §5).
+// Marketr — Phase 9 M5: Agent Playbooks versioning store (docs/specs/SPEC-PHASE9.md §P9D, §5).
 //
 // Versioning model (research §4: immutable versions, mutable label pointers):
 //   - `playbook`          — the named procedure (learned | community | seed).
@@ -296,7 +296,7 @@ export async function createVersion(
     throw new Error("createVersion: content must be an object with a steps array.");
   }
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const playbook = await tx.playbook.findUnique({ where: { id: playbookId } });
+    const playbook = await tx.playbook.findFirst({ where: { id: playbookId, workspaceId } });
     if (!playbook || playbook.workspaceId !== workspaceId) {
       throw new Error("Playbook not found in this workspace.");
     }
@@ -333,12 +333,12 @@ export async function setLabel(
 ): Promise<{ version: number; label: PlaybookLabel }> {
   if (!LABELS.includes(label)) throw new Error(`setLabel: unknown label "${label}".`);
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const playbook = await tx.playbook.findUnique({ where: { id: playbookId } });
+    const playbook = await tx.playbook.findFirst({ where: { id: playbookId, workspaceId } });
     if (!playbook || playbook.workspaceId !== workspaceId) {
       throw new Error("Playbook not found in this workspace.");
     }
-    const target = await tx.playbookVersion.findUnique({
-      where: { playbookId_version: { playbookId, version } },
+    const target = await tx.playbookVersion.findFirst({
+      where: { playbookId, version, workspaceId },
       select: { id: true, workspaceId: true, labels: true },
     });
     if (!target || target.workspaceId !== workspaceId) {
@@ -354,13 +354,13 @@ export async function setLabel(
     for (const h of holders) {
       if (h.id === target.id) continue;
       await tx.playbookVersion.update({
-        where: { id: h.id },
+        where: { id: h.id, workspaceId },
         data: { labels: { set: (h.labels as string[]).filter((l) => l !== label) } },
       });
     }
     if (!(target.labels as string[]).includes(label)) {
       await tx.playbookVersion.update({
-        where: { id: target.id },
+        where: { id: target.id, workspaceId },
         data: { labels: { set: [...((target.labels as string[]) ?? []), label] } },
       });
     }
@@ -394,7 +394,7 @@ export async function transitionVersion(
     throw new Error(`transition: unknown target status "${to}".`);
   }
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.playbookVersion.findUnique({ where: { id: versionId } });
+    const row = await tx.playbookVersion.findFirst({ where: { id: versionId, workspaceId } });
     if (!row || row.workspaceId !== workspaceId) {
       throw new Error("Playbook version not found in this workspace.");
     }
@@ -413,7 +413,7 @@ export async function transitionVersion(
         productionApproval: { approvedBy: opts.approver, approvedAt: new Date().toISOString() },
       };
     }
-    await tx.playbookVersion.update({ where: { id: versionId }, data });
+    await tx.playbookVersion.update({ where: { id: versionId, workspaceId }, data });
     // Promotion to production moves the production pointer (research §4:
     // "promoted with an environment pointer"). Rollback is still a separate
     // setLabel call — nothing is rewritten.
@@ -425,12 +425,12 @@ export async function transitionVersion(
       for (const h of holders) {
         if (h.id === versionId) continue;
         await tx.playbookVersion.update({
-          where: { id: h.id },
+          where: { id: h.id, workspaceId },
           data: { labels: { set: (h.labels as string[]).filter((l) => l !== "production") } },
         });
       }
       await tx.playbookVersion.update({
-        where: { id: versionId },
+        where: { id: versionId, workspaceId },
         data: { labels: { set: [...new Set([...((row.labels as string[]) ?? []), "production"])] } },
       });
     }
@@ -453,7 +453,7 @@ export async function proposeFromLearning(
   opts: { capture?: typeof captureEpisode } = {},
 ): Promise<{ playbookId: string; versionId: string; version: number }> {
   const result = await withWorkspaceScope(workspaceId, async (tx) => {
-    const learning = await tx.memoryLearning.findUnique({ where: { id: learningId } });
+    const learning = await tx.memoryLearning.findFirst({ where: { id: learningId, workspaceId } });
     if (!learning || learning.workspaceId !== workspaceId) {
       throw new Error("Learning not found in this workspace.");
     }
@@ -559,12 +559,12 @@ export async function recordEval(
     recordedAt: new Date().toISOString(),
   };
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.playbookVersion.findUnique({ where: { id: versionId } });
+    const row = await tx.playbookVersion.findFirst({ where: { id: versionId, workspaceId } });
     if (!row || row.workspaceId !== workspaceId) {
       throw new Error("Playbook version not found in this workspace.");
     }
     await tx.playbookVersion.update({
-      where: { id: versionId },
+      where: { id: versionId, workspaceId },
       data: { evalResults: evalDoc as unknown as Prisma.InputJsonObject },
     });
     return { id: versionId, eval: evalDoc };
@@ -608,7 +608,7 @@ export async function runPlaybook(
   input: Record<string, unknown>,
 ): Promise<PlaybookRunResult> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const playbook = await tx.playbook.findUnique({ where: { id: playbookId } });
+    const playbook = await tx.playbook.findFirst({ where: { id: playbookId, workspaceId } });
     if (!playbook || playbook.workspaceId !== workspaceId) {
       throw new Error("Playbook not found in this workspace.");
     }
@@ -732,7 +732,7 @@ export async function getPlaybook(
   playbookId: string,
 ): Promise<{ playbook: { id: string; name: string; source: PlaybookSource; description: string | null; createdAt: string }; versions: VersionView[] } | null> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const p = await tx.playbook.findUnique({ where: { id: playbookId } });
+    const p = await tx.playbook.findFirst({ where: { id: playbookId, workspaceId } });
     if (!p || p.workspaceId !== workspaceId) return null;
     const versions = await tx.playbookVersion.findMany({
       where: { playbookId, workspaceId },
@@ -845,7 +845,7 @@ export async function exportPlaybook(
         "exportPlaybook: community sharing is OFF for this workspace (opt-in required).",
       );
     }
-    const playbook = await tx.playbook.findUnique({ where: { id: playbookId } });
+    const playbook = await tx.playbook.findFirst({ where: { id: playbookId, workspaceId } });
     if (!playbook || playbook.workspaceId !== workspaceId) {
       throw new Error("Playbook not found in this workspace.");
     }

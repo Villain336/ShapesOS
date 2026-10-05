@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/guard";
-import { decideApproval } from "@/lib/integrations/actions/gate";
+import { decideApproval, SeparationOfDutiesError } from "@/lib/integrations/actions/gate";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // decidedBy comes from the session, never the body; the gate refuses a
+    // requester approving their own action (separation of duties).
     const { user, workspace } = await guardWorkspace({ editor: true });
     const { id } = await params;
     const body = DecideSchema.parse(await readJson(req));
@@ -32,6 +34,7 @@ export async function POST(
     });
     return Response.json({ approval });
   } catch (e) {
+    if (e instanceof SeparationOfDutiesError) return Response.json({ error: e.message }, { status: 403 });
     return httpErrorResponse(e);
   }
 }

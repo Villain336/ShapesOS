@@ -135,7 +135,7 @@ export function createMemoryDspAdapterStore(): DspAdapterStore {
         throw new Error(
           `Refusing ${dsp} seat connection without a vault config ref. ` +
             `Bring your own seat: store credentials in the vault and connect with ` +
-            `config_ref "vault://...". Marketr never accepts raw credentials.`,
+            `config_ref "vault://...". ShapesOS never accepts raw credentials.`,
         );
       }
       const key = `${workspaceId}:${dsp}`;

@@ -4,11 +4,11 @@
 // and must still be approved before it can render. Editing figures re-runs the
 // grounding evaluation (may flip the report to `flagged`).
 
-import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { editReportSend } from "@/lib/reports/report-gate";
 import type { ReportFigure } from "@/lib/reports/figures";
+import { scopedDb } from "@/lib/substrate/memory/rls";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
-    const approval = await editReportSend(prisma, {
+    const approval = await editReportSend(scopedDb(workspace.id), {
       workspaceId: workspace.id,
       id,
       actor: user.id,

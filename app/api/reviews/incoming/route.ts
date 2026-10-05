@@ -8,6 +8,7 @@
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { listIncomingReviews, draftReviewResponse, ResponderError } from "@/lib/reviews/responder";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 async function guard(reqRole: "viewer" | "editor" = "viewer") {
   const user = await requireUser();
@@ -23,7 +24,9 @@ export async function GET(req: Request) {
   const g = await guard("viewer");
   if (g.error) return g.error;
   const url = new URL(req.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10) || 50, 200);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), url.searchParams);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const reviews = await listIncomingReviews(g.workspace!.id, { limit });
   return Response.json({ reviews, workspaceId: g.workspace!.id });
 }

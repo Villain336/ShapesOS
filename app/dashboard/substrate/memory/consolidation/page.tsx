@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G3: consolidation status (SPEC-PHASE8.md §6).
+// Marketr — Phase 8 G3: consolidation status (docs/specs/SPEC-PHASE8.md §6).
 // Server status + client trigger button. Async by design: trigger returns
 // 202 immediately; the pass runs detached on the worker pool.
 
@@ -15,7 +15,7 @@ const chipNeutral =
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Consolidation — Growth Memory — Marketr",
+  title: "Consolidation — Growth Memory — ShapesOS",
   description: "Async distillation, contradiction detection, and decay-to-floor pruning.",
 };
 

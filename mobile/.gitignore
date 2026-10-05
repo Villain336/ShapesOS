@@ -1,3 +1,6 @@
 node_modules/
 .expo/
 dist/
+secrets/
+.env
+.env.*

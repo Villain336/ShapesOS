@@ -11,6 +11,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireProjectRole } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { normalizeDomain } from "@/lib/competitors";
+import { assertSafeUrl, UnsafeUrlError } from "@/lib/safe-url";
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();
@@ -70,11 +71,21 @@ export async function POST(req: NextRequest) {
   if (sitemapUrl && !/^https?:\/\//i.test(sitemapUrl)) {
     return Response.json({ error: "sitemapUrl must be an absolute http(s) URL" }, { status: 400 });
   }
+  if (sitemapUrl) {
+    // H8: refuse internal targets up front (the fleet's safeFetch re-checks
+    // every request and redirect hop at crawl time too).
+    try {
+      await assertSafeUrl(sitemapUrl);
+    } catch (err) {
+      const msg = err instanceof UnsafeUrlError ? err.message : "sitemapUrl is not allowed";
+      return Response.json({ error: `sitemapUrl refused: ${msg}` }, { status: 400 });
+    }
+  }
 
   const workspaceId = (await getOrCreateWorkspace(user.id, user.email)).id;
   const watch = await withWorkspaceScope(workspaceId, (tx) =>
     tx.competitorWatch.upsert({
-      where: { projectId_competitorDomain: { projectId: body.projectId!, competitorDomain: domain } },
+      where: { projectId_competitorDomain: { projectId: body.projectId!, competitorDomain: domain }, workspaceId },
       create: {
         workspaceId,
         projectId: body.projectId!,
@@ -104,7 +115,7 @@ export async function DELETE(req: NextRequest) {
     });
     if (!existing) return null;
     if (!(await requireProjectRole(user.id, existing.projectId, "editor"))) return "forbidden";
-    await tx.competitorWatch.delete({ where: { id } });
+    await tx.competitorWatch.delete({ where: { id, workspaceId } });
     return true;
   });
 

@@ -81,7 +81,7 @@ export async function saveBigQueryExportConfig(
     const base = (existing?.config ?? {}) as Record<string, unknown>;
     const next = { ...base, bigquery: cfg };
     if (existing) {
-      await tx.dataSource.update({ where: { id: existing.id }, data: { config: next } });
+      await tx.dataSource.update({ where: { id: existing.id, workspaceId }, data: { config: next } });
     } else {
       await tx.dataSource.create({
         data: { workspaceId, type: "gsc", config: next, status: "active" },

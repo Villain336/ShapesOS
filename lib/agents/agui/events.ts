@@ -177,4 +177,6 @@ export const MARKETR_EMITTED_KINDS = [
 export const MARKETR_CUSTOM_NAMES = {
   /** A tool call held behind the confirmation gate (pending_confirmation). */
   toolProposal: "marketr.toolProposal",
+  /** Phase 8: the turn was handed to the agent worker; the stream keeps tailing it. */
+  queued: "marketr.queued",
 } as const;

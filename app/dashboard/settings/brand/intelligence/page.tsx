@@ -19,7 +19,7 @@ import ContentTab from "./content-tab";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Brand Intelligence — Settings — Marketr",
+  title: "Brand Intelligence — Settings — ShapesOS",
   description: "The living company intelligence layer: brand voice, knowledge, style rules, content memory.",
 };
 

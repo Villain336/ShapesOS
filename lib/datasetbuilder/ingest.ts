@@ -6,6 +6,8 @@
 // A Document only flips to "ready" after all its chunks are written, so a
 // crash mid-ingest leaves it "pending" (or "failed"), never half-claimed.
 
+import { assertSafeUrl, UnsafeUrlError, type ResolveFn } from "@/lib/safe-url";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
 import { chunkInputsForDocument } from "./chunking";
 import { extractTextFromUpload } from "./extract";
 import type { NangoDriveAdapter } from "./nango";
@@ -148,9 +150,16 @@ export async function ingestDriveFile(
 
 const MAX_CRAWL_BYTES = 2_000_000;
 
+/** Network seams for the crawl path (tests inject fake fetch + DNS). */
+export interface CrawlDeps {
+  fetchImpl?: typeof fetch;
+  resolve?: ResolveFn;
+}
+
 export async function ingestWeb(
   store: DatasetBuilderStore,
   input: CrawlInput,
+  deps: CrawlDeps = {},
 ): Promise<IngestResult> {
   const chunking = input.chunking ?? DEFAULT_CHUNKING_CONFIG;
   let url: URL;
@@ -163,6 +172,17 @@ export async function ingestWeb(
     throw new DatasetBuilderError(
       "VALIDATION_FAILED",
       `refusing to crawl non-http(s) URL: "${input.url}"`,
+    );
+  }
+  // SSRF guard (H7): the crawled text is stored and readable, so an internal
+  // target would be a full-read SSRF. Refuse before any row is created; the
+  // fetch below re-validates every request and redirect hop.
+  try {
+    await assertSafeUrl(url.toString(), { resolve: deps.resolve });
+  } catch (err) {
+    throw new DatasetBuilderError(
+      "VALIDATION_FAILED",
+      `refusing to crawl "${input.url}": ${err instanceof Error ? err.message : "unsafe URL"}`,
     );
   }
   const source = await store.createSource({
@@ -178,7 +198,7 @@ export async function ingestWeb(
     mimeType: "text/html",
   });
   try {
-    const text = await fetchAndExtractMainContent(url.toString());
+    const text = await fetchAndExtractMainContent(url.toString(), deps.fetchImpl, deps.resolve);
     return await finalizeDocument(store, doc, text, chunking);
   } catch (err) {
     return failDocument(store, doc, err);
@@ -188,15 +208,21 @@ export async function ingestWeb(
 /** Fetch a page and extract its main readable text. Injectable for tests. */
 export async function fetchAndExtractMainContent(
   url: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl?: typeof fetch,
+  resolve?: ResolveFn,
 ): Promise<string> {
   let res: Response;
   try {
-    res = await fetchImpl(url, {
-      headers: { "user-agent": "Marketr-DatasetBuilder/1.0 (+ingest)" },
-      redirect: "follow",
-    });
+    // safeFetch: per-request DNS validation + every redirect hop re-checked.
+    res = await safeFetch(
+      url,
+      { headers: { "user-agent": "Marketr-DatasetBuilder/1.0 (+ingest)" } },
+      { fetchFn: fetchImpl, resolve },
+    );
   } catch (err) {
+    if (err instanceof UnsafeUrlError) {
+      throw new DatasetBuilderError("FETCH_FAILED", `refusing to fetch "${url}": ${err.message}`);
+    }
     throw new DatasetBuilderError(
       "FETCH_FAILED",
       `could not fetch "${url}": ${err instanceof Error ? err.message : String(err)}`,

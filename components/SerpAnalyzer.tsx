@@ -8,9 +8,9 @@ import { useState, type FormEvent } from "react";
 import type { SerpAnalysis } from "@/lib/serp/analyze";
 
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const th =
-  "px-3 py-2 text-left text-xs font-medium uppercase tracking-widest text-zinc-500";
+  "px-3 py-2 text-left text-xs font-semibold text-muted";
 const td = "px-3 py-2 text-sm";
 
 export default function SerpAnalyzer({ projectId }: { projectId: string }) {
@@ -50,14 +50,14 @@ export default function SerpAnalyzer({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-zinc-300 bg-white p-4">
-      <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+    <div className="rounded-lg bg-paper shadow-hairline p-4">
+      <h2 className="text-lg font-heading tracking-heading stretch-heading text-ink">
         SERP analysis
       </h2>
-      <p className="mt-1 text-sm text-zinc-500">
+      <p className="mt-1 text-sm text-muted">
         Pull the live search results page for any keyword — top results, SERP
         features, and a deterministic breakdown.{" "}
-        <span className="font-medium text-zinc-700">Costs 1 credit</span> per
+        <span className="font-medium text-ink">Costs 1 credit</span> per
         analysis (same keyword, same day is not charged twice).
       </p>
       <form onSubmit={onAnalyze} className="mt-3 flex flex-wrap items-end gap-2">
@@ -80,33 +80,33 @@ export default function SerpAnalyzer({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={loading || !keyword.trim()}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
         >
           {loading ? "Analyzing…" : "Analyze SERP"}
         </button>
       </form>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-failed-text">{error}</p>}
       {result && (
         <div className="mt-4">
           <div className="flex flex-wrap gap-4 text-sm">
             <span>
-              <span className="text-zinc-500">Results:</span>{" "}
+              <span className="text-muted">Results:</span>{" "}
               <span className="font-medium">{result.analysis.resultCount}</span>
             </span>
             <span>
-              <span className="text-zinc-500">Unique domains:</span>{" "}
+              <span className="text-muted">Unique domains:</span>{" "}
               <span className="font-medium">
                 {result.analysis.uniqueDomains}
               </span>
             </span>
             <span>
-              <span className="text-zinc-500">Domain diversity:</span>{" "}
+              <span className="text-muted">Domain diversity:</span>{" "}
               <span className="font-medium">
                 {result.analysis.domainDiversity}
               </span>
             </span>
             <span>
-              <span className="text-zinc-500">AI Overview:</span>{" "}
+              <span className="text-muted">AI Overview:</span>{" "}
               <span className="font-medium">
                 {result.features.aiOverviewPresent == null
                   ? "—"
@@ -116,14 +116,14 @@ export default function SerpAnalyzer({ projectId }: { projectId: string }) {
               </span>
             </span>
             <span>
-              <span className="text-zinc-500">People also ask:</span>{" "}
+              <span className="text-muted">People also ask:</span>{" "}
               <span className="font-medium">
                 {result.features.peopleAlsoAskCount}
               </span>
             </span>
           </div>
           {result.mock && (
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs text-muted">
               Mock SERP — connect a live data source for real results.
             </p>
           )}
@@ -137,20 +137,20 @@ export default function SerpAnalyzer({ projectId }: { projectId: string }) {
             </thead>
             <tbody>
               {result.results.map((r) => (
-                <tr key={r.position} className="border-t border-zinc-200">
+                <tr key={r.position} className="border-t border-line">
                   <td className={td}>{r.position}</td>
                   <td className={td}>{r.domain}</td>
-                  <td className={`${td} text-zinc-600`}>{r.title}</td>
+                  <td className={`${td} text-muted`}>{r.title}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           {result.peopleAlsoAsk.length > 0 && (
             <div className="mt-3">
-              <h3 className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+              <h3 className="text-xs font-semibold text-muted">
                 People also ask
               </h3>
-              <ul className="mt-1 list-disc pl-5 text-sm text-zinc-700">
+              <ul className="mt-1 list-disc pl-5 text-sm text-ink">
                 {result.peopleAlsoAsk.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}

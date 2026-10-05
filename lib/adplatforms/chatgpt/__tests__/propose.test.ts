@@ -50,10 +50,11 @@ function stubProposalStore() {
       proposals.set(p.id, p);
       return p;
     },
-    async get(id) {
-      return proposals.get(id) ?? null;
+    async get(id, ws) {
+      const p = proposals.get(id);
+      return p && p.workspaceId === ws ? p : null;
     },
-    async setStatus(id, status, decidedBy) {
+    async setStatus(id, _ws: string, status, decidedBy) {
       const p = proposals.get(id);
       if (!p) throw new AdsGateError("NOT_FOUND", id);
       p.status = status;
@@ -79,8 +80,9 @@ function stubApprovalStore(): SpendApprovalStore {
       approvals.set(a.proposalId, a);
       return a;
     },
-    async getByProposalId(proposalId) {
-      return approvals.get(proposalId) ?? null;
+    async getByProposalId(proposalId, ws) {
+      const a = approvals.get(proposalId);
+      return a && a.workspaceId === ws ? a : null;
     },
   };
 }

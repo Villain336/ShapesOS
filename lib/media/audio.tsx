@@ -161,7 +161,7 @@ export function planAudioBuy(input: AudioPlanInput): AudioBudget {
   }
   notes.push(minimums.note);
   notes.push(
-    "Execute in the client's own account (Spotify Ads Manager / Acast / AudioGo self-serve) — Marketr plans and briefs; it never holds or moves client money.",
+    "Execute in the client's own account (Spotify Ads Manager / Acast / AudioGo self-serve) — ShapesOS plans and briefs; it never holds or moves client money.",
   );
 
   return {
@@ -379,7 +379,7 @@ export function buildAudioBriefDocument(d: AudioBriefDocInput): ReactElement {
             <PdfDivider />
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
               <SpanText style={{ fontSize: 9, color: "#71717a" }}>
-                Generated {d.generatedAt} · {d.workspaceName} · Marketr streaming-audio concierge
+                Generated {d.generatedAt} · {d.workspaceName} · ShapesOS streaming-audio concierge
               </SpanText>
               <PageNumber format="Page {page} of {total}" align="right" />
             </View>

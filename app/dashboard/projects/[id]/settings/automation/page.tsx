@@ -44,7 +44,7 @@ export default async function AutomationSettingsPage({
       <Card>
         <CardHeader
           title="Approval mode"
-          description="How much Marketr may act on its own in this project"
+          description="How much ShapesOS may act on its own in this project"
         />
         <CardBody>
           <AutomationClient

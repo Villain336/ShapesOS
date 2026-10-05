@@ -1,6 +1,6 @@
 // Marketr — Growth Memory write path (Phase 8 G3).
 //
-// Write discipline (the 2026 field-guide rules, SPEC-PHASE8.md §2 G3):
+// Write discipline (the 2026 field-guide rules, docs/specs/SPEC-PHASE8.md §2 G3):
 //   - selective writes: decisions, corrections, gotchas + their WHY.
 //     Not the derivable, trivial, or duplicate.
 //   - every write carries provenance (source episode / actor / timestamps).
@@ -26,6 +26,7 @@ import type {
   MemoryLearningResult,
   MemoryLearningSource,
 } from "./types";
+import { NotFoundError } from "@/lib/api/errors";
 
 /** Selectivity gate: refuse writes that are trivially derivable/empty. */
 export function assertWriteWorthy(kind: string, text: string): void {
@@ -121,7 +122,7 @@ export async function supersedeFact(
   replacement: FactInput,
 ): Promise<{ oldId: string; newId: string }> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const old = await tx.memoryFact.findUnique({ where: { id: oldFactId } });
+    const old = await tx.memoryFact.findFirst({ where: { id: oldFactId, workspaceId } });
     if (!old || old.workspaceId !== workspaceId) throw new Error("Fact not found in workspace.");
     if (old.invalidAt) throw new Error("Fact is already superseded.");
     const now = new Date();
@@ -139,7 +140,7 @@ export async function supersedeFact(
       select: { id: true },
     });
     await tx.memoryFact.update({
-      where: { id: oldFactId },
+      where: { id: oldFactId, workspaceId },
       data: { invalidAt: now, expiredAt: now, supersededById: created.id },
     });
     await setEmbedding(
@@ -195,10 +196,10 @@ export async function invalidateLearning(
   assertWriteWorthy("invalidation.reason", reason);
   const scrubbed = scrubSecrets(reason);
   await withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.memoryLearning.findUnique({ where: { id: learningId } });
+    const row = await tx.memoryLearning.findFirst({ where: { id: learningId, workspaceId } });
     if (!row || row.workspaceId !== workspaceId) throw new Error("Learning not found in workspace.");
     await tx.memoryLearning.update({
-      where: { id: learningId },
+      where: { id: learningId, workspaceId },
       data: {
         invalidatedAt: new Date(),
         contextRefs: {
@@ -207,6 +208,30 @@ export async function invalidateLearning(
         },
       },
     });
+  });
+}
+
+/**
+ * Human acceptance of an agent-inferred learning (memory-poisoning guard):
+ * stamps contextRefs.acceptedAt/acceptedBy so prompt-feeding recall
+ * (RecallOptions.acceptedOnly) starts including it. Idempotent.
+ */
+export async function acceptLearning(
+  workspaceId: string,
+  learningId: string,
+  userId: string,
+): Promise<{ acceptedAt: string }> {
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const row = await tx.memoryLearning.findFirst({ where: { id: learningId, workspaceId } });
+    if (!row) throw new NotFoundError("Learning not found in workspace.");
+    const refs = (row.contextRefs as Record<string, unknown>) ?? {};
+    if (typeof refs.acceptedAt === "string") return { acceptedAt: refs.acceptedAt };
+    const acceptedAt = new Date().toISOString();
+    await tx.memoryLearning.update({
+      where: { id: learningId, workspaceId },
+      data: { contextRefs: { ...refs, acceptedAt, acceptedBy: userId } },
+    });
+    return { acceptedAt };
   });
 }
 
@@ -219,7 +244,7 @@ export function updateEpisode(): never {
 
 export async function getEpisode(workspaceId: string, id: string) {
   return withWorkspaceScope(workspaceId, async (tx) =>
-    tx.memoryEpisode.findUnique({ where: { id } }),
+    tx.memoryEpisode.findFirst({ where: { id, workspaceId } }),
   );
 }
 

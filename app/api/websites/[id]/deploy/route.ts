@@ -54,7 +54,7 @@ export async function POST(
   if (!remote) return Response.json({ error: "No remote configured" }, { status: 400 });
 
   const message =
-    (body?.message ?? "").trim().slice(0, 200) || `Marketr deploy: ${site.name}`;
+    (body?.message ?? "").trim().slice(0, 200) || `ShapesOS deploy: ${site.name}`;
 
   try {
     const paths = await collectAllFiles(working);

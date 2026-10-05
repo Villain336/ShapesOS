@@ -12,7 +12,7 @@ export const GBP_EDIT_SPACING_MS = Math.floor(60_000 / GBP_EDITS_PER_MINUTE);
 
 /** Application gating copy — shown verbatim wherever GBP is presented. */
 export const GBP_APPLICATION_COPY =
-  "API access requires application (Marketr's own 60+ day verified GBP + website); quota 0 QPM until approved, 300 QPM after.";
+  "API access requires application (ShapesOS's own 60+ day verified GBP + website); quota 0 QPM until approved, 300 QPM after.";
 
 export interface GbpEditRequest {
   profileId: string;
@@ -145,6 +145,6 @@ export function createGbpProfileManager(enqueue: (edit: GbpEditRequest, schedule
 /** Owner-performed verification flow steps (the API only initiates/completes; the owner verifies). */
 export const GBP_VERIFICATION_STEPS = [
   "Initiate verification in Business Profile Manager (postcard or video).",
-  "Owner completes the postcard or video verification — Marketr cannot perform this step.",
+  "Owner completes the postcard or video verification — ShapesOS cannot perform this step.",
   "Confirm verification status; the API reflects it once Google marks the profile verified.",
 ] as const;

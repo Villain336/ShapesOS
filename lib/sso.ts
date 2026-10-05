@@ -14,6 +14,7 @@
 
 import { prisma } from "./prisma";
 import type { WorkspaceRole } from "@prisma/client";
+import { planHasFeature } from "./billing/entitlements";
 
 // Owner is deliberately excluded: SSO must never mint owners.
 const SSO_ROLES: WorkspaceRole[] = ["viewer", "editor", "admin"];
@@ -46,6 +47,8 @@ export async function provisionSsoUser(
 
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   if (!workspace) return;
+  // Phase 4a: SSO auto-provisioning is a plan entitlement.
+  if (!planHasFeature(workspace.plan, "sso")) return;
 
   const existing = await prisma.workspaceMember.findFirst({
     where: { workspaceId, userId },

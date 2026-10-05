@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: graph nodes API (SPEC-PHASE8.md §5).
+// Marketr — Phase 8 G1: graph nodes API (docs/specs/SPEC-PHASE8.md §5).
 // GET /api/substrate/graph/nodes?type=&q=&workspaceId=
 
 import type { NextRequest } from "next/server";
@@ -7,6 +7,7 @@ import { workspaceIdFrom, requireWorkspaceAccess, badRequest } from "@/lib/route
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { freshnessLabel } from "@/lib/substrate/graph/freshness";
 import { ENTITY_TYPES } from "@/lib/substrate/graph/types";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,9 @@ export async function GET(req: NextRequest) {
 
   const type = req.nextUrl.searchParams.get("type");
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
-  const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") ?? 100) || 100, 500);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(100, 1, 500) }), req.nextUrl.searchParams);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   if (type && !(ENTITY_TYPES as string[]).includes(type)) {
     return badRequest(`unknown entity type: ${type}`);
   }

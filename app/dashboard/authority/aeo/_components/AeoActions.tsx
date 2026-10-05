@@ -11,6 +11,7 @@ import { Input } from "@/components/vault/shadcn/input";
 import { Label } from "@/components/vault/shadcn/label";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import { CheckCircle2, Play, RefreshCw } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // Agentic OS pressables: done = approve, running = run verbs.
 const btnP =
@@ -55,7 +56,7 @@ export function ApproveActionButton({ id }: { id: string }) {
   const { post, busy, result, setResult, error } = usePost();
 
   async function act() {
-    if (!window.confirm("Approve this action? Approval never publishes by itself — fixes enter the supervised ladder, third-party plans are commitments for you to execute.")) return;
+    if (!await confirmAction("Approve this action? Approval never publishes by itself — fixes enter the supervised ladder, third-party plans are commitments for you to execute.")) return;
     const data = (await post(`/api/authority/aeo/actions/${id}/approve`)) as {
       action?: { status?: string };
     } | null;

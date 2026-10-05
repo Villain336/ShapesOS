@@ -10,7 +10,7 @@ import { ConnectorApp } from "./ConnectorApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Network — Marketr",
+  title: "Network — ShapesOS",
   description:
     "Your connector agent's network graph: people, companies, relationship warmth, and import provenance.",
 };

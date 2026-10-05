@@ -17,6 +17,7 @@ import {
   type SetupInput,
   type WorkModeState,
 } from "@/lib/wfh/mode";
+import { isValidTimeZone } from "@/lib/time/zoned";
 
 interface ToggleBody {
   action?: string;
@@ -28,12 +29,14 @@ function toState(row: {
   mode: string;
   wfhDays: string[];
   setupCompletedAt: Date | null;
+  timezone?: string | null;
 } | null): WorkModeState | null {
   if (!row) return null;
   return {
     mode: row.mode as WorkModeState["mode"],
     wfhDays: row.wfhDays,
     setupCompletedAt: row.setupCompletedAt,
+    timezone: row.timezone ?? null,
   };
 }
 
@@ -92,6 +95,7 @@ export async function POST(req: NextRequest) {
         focusBlockMinutes: setup?.focusBlockMinutes ?? 90,
         standupCadence: setup?.standupCadence ?? "daily",
         notificationProfile: setup?.notificationProfile ?? "batched",
+        ...(setup?.timezone ? { timezone: setup.timezone } : {}),
         setupCompletedAt: setup ? new Date() : null,
       },
       update: {
@@ -104,6 +108,7 @@ export async function POST(req: NextRequest) {
               focusBlockMinutes: setup.focusBlockMinutes,
               standupCadence: setup.standupCadence,
               notificationProfile: setup.notificationProfile,
+              ...(setup.timezone ? { timezone: setup.timezone } : {}),
               setupCompletedAt: new Date(),
             }
           : {}),
@@ -136,7 +141,8 @@ export async function POST(req: NextRequest) {
 
 /**
  * PATCH /api/wfh/mode — update WFH preferences without changing the mode.
- * Body: { digestTimesMin?: number[], notificationProfile?: "realtime"|"batched" }.
+ * Body: { digestTimesMin?: number[], notificationProfile?: "realtime"|"batched",
+ *         timezone?: IANA name }.
  */
 export async function PATCH(req: NextRequest) {
   const user = await requireUser();
@@ -145,14 +151,14 @@ export async function PATCH(req: NextRequest) {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "editor");
   if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let body: { digestTimesMin?: unknown; notificationProfile?: unknown };
+  let body: { digestTimesMin?: unknown; notificationProfile?: unknown; timezone?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const patch: { digestTimesMin?: number[]; notificationProfile?: "realtime" | "batched" } = {};
+  const patch: { digestTimesMin?: number[]; notificationProfile?: "realtime" | "batched"; timezone?: string } = {};
   if (body.digestTimesMin !== undefined) {
     const times = Array.isArray(body.digestTimesMin) ? body.digestTimesMin : [];
     const clean = [
@@ -178,6 +184,15 @@ export async function PATCH(req: NextRequest) {
       );
     }
     patch.notificationProfile = body.notificationProfile;
+  }
+  if (body.timezone !== undefined) {
+    if (!isValidTimeZone(body.timezone)) {
+      return NextResponse.json(
+        { error: "timezone must be an IANA name such as America/New_York." },
+        { status: 400 },
+      );
+    }
+    patch.timezone = body.timezone;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });

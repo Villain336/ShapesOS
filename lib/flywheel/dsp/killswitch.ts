@@ -87,7 +87,7 @@ export async function executeDspKillAction(
         reallyExecuted: false,
         // Honest no-op: Marketr cannot pause this buy — alerts only.
         honestReason:
-          `Marketr cannot pause this ${DSP_LABELS[adapter.kind]} buy: no agency seat connected. ` +
+          `ShapesOS cannot pause this ${DSP_LABELS[adapter.kind]} buy: no agency seat connected. ` +
           `The human must pause it in the DSP UI. Guidance: ${err.guidance}`,
       };
     }

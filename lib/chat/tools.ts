@@ -14,7 +14,7 @@
 // lib/chat/agent.ts holds them behind the confirmation gate.
 
 import { prisma } from "@/lib/prisma";
-import type { SiteSourceType, WorkspaceRole } from "@prisma/client";
+import type { WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
 import { getSeoProvider } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
@@ -25,8 +25,7 @@ import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { inferIntent } from "@/lib/keywords/intent";
 import { getLlmProviderFor } from "@/lib/llm";
-import { runAudit } from "@/lib/audit/audit";
-import { getSiteIdeProvider, siteIsMock } from "@/lib/connectors/source";
+import { auditProjectSite } from "@/lib/audit/project-audit";
 import { generateReport } from "@/lib/pdf/generate";
 import { approveAutopilotItem } from "@/lib/seo/autopilot-service";
 import { designQr, printLockQr, QrDesignerError } from "@/lib/studio/qr-designer";
@@ -37,6 +36,13 @@ import { OPS_TOOLS } from "./ops-tools";
 // Wave 2 context.dev slice 3: agent-facing research tool (spend-kind,
 // confirmation-gated, budget-gated before the vendor is hit).
 import { research_question } from "@/lib/knowledge/contextdev/research-tool";
+// Phase 4b: answers grounded in the tenant's published datasets.
+import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
+import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
+// Phase 7: OpenAI image generation (media group, spend, draft_image).
+import { generate_image } from "@/lib/images/tool";
+// Phase 5: tool groups (per-task tool grants).
+import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -53,12 +59,30 @@ export interface ToolContext {
    * lib/chat/connector-tools.ts reads this.
    */
   loadedSkills?: Set<string>;
+  /**
+   * Phase 5: the agent running this turn ("lead" or a sub-agent key) and the
+   * tool groups the task was granted (lib/agents/grants.ts). A missing grant
+   * means "no task grant" (legacy callers): the role checks alone apply.
+   */
+  agentKey?: AgentKey;
+  grant?: readonly ToolGroup[] | null;
+  /** Phase 5: the AgentRun this turn belongs to (timeline + Stop). */
+  runId?: string;
+  /** Phase 5: aborted when the run is stopped. */
+  signal?: AbortSignal;
 }
 
 export interface ToolResult {
   summary: string;
   details?: unknown;
 }
+
+/**
+ * Phase 8: a tool that appended its own (richer) run event sets
+ * details[TOOL_RECORDED_EVENT] = true; the loop's own tool_result event is
+ * then marked recorded (kept for the live stream, hidden from the timeline).
+ */
+export const TOOL_RECORDED_EVENT = "recordedRunEvent";
 
 export interface ToolArgSchema {
   type: string;
@@ -562,47 +586,51 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree.",
+    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
     type: "object",
     properties: {
       siteId: { type: "string", description: "Site id to audit (optional — defaults to the project's first auditable site)." },
+      // Phase 11 (seotools): live-URL crawl (lib/audit/live.ts).
+      live: { type: "boolean", description: "Crawl the live URLs instead of the site files (optional)." },
+      url: { type: "string", description: "Live crawl start URL (optional — defaults to the newest deployment or the project domain)." },
+      maxPages: { type: "number", description: "Live crawl page budget (optional, default 20, max 50)." },
+      renderJs: { type: "boolean", description: "Live crawl: render pages with headless Chromium in the code sandbox when one is available (optional)." },
     },
   },
   async execute(ctx, args) {
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
-    const CONTENT_ONLY: SiteSourceType[] = ["wordpress", "webflow"];
-    let site = str(args.siteId)
-      ? await prisma.site.findFirst({
-          where: { id: str(args.siteId), projectId: ctx.projectId },
-          include: { sftpConnection: true },
-        })
-      : await prisma.site.findFirst({
-          where: { projectId: ctx.projectId, sourceType: { notIn: CONTENT_ONLY } },
-          orderBy: { createdAt: "asc" },
-          include: { sftpConnection: true },
-        });
-    if (!site) throw new Error("No auditable site found in this project");
-    if (CONTENT_ONLY.includes(site.sourceType)) {
-      throw new Error("Audits scan site files — this site is a content-level source with no file tree");
+    // Phase 11 (seotools): live mode, optionally JS-rendered in the sandbox.
+    const live = args.live === true || args.live === "true" || !!str(args.url);
+    let renderer: import("@/lib/audit/live").PageRenderer | null = null;
+    if (live && (args.renderJs === true || args.renderJs === "true") && ctx.runId) {
+      try {
+        const { sandboxForRun } = await import("@/lib/sandbox");
+        const { sandboxChromiumRenderer } = await import("@/lib/audit/render-sandbox");
+        renderer = sandboxChromiumRenderer(await sandboxForRun(ctx));
+      } catch {
+        renderer = null; // no sandbox: static fetch, labelled in the crawl summary
+      }
     }
-    const useMock = siteIsMock(site as never);
-    const provider = useMock ? null : await getSiteIdeProvider(site as never);
-    const result = await runAudit({
-      siteId: site.id,
+    // Phase 6: shared with the MCP run_seo_audit tool (lib/audit/project-audit).
+    const { site, mock: useMock, result } = await auditProjectSite({
       projectId: ctx.projectId,
-      siteName: site.name,
-      provider,
-      mock: useMock,
+      siteId: str(args.siteId) || null,
+      live: live ? { url: str(args.url) ?? null, maxPages: Math.min(Math.max(1, num(args.maxPages) ?? 20), 50), renderer } : null,
     });
+    const crawl = (result.audit as { crawl?: { pagesCrawled?: number; rendering?: string; renderingNote?: string } | null }).crawl ?? null;
     return {
-      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
+      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}${crawl ? ` (live crawl of ${crawl.pagesCrawled} page${crawl.pagesCrawled === 1 ? "" : "s"}, ${crawl.rendering} rendering)` : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
       details: {
         auditId: result.audit.id,
         issueCount: result.issues.length,
         mock: useMock,
+        mode: live ? "live" : "files",
+        crawl,
+        // Phase 11: Core Web Vitals (PageSpeed Insights) or { unavailable, reason }.
+        vitals: (result.audit as { vitals?: unknown }).vitals ?? null,
         topIssues: result.issues.slice(0, 10).map((i) => ({
           category: i.category,
           severity: i.severity,
@@ -885,7 +913,7 @@ const trigger_automation_flow: ToolDef = {
     const flowId = str(args.flowId);
     if (!flowId) throw new Error("flowId is required");
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
-    const { isActivepiecesConfigured, triggerFlow } = await import("@/lib/integrations/activepieces");
+    const { isActivepiecesConfigured, workspaceFlows } = await import("@/lib/integrations/activepieces");
     if (!isActivepiecesConfigured()) {
       throw new Error(
         "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers). No flow was triggered.",
@@ -903,7 +931,8 @@ const trigger_automation_flow: ToolDef = {
         throw new Error(`payload must be valid JSON: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    const result = await triggerFlow(flowId, payload);
+    // Only flows bound to this workspace can fire (H6).
+    const result = await workspaceFlows(ctx.workspaceId).trigger(flowId, payload);
     // Ledger the trigger (0-credit visibility event, brandfetch precedent).
     await meter({
       workspaceId: ctx.workspaceId,
@@ -935,17 +964,18 @@ const automation_flow_status: ToolDef = {
     },
   },
   async execute(ctx, args) {
-    void ctx;
     const runId = str(args.runId);
     const flowId = str(args.flowId);
     if (!runId && !flowId) throw new Error("runId or flowId is required");
-    const { isActivepiecesConfigured, getFlowRun, latestFlowRun } = await import("@/lib/integrations/activepieces");
+    const { isActivepiecesConfigured, workspaceFlows } = await import("@/lib/integrations/activepieces");
     if (!isActivepiecesConfigured()) {
       throw new Error(
         "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers).",
       );
     }
-    const run = runId ? await getFlowRun(runId) : await latestFlowRun(flowId as string);
+    // Runs/flows outside this workspace read as not found (H6).
+    const flows = workspaceFlows(ctx.workspaceId);
+    const run = runId ? await flows.run(runId) : await flows.latestRun(flowId as string);
     if (!run) {
       return { summary: `No runs recorded for flow "${flowId}" yet.`, details: { run: null } };
     }
@@ -953,6 +983,38 @@ const automation_flow_status: ToolDef = {
     return {
       summary: `Run ${run.id}: ${state}${run.failure?.errorMessage ? ` — ${run.failure.errorMessage}` : ""}`,
       details: { run },
+    };
+  },
+};
+
+// Phase 4b (Dataset Builder slice 4 "Activate"): the OS RAG layer. Answers
+// only from datasets the tenant published to RAG + Feed, with citations;
+// refuses to guess when nothing matches.
+const ask_business_data: ToolDef = {
+  name: "ask_business_data",
+  description:
+    "Answer a question about the business (FAQs, products, policies, SOPs, company facts, pricing) strictly from the datasets this workspace published to RAG + Feed. Returns the best-matching passage plus Source → Document → Chunk citations; says so when nothing matches. Use it before answering factual questions about the tenant's own business.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The question, in the user's words." },
+    },
+    required: ["question"],
+  },
+  async execute(ctx, args) {
+    const question = str(args.question);
+    if (!question) return { summary: "A question is required." };
+    const store = new PrismaDatasetBuilderStore(prisma);
+    const res = await askPublishedDatasets(store, ctx.workspaceId, question.slice(0, 2000));
+    if (!res.grounded) return { summary: res.answer, details: { searched: res.searched } };
+    const cites = res.citations
+      .map((c) => `${c.datasetLabel} v${c.datasetVersion}: ${c.sourceName} → ${c.documentName}`)
+      .join("; ");
+    return {
+      summary: `${res.answer.slice(0, 600)}${res.answer.length > 600 ? "…" : ""} (sources: ${cites})`,
+      details: res,
     };
   },
 };
@@ -977,18 +1039,308 @@ export const TOOLS: ToolDef[] = [
   automation_flow_status,
   // Wave 2 context.dev slice 3: research a question (spend-kind).
   research_question,
+  // Phase 4b: grounded answers from published datasets.
+  ask_business_data,
+  // Phase 7: images from OpenAI's image model, saved as workspace files.
+  generate_image,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
-  return TOOLS.find((t) => t.name === name);
+  return TOOLS.find((t) => t.name === name) ?? EXTRA_TOOLS.get(name);
 }
 
-/** One-line safety legend for the agent system prompt. */
-export function toolCatalogForPrompt(): string {
-  return TOOLS.map((t) => {
+// ---------------------------------------------------------------------------
+// Phase 5: tool groups + automation actions.
+//
+// Every tool belongs to exactly one group (what a task's grant is made of)
+// and every non-safe tool names the automation action it stands for (what a
+// per-agent auto-approve rule is keyed by; lib/automation/policy.ts). Kept
+// as one table so a new tool can't silently skip either — the tools test
+// asserts every registered tool has a group.
+// ---------------------------------------------------------------------------
+
+export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
+  get_keywords: "workspace",
+  get_rankings: "workspace",
+  get_competitors: "workspace",
+  get_content: "workspace",
+  get_alerts: "workspace",
+  get_visibility_score: "workspace",
+  get_workflows: "workspace",
+  load_skill: "workspace",
+  ask_business_data: "workspace",
+  automation_flow_status: "workspace",
+  research_keywords: "web",
+  research_question: "web",
+  create_content_draft: "content",
+  create_report: "content",
+  design_qr_code: "content",
+  generate_image: "media",
+  run_seo_audit: "site",
+  run_workflow: "automation",
+  approve_autopilot_item: "automation",
+  trigger_automation_flow: "automation",
+  ops_operations_summary: "workspace",
+  ops_list_invoices: "workspace",
+  ops_list_products: "workspace",
+  ops_list_purchase_orders: "workspace",
+  ops_list_projects: "workspace",
+  ops_list_team: "workspace",
+  ops_list_workflow_runs: "workspace",
+  ops_draft_invoice: "ops",
+  ops_draft_purchase_order: "ops",
+  ops_create_project: "ops",
+  ops_request_leave: "ops",
+  ops_send_invoice: "ops",
+  ops_mark_invoice_paid: "ops",
+  ops_approve_leave: "ops",
+  ops_launch_workflow: "ops",
+  // Phase 10 (finance): reports are reads; the rest are ops writes.
+  ops_accounting_report: "workspace",
+  ops_draft_quote: "ops",
+  ops_convert_quote: "ops",
+  ops_record_payment: "ops",
+  ops_draft_vendor_bill: "ops",
+  ops_submit_expense_claim: "ops",
+  ops_post_journal_entry: "ops",
+  // Phase 10 (ops-core): reads are workspace, writes are ops.
+  ops_list_contacts: "workspace",
+  ops_list_companies: "workspace",
+  ops_list_deals: "workspace",
+  ops_list_tickets: "workspace",
+  ops_list_stock_by_location: "workspace",
+  ops_create_contact: "ops",
+  ops_create_company: "ops",
+  ops_create_deal: "ops",
+  ops_move_deal_stage: "ops",
+  ops_convert_lead: "ops",
+  ops_create_task: "ops",
+  ops_log_time: "ops",
+  ops_create_ticket: "ops",
+  ops_reply_ticket: "ops",
+  ops_close_ticket: "ops",
+  ops_create_transfer: "ops",
+  ops_set_reorder_rule: "ops",
+  // Phase 10 (store): the overview is a read; listing products is an ops write.
+  ops_store_overview: "workspace",
+  ops_store_list_product: "ops",
+  // Phase 12 (mfgpos): reads are workspace, writes are ops.
+  ops_list_manufacturing_orders: "workspace",
+  ops_pos_overview: "workspace",
+  ops_create_manufacturing_order: "ops",
+  ops_confirm_manufacturing_order: "ops",
+  ops_log_work_time: "ops",
+  ops_complete_manufacturing_order: "ops",
+  ops_close_pos_session: "ops",
+  // Phase 12 (people): payroll + events (reads are workspace, writes ops).
+  ops_payroll_overview: "workspace",
+  ops_payroll_draft_run: "ops",
+  ops_payroll_request_approval: "ops",
+  ops_payroll_request_posting: "ops",
+  ops_events_overview: "workspace",
+  ops_events_create_event: "ops",
+  ops_events_register: "ops",
+  // Phase 13 (twincore): digital twin — reads are workspace, writes are ops.
+  twin_site_state: "workspace",
+  twin_find: "workspace",
+  twin_book_dock: "ops",
+  twin_assign_equipment: "ops",
+  twin_draft_layout: "ops",
+  delegate_to_subagent: "delegate",
+  // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
+  // that leaves the sandbox is "ship" (lib/ship/tools.ts).
+  git_clone: "code",
+  git_status: "code",
+  git_diff: "code",
+  git_commit: "code",
+  git_push_branch: "ship",
+  open_pull_request: "ship",
+  read_pr_feedback: "ship",
+  // Phase 8: recorded browser tools (lib/agents/runs/browser-tools.ts).
+  browser_open: "web",
+  browser_extract: "web",
+  browser_act: "web",
+  // Phase 8: code tools, registered by lib/sandbox/tools.ts (run in the
+  // agent run's sandbox, never on the host).
+  read_file: "code",
+  glob: "code",
+  grep: "code",
+  write_file: "code",
+  edit_file: "code",
+  bash: "code",
+  run_tests: "code",
+  // Phase 9 (sites): SiteBuilder sites edited in the sandbox
+  // (lib/sites/tools.ts). Drafts only — applying and deploying stay human.
+  site_checkout: "site",
+  site_publish_draft: "site",
+  // Phase 9 (repos): lint / typecheck / test / build from the repo profile.
+  run_checks: "code",
+  // Phase 9 (apps): mini-app tools, registered by lib/apps/tools.ts. Reads
+  // are workspace; writes are ops (same split as the ops tools).
+  app_list_records: "workspace",
+  app_create_spec: "ops",
+  app_upsert_record: "ops",
+  app_delete_record: "ops",
+  // Phase 11 (seotools): structured data for sites (lib/seo/tools.ts) —
+  // drafts only, applying and deploying stay human.
+  add_structured_data: "site",
+  validate_structured_data: "site",
+  submit_sitemap: "site",
+  // Phase 11 (seotools): document output (lib/documents/tools.ts).
+  create_document: "content",
+  create_spreadsheet: "content",
+  // Phase 11 (seotools): data analysis code in the run's sandbox
+  // (lib/sandbox/analyze-tool.ts) — off with the rest of "code" when no sandbox.
+  analyze_data: "code",
+  // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
+  web_scrape: "web",
+  web_crawl: "web",
+};
+
+/**
+ * The automation action each non-safe tool stands for. Tier-0 kinds (draft_,
+ * audit_, report_, search_) may be switched to auto per agent; everything
+ * else here evaluates Tier 2+ in lib/orchestrator/authority.ts and so always
+ * asks, whatever a rule says.
+ */
+export const TOOL_ACTION: Readonly<Record<string, string>> = {
+  research_keywords: "search_keywords",
+  research_question: "search_web",
+  create_content_draft: "draft_content",
+  create_report: "report_generate",
+  design_qr_code: "draft_qr_code",
+  generate_image: "draft_image",
+  run_seo_audit: "audit_site",
+  run_workflow: "run_workflow",
+  approve_autopilot_item: "approve_autopilot_item",
+  trigger_automation_flow: "trigger_automation_flow",
+  ops_draft_invoice: "draft_invoice",
+  ops_draft_purchase_order: "draft_purchase_order",
+  ops_create_project: "create_project",
+  ops_request_leave: "request_leave",
+  ops_send_invoice: "send_invoice",
+  ops_mark_invoice_paid: "mark_invoice_paid",
+  ops_approve_leave: "approve_leave",
+  ops_launch_workflow: "launch_workflow",
+  // Phase 10 (finance): drafts are Tier 0; converting and submitting are
+  // Tier 2; recording payments and posting journal entries are Tier 3
+  // (lib/orchestrator/authority.ts) — never automated.
+  ops_draft_quote: "draft_quote",
+  ops_convert_quote: "convert_quote",
+  ops_record_payment: "record_payment",
+  ops_draft_vendor_bill: "draft_vendor_bill",
+  ops_submit_expense_claim: "submit_expense_claim",
+  ops_post_journal_entry: "post_journal_entry",
+  // Phase 10 (ops-core): Tier 2 — always ask (lib/automation/actions.ts).
+  ops_create_contact: "write_crm_record",
+  ops_create_company: "write_crm_record",
+  ops_create_deal: "write_crm_record",
+  ops_move_deal_stage: "write_crm_record",
+  ops_convert_lead: "write_crm_record",
+  ops_create_task: "write_project_record",
+  ops_log_time: "write_project_record",
+  ops_create_ticket: "write_ticket",
+  ops_close_ticket: "write_ticket",
+  ops_reply_ticket: "send_ticket_reply",
+  ops_create_transfer: "move_stock",
+  ops_set_reorder_rule: "set_reorder_rule",
+  // Phase 10 (store): Tier 2 — always asks (lib/automation/actions.ts).
+  ops_store_list_product: "write_store_listing",
+  // Phase 12 (mfgpos): a draft MO is Tier 0; confirming and logging time are
+  // Tier 2 (always ask); completing an MO and closing a till session move
+  // stock and the books — Tier 3, never automated (lib/orchestrator/authority.ts).
+  ops_create_manufacturing_order: "draft_manufacturing_order",
+  ops_confirm_manufacturing_order: "confirm_manufacturing_order",
+  ops_log_work_time: "log_work_order_time",
+  ops_complete_manufacturing_order: "complete_manufacturing_order",
+  ops_close_pos_session: "close_pos_session",
+  // Phase 12 (people): drafting a pay run is Tier 0; approving and posting
+  // payroll are Tier 3 (never automated); event writes are Tier 2.
+  ops_payroll_draft_run: "draft_pay_run",
+  ops_payroll_request_approval: "approve_pay_run",
+  ops_payroll_request_posting: "post_pay_run",
+  ops_events_create_event: "write_event",
+  ops_events_register: "write_event",
+  // Phase 13 (twincore): booking a dock and giving a forklift a task are
+  // Tier 1 (internal site operations — an automation rule can let them run;
+  // without one they ask); drafting a layout is Tier 0 (publishing it is a
+  // person's gated step).
+  twin_book_dock: "book_dock",
+  twin_assign_equipment: "assign_equipment",
+  twin_draft_layout: "draft_site_layout",
+  // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
+  git_push_branch: "push_branch",
+  open_pull_request: "open_pr",
+  browser_act: "browser_act",
+  // Phase 8: sandbox edits are Tier 0 (local to an isolated, checkpointed
+  // sandbox — a per-agent auto rule may apply); commands are Tier 2 (ask).
+  write_file: "edit_sandbox_files",
+  edit_file: "edit_sandbox_files",
+  bash: "run_sandbox_command",
+  run_tests: "run_sandbox_command",
+  // Phase 9 (repos): runs repository code like run_tests — Tier 2, asks.
+  run_checks: "run_sandbox_command",
+  // Phase 9 (apps): drafting a spec is Tier 0 (a draft; publishing is a
+  // person's job); record writes are Tier 2 and deletes Tier 3 — both
+  // always ask (lib/automation/actions.ts).
+  app_create_spec: "draft_app_spec",
+  app_upsert_record: "write_app_record",
+  app_delete_record: "delete_app_record",
+  // Phase 11 (seotools): a site draft revision — Tier 0 (lib/automation/actions.ts).
+  add_structured_data: "draft_structured_data",
+  // Phase 11 (seotools): pinging search engines about your own site — the
+  // existing Tier 1 "refresh owned page" kind (asks unless automation is on).
+  submit_sitemap: "refresh_owned_page",
+  // Phase 11 (seotools): files saved to the workspace — Tier 0 drafts.
+  create_document: "draft_document",
+  create_spreadsheet: "draft_spreadsheet",
+  // Phase 11 (seotools): runs code in the sandbox — same tier as bash (asks).
+  analyze_data: "run_sandbox_command",
+  // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
+  web_scrape: "fetch_web_pages",
+  web_crawl: "fetch_web_pages",
+};
+
+/** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */
+export function toolGroup(name: string): ToolGroup {
+  return TOOL_GROUP[name] ?? "connectors";
+}
+
+/** The automation action a tool stands for (unknown = a Tier-2 kind that always asks). */
+export function toolAction(name: string): string {
+  return TOOL_ACTION[name] ?? `tool_${name}`;
+}
+
+/** Is this tool inside the task's grant? */
+export function toolGranted(name: string, grant: readonly string[] | null | undefined): boolean {
+  return isGroupGranted(grant, toolGroup(name));
+}
+
+/**
+ * Tools registered at runtime by the agent loop (delegate_to_subagent lives
+ * in lib/chat/agent.ts because it runs the loop itself). Same ToolDef
+ * contract, same gates.
+ */
+const EXTRA_TOOLS = new Map<string, ToolDef>();
+
+export function registerExtraTool(tool: ToolDef): void {
+  EXTRA_TOOLS.set(tool.name, tool);
+}
+
+export function allTools(): ToolDef[] {
+  return [...TOOLS, ...EXTRA_TOOLS.values()];
+}
+
+/**
+ * One-line safety legend for the agent system prompt. Phase 5: with a grant,
+ * only the tools inside it are listed — the model never sees the rest (and
+ * executeTool refuses them anyway).
+ */
+export function toolCatalogForPrompt(grant?: readonly string[] | null): string {
+  return allTools().filter((t) => toolGranted(t.name, grant)).map((t) => {
     const props = Object.entries(t.argsSchema.properties)
       .map(([k, v]) => `${k}: ${v.type}${t.argsSchema.required?.includes(k) ? " (required)" : ""} — ${v.description}`)
       .join("\n    ");

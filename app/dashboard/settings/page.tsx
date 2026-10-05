@@ -1,68 +1,19 @@
-// Marketr — workspace settings landing (Phase 13, A1).
-// This page kills the /dashboard/settings 404: the command-bar ⌥6 shortcut
-// and the dashboard's new-user "Connect data" CTA both land here.
-// It also unifies the two settings navs — the 16-tab SettingsNav island plus
-// the sidebar's separate Settings island (alert rules, brand kits) — into one
-// tab strip covering all 17 subpages, with a section index below.
+// ShapesOS — workspace settings index (Phase 13 A1; grouped in Phase 3).
+// Every settings page, grouped into six sections (components/settings/
+// settingsSections.ts — the same source as the SettingsNav tab strip).
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Bell,
-  Bot,
-  Brain,
-  Cloud,
-  FlaskConical,
-  Gauge,
-  Globe,
-  Lock,
-  Mail,
-  Palette,
-  PenLine,
-  Plug,
-  Scale,
-  ScrollText,
-  Shield,
-  SlidersHorizontal,
-  Terminal,
-  Users,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import SettingsNav from "@/components/settings/SettingsNav";
+import { SETTINGS_GROUPS } from "@/components/settings/settingsSections";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Settings — Marketr",
-  description: "Workspace settings: integrations, team, automation, and compliance.",
+  title: "Settings — ShapesOS",
+  description: "Workspace settings: members, billing, integrations, brand, and developer access.",
 };
-
-const SECTIONS: { href: string; label: string; description: string; icon: LucideIcon }[] = [
-  { href: "/dashboard/settings/skills", label: "Skills", description: "Install skills that teach Marketr how your team works.", icon: Wrench },
-  { href: "/dashboard/settings/connectors", label: "Connectors", description: "Connect data sources once; credentials live in the vault.", icon: Plug },
-  { href: "/dashboard/settings/mail", label: "Direct Mail", description: "Senders, postage, and mail defaults.", icon: Mail },
-  { href: "/dashboard/settings/media", label: "Media safety", description: "Spend guardrails, approvals, and kill switches.", icon: Shield },
-  { href: "/dashboard/settings/members", label: "Members", description: "Invite teammates and control what they can do.", icon: Users },
-  { href: "/dashboard/settings/providers", label: "Providers", description: "Which external providers Marketr is using.", icon: Cloud },
-  { href: "/dashboard/settings/governance", label: "Governance", description: "Retention and sharing defaults, inherited by every project.", icon: Scale },
-  { href: "/dashboard/settings/automation", label: "Automation", description: "What Marketr may do on its own, what asks first, and what never runs.", icon: Bot },
-  // Phase 13B: agent learning + company intelligence — the "what I've learned"
-  // surface, preference profile, and the five personas.
-  { href: "/dashboard/settings/agents", label: "Agents", description: "What Marketr's agents have learned — lessons, preferences, personas.", icon: Brain },
-  { href: "/dashboard/settings/experiments", label: "Experiments", description: "Feature flags and growth experiments.", icon: FlaskConical },
-  { href: "/dashboard/settings/signing", label: "Signing", description: "Document signing requests and status.", icon: PenLine },
-  { href: "/dashboard/settings/security", label: "Security", description: "Authentication, SSO, and secret-storage posture.", icon: Lock },
-  { href: "/dashboard/settings/notifications", label: "Notifications", description: "Workspace-wide notification defaults.", icon: Bell },
-  { href: "/dashboard/settings/defaults", label: "Defaults", description: "The baseline every project inherits: model, locale, tone.", icon: SlidersHorizontal },
-  { href: "/dashboard/settings/api-mcp", label: "API / MCP", description: "Expose this workspace to MCP clients.", icon: Terminal },
-  { href: "/dashboard/settings/audit", label: "Audit log", description: "Every consequential action, who did it, and when.", icon: ScrollText },
-  { href: "/dashboard/settings/usage", label: "Usage", description: "Credit usage this period, by action and by project.", icon: Gauge },
-  { href: "/dashboard/settings/alerts", label: "Alert rules", description: "Rules that watch for rank drops, AI Overview changes, and run completions.", icon: SlidersHorizontal },
-  { href: "/dashboard/settings/brand-kits", label: "Brand kits", description: "White-label identity for client reports — logo, colors, fonts, tone.", icon: Palette },
-  { href: "/dashboard/settings/white-label", label: "White-label", description: "Client-facing identity for public pages — logo, custom domain, and brand color.", icon: Globe },
-];
 
 export default async function SettingsLandingPage() {
   const user = await requireUser();
@@ -74,40 +25,41 @@ export default async function SettingsLandingPage() {
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <div>
           <h1 className="aos-heading">Settings</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
-            {workspace.name} — every workspace setting in one place. Pick a section below.
-          </p>
+          <p className="mt-0.5 text-sm text-muted">{workspace.name}: every workspace setting, by section.</p>
         </div>
         <SettingsNav />
-        <nav aria-label="All settings sections">
-          <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-            {SECTIONS.map((s) => {
-              const Icon = s.icon;
-              return (
-                <li key={s.href}>
-                  <Link
-                    href={s.href}
-                    className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-hover-paper"
-                  >
-                    <Icon
-                      size={16}
-                      className="mt-0.5 shrink-0 text-subtle transition-colors group-hover:text-ink"
-                      aria-hidden
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-[13.5px] font-medium text-ink transition-colors group-hover:text-ink">
-                        {s.label}
-                      </span>
-                      <span className="block text-[12.5px] leading-snug text-muted">
-                        {s.description}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <div className="flex flex-col gap-6">
+          {SETTINGS_GROUPS.map((group) => {
+            const GroupIcon = group.icon;
+            return (
+              <section key={group.id} aria-labelledby={`settings-${group.id}`}>
+                <h2 id={`settings-${group.id}`} className="aos-subheading flex items-center gap-2">
+                  <GroupIcon size={18} aria-hidden />
+                  {group.label}
+                </h2>
+                <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.pages.map((s) => {
+                    const Icon = s.icon;
+                    return (
+                      <li key={s.href}>
+                        <Link
+                          href={s.href}
+                          className="group flex items-start gap-3 rounded-sm px-3 py-2.5 transition-colors hover:bg-hover"
+                        >
+                          <Icon size={16} className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-ink" aria-hidden />
+                          <span className="min-w-0">
+                            <span className="block text-base font-semibold text-ink">{s.label}</span>
+                            <span className="block text-sm leading-snug text-muted">{s.description}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Pencil,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const inputCls =
   "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
@@ -122,7 +123,7 @@ export function PronunciationApp() {
   );
 
   const remove = useCallback(async (id: string) => {
-    if (!confirm("Remove this pronunciation entry?")) return;
+    if (!await confirmAction("Remove this pronunciation entry?")) return;
     await fetch(`/api/voice/pronunciation?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
@@ -180,7 +181,7 @@ export function PronunciationApp() {
         <input
           value={newTerm}
           onChange={(e) => setNewTerm(e.target.value)}
-          placeholder="Term (e.g. Marketr)"
+          placeholder="Term (e.g. ShapesOS)"
           className={inputCls}
         />
         <input

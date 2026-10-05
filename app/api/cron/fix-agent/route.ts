@@ -19,6 +19,7 @@ import { requireUser } from "@/lib/session";
 import { getSiteIdeProvider } from "@/lib/connectors/source";
 import { runScheduledFixes } from "@/lib/audit/runner";
 import { emitAlert } from "@/lib/alerts/evaluate";
+import { bearerMatches } from "@/lib/security/constant-time";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ function cronAuthorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET ?? "").trim();
   if (!secret) return false;
   const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
+  return bearerMatches(header, secret);
 }
 
 export async function POST(req: NextRequest) {

@@ -20,6 +20,7 @@ import {
 import { getV1App, isValidTier } from "@/lib/integrations/actions/risk";
 import { signOAuthState } from "@/lib/integrations/actions/oauth-state";
 import { refreshCatalogForConnection } from "@/lib/integrations/actions/discovery";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 export interface InitiateConnectResult {
   connectUrl: string;
@@ -38,7 +39,7 @@ function publicOrigin(): string {
 function requireV1App(appKey: string) {
   const app = getV1App(appKey);
   if (!app) {
-    throw new Error(
+    throw new BadRequestError(
       `Unknown app "${appKey}". v1 apps: gmail, google-sheets, slack, hubspot, notion.`,
     );
   }
@@ -92,7 +93,7 @@ export async function confirmConnection(opts: {
   scopes?: string[];
 }): Promise<{ id: string; status: string }> {
   requireV1App(opts.appKey);
-  if (!opts.connectedAccountId.trim()) throw new Error("connectedAccountId is required");
+  if (!opts.connectedAccountId.trim()) throw new BadRequestError("connectedAccountId is required");
   const row = await withWorkspaceScope(opts.workspaceId, async (tx) => {
     const row = await tx.composioConnection.upsert({
       where: {
@@ -116,7 +117,7 @@ export async function confirmConnection(opts: {
     return row;
   });
   // Phase 15 slice 1: seed/refresh the per-workspace tool catalog on connect
-  // finalize (fixture-backed until COMPOSIO_API_KEY is wired). Best-effort:
+  // finalize (live discovery with COMPOSIO_API_KEY, fixtures without). Best-effort:
   // a catalog miss must never break connection finalize.
   try {
     await refreshCatalogForConnection(opts.workspaceId, opts.appKey);
@@ -151,9 +152,9 @@ export async function listConnections(workspaceId: string) {
 export async function revokeConnection(workspaceId: string, id: string) {
   return withWorkspaceScope(workspaceId, async (tx) => {
     const existing = await tx.composioConnection.findFirst({ where: { id, workspaceId } });
-    if (!existing) throw new Error("Connection not found");
+    if (!existing) throw new NotFoundError("Connection not found");
     return tx.composioConnection.update({
-      where: { id },
+      where: { id, workspaceId },
       data: { status: "revoked", lastError: null },
       select: { id: true, status: true },
     });
@@ -172,7 +173,7 @@ export async function requireConnectedEntity(
       select: { composioEntityId: true },
     }),
   );
-  if (!row) throw new Error(`App "${appKey}" is not connected in this workspace.`);
+  if (!row) throw new ConflictError(`App "${appKey}" is not connected in this workspace.`);
   return row.composioEntityId;
 }
 
@@ -205,7 +206,7 @@ export async function setToolTierOverrides(
 ): Promise<Record<string, string>> {
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(overrides)) {
-    if (!isValidTier(v)) throw new Error(`Invalid tier "${v}" for tool "${k}"`);
+    if (!isValidTier(v)) throw new BadRequestError(`Invalid tier "${v}" for tool "${k}"`);
     clean[k.toUpperCase()] = v;
   }
   await withWorkspaceScope(workspaceId, (tx) =>

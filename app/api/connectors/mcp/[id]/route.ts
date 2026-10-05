@@ -9,6 +9,10 @@ import { requireUser } from "@/lib/session";
 import { requirePermission, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, badRequest, notFound } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
+import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z } from "@/lib/api/validate";
+import type { Prisma } from "@prisma/client";
+import { validateToolPolicies, type McpToolPolicy } from "@/lib/connectors/m21/mcp-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -51,4 +55,71 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     actorUserId: user.id,
   });
   return Response.json({ ok: true });
+}
+
+const PatchSchema = z.object({
+  workspaceId: z.string().trim().max(120).optional(),
+  readOnlyTools: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
+  // Phase 11 (conncore): { [tool]: { group, action } } (lib/connectors/m21/mcp-policy.ts).
+  toolPolicies: z.record(z.string(), z.object({ group: z.string(), action: z.string() })).optional(),
+});
+
+/**
+ * PATCH /api/connectors/mcp/[id]?workspaceId= { readOnlyTools: string[] }
+ * Admin allow-list of tools the agent may run WITHOUT confirmation (H5).
+ * Everything else on a custom MCP server is mutating (confirmation-gated)
+ * unless the server itself annotates it readOnlyHint. Audited.
+ */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const v = validateBody(PatchSchema, await readJsonBody(req));
+  if (!v.ok) return v.error;
+  const workspaceId = workspaceIdFrom(req, v.data);
+  if (!workspaceId) return badRequest("workspaceId is required");
+  if (!(await requirePermission(user.id, workspaceId, "connectors.connect"))) {
+    return forbidden("connectors.connect permission required.");
+  }
+  const connector = await prisma.connector.findFirst({ where: { id, workspaceId } });
+  if (!connector) return notFound("Connector not found");
+  if (connector.kind !== "mcp") return badRequest("Only custom MCP connectors have tool settings");
+
+  const prevConfig =
+    connector.config && typeof connector.config === "object" && !Array.isArray(connector.config)
+      ? (connector.config as Record<string, unknown>)
+      : {};
+  if (v.data.readOnlyTools === undefined && v.data.toolPolicies === undefined) {
+    return badRequest("Nothing to update — pass readOnlyTools or toolPolicies.");
+  }
+  const next: Record<string, unknown> = { ...prevConfig };
+  const changes: string[] = [];
+  let readOnlyTools: string[] | undefined;
+  if (v.data.readOnlyTools !== undefined) {
+    readOnlyTools = [...new Set(v.data.readOnlyTools)];
+    next.readOnlyTools = readOnlyTools;
+    changes.push(`read-only allow-list set to [${readOnlyTools.join(", ")}]`);
+  }
+  // Phase 11 (conncore): per-tool group + action (tier). Unmapped tools stay
+  // in "Connected apps" and always ask.
+  let toolPolicies: Record<string, McpToolPolicy> | undefined;
+  if (v.data.toolPolicies !== undefined) {
+    const checked = validateToolPolicies(v.data.toolPolicies);
+    if (!checked.ok) return badRequest(checked.error);
+    toolPolicies = checked.policies;
+    next.toolPolicies = toolPolicies;
+    changes.push(`tool groups/tiers set for ${Object.keys(toolPolicies).length} tool(s)`);
+  }
+  await prisma.connector.update({
+    where: { id: connector.id },
+    data: { config: next as Prisma.InputJsonValue },
+  });
+  await auditEvent({
+    projectId: null,
+    workspaceId,
+    action: "settings_workspace_updated",
+    summary: `MCP connector "${connector.displayName}": ${changes.join("; ")}`.slice(0, 500),
+    actorUserId: user.id,
+  });
+  return Response.json({ ok: true, ...(readOnlyTools ? { readOnlyTools } : {}), ...(toolPolicies ? { toolPolicies } : {}) });
 }

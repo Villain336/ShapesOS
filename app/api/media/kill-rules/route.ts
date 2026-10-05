@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       window: parsed.data.window,
       action: parsed.data.action,
       cooldownMinutes: parsed.data.cooldownMinutes,
-      enabled: true, // new rules ship enabled (SPEC-PHASE5.md §9.8)
+      enabled: true, // new rules ship enabled (docs/specs/SPEC-PHASE5.md §9.8)
     });
     await logMediaAudit(audit, {
       workspaceId: gate.workspaceId, actor: gate.userId,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Seed the default v1 rule pack (ships enabled per SPEC-PHASE5.md §9.8). */
+/** Seed the default v1 rule pack (ships enabled per docs/specs/SPEC-PHASE5.md §9.8). */
 export async function PUT(req: NextRequest) {
   const gate = await mediaGuard("editor");
   if (gate instanceof Response) return gate;

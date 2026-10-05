@@ -1,6 +1,6 @@
 // Marketr — Growth Memory (Phase 8 G3): shared types.
 //
-// Three stores, one retrieval contract (SPEC-PHASE8.md §2 G3):
+// Three stores, one retrieval contract (docs/specs/SPEC-PHASE8.md §2 G3):
 //   episodic  — memory_episodes  (what happened; immutable)
 //   semantic  — memory_facts     (distilled, bi-temporal; invalidate, never delete)
 //   procedural— memory_learnings (what worked / failed / when; the F3 sink schema)
@@ -86,6 +86,13 @@ export interface RecallOptions {
   alpha?: number;
   /** Skip the cross-encoder (used by the nDCG battery for ablations). */
   skipRerank?: boolean;
+  /**
+   * Memory-poisoning guard: leave out agent-INFERRED learnings (nightly
+   * consolidation lessons, origin agent_inferred) that no human has accepted
+   * yet. Every path that feeds recall into a model prompt sets this; the
+   * memory UI/API leaves it off so reviewers can see and accept them.
+   */
+  acceptedOnly?: boolean;
 }
 
 /** Provenance string rendered in UI / agent context packets. */

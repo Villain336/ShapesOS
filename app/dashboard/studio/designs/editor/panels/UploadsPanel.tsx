@@ -243,7 +243,7 @@ export function UploadsPanel() {
           <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
             Uploads go straight to your Cloudinary account with auto format and
             quality (f_auto,q_auto). Quota: 25 credits/month on Cloudinary&apos;s
-            free tier — metered by Cloudinary, not by Marketr.
+            free tier — metered by Cloudinary, not by ShapesOS.
           </p>
         ) : (
           <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">

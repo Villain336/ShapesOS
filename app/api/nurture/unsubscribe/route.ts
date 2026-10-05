@@ -17,7 +17,7 @@ function page(ok: boolean, leadName: string | null): Response {
     ? `<p>${leadName ? `<strong>${leadName}</strong>, you` : "You"} will no longer receive these messages. Changed your mind? Reply to any message to opt back in.</p>`
     : `<p>This unsubscribe link is invalid.</p>`;
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — Marketr</title></head>` +
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — ShapesOS</title></head>` +
       `<body style="font-family:Arial,Helvetica,sans-serif;background:#f8f7f4;margin:0;padding:48px 16px">` +
       `<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;text-align:center;border:1px solid #e7e5e4">` +
       `<h1 style="font-size:20px;color:#1c1917">${title}</h1>${body}</div></body></html>`,

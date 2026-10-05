@@ -196,7 +196,7 @@ export class PostGridProvider implements MailProvider {
             // Omit `from` entirely when unset — the client's type does not
             // accept `undefined` here.
             ...(creative.from ? { from: toPostGridContact(creative.from) as never } : {}),
-            html: creative.html ?? "<html><body>Marketr mail piece</body></html>",
+            html: creative.html ?? "<html><body>ShapesOS mail piece</body></html>",
             mergeVariables,
             metadata,
             // The client's letter payload type is strict; our contact shape
@@ -211,7 +211,7 @@ export class PostGridProvider implements MailProvider {
           {
             size: creative.size ?? "4x6",
             to: to as never,
-            frontHTML: creative.frontHtml ?? "<html><body>Marketr mail piece</body></html>",
+            frontHTML: creative.frontHtml ?? "<html><body>ShapesOS mail piece</body></html>",
             backHTML: creative.backHtml ?? "<html><body></body></html>",
             mergeVariables,
             metadata,

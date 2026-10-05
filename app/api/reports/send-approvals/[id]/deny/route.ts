@@ -2,10 +2,10 @@
 // POST /api/reports/send-approvals/[id]/deny  { note? }  (editor+)
 // Denials are never silent — the gate writes an audit entry.
 
-import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { denyReportSend } from "@/lib/reports/report-gate";
+import { scopedDb } from "@/lib/substrate/memory/rls";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
-    await denyReportSend(prisma, { workspaceId: workspace.id, id, actor: user.id, note: body.note });
+    await denyReportSend(scopedDb(workspace.id), { workspaceId: workspace.id, id, actor: user.id, note: body.note });
     return Response.json({ ok: true });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "Deny failed" }, { status: 400 });

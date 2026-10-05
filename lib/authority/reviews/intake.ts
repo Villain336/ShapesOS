@@ -1,6 +1,6 @@
 // Marketr — R1 review intake: Pub/Sub webhook handling + sentiment classification.
 //
-// SPEC-PHASE6.md §2/R1, §3/F2.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2.
 // Pipeline: signature-verified webhook payload → idempotency check →
 // sentiment classification (keyword heuristic + fake-LLM confirm) →
 // guardrails (./guardrails.ts) → draft (./drafts.ts, v1 drafts-only).
@@ -12,6 +12,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { ReviewSentiment, ReviewSource, ReviewIntakePayload, IntakeResult } from "./types";
 import { runGuardrails } from "./guardrails";
 import { generateDraft } from "./drafts";
+import { requireSecret } from "@/lib/env/secrets";
 
 const POSITIVE_KEYWORDS = [
   "excellent", "amazing", "outstanding", "wonderful", "fantastic", "love", "loved",
@@ -78,9 +79,7 @@ export function classifySentiment(text: string, rating: number): { sentiment: Re
 // ---------------------------------------------------------------------------
 
 export function webhookSecret(): string {
-  const s = (process.env.MARKETR_GBP_WEBHOOK_SECRET ?? "marketr-gbp-webhook-dev-secret").trim();
-  if (!s) throw new Error("MARKETR_GBP_WEBHOOK_SECRET must not be empty.");
-  return s;
+  return requireSecret("MARKETR_GBP_WEBHOOK_SECRET", "marketr-gbp-webhook-dev-secret");
 }
 
 /** HMAC-SHA256 signature of the raw body. The route compares this to the header. */

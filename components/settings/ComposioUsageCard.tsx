@@ -107,8 +107,8 @@ export default function ComposioUsageCard({ workspaceId }: { workspaceId: string
             <span className="aos-shape aos-shape--needs aos-shape--edged mt-1" role="img" aria-label="Needs attention" />
             <p>
               {budget.over
-                ? "Free tier exceeded: further calls bill to Marketr's hosted Composio key until the month resets. Consider throttling automations."
-                : "Past 80% of the hosted free tier: calls keep working, but overage bills to Marketr's hosted Composio key. New executions carry a warning in the audit log."}
+                ? "Free tier exceeded: further calls bill to ShapesOS's hosted Composio key until the month resets. Consider throttling automations."
+                : "Past 80% of the hosted free tier: calls keep working, but overage bills to ShapesOS's hosted Composio key. New executions carry a warning in the audit log."}
             </p>
           </div>
         )}

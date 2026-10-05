@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M1: kill switches (SPEC-PHASE9.md §3.5).
+// Marketr — Phase 9 M1: kill switches (docs/specs/SPEC-PHASE9.md §3.5).
 //
 // Three levels, checked by every executor entry point BEFORE anything acts:
 //   1. pauseMission   — per-mission pause; running loops must check status.
@@ -83,7 +83,7 @@ export async function pauseMission(
       throw new KillSwitchError(`Cannot pause mission in status "${found.status}".`);
     }
     await tx.mission.update({
-      where: { id: missionId },
+      where: { id: missionId, workspaceId },
       data: { status: "paused" },
     });
     return found;
@@ -137,7 +137,7 @@ export async function resumeMission(
   }
   await withWorkspaceScope(workspaceId, async (tx) => {
     await tx.mission.update({
-      where: { id: missionId },
+      where: { id: missionId, workspaceId },
       data: { status: "active" },
     });
   });
@@ -220,11 +220,11 @@ export async function globalHalt(actor = "killswitch", reason?: string): Promise
   for (const ws of workspaces) {
     const res = await withWorkspaceScope(ws.id, async (tx) => {
       const targets = await tx.mission.findMany({
-        where: { status: "active" },
+        where: { workspaceId: ws.id, status: "active" },
         select: { id: true },
       });
       for (const t of targets) {
-        await tx.mission.update({ where: { id: t.id }, data: { status: "paused" } });
+        await tx.mission.update({ where: { id: t.id, workspaceId: ws.id }, data: { status: "paused" } });
       }
       return targets.length;
     });

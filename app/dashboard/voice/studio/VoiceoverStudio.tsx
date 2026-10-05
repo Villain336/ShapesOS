@@ -25,6 +25,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const inputCls =
   "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
@@ -178,7 +179,7 @@ export function VoiceoverStudio() {
   }, [attachClip]);
 
   const remove = useCallback(async (jobId: string) => {
-    if (!confirm("Delete this voiceover job and its audio?")) return;
+    if (!await confirmAction("Delete this voiceover job and its audio?")) return;
     await fetch(`/api/voice/voiceovers/${jobId}`, { method: "DELETE" });
     setJobs((prev) => prev.filter((j) => j.id !== jobId));
   }, []);

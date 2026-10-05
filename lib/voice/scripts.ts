@@ -14,6 +14,7 @@
 
 import { Prisma, type CallScript } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 const json = (v: unknown): Prisma.InputJsonValue => v as Prisma.InputJsonValue;
 
@@ -144,9 +145,9 @@ export async function createDraftScript(
   workspaceId: string,
   input: { agentId: string; name: string; body: ScriptBody },
 ): Promise<CallScript> {
-  if (!input.name.trim()) throw new Error("Script name is required.");
+  if (!input.name.trim()) throw new BadRequestError("Script name is required.");
   if (!toScriptBody(input.body).opening.trim())
-    throw new Error("Script opening is required.");
+    throw new BadRequestError("Script opening is required.");
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.create({
       data: {
@@ -169,12 +170,12 @@ export async function updateDraftScript(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.findFirst({ where: { id: scriptId, workspaceId } }),
   );
-  if (!current) throw new Error("Script not found.");
+  if (!current) throw new NotFoundError("Script not found.");
   if (current.status !== "draft")
-    throw new Error("Only draft scripts can be edited — create a new version instead.");
+    throw new ConflictError("Only draft scripts can be edited — create a new version instead.");
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.body !== undefined ? { body: json(toScriptBody(patch.body)) } : {}),
@@ -191,12 +192,12 @@ export async function submitForReview(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.findFirst({ where: { id: scriptId, workspaceId } }),
   );
-  if (!current) throw new Error("Script not found.");
+  if (!current) throw new NotFoundError("Script not found.");
   if (current.status !== "draft" && current.status !== "rejected")
-    throw new Error(`Cannot submit a ${current.status} script for review.`);
+    throw new ConflictError(`Cannot submit a ${current.status} script for review.`);
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "in_review" },
     }),
   );
@@ -213,16 +214,16 @@ export async function approveScript(
   scriptId: string,
   approvedBy: string,
 ): Promise<CallScript> {
-  if (!approvedBy.trim()) throw new Error("approvedBy (human reviewer) is required.");
+  if (!approvedBy.trim()) throw new BadRequestError("approvedBy (human reviewer) is required.");
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.findFirst({ where: { id: scriptId, workspaceId } }),
   );
-  if (!current) throw new Error("Script not found.");
+  if (!current) throw new NotFoundError("Script not found.");
   if (current.status !== "in_review" && current.status !== "draft")
-    throw new Error(`Cannot approve a ${current.status} script.`);
+    throw new ConflictError(`Cannot approve a ${current.status} script.`);
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: {
         status: "approved",
         approvedBy: approvedBy.trim(),
@@ -240,13 +241,13 @@ export async function rejectScript(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.findFirst({ where: { id: scriptId, workspaceId } }),
   );
-  if (!current) throw new Error("Script not found.");
+  if (!current) throw new NotFoundError("Script not found.");
   if (current.status !== "in_review" && current.status !== "draft")
-    throw new Error(`Cannot reject a ${current.status} script.`);
+    throw new ConflictError(`Cannot reject a ${current.status} script.`);
   void reason;
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "rejected", approvedBy: null, approvedAt: null },
     }),
   );
@@ -265,11 +266,11 @@ export async function newScriptVersion(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.findFirst({ where: { id: scriptId, workspaceId } }),
   );
-  if (!current) throw new Error("Script not found.");
+  if (!current) throw new NotFoundError("Script not found.");
   return withWorkspaceScope(workspaceId, async (tx) => {
     // Already inside the scope transaction — no nested $transaction.
     await tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "archived" },
     });
     return tx.callScript.create({

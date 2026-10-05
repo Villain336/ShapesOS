@@ -61,10 +61,11 @@ function stubStores() {
       proposals.set(p.id, p);
       return p;
     },
-    async get(id) {
-      return proposals.get(id) ?? null;
+    async get(id, ws) {
+      const p = proposals.get(id);
+      return p && p.workspaceId === ws ? p : null;
     },
-    async setStatus(id, status: SpendProposalStatus, decidedBy?: string) {
+    async setStatus(id, _ws: string, status: SpendProposalStatus, decidedBy?: string) {
       const p = proposals.get(id);
       if (!p) throw new Error("missing proposal");
       const next = {
@@ -90,8 +91,9 @@ function stubStores() {
       approvals.set(input.proposalId, a);
       return a;
     },
-    async getByProposalId(proposalId) {
-      return approvals.get(proposalId) ?? null;
+    async getByProposalId(proposalId, ws) {
+      const a = approvals.get(proposalId);
+      return a && a.workspaceId === ws ? a : null;
     },
   };
   return { proposals, approvals, proposalStore, approvalStore };
@@ -150,7 +152,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
 
   it("refuses a rejected proposal", async () => {
     const p = await pendingLaunch(ctx);
-    await rejectSpendAction(ctx.proposalStore, p.id, ACTOR);
+    await rejectSpendAction(ctx.proposalStore, WS, p.id, ACTOR);
     const { executed, error } = await tryExecute(ctx, p.id, PAYLOAD);
     assert.equal(executed, false);
     assert.equal(gateCode(error), "NOT_APPROVED");
@@ -158,7 +160,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
 
   it("refuses when the execution payload differs from the approved scope (TOCTOU)", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     // "Approve $500, execute $50,000" — different payload, different hash.
     const tampered = { ...PAYLOAD, budgetCents: 5_000_000 };
     const { executed, error } = await tryExecute(ctx, p.id, tampered);
@@ -170,7 +172,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
     // Simulates a corrupted/rolled-back approval store: proposal flipped to
     // approved without a SpendApproval row ever being minted.
     const p = await pendingLaunch(ctx);
-    await ctx.proposalStore.setStatus(p.id, "approved", ACTOR);
+    await ctx.proposalStore.setStatus(p.id, WS, "approved", ACTOR);
     const { executed, error } = await tryExecute(ctx, p.id, PAYLOAD);
     assert.equal(executed, false);
     assert.equal(gateCode(error), "APPROVAL_MISSING");
@@ -178,7 +180,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
 
   it("refuses replay: an already-executed proposal cannot execute twice", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     const first = await tryExecute(ctx, p.id, PAYLOAD);
     assert.equal(first.executed, true, "first execution runs");
     assert.equal(first.error, null);
@@ -189,7 +191,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
 
   it("refuses an expired proposal even with a valid approval", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     // Age the proposal past expiry.
     const stored = ctx.proposals.get(p.id)!;
     ctx.proposals.set(p.id, { ...stored, expiresAt: new Date(Date.now() - 1000) });
@@ -200,7 +202,7 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
 
   it("refuses a workspace-mismatched execution", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     let executed = false;
     await assert.rejects(
       () =>
@@ -212,23 +214,57 @@ describe("spend gate negatives — no execution path without SpendApproval", () 
             executed = true;
           },
         ),
-      (e: unknown) => e instanceof AdsGateError && e.code === "WORKSPACE_MISMATCH",
+      // The workspace-scoped store hides the foreign proposal entirely.
+      (e: unknown) =>
+        e instanceof AdsGateError && (e.code === "PROPOSAL_NOT_FOUND" || e.code === "WORKSPACE_MISMATCH"),
     );
     assert.equal(executed, false);
   });
 
+  it("refuses to approve or reject another workspace's proposal (H2)", async () => {
+    const p = await pendingLaunch(ctx);
+    await assert.rejects(
+      () => approveSpendAction(ctx.proposalStore, ctx.approvalStore, "ws_attacker", p.id, "user_attacker"),
+      (e: unknown) => e instanceof AdsGateError && e.code === "PROPOSAL_NOT_FOUND",
+    );
+    await assert.rejects(
+      () => rejectSpendAction(ctx.proposalStore, "ws_attacker", p.id, "user_attacker"),
+      (e: unknown) => e instanceof AdsGateError && e.code === "PROPOSAL_NOT_FOUND",
+    );
+    const stored = ctx.proposals.get(p.id)!;
+    assert.equal(stored.status, "pending", "victim proposal untouched");
+    assert.equal(stored.decidedBy, null);
+  });
+
+  it("refuses a foreign proposal even when a store ignores workspaceId (defense in depth)", async () => {
+    const p = await pendingLaunch(ctx);
+    const leaky: SpendProposalStore = {
+      ...ctx.proposalStore,
+      get: async (id) => ctx.proposals.get(id) ?? null,
+    };
+    await assert.rejects(
+      () => approveSpendAction(leaky, ctx.approvalStore, "ws_attacker", p.id, "user_attacker"),
+      (e: unknown) => e instanceof AdsGateError && e.code === "PROPOSAL_NOT_FOUND",
+    );
+    await assert.rejects(
+      () => rejectSpendAction(leaky, "ws_attacker", p.id, "user_attacker"),
+      (e: unknown) => e instanceof AdsGateError && e.code === "PROPOSAL_NOT_FOUND",
+    );
+    assert.equal(ctx.proposals.get(p.id)!.status, "pending");
+  });
+
   it("refuses to approve an already-approved proposal (no double approvals)", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     await assert.rejects(
-      () => approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, "user_other"),
+      () => approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, "user_other"),
       (e: unknown) => e instanceof AdsGateError && e.code === "ALREADY_DECIDED",
     );
   });
 
   it("budget changes always mint a NEW proposal — never mutate in place", async () => {
     const p = await pendingLaunch(ctx);
-    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, p.id, ACTOR);
+    await approveSpendAction(ctx.proposalStore, ctx.approvalStore, WS, p.id, ACTOR);
     const budgetProposal = await proposeBudgetChange(ctx.proposalStore, {
       workspaceId: WS,
       targetType: "campaign",

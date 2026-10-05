@@ -8,16 +8,32 @@
 // the fleet acted.
 
 import type { NextRequest } from "next/server";
-import { requireUser } from "@/lib/session";
+import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireProjectRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import type { CompetitorChangeStatus, CompetitorChangeType } from "@prisma/client";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 const STATUSES: CompetitorChangeStatus[] = ["new", "reviewed", "actioned", "dismissed"];
+const CHANGE_TYPES: CompetitorChangeType[] = [
+  "page_added",
+  "page_removed",
+  "content_updated",
+  "metadata_updated",
+  "structure_changed",
+];
+
+const ChangesQuerySchema = z.object({
+  projectId: z.string().max(120).optional(),
+  watchId: z.string().max(120).optional(),
+  changeType: z.enum(CHANGE_TYPES as [CompetitorChangeType, ...CompetitorChangeType[]]).optional(),
+  status: z.enum(STATUSES as [CompetitorChangeStatus, ...CompetitorChangeStatus[]]).optional(),
+  q: z.string().max(500).optional(),
+  take: intQuery(50, 1, 200),
+});
 
 async function workspaceIdFor(userId: string, email?: string | null): Promise<string> {
-  const { getOrCreateWorkspace } = await import("@/lib/session");
   return (await getOrCreateWorkspace(userId, email ?? "")).id;
 }
 
@@ -25,13 +41,11 @@ export async function GET(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sp = req.nextUrl.searchParams;
-  const projectId = sp.get("projectId") ?? undefined;
-  const watchId = sp.get("watchId") ?? undefined;
-  const changeType = sp.get("changeType") ?? undefined;
-  const status = sp.get("status") ?? undefined;
-  const q = sp.get("q")?.trim() || undefined;
-  const take = Math.max(1, Math.min(Number(sp.get("take") ?? 50), 200));
+  // ?take=abc / ?take=1.5 / an unknown enum filter → 400, never a Prisma 500.
+  const query = parseQuery(ChangesQuerySchema, req.nextUrl.searchParams);
+  if (!query.ok) return query.error;
+  const { projectId, watchId, changeType, status, take } = query.data;
+  const q = query.data.q?.trim() || undefined;
 
   if (projectId && !(await requireProjectRole(user.id, projectId, "viewer"))) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -43,8 +57,8 @@ export async function GET(req: NextRequest) {
       where: {
         workspaceId,
         ...(watchId ? { watchId } : {}),
-        ...(changeType ? { changeType: changeType as CompetitorChangeType } : {}),
-        ...(status ? { status: status as CompetitorChangeStatus } : {}),
+        ...(changeType ? { changeType } : {}),
+        ...(status ? { status } : {}),
         ...(q ? { url: { contains: q, mode: "insensitive" } } : {}),
         ...(projectId ? { watch: { projectId } } : {}),
       },
@@ -94,7 +108,7 @@ export async function PATCH(req: NextRequest) {
     if (!existing) return null;
     if (!(await requireProjectRole(user.id, existing.watch.projectId, "editor"))) return "forbidden";
     return tx.competitorChange.update({
-      where: { id: body.id },
+      where: { id: body.id, workspaceId },
       data: { status: body.status as CompetitorChangeStatus },
       select: { id: true, status: true },
     });

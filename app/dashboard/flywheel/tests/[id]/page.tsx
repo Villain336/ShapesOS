@@ -54,7 +54,7 @@ import { TestLabActions } from "./_components/TestLabActions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Experiment — Test Lab — Marketr",
+  title: "Experiment — Test Lab — ShapesOS",
 };
 
 export default async function ExperimentDetailPage({ params }: { params: Promise<{ id: string }> }) {

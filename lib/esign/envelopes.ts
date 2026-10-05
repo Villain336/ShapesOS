@@ -6,8 +6,18 @@
 //   over the exact draft bytes the human reviewed. A changed draft invalidates
 //   the token, so no agent path can send a stale or altered document.
 // - void_envelope: requires a reason; sealed artifacts are never deleted.
-// - complete_envelope: webhook-driven ONLY. Nothing here marks an envelope
-//   complete on anything but the vendor's DOCUMENT_COMPLETED event.
+// - complete_envelope: vendor-driven ONLY (DOCUMENT_COMPLETED, or a refresh
+//   that reads the vendor's COMPLETED). Both go through completeEnvelope's
+//   guarded flip, so pipeline links fire exactly once.
+//
+// State-machine integrity (Phase 2 F):
+// - Status is monotonic: draft/error < sending < sent < partially-signed <
+//   terminal. Every status write is a guarded updateMany that only moves
+//   forward, so out-of-order webhooks or a stale refresh never regress it.
+// - voided / declined / expired are terminal: later events are ignored.
+// - send claims the draft (-> "sending") before any vendor call, so a double
+//   confirm creates one vendor envelope; a failed send lands in "error",
+//   which can be re-sent or voided.
 
 import { timingSafeEqual } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
@@ -214,6 +224,116 @@ function auditBodyHash(parts: Array<string | null | undefined>): string {
 }
 
 // ---------------------------------------------------------------------------
+// Status order — envelopes only ever move forward.
+// ---------------------------------------------------------------------------
+
+/** Transient claim status while a send is talking to the vendor. */
+export const SENDING_STATUS = "sending";
+/** A "sending" claim older than this is presumed abandoned (worker died). */
+export const SEND_CLAIM_STALE_MS = 10 * 60 * 1000;
+
+/** Final states. voided/declined/expired ignore every later vendor event. */
+export const TERMINAL_ENVELOPE_STATUSES = ["completed", "declined", "voided", "expired"] as const;
+
+const STATUS_RANK: Record<string, number> = {
+  draft: 0,
+  error: 0,
+  [SENDING_STATUS]: 1,
+  sent: 2,
+  "partially-signed": 3,
+  completed: 4,
+  declined: 4,
+  voided: 4,
+  expired: 4,
+};
+
+export function isTerminalEnvelopeStatus(status: string): boolean {
+  return (TERMINAL_ENVELOPE_STATUSES as readonly string[]).includes(status);
+}
+
+/** Statuses an envelope may move FROM to reach `next` (strictly lower rank). */
+export function statusesBelow(next: string): string[] {
+  const rank = STATUS_RANK[next];
+  if (rank === undefined) return [];
+  return Object.keys(STATUS_RANK).filter((s) => STATUS_RANK[s]! < rank);
+}
+
+/** Guarded forward move. True only for the caller whose write flipped it. */
+async function advanceStatus(db: EsignDb, id: string, next: EnvelopeStatus): Promise<boolean> {
+  const from = statusesBelow(next);
+  if (from.length === 0) return false;
+  const res = await db.esignEnvelope.updateMany({
+    where: { id, status: { in: from } },
+    data: { status: next },
+  });
+  return res.count === 1;
+}
+
+/**
+ * The one completion path (webhook DOCUMENT_COMPLETED and refresh). The
+ * flip to "completed" is a guarded updateMany; pipeline links fire only for
+ * the caller whose write flipped it, so duplicate / concurrent deliveries
+ * fire them once, and a voided/declined/expired envelope never completes.
+ */
+async function completeEnvelope(
+  db: EsignDb,
+  vendor: EsignVendor,
+  envelope: {
+    id: string;
+    workspaceId: string;
+    vendorRef: string | null;
+    sealedPdf?: Uint8Array | null;
+    contractType: string | null;
+    contractRef: string | null;
+    pipelineRef: unknown;
+  },
+): Promise<{ completed: boolean; sealedPdfFetched: boolean }> {
+  let sealed: { bytes: Uint8Array; hash: string } | null = null;
+  if (!envelope.sealedPdf && envelope.vendorRef) {
+    try {
+      sealed = await vendor.getSealedPdf(envelope.vendorRef);
+    } catch {
+      sealed = null; // Recovery retried on the next refresh; never blocks the status.
+    }
+  }
+  const sealedData = sealed
+    ? {
+        sealedPdf: Buffer.from(sealed.bytes),
+        sealedPdfHash: sealed.hash,
+        sealedPdfFetchedAt: new Date(),
+      }
+    : {};
+  const res = await db.esignEnvelope.updateMany({
+    where: { id: envelope.id, status: { in: statusesBelow("completed") } },
+    data: { status: "completed", vendorStatus: "COMPLETED", ...sealedData },
+  });
+  if (res.count === 1) {
+    // Pipeline links fire ONLY on the completion transition: the vendor
+    // sealed the document, so downstream objects (proposal->contract, SOW->
+    // invoice-draft, contract->executed) may react. Announced as subscribable
+    // internal events with a durable audit row the future legal/pipeline
+    // modules can replay — nothing here invents downstream records.
+    await firePipelineLinks(db, {
+      id: envelope.id,
+      workspaceId: envelope.workspaceId,
+      contractType: envelope.contractType,
+      contractRef: envelope.contractRef,
+      pipelineRef: envelope.pipelineRef,
+    });
+    return { completed: true, sealedPdfFetched: !!sealed };
+  }
+  // Already completed (duplicate delivery, or refresh got there first):
+  // only backfill a sealed PDF the first completion could not fetch.
+  if (sealed) {
+    await db.esignEnvelope.updateMany({
+      where: { id: envelope.id, status: "completed", sealedPdfHash: null },
+      data: sealedData,
+    });
+  }
+  return { completed: false, sealedPdfFetched: !!sealed };
+}
+
+// ---------------------------------------------------------------------------
 // create_envelope — light gate (workspace member+ enforced at the route).
 // ---------------------------------------------------------------------------
 
@@ -306,7 +426,12 @@ export async function sendEnvelope(
     include: { signers: { orderBy: { orderIndex: "asc" } }, fields: true },
   });
   if (!envelope) throw new EsignGateError("unknown_envelope", "Envelope not found.");
-  if (envelope.status !== "draft") {
+  // Sendable: a draft, an envelope whose earlier send failed ("error"), or a
+  // send claim abandoned long enough ago that its worker is gone.
+  const staleClaim =
+    envelope.status === SENDING_STATUS &&
+    envelope.updatedAt.getTime() < Date.now() - SEND_CLAIM_STALE_MS;
+  if (envelope.status !== "draft" && envelope.status !== "error" && !staleClaim) {
     throw new EsignGateError("not_draft", `Only drafts can be sent (status: ${envelope.status}).`);
   }
   const expected = buildSendToken(tokenBasisOf(envelope));
@@ -320,8 +445,20 @@ export async function sendEnvelope(
     throw new EsignGateError("invalid_input", "The draft has no document bytes to send.");
   }
 
+  // Claim the exact row version the token was checked against (status +
+  // updatedAt): of two concurrent confirms only one creates a vendor envelope.
+  const claim = await db.esignEnvelope.updateMany({
+    where: { id: envelope.id, status: envelope.status, updatedAt: envelope.updatedAt },
+    data: { status: SENDING_STATUS },
+  });
+  if (claim.count !== 1) {
+    throw new EsignGateError("not_draft", "This envelope is already being sent (or changed since review).");
+  }
+
+  let created: { vendorRef: string; vendorStatus: string } | null = null;
+  let lostClaim = false;
   try {
-    const created = await vendor.createEnvelope({
+    created = await vendor.createEnvelope({
       title: envelope.title,
       pdfBytes: new Uint8Array(envelope.sourcePdf),
       filename: envelope.documentName ?? "document.pdf",
@@ -332,7 +469,8 @@ export async function sendEnvelope(
       role: s.role as VendorSignerInput["role"],
       orderIndex: s.orderIndex,
     }));
-    await vendor.addSigners(created.vendorRef, vendorSigners);
+    const vendorRef = created.vendorRef;
+    await vendor.addSigners(vendorRef, vendorSigners);
     if (envelope.fields.length > 0) {
       const signerById = new Map(envelope.signers.map((s) => [s.id, s.email]));
       const vendorFields: VendorFieldInput[] = envelope.fields.map((f) => ({
@@ -345,18 +483,21 @@ export async function sendEnvelope(
         height: f.height,
         required: f.required,
       }));
-      await vendor.addFields(created.vendorRef, vendorFields);
+      await vendor.addFields(vendorRef, vendorFields);
     }
-    await vendor.sendEnvelope(created.vendorRef);
+    await vendor.sendEnvelope(vendorRef);
 
-    const updated = await db.esignEnvelope.update({
-      where: { id: envelope.id },
-      data: {
-        vendorRef: created.vendorRef,
-        vendorStatus: created.vendorStatus,
-        status: "sent",
-      },
+    // Only our own claim moves to "sent". Losing it means a stale-claim
+    // re-send took over — handled as a failure below (our vendor copy is voided).
+    const done = await db.esignEnvelope.updateMany({
+      where: { id: envelope.id, status: SENDING_STATUS },
+      data: { vendorRef, vendorStatus: created.vendorStatus, status: "sent" },
     });
+    if (done.count !== 1) {
+      lostClaim = true;
+      throw new EsignGateError("not_draft", "Another send took over this envelope.");
+    }
+    const updated = (await db.esignEnvelope.findFirst({ where: { id: envelope.id } }))!;
     await appendAuditEvent(db, {
       envelopeId: envelope.id,
       event: "sent",
@@ -371,17 +512,32 @@ export async function sendEnvelope(
     return updated;
   } catch (e) {
     const message = e instanceof Error ? e.message : "Vendor send failed.";
+    // A vendor envelope created before the failure would be orphaned (and
+    // could still be signed): void it, best-effort, and say so in the audit.
+    let orphanVoided: boolean | null = null;
+    if (created) {
+      try {
+        await vendor.voidEnvelope(created.vendorRef, "Send failed before completion; superseded.");
+        orphanVoided = true;
+      } catch {
+        orphanVoided = false;
+      }
+    }
     await appendAuditEvent(db, {
       envelopeId: envelope.id,
       event: "send_failed",
       actor: input.actor,
-      payload: { error: message },
+      payload: { error: message, orphanVendorRef: created?.vendorRef ?? null, orphanVoided },
       bodyHash: auditBodyHash(["send_failed", envelope.id, String(Date.now())]),
     });
-    await db.esignEnvelope.update({
-      where: { id: envelope.id },
-      data: { status: "error" },
-    });
+    // "error" is recoverable: it can be re-sent (same token) or voided.
+    // (A lost claim belongs to the other sender now — leave it alone.)
+    if (!lostClaim) {
+      await db.esignEnvelope.updateMany({
+        where: { id: envelope.id, status: SENDING_STATUS },
+        data: { status: "error" },
+      });
+    }
     if (e instanceof DocumensoApiError && e.status === 0) {
       throw new EsignGateError("vendor_not_configured", message);
     }
@@ -392,6 +548,10 @@ export async function sendEnvelope(
 // ---------------------------------------------------------------------------
 // void_envelope — voids with reason; the sealed artifact is never deleted.
 // ---------------------------------------------------------------------------
+
+/** "error" is voidable so a failed send is never a dead end. "sending" is
+ *  not: it is a seconds-long claim (a stale one can be re-sent). */
+const VOIDABLE_STATUSES = ["draft", "error", "sent", "partially-signed", "expired"];
 
 export async function voidEnvelope(
   db: EsignDb,
@@ -405,7 +565,7 @@ export async function voidEnvelope(
     where: { id: input.envelopeId, ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}) },
   });
   if (!envelope) throw new EsignGateError("unknown_envelope", "Envelope not found.");
-  if (!["draft", "sent", "partially-signed", "expired"].includes(envelope.status)) {
+  if (!VOIDABLE_STATUSES.includes(envelope.status)) {
     throw new EsignGateError(
       "not_voidable",
       `Envelope in status ${envelope.status} cannot be voided.`,
@@ -414,10 +574,15 @@ export async function voidEnvelope(
   if (envelope.vendorRef) {
     await vendor.voidEnvelope(envelope.vendorRef, input.reason.trim());
   }
-  const updated = await db.esignEnvelope.update({
-    where: { id: envelope.id },
+  // Guarded: a completion that landed meanwhile is never overwritten.
+  const res = await db.esignEnvelope.updateMany({
+    where: { id: envelope.id, status: { in: VOIDABLE_STATUSES } },
     data: { status: "voided", voidReason: input.reason.trim() },
   });
+  if (res.count !== 1) {
+    throw new EsignGateError("not_voidable", "The envelope changed state while voiding; reload it.");
+  }
+  const updated = (await db.esignEnvelope.findFirst({ where: { id: envelope.id } }))!;
   await appendAuditEvent(db, {
     envelopeId: envelope.id,
     event: "voided",
@@ -452,35 +617,28 @@ export async function refreshEnvelope(
       ? "partially-signed"
       : envelopeStatus;
 
-  let sealed: { bytes: Uint8Array; hash: string } | null = null;
-  if (next === "completed" && !envelope.sealedPdf) {
-    try {
-      sealed = await vendor.getSealedPdf(envelope.vendorRef);
-    } catch {
-      sealed = null; // Recovery retried on the next refresh; never blocks the status.
-    }
+  // Monotonic: a refresh only ever moves the status forward (a locally
+  // voided envelope the vendor still reports as sent stays voided; an
+  // unknown vendor state never overwrites a live one).
+  let moved = false;
+  let sealedPdfFetched = false;
+  if (next === "completed") {
+    const r = await completeEnvelope(db, vendor, envelope);
+    moved = r.completed;
+    sealedPdfFetched = r.sealedPdfFetched;
+  } else {
+    moved = await advanceStatus(db, envelope.id, next);
   }
-
   const updated = await db.esignEnvelope.update({
     where: { id: envelope.id },
-    data: {
-      vendorStatus,
-      status: next,
-      ...(sealed
-        ? {
-            sealedPdf: Buffer.from(sealed.bytes),
-            sealedPdfHash: sealed.hash,
-            sealedPdfFetchedAt: new Date(),
-          }
-        : {}),
-    },
+    data: { vendorStatus },
   });
-  if (next !== envelope.status) {
+  if (moved) {
     await appendAuditEvent(db, {
       envelopeId: envelope.id,
       event: `status:${next}`,
       actor: "system",
-      payload: { vendorStatus, sealedPdfFetched: !!sealed },
+      payload: { vendorStatus, sealedPdfFetched },
       bodyHash: auditBodyHash(["status", envelope.id, next, vendorStatus]),
     });
   }
@@ -524,6 +682,20 @@ export async function ingestDocumensoWebhook(
 
   const bodyHash = sha256Hex(input.rawBody);
 
+  // voided / declined / expired are final: a late (or replayed) vendor event
+  // is recorded for evidence and otherwise ignored — no signer writes, no
+  // completion, no pipeline links.
+  if (envelope.status !== "completed" && isTerminalEnvelopeStatus(envelope.status)) {
+    await appendAuditEvent(db, {
+      envelopeId: envelope.id,
+      event: `webhook:${parsed.event}`,
+      actor: "webhook:documenso",
+      payload: { documentId: parsed.documentId, ignored: "terminal_state", status: envelope.status },
+      bodyHash,
+    });
+    return { ok: true, ignored: "terminal_state" };
+  }
+
   // Signer-level updates from the payload's Recipient array (defensive).
   const raw = parsed.raw as { payload?: { Recipient?: unknown } };
   const recipients = Array.isArray(raw.payload?.Recipient) ? raw.payload!.Recipient as Array<{
@@ -531,6 +703,16 @@ export async function ingestDocumensoWebhook(
     signingStatus?: unknown;
     signedAt?: unknown;
   }> : [];
+  // Validate every signer date BEFORE any write: an unparseable signedAt is
+  // a malformed payload (400, not retried) — never a half-applied delivery.
+  const signedAtByEmail = new Map<string, Date>();
+  for (const r of recipients) {
+    if (typeof r.email !== "string" || r.signingStatus !== "SIGNED") continue;
+    if (r.signedAt === undefined || r.signedAt === null) continue;
+    const d = typeof r.signedAt === "string" ? new Date(r.signedAt) : null;
+    if (!d || Number.isNaN(d.getTime())) return { ok: false, reason: "bad_payload" };
+    signedAtByEmail.set(r.email.toLowerCase(), d);
+  }
   for (const r of recipients) {
     if (typeof r.email !== "string") continue;
     const signer = envelope.signers.find(
@@ -542,7 +724,7 @@ export async function ingestDocumensoWebhook(
         where: { id: signer.id },
         data: {
           status: "signed",
-          signedAt: typeof r.signedAt === "string" ? new Date(r.signedAt) : new Date(),
+          signedAt: signedAtByEmail.get(signer.email.toLowerCase()) ?? new Date(),
           identityEvidence: { signingStatus: r.signingStatus },
         },
       });
@@ -554,52 +736,13 @@ export async function ingestDocumensoWebhook(
   }
 
   // Envelope-level transition. COMPLETED additionally pulls the sealed PDF —
-  // the evidence that makes "completed" mean something.
+  // the evidence that makes "completed" mean something. Every other status
+  // only moves forward (a late DOCUMENT_SENT never undoes partially-signed).
   let sealedPdfFetched = false;
-  const wasCompleted = envelope.status === "completed";
   if (transition.envelopeStatus === "completed") {
-    try {
-      const sealed = await vendor.getSealedPdf(envelope.vendorRef!);
-      await db.esignEnvelope.update({
-        where: { id: envelope.id },
-        data: {
-          status: "completed",
-          vendorStatus: "COMPLETED",
-          sealedPdf: Buffer.from(sealed.bytes),
-          sealedPdfHash: sealed.hash,
-          sealedPdfFetchedAt: new Date(),
-        },
-      });
-      sealedPdfFetched = true;
-    } catch {
-      await db.esignEnvelope.update({
-        where: { id: envelope.id },
-        data: { status: "completed", vendorStatus: "COMPLETED" },
-      });
-    }
-    // Pipeline links fire ONLY on the first completion transition: the vendor
-    // sealed the document, so downstream objects (proposal→contract, SOW→
-    // invoice-draft, contract→executed) may react. Announced as subscribable
-    // internal events with a durable audit row the future legal/pipeline
-    // modules can replay — nothing here invents downstream records.
-    if (!wasCompleted) {
-      await firePipelineLinks(db, {
-        id: envelope.id,
-        workspaceId: envelope.workspaceId,
-        contractType: envelope.contractType,
-        contractRef: envelope.contractRef,
-        pipelineRef: envelope.pipelineRef,
-      });
-    }
+    sealedPdfFetched = (await completeEnvelope(db, vendor, envelope)).sealedPdfFetched;
   } else if (transition.envelopeStatus) {
-    // Never regress a terminal state: completed/voided/declined are final.
-    const terminal = ["completed", "voided", "declined"].includes(envelope.status);
-    if (!terminal) {
-      await db.esignEnvelope.update({
-        where: { id: envelope.id },
-        data: { status: transition.envelopeStatus },
-      });
-    }
+    await advanceStatus(db, envelope.id, transition.envelopeStatus);
   }
 
   const appended = await appendAuditEvent(db, {

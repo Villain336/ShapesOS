@@ -14,6 +14,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/calls/inbound";
 import type { ContactConsent } from "@prisma/client";
+import { requireSecret } from "@/lib/env/secrets";
 
 export type ConsentChannel = "sms" | "email" | "voice" | "mail";
 export type ConsentStatus = "unknown" | "pending" | "opted_in" | "opted_out";
@@ -155,7 +156,7 @@ export async function handleInboundSms(
 // ---------------------------------------------------------------------------
 
 function unsubscribeSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.MESSAGING_UNSUBSCRIBE_SECRET ?? "messaging-unsubscribe-dev-secret").trim();
+  return requireSecret("MESSAGING_UNSUBSCRIBE_SECRET", "messaging-unsubscribe-dev-secret", env);
 }
 
 function b64url(buf: Buffer): string {

@@ -21,6 +21,7 @@ import { createLeadRecord } from "@/lib/crm/leads";
 import { channelFor, logTouch } from "@/lib/attribution/touches";
 import { logActivity } from "@/lib/crm/dedup";
 import { queueBookingReminders } from "./reminders";
+import { isValidTimeZone, zonedParts as zonedWallParts, zonedTimeToUtc } from "@/lib/time/zoned";
 
 /** sha256 hex of a booking-page token (the token itself is never stored). */
 export function hashBookingToken(token: string): string {
@@ -54,7 +55,13 @@ export const WorkingHoursSchema = z
 export const BookingSettingsSchema = z.object({
   durationMin: z.number().int().min(5).max(480).default(30),
   bufferMin: z.number().int().min(0).max(120).default(10),
-  timezone: z.string().trim().min(1).max(64).default("America/New_York"),
+  timezone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .refine(isValidTimeZone, { message: "timezone must be an IANA name such as America/New_York" })
+    .default("America/New_York"),
   workingHours: WorkingHoursSchema,
 });
 
@@ -64,28 +71,8 @@ const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 /** Local parts of an instant in an IANA timezone. */
 export function zonedParts(d: Date, tz: string): { weekday: string; minutes: number; ymd: string } {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    weekday: "short",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
-  const wd = (parts.weekday ?? "Mon").toLowerCase().slice(0, 3);
-  const weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(wd) ? wd : "mon";
-  // en-US hour12:false renders midnight as "24" — normalize to 0 so the
-  // local-midnight derivation below doesn't land a day off.
-  let hour = Number(parts.hour ?? 0);
-  if (hour === 24) hour = 0;
-  return {
-    weekday,
-    minutes: hour * 60 + Number(parts.minute ?? 0),
-    ymd: `${parts.year}-${parts.month}-${parts.day}`,
-  };
+  const p = zonedWallParts(d, tz);
+  return { weekday: DAYS[p.weekday], minutes: p.minutes, ymd: p.ymd };
 }
 
 /**
@@ -137,29 +124,29 @@ export async function getAvailability(opts: {
   }));
 
   const slots: AvailabilitySlot[] = [];
-  // Walk day by day in the page's timezone. Anchor on local midnight and step
-  // to the next local midnight (+1 min) so DST transitions can't skip or
-  // repeat a day. A day is processed when its local midnight is before `to`
-  // (the cursor itself may already be past `to` while its local day isn't).
-  let cursor = new Date(from.getTime());
+  // Walk LOCAL calendar dates in the page's timezone (step by date, never by
+  // 24h of milliseconds) and convert each local slot start to an instant on
+  // its own, so DST days produce exactly the offered local slots: a slot
+  // whose local time doesn't exist (spring-forward gap) is skipped, and one
+  // that occurs twice (fall-back) is offered once, at its first occurrence.
+  const first = zonedWallParts(from, tz);
   for (let day = 0; day < 62; day++) {
-    const lp = zonedParts(cursor, tz);
-    // Find the UTC instant of local midnight: step back lp.minutes.
-    const localMidnightUtc = cursor.getTime() - lp.minutes * 60_000;
-    if (localMidnightUtc >= to.getTime()) break;
-    const hours = wh[lp.weekday as keyof typeof wh];
-    if (hours) {
-      const [open, close] = hours;
-      for (let m = open; m + settings.durationMin <= close; m += settings.durationMin) {
-        const s = localMidnightUtc + m * 60_000;
-        const e = s + settings.durationMin * 60_000;
-        if (s < from.getTime()) continue;
-        if (s >= to.getTime()) break;
-        const overlaps = busy.some((b) => s < b.e && e > b.s);
-        if (!overlaps) slots.push({ startAt: new Date(s).toISOString(), endAt: new Date(e).toISOString() });
-      }
+    const date = new Date(Date.UTC(first.year, first.month - 1, first.day + day));
+    const [y, mo, d] = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
+    if (zonedTimeToUtc(y, mo, d, 0, tz).date.getTime() >= to.getTime()) break;
+    const hours = wh[DAYS[date.getUTCDay()] as keyof typeof wh];
+    if (!hours) continue;
+    const [open, close] = hours;
+    for (let m = open; m + settings.durationMin <= close; m += settings.durationMin) {
+      const local = zonedTimeToUtc(y, mo, d, m, tz);
+      if (local.resolution === "gap") continue;
+      const s = local.date.getTime();
+      const e = s + settings.durationMin * 60_000;
+      if (s < from.getTime()) continue;
+      if (s >= to.getTime()) break;
+      const overlaps = busy.some((b) => s < b.e && e > b.s);
+      if (!overlaps) slots.push({ startAt: new Date(s).toISOString(), endAt: new Date(e).toISOString() });
     }
-    cursor = new Date(localMidnightUtc + 24 * 3600 * 1000 + 60_000);
   }
   return { slots, settings };
 }
@@ -208,12 +195,15 @@ export function isOfferedSlot(
   const wh = settings.workingHours ?? {
     mon: [540, 1020], tue: [540, 1020], wed: [540, 1020], thu: [540, 1020], fri: [540, 1020],
   };
-  const lp = zonedParts(startAt, settings.timezone);
-  const hours = wh[lp.weekday as keyof typeof wh];
+  const lp = zonedWallParts(startAt, settings.timezone);
+  const hours = wh[DAYS[lp.weekday] as keyof typeof wh];
   if (!hours) return false;
   const [open, close] = hours;
   const m = lp.minutes;
-  return m >= open && m + settings.durationMin <= close && (m - open) % settings.durationMin === 0;
+  if (!(m >= open && m + settings.durationMin <= close && (m - open) % settings.durationMin === 0)) return false;
+  // Must be the exact instant getAvailability offers for that local slot
+  // (whole minute; on a fall-back day, the first of the two 01:30s).
+  return zonedTimeToUtc(lp.year, lp.month, lp.day, m, settings.timezone).date.getTime() === startAt.getTime();
 }
 
 /**

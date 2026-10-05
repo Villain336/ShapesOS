@@ -3,6 +3,8 @@
 // Connection owner or admin+ (same gate as the refresh route — running a
 // check can trigger a silent token refresh, which is a sensitive action).
 // Audited (connector_health_checked). Rate-limited by the global proxy tiers.
+// Phase 4b: live-wired adapters also make one cheap provider call
+// (lib/connectors/m21/live/probe.ts) — the scheduled checker never does.
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +13,7 @@ import { getMembership, roleAtLeast, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, badRequest, notFound } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { checkConnection, serializeHealth } from "@/lib/connectors/health";
+import { probeConnection } from "@/lib/connectors/m21/live/probe";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return forbidden("Only the connection owner or an admin can run a health check.");
   }
 
-  const result = await checkConnection(id);
+  // Manual check: one cheap live call to the provider's fixed endpoint.
+  const result = await checkConnection(id, { liveCheck: probeConnection });
   if (!result) return notFound("Connection not found");
 
   await auditEvent({

@@ -62,7 +62,7 @@ export async function getVendorCredentials(workspaceId: string): Promise<VendorC
   const merged: VendorCredentials = envCredentials();
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.dataSource.findFirst({
-      where: { type: "serp_vendor", status: "active" },
+      where: { workspaceId, type: "serp_vendor", status: "active" },
       orderBy: { updatedAt: "desc" },
     }),
   );
@@ -110,7 +110,7 @@ export interface VendorConfigRow {
 
 export async function getVendorConfigs(workspaceId: string): Promise<VendorConfigRow[]> {
   const rows = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.serpVendorConfig.findMany({ orderBy: { vendor: "asc" } }),
+    tx.serpVendorConfig.findMany({ where: { workspaceId }, orderBy: { vendor: "asc" } }),
   );
   return rows.map((r) => ({
     vendor: r.vendor as SerpVendorId,

@@ -33,10 +33,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { claimRows } from "@/lib/jobs/claim";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getStorageAdapter } from "@/lib/filesystem/storage";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
+import type { ResolveFn } from "@/lib/safe-url";
 import { queueClipDraftToPostiz } from "@/app/api/clipper/_postiz-choke";
 
 const execFileAsync = promisify(execFile);
@@ -48,10 +50,6 @@ export interface WordTimedTranscript { words: TimedWord[]; text: string }
 export interface ClipCandidate {
   startSec: number; endSec: number; viralityScore: number;
   scoreReasons: unknown[]; hookText: string;
-}
-
-function escapeLiteral(s: string): string {
-  return s.replace(/'/g, "''");
 }
 
 // ── Storage + temp helpers ────────────────────────────────────────────────
@@ -76,8 +74,13 @@ export async function readSourceBytes(source: { fileRef: string | null; sourceUr
 }
 
 /** Bounded direct-URL fetch for url-origin sources. Not a generic browser:
- *  refuses non-http(s), caps bytes, 30s timeout. */
-async function downloadUrlBytes(url: string): Promise<Buffer> {
+ *  refuses non-http(s), caps bytes, 30s timeout, and goes through safeFetch
+ *  (per-request DNS validation, every redirect hop re-checked) so a source
+ *  URL can't reach internal addresses. Exported for tests. */
+export async function downloadUrlBytes(
+  url: string,
+  deps: { fetchImpl?: typeof fetch; resolve?: ResolveFn } = {},
+): Promise<Buffer> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -90,7 +93,11 @@ async function downloadUrlBytes(url: string): Promise<Buffer> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 30_000);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+    const res = await safeFetch(
+      url,
+      { signal: ctrl.signal },
+      { fetchFn: deps.fetchImpl, resolve: deps.resolve },
+    );
     if (!res.ok) throw new Error(`Source URL returned ${res.status}.`);
     const len = res.headers.get("content-length");
     if (len && Number(len) > CLIPPER_MAX_URL_BYTES) throw new Error("Source file too large.");
@@ -166,20 +173,20 @@ const jobSelect = {
 
 async function setJobProgress(workspaceId: string, jobId: string, progress: number) {
   await withWorkspaceScope(workspaceId, (tx) =>
-    tx.clipJob.update({ where: { id: jobId }, data: { progress } }),
+    tx.clipJob.update({ where: { id: jobId, workspaceId }, data: { progress } }),
   );
 }
 
 async function finishJob(workspaceId: string, jobId: string, progress = 1) {
   await withWorkspaceScope(workspaceId, (tx) =>
-    tx.clipJob.update({ where: { id: jobId }, data: { status: "done", progress } }),
+    tx.clipJob.update({ where: { id: jobId, workspaceId }, data: { status: "done", progress } }),
   );
 }
 
 async function failJob(workspaceId: string, jobId: string, message: string) {
   await withWorkspaceScope(workspaceId, (tx) =>
     tx.clipJob.update({
-      where: { id: jobId },
+      where: { id: jobId, workspaceId },
       data: { status: "failed", error: message.slice(0, 2000) },
     }),
   );
@@ -189,6 +196,8 @@ async function failJob(workspaceId: string, jobId: string, message: string) {
 // Single UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED) in one
 // transaction with the workspace GUC set: exactly one claimer wins per row,
 // even with concurrent processors. Returns null when nothing is pending.
+// Phase 8: the statement is the shared claim helper (lib/jobs/claim.ts),
+// which the agent job queue uses too.
 
 interface ClaimedJob {
   id: string; workspaceId: string; sourceId: string | null; kind: string;
@@ -196,20 +205,13 @@ interface ClaimedJob {
 }
 
 export async function claimNextPendingJob(workspaceId: string): Promise<ClaimedJob | null> {
-  const rows = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.workspace_id = '${escapeLiteral(workspaceId)}'`);
-    return tx.$queryRawUnsafe<ClaimedJob[]>(`
-      UPDATE "clip_jobs"
-      SET "status" = 'processing', "progress" = 0, "updated_at" = NOW()
-      WHERE "id" = (
-        SELECT sub."id" FROM "clip_jobs" AS sub
-        WHERE sub."status" = 'pending'
-        ORDER BY sub."created_at" ASC
-        FOR UPDATE SKIP LOCKED
-        LIMIT 1
-      )
-      RETURNING "id", "workspace_id" AS "workspaceId", "source_id" AS "sourceId",
-                "kind", "payload"`);
+  const rows = await claimRows<ClaimedJob>({
+    workspaceId,
+    table: "clip_jobs",
+    where: Prisma.sql`sub."status" = 'pending'`,
+    orderBy: Prisma.sql`sub."created_at" ASC`,
+    set: Prisma.sql`"status" = 'processing', "progress" = 0, "updated_at" = NOW()`,
+    returning: Prisma.sql`"id", "workspace_id" AS "workspaceId", "source_id" AS "sourceId", "kind", "payload"`,
   });
   return rows[0] ?? null;
 }
@@ -220,11 +222,11 @@ async function executeTranscribe(job: ClaimedJob) {
   const ws = job.workspaceId;
   await setJobProgress(ws, job.id, 0.1);
   const source = await withWorkspaceScope(ws, (tx) =>
-    tx.clipSource.findUnique({ where: { id: job.sourceId ?? "" } }),
+    tx.clipSource.findUnique({ where: { id: job.sourceId ?? "", workspaceId: ws } }),
   );
   if (!source) throw new Error("Source not found for transcribe job.");
   await withWorkspaceScope(ws, (tx) =>
-    tx.clipSource.update({ where: { id: source.id }, data: { transcriptStatus: "processing" } }),
+    tx.clipSource.update({ where: { id: source.id, workspaceId: ws }, data: { transcriptStatus: "processing" } }),
   );
 
   const bytes = await readSourceBytes(source);
@@ -247,7 +249,7 @@ async function executeTranscribe(job: ClaimedJob) {
 
     await withWorkspaceScope(ws, (tx) =>
       tx.clipSource.update({
-        where: { id: source.id },
+        where: { id: source.id, workspaceId: ws },
         data: {
           transcriptStatus: "ready",
           transcript: { words, text } as unknown as Prisma.InputJsonValue,
@@ -265,7 +267,7 @@ async function executeGenerate(job: ClaimedJob) {
   await setJobProgress(ws, job.id, 0.1);
   const source = await withWorkspaceScope(ws, (tx) =>
     tx.clipSource.findUnique({
-      where: { id: job.sourceId ?? "" },
+      where: { id: job.sourceId ?? "", workspaceId: ws },
       select: { id: true, title: true, transcriptStatus: true, transcript: true },
     }),
   );
@@ -308,7 +310,7 @@ async function executeRender(job: ClaimedJob) {
   if (!payload.clipId) throw new Error("Render job is missing clipId.");
   const clip = await withWorkspaceScope(ws, (tx) =>
     tx.clip.findUnique({
-      where: { id: payload.clipId },
+      where: { id: payload.clipId, workspaceId: ws },
       include: { source: { select: { fileRef: true, sourceUrl: true, transcript: true } } },
     }),
   );
@@ -317,7 +319,7 @@ async function executeRender(job: ClaimedJob) {
     throw new Error(`Clip must be draft or approved to render (was ${clip.status}).`);
   }
   await withWorkspaceScope(ws, (tx) =>
-    tx.clip.update({ where: { id: clip.id }, data: { renderStatus: "processing" } }),
+    tx.clip.update({ where: { id: clip.id, workspaceId: ws }, data: { renderStatus: "processing" } }),
   );
 
   const transcript = clip.source.transcript as unknown as WordTimedTranscript | null;
@@ -363,7 +365,7 @@ async function executeRender(job: ClaimedJob) {
 
     await withWorkspaceScope(ws, (tx) =>
       tx.clip.update({
-        where: { id: clip.id },
+        where: { id: clip.id, workspaceId: ws },
         data: {
           outputRef: key,
           renderStatus: "ready",
@@ -376,7 +378,7 @@ async function executeRender(job: ClaimedJob) {
     );
   } catch (e) {
     await withWorkspaceScope(ws, (tx) =>
-      tx.clip.update({ where: { id: clip.id }, data: { renderStatus: "failed" } }),
+      tx.clip.update({ where: { id: clip.id, workspaceId: ws }, data: { renderStatus: "failed" } }),
     );
     throw e;
   } finally {
@@ -399,7 +401,7 @@ export async function executeClaimedJob(job: ClaimedJob): Promise<void> {
     if (job.kind === "transcribe" && job.sourceId) {
       await withWorkspaceScope(job.workspaceId, (tx) =>
         tx.clipSource.update({
-          where: { id: job.sourceId as string },
+          where: { id: job.sourceId as string, workspaceId: job.workspaceId },
           data: { transcriptStatus: "failed" },
         }),
       ).catch(() => {});

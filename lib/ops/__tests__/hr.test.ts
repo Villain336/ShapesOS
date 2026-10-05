@@ -6,11 +6,13 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITY_MAP } from "../entities";
 import { OPS_MONEY_ACTION_MAP, opsBindingFor, type OpsGatePort } from "../gate";
 import { OpsError, opsCreate, opsPatch, type OpsActor } from "../doctype";
 import { assertLegalLeaveTransition } from "../hr";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_hr5", userId: "user_hr5" };
 const MEMBERS = OPS_ENTITY_MAP["team-members"];
@@ -47,7 +49,7 @@ function portWith(
   return {
     propose: async () => ({ id: "ap_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,
@@ -74,10 +76,12 @@ function approvedLeavePort(): OpsGatePort {
 function makeStubTx(existing: Record<string, unknown>, opts: { createdId?: string } = {}) {
   const created: Array<Record<string, unknown>> = [];
   const audits: Array<Record<string, unknown>> = [];
+  const claims = approvalClaimDelegate();
   const tx = new Proxy(
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (a: { data: Record<string, unknown> }) => {

@@ -21,6 +21,7 @@ import {
 import { buttonVariants } from "@/components/vault/atoms/button-variants";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/vault/EmptyState";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -137,6 +138,13 @@ export default function FilesClient({
   }
 
   async function removeFile(id: string) {
+    const ok = await confirmAction({
+      title: "Delete this file?",
+      description: "It is removed from the project and can't be recovered.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/files/${id}`, {
@@ -158,7 +166,7 @@ export default function FilesClient({
         <EmptyState
           icon={<FileText className="size-5" />}
           title="No files yet"
-          description="Upload a brief or reference one from a connected Drive/Notion, then attach it to a Marketr chat."
+          description="Upload a brief or reference one from a connected Drive/Notion, then attach it to a ShapesOS chat."
         />
       ) : (
         <ul className="flex flex-col">

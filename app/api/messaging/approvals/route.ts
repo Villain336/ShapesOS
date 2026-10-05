@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { messagingGuard, badRequest } from "../_lib";
 import { requestApproval } from "@/lib/messaging/dispatcher";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export async function GET(req: NextRequest) {
   if (gate instanceof Response) return gate;
 
   const q = req.nextUrl.searchParams;
-  const limit = Math.min(Math.max(Number(q.get("limit") ?? 50) || 50, 1), 200);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), q);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const where: Record<string, unknown> = { workspaceId: gate.workspaceId };
   const status = q.get("status")?.trim();
   if (status) where.status = status;

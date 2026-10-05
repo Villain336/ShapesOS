@@ -1,14 +1,22 @@
 // Marketr — connector catalog + workspace connections (milestone 21).
 // GET /api/connectors?workspaceId= → { connectors: [{
 //   key, displayName, kind: "native"|"mcp", authType, description, custom,
-//   connections: [{ id, userId, status, scopes, meta, connectedAt }]
+//   connections: [{ id, userId, status, scopes, meta, connectedAt }],
+//   readOnlyTools?: string[]   (custom MCP only — the admin allow-list)
+//   credentialModes?: [{ id, label, help?, fields: [{ name, label, kind, required, … }] }]
+//                              (Phase 14: built-ins that take typed-in credentials —
+//                               the connect form renders these fields)
 // }] } (viewer+). Credential blobs are never returned.
 
+import { mcpOAuthConfig } from "@/lib/connectors/m21/mcp-oauth";
+import { mcpToolPolicies } from "@/lib/connectors/m21/mcp-policy";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { workspaceIdFrom, requireWorkspaceAccess } from "@/lib/route-utils";
 import { listBuiltinConnectors } from "@/lib/connectors/m21/registry";
+import { readOnlyToolsFromConfig } from "@/lib/connectors/m21";
+import { publicCredentialModes } from "@/lib/connectors/m21/credential-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +69,7 @@ export async function GET(req: NextRequest) {
     description: m.description,
     custom: false,
     connections: (byKey.get(m.key) ?? []).map(publicConnection),
+    credentialModes: publicCredentialModes(m),
   }));
   const customList = customs.map((c) => {
     const config = (c.config ?? {}) as Record<string, unknown>;
@@ -73,6 +82,10 @@ export async function GET(req: NextRequest) {
       description: typeof config.description === "string" ? config.description : null,
       custom: true,
       connections: (byKey.get(c.key) ?? []).map(publicConnection),
+      readOnlyTools: c.kind === "mcp" ? readOnlyToolsFromConfig(c.config) : [],
+      // Phase 11 (conncore): OAuth-protected MCP server + mapped tool count.
+      needsAuth: c.kind === "mcp" && mcpOAuthConfig(c.config) !== null,
+      mappedTools: c.kind === "mcp" ? Object.keys(mcpToolPolicies(c.config)).length : 0,
     };
   });
 

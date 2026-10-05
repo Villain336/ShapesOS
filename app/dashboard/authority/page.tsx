@@ -17,7 +17,7 @@ const chipRed = `${chip} bg-failed-tint text-failed-text border-failed`;
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Authority — Marketr",
+  title: "Authority — ShapesOS",
   description: "Authority & relevance command center: outreach, PR, listings, AEO, reviews.",
 };
 

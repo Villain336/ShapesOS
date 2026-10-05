@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Tier-M manual/assisted connectors (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Tier-M manual/assisted connectors (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // WooCommerce (per-site consumer key handoff + GENTLE polling — never melt a
 // shared host), CSV import, and the onboarding-wizard bootstrap that seeds
@@ -54,7 +54,7 @@ export async function pollWooCommerce(opts: {
       });
     }
     await tx.graphSyncJob.update({
-      where: { id: job.id },
+      where: { id: job.id, workspaceId },
       data: { status: "running", lastRunAt: now },
     });
 
@@ -89,13 +89,13 @@ export async function pollWooCommerce(opts: {
         ingested++;
       }
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: { status: "succeeded", lastSuccessAt: now, errorCount: 0, backoffUntil: null },
       });
       return { ran: true, rowsIngested: ingested, detail: `${ingested} row(s) (fake mode: ${reason})` };
     } catch (e) {
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: { status: "failed", errorCount: { increment: 1 } },
       });
       return { ran: true, rowsIngested: 0, detail: `poll failed honestly: ${(e as Error).message}` };

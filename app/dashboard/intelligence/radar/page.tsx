@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { RadarClient } from "./RadarClient";
 
-export const metadata = { title: "Platform-change radar — Marketr" };
+export const metadata = { title: "Platform-change radar — ShapesOS" };
 
 export default async function PlatformRadarPage() {
   const session = await auth();

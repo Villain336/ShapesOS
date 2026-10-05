@@ -93,10 +93,10 @@ export class SeatNotConnectedError extends Error {
   constructor(dsp: DspKind) {
     const label = DSP_LABELS[dsp];
     const guidance =
-      `No ${label} seat connected. Marketr cannot pause, cap, or report on ${label} ` +
+      `No ${label} seat connected. ShapesOS cannot pause, cap, or report on ${label} ` +
       `campaigns without your agency's own seat. Connect your agency seat: ` +
       `Settings → Flywheel → DSP seat configs → ${label} (bring your own seat; ` +
-      `contracts and billing stay with your agency — never Marketr).`;
+      `contracts and billing stay with your agency — never ShapesOS).`;
     super(guidance);
     this.name = "SeatNotConnectedError";
     this.dsp = dsp;
@@ -106,8 +106,8 @@ export class SeatNotConnectedError extends Error {
 
 /** Zero-custody contract: this namespace holds NO payment instruments. */
 export const ZERO_CUSTODY_COPY =
-  "DSP contracts and billing sit with the agency/client entity — never Marketr. " +
-  "Marketr orchestrates, approves, kill-switches, and accounts. It never holds, " +
+  "DSP contracts and billing sit with the agency/client entity — never ShapesOS. " +
+  "ShapesOS orchestrates, approves, kill-switches, and accounts. It never holds, " +
   "fronts, or co-mingles client funds.";
 
 export function assertDspKind(v: string): asserts v is DspKind {

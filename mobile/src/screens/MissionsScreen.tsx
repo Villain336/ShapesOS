@@ -8,6 +8,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useSession } from "../session-context";
 import { fetchMissions, GateApiError, type MissionLite } from "../api/gate";
 import { MissionProgressWidget, type MissionProgress } from "../components/MissionProgressWidget";
+import { color } from "../theme";
 
 function toWidget(m: MissionLite): MissionProgress {
   return {
@@ -49,7 +50,7 @@ export function MissionsScreen() {
     <View style={styles.root}>
       {loading && !refreshing ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#7c3aed" />
+          <ActivityIndicator color={color.ink} />
           <Text style={styles.muted}>Loading missions…</Text>
         </View>
       ) : error ? (
@@ -77,12 +78,12 @@ export function MissionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#FAFAF7" },
+  root: { flex: 1, backgroundColor: color.canvas },
   scroll: { flex: 1 },
   scrollContent: { padding: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
-  muted: { fontSize: 13, color: "#a8a29e", textAlign: "center" },
-  error: { fontSize: 13, color: "#b91c1c", textAlign: "center" },
-  retry: { marginTop: 8, backgroundColor: "#f5f5f4", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { color: "#44403c", fontWeight: "600", fontSize: 13 },
+  muted: { fontSize: 13, color: color.subtle, textAlign: "center" },
+  error: { fontSize: 13, color: color.failedText, textAlign: "center" },
+  retry: { marginTop: 8, backgroundColor: color.canvas, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { color: color.muted, fontWeight: "600", fontSize: 13 },
 });

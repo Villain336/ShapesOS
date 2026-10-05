@@ -3,6 +3,8 @@
 
 import { missionsGuard, safetyError, serializeMission, serializeApproval, serializeEvent, missionDeps } from "../_lib";
 import { loadMission } from "@/lib/missions/engine";
+import { missionAgentView } from "@/lib/aos/missions";
+import { safeMissionRuns } from "@/lib/aos/missions.server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,7 @@ export async function GET(
   const { id } = await params;
   try {
     const loaded = await loadMission(missionDeps(), id, gate.workspaceId);
+    const runs = await safeMissionRuns(gate.workspaceId, [loaded.mission.id]);
     return Response.json({
       mission: serializeMission(loaded.mission),
       events: loaded.events.map(serializeEvent),
@@ -26,6 +29,9 @@ export async function GET(
       progress: loaded.progress,
       termination: loaded.termination,
       nextCheckpoint: loaded.nextCheckpoint,
+      // Agentic OS: agent state + the lead's delegations (additive).
+      agent: missionAgentView(loaded, runs),
+      runs: runs.map((r) => ({ id: r.id, kind: r.kind, status: r.status, createdAt: r.createdAt, endedAt: r.endedAt })),
     });
   } catch (err) {
     return safetyError(err);

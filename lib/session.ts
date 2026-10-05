@@ -6,7 +6,9 @@
 //      they can still access, else
 //   1. their SSO-provisioned workspace (if SSO auto-provisioning ran), else
 //   2. the first workspace they own or are a member of, else
-//   3. a freshly created personal workspace (with an `owner` membership row).
+//   3. a freshly created personal workspace (with an `owner` membership row)
+//      — unless SIGNUP_MODE=invite, where only the operator gets one and
+//      everyone else gets InviteRequiredError (lib/auth/signup.ts).
 //
 // The cookie preference is honored inside getOrCreateWorkspace so the switch
 // propagates to every page and API route that resolves "the current
@@ -15,6 +17,15 @@
 
 import { auth } from "@/auth";
 import { prisma } from "./prisma";
+import { InviteRequiredError, mayProvisionWorkspace } from "./auth/signup";
+import { MAX_WORKSPACE_NAME, createWorkspaceForUser } from "./workspace/lifecycle";
+
+/** "ana's workspace" from ana@example.com; "My workspace" without an email. */
+export function defaultWorkspaceName(email?: string | null): string {
+  const local = (email ?? "").split("@")[0]?.trim();
+  if (!local) return "My workspace";
+  return `${local.slice(0, MAX_WORKSPACE_NAME - 12)}'s workspace`;
+}
 
 /** httpOnly preference cookie naming the user's active workspace. */
 export const ACTIVE_WORKSPACE_COOKIE = "marketr_active_workspace";
@@ -79,13 +90,23 @@ export async function getOrCreateWorkspace(
   const existing = accessible[0];
   if (existing) return existing;
 
-  const created = await prisma.workspace.create({
-    data: {
-      name: email ? `${email}'s workspace` : "My workspace",
-      ownerUserId: userId,
-      plan: "self_hosted",
-      members: { create: { userId, role: "owner" } },
-    },
-  });
-  return created;
+  // Phase 1: SIGNUP_MODE=invite — only the operator gets a workspace
+  // provisioned; everyone else must join through an invite.
+  if (!mayProvisionWorkspace(userId)) throw new InviteRequiredError();
+
+  // Phase 3: the plan follows DEPLOYMENT_MODE (hosted signups start the
+  // 14-day trial; self-hosted keeps self_hosted) and the creation is audited.
+  // The onboarding wizard lets the owner pick a real name.
+  // Phase 4a: a session that outlived a deleted account must not provision a
+  // fresh workspace (createWorkspaceForUser checks the sign-in time).
+  // Outside a request (scripts, tests) there is no session: no sign-in time,
+  // which only matters for an account that was deleted.
+  let authAt: number | null = null;
+  try {
+    const session = await auth();
+    if (session?.user?.id === userId) authAt = session.user.authAt ?? null;
+  } catch {
+    // no request scope
+  }
+  return createWorkspaceForUser({ userId, name: defaultWorkspaceName(email), ifNoneExists: true, authAt });
 }

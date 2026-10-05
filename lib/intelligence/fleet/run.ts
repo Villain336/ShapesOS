@@ -35,7 +35,7 @@ async function summarizeNewChanges(
 ): Promise<number> {
   return withWorkspaceScope(workspaceId, async (tx) => {
     const pending = await tx.competitorChange.findMany({
-      where: { watchId: watch.id, semanticSummary: null, status: "new" },
+      where: { workspaceId, watchId: watch.id, semanticSummary: null, status: "new" },
       select: { id: true, url: true, changeType: true },
       orderBy: { detectedAt: "desc" },
       take: limit,
@@ -110,8 +110,8 @@ export async function runFleetForWorkspace(workspaceId: string): Promise<FleetRu
     // 2. Change detection over tracked URLs (the watch's discovered URL set).
     try {
       const tracked = await withWorkspaceScope(workspaceId, (tx) =>
-        tx.competitorWatch.findUnique({
-          where: { id: watch.id },
+        tx.competitorWatch.findFirst({
+          where: { id: watch.id, workspaceId },
           select: { newUrls: true },
         }),
       );

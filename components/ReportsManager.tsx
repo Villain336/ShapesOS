@@ -5,6 +5,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ssr: false });
 
@@ -220,7 +221,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
   }
 
   async function deleteTemplate() {
-    if (!selected || !confirm(`Delete template "${selected.name}"? Generated reports are kept.`)) return;
+    if (!selected || !await confirmAction(`Delete template "${selected.name}"? Generated reports are kept.`)) return;
     const res = await fetch(`/api/report-templates/${selected.id}`, { method: "DELETE" });
     if (res.ok) {
       setTemplates((prev) => prev.filter((t) => t.id !== selected.id));
@@ -234,7 +235,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
       <div className="flex flex-col gap-2">
         <button
           onClick={startNew}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press"
         >
           New template
         </button>
@@ -242,56 +243,56 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
           <button
             key={t.id}
             onClick={() => select(t.id)}
-            className={`rounded-lg border p-3 text-left ${
-              selectedId === t.id ? "border-orange-200 bg-white" : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
+            className={`rounded-lg bg-paper p-3 text-left ${
+              selectedId === t.id ? "shadow-outline" : "shadow-hairline hover:bg-hover-paper"
             }`}
           >
-            <p className="text-sm font-medium text-zinc-900">{t.name}</p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="text-sm font-medium text-ink">{t.name}</p>
+            <p className="mt-1 text-xs text-muted">
               {t.type} · {t.schedule}
               {t.project ? ` · ${t.project.domain}` : ""}
               {t._count ? ` · ${t._count.reports} reports` : ""}
             </p>
           </button>
         ))}
-        {templates.length === 0 && <p className="text-sm text-zinc-500">No templates yet.</p>}
+        {templates.length === 0 && <p className="text-sm text-muted">No templates yet.</p>}
       </div>
 
       {/* Editor / history */}
       <div className="flex min-w-0 flex-col gap-4">
-        {error && <p className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-md bg-failed-tint px-4 py-2 text-sm text-failed-text">{error}</p>}
         {notice && (
-          <p className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">{notice}</p>
+          <p className="rounded-md bg-paper px-4 py-2 text-sm text-ink shadow-hairline">{notice}</p>
         )}
 
         {(selected || selectedId === "new") && (
           <>
-            <div className="grid gap-3 rounded-lg border border-zinc-300 bg-white p-4 md:grid-cols-2">
+            <div className="grid gap-3 rounded-lg bg-paper p-4 shadow-hairline md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Template name</span>
+                <span className="text-muted">Template name</span>
                 <input
                   value={meta.name}
                   onChange={(e) => setMeta({ ...meta, name: e.target.value })}
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Type</span>
+                <span className="text-muted">Type</span>
                 <select
                   value={meta.type}
                   onChange={(e) => setMeta({ ...meta, type: e.target.value })}
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 >
                   <option value="ranking">Ranking report</option>
                   <option value="custom">Custom</option>
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Brand kit</span>
+                <span className="text-muted">Brand kit</span>
                 <select
                   value={meta.brandKitId}
                   onChange={(e) => setMeta({ ...meta, brandKitId: e.target.value })}
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 >
                   <option value="">Workspace default</option>
                   {brandKits.map((k) => (
@@ -302,11 +303,11 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Project (data source)</span>
+                <span className="text-muted">Project (data source)</span>
                 <select
                   value={meta.projectId}
                   onChange={(e) => setMeta({ ...meta, projectId: e.target.value })}
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 >
                   <option value="">None</option>
                   {projects.map((p) => (
@@ -317,11 +318,11 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-500">Schedule</span>
+                <span className="text-muted">Schedule</span>
                 <select
                   value={meta.schedule}
                   onChange={(e) => setMeta({ ...meta, schedule: e.target.value })}
-                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
+                  className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-ink"
                 >
                   <option value="manual">Manual</option>
                   <option value="weekly">Weekly</option>
@@ -340,7 +341,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
               <button
                 onClick={saveTemplate}
                 disabled={saving}
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
               >
                 {saving ? "Saving…" : selectedId === "new" ? "Create template" : "Save template"}
               </button>
@@ -348,7 +349,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 <button
                   onClick={generateNow}
                   disabled={generating}
-                  className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                  className="rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press disabled:bg-disabled disabled:text-disabled-fg disabled:shadow-none"
                 >
                   {generating ? "Generating PDF…" : "Generate PDF now"}
                 </button>
@@ -357,7 +358,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 <button
                   onClick={openInDocs}
                   disabled={openingDoc}
-                  className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                  className="rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press disabled:bg-disabled disabled:text-disabled-fg disabled:shadow-none"
                   title="Open this template as an editable Univer document"
                 >
                   {openingDoc ? "Opening…" : "Open in Docs"}
@@ -366,7 +367,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
               {selectedId !== "new" && (
                 <button
                   onClick={deleteTemplate}
-                  className="rounded-md border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+                  className="rounded-full bg-paper px-4 py-2 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint aos-press"
                 >
                   Delete
                 </button>
@@ -375,30 +376,37 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
 
             {/* History */}
             {historyFor === selectedId && history.length > 0 && (
-              <div className="rounded-lg border border-zinc-300 bg-white p-4">
-                <h3 className="mb-2 text-sm font-semibold text-zinc-800">Generated reports</h3>
+              <div className="rounded-lg bg-paper p-4 shadow-hairline">
+                <h3 className="mb-2 text-sm font-semibold text-ink">Generated reports</h3>
                 <ul className="flex flex-col gap-2">
                   {history.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between rounded border border-zinc-200 px-3 py-2 text-sm">
-                      <span className="text-zinc-500">
+                    <li key={r.id} className="flex items-center justify-between rounded-sm border border-line px-3 py-2 text-sm">
+                      <span className="text-muted">
                         {r.period} · {new Date(r.createdAt).toLocaleString()}
                         <span
-                          className={`ml-2 rounded px-1.5 py-0.5 text-xs ${
+                          className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
                             r.status === "ready"
-                              ? "bg-green-50 text-green-700"
+                              ? "bg-done text-white"
                               : r.status === "failed"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-zinc-100 text-zinc-500"
+                                ? "bg-failed text-white"
+                                : "bg-canvas text-muted"
                           }`}
                         >
+                          {(r.status === "ready" || r.status === "failed") && (
+                            <span
+                              aria-hidden
+                              className={`aos-shape ${r.status === "ready" ? "aos-shape--done" : "aos-shape--failed"}`}
+                              style={{ color: "inherit" }}
+                            />
+                          )}
                           {r.status}
                         </span>
-                        {r.error && <span className="ml-2 text-xs text-red-600">{r.error.slice(0, 120)}</span>}
+                        {r.error && <span className="ml-2 text-xs text-failed-text">{r.error.slice(0, 120)}</span>}
                       </span>
                       {r.status === "ready" && (
                         <a
                           href={`/api/reports/${r.id}/download`}
-                          className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-100"
+                          className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline"
                         >
                           Download PDF
                         </a>
@@ -412,7 +420,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
         )}
 
         {!selected && selectedId !== "new" && (
-          <p className="text-sm text-zinc-500">Select a template to edit, or create a new one.</p>
+          <p className="text-sm text-muted">Select a template to edit, or create a new one.</p>
         )}
       </div>
     </div>

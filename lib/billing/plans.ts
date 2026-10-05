@@ -55,6 +55,8 @@ export const PLANS: BillingPlan[] = [
       "Keyword research + competitor gap",
       "AI content engine",
     ],
+    // Phase 4a: limits + tiered features are enforced from
+    // lib/billing/entitlements.ts — keep these strings in step with it.
   },
   {
     id: "pro",
@@ -69,19 +71,23 @@ export const PLANS: BillingPlan[] = [
       "Everything in Starter",
       "Growth memory + missions + playbooks",
       "Competitor radar + content refresh engine",
+      "API, MCP and outbound webhooks",
+      "Custom dashboard branding",
     ],
   },
   {
     id: "agency",
     name: "Agency",
-    tagline: "For agencies running Marketr for clients.",
+    tagline: "For agencies running ShapesOS for clients.",
     priceCents: 19900,
     stripePriceEnv: "STRIPE_PRICE_AGENCY",
     features: [
       "30,000 included credits / month",
       "Unlimited projects · 15 seats",
       "Everything in Pro",
-      "White-label client reports",
+      "White-label client pages + custom domains",
+      "SSO and SCIM",
+      "Up to 25 client workspaces",
       "Priority support",
     ],
   },
@@ -132,4 +138,11 @@ export function planIdForStripePrice(priceId: string | null | undefined): PaidPl
 /** Display price, e.g. "$29". */
 export function planPriceDisplay(plan: BillingPlan): string {
   return `$${(plan.priceCents / 100).toFixed(plan.priceCents % 100 === 0 ? 0 : 2)}`;
+}
+
+/** Human name for any workspace plan, including the non-purchasable ones. */
+export function planDisplayName(planId: string): string {
+  if (planId === "self_hosted") return "Self-hosted";
+  if (planId === "trial") return "Trial";
+  return PLANS.find((p) => p.id === planId)?.name ?? planId;
 }

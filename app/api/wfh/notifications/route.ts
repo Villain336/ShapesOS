@@ -36,7 +36,12 @@ export async function POST(req: NextRequest) {
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
   });
   const mode: WorkModeState | null = row
-    ? { mode: row.mode as WorkModeState["mode"], wfhDays: row.wfhDays, setupCompletedAt: row.setupCompletedAt }
+    ? {
+        mode: row.mode as WorkModeState["mode"],
+        wfhDays: row.wfhDays,
+        setupCompletedAt: row.setupCompletedAt,
+        timezone: row.timezone,
+      }
     : null;
 
   const decision = routeNotification(body, {

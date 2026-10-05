@@ -1,7 +1,7 @@
 // Marketr — Expert Constitution Pack v1: drift tripwire tests.
 //
 // The constitutions and exemplars in ../constitution.ts are transcribed
-// VERBATIM from EXPERT-CONSTITUTION.md. These tests pin the structural
+// VERBATIM from docs/specs/EXPERT-CONSTITUTION.md. These tests pin the structural
 // contract (counts, ordering, key hard-rule phrases) so a careless edit
 // fails loudly. They do not pin full text (that would duplicate the doc);
 // a doc revision must re-transcribe the module and bump

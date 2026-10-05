@@ -24,20 +24,21 @@ export type SavedKeywordOption = {
 };
 
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 const STATUS_STYLES: Record<string, string> = {
-  brief: "border-sky-200 bg-sky-50/40 text-sky-700",
-  draft: "border-violet-200 bg-violet-50/40 text-violet-700",
-  editing: "border-amber-200 bg-amber-50/40 text-amber-700",
-  published: "border-emerald-800 bg-emerald-50/40 text-emerald-700",
+  // Content workflow stages, not agent states: neutral, the label carries meaning.
+  brief: "bg-canvas text-muted",
+  draft: "bg-paper text-ink shadow-control",
+  editing: "bg-paper text-ink shadow-outline",
+  published: "bg-ink text-white",
 };
 
 export function statusPill(status: string) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-        STATUS_STYLES[status] ?? "border-zinc-200 text-zinc-500"
+      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        STATUS_STYLES[status] ?? "bg-canvas text-muted"
       }`}
     >
       {status}
@@ -90,18 +91,18 @@ export default function ContentList({
       {/* Create brief — v2 treatment when the `content.brief-v2` flag is on. */}
       <form
         onSubmit={onCreateBrief}
-        className={`flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-end ${
-          briefV2 ? "border-violet-200 bg-violet-50/40" : "border-zinc-200 bg-white/60"
+        className={`flex flex-col gap-3 rounded-lg bg-paper p-5 sm:flex-row sm:items-end ${
+          briefV2 ? "shadow-outline" : "shadow-hairline"
         }`}
       >
         <div className="flex-1">
           <label
             htmlFor="keyword"
-            className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
+            className="mb-1 block text-xs font-semibold text-muted"
           >
             Saved keyword
             {briefV2 && (
-              <span className="ml-1.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-white">
+              <span className="ml-1.5 rounded-full bg-ink px-1.5 py-0.5 text-2xs font-semibold text-white">
                 v2
               </span>
             )}
@@ -124,14 +125,14 @@ export default function ContentList({
         <button
           type="submit"
           disabled={loading || !keywordId}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
         >
           {loading ? "Building brief…" : "Create brief"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-failed-text">{error}</p>}
       {keywords.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           No saved keywords yet — run keyword research first, then come back
           to build a brief.
         </p>
@@ -139,11 +140,11 @@ export default function ContentList({
 
       {/* Content items */}
       <div>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
+        <h2 className="mb-3 text-sm font-semibold text-muted">
           Content ({items.length})
         </h2>
         {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+          <p className="rounded-lg border border-dashed border-control p-8 text-center text-sm text-muted">
             No content yet. Create a brief from a saved keyword above.
           </p>
         ) : (
@@ -156,18 +157,18 @@ export default function ContentList({
                       `/dashboard/projects/${projectId}/content/${item.id}`,
                     )
                   }
-                  className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-left hover:border-zinc-300"
+                  className="flex w-full items-center justify-between gap-4 rounded-lg bg-paper px-5 py-3 text-left shadow-hairline hover:bg-hover-paper"
                 >
                   <span className="flex items-center gap-3">
                     {statusPill(item.status)}
-                    <span className="font-medium text-zinc-900">
+                    <span className="font-medium text-ink">
                       {item.keyword?.phrase ?? "Untitled"}
                     </span>
                   </span>
-                  <span className="flex items-center gap-4 text-sm text-zinc-500">
+                  <span className="flex items-center gap-4 text-sm text-muted">
                     {item.seoScore != null && (
                       <span>
-                        SEO <span className="text-zinc-800">{Math.round(item.seoScore)}</span>/100
+                        SEO <span className="text-ink">{Math.round(item.seoScore)}</span>/100
                       </span>
                     )}
                     <span>

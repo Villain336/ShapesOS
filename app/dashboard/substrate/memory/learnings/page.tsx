@@ -5,12 +5,16 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { requireWorkspaceRole } from "@/lib/authz";
+import { acceptLearning } from "@/lib/substrate/memory/write";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { CheckCircle2, XCircle, HelpCircle, FlaskConical, Filter } from "lucide-react";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { freshnessLabel } from "@/lib/substrate/graph/freshness";
 import {
   Chip,
+  btnGhost,
   btnPrimary,
   infoNoteCls,
   inputCls,
@@ -23,7 +27,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Learnings — Growth Memory — Marketr",
+  title: "Learnings — Growth Memory — ShapesOS",
   description: "What worked, what failed, what was inconclusive — with provenance.",
 };
 
@@ -43,6 +47,25 @@ function bucketTone(bucket: string): "slate" | "amber" | "red" {
   if (bucket === "fresh") return "slate";
   if (bucket === "aging") return "amber";
   return "red";
+}
+
+/** Agent-inferred lesson that no human has accepted yet (kept out of prompts). */
+function needsReview(l: { source: string; contextRefs: unknown }): boolean {
+  const refs = (l.contextRefs ?? {}) as Record<string, unknown>;
+  const inferred = l.source === "consolidation" || refs.origin === "agent_inferred";
+  return inferred && typeof refs.acceptedAt !== "string";
+}
+
+async function acceptLearningAction(formData: FormData) {
+  "use server";
+  const user = await requireUser();
+  if (!user?.id) redirect("/login");
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "editor"))) return;
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await acceptLearning(workspace.id, id, user.id).catch(() => undefined);
+  revalidatePath("/dashboard/substrate/memory/learnings");
 }
 
 async function listLearnings(
@@ -136,6 +159,15 @@ export default async function LearningsPage({
                       <div className="min-w-0">
                         <div className="font-medium leading-snug text-ink">{l.hypothesis}</div>
                         <div className="mt-0.5 text-[12px] text-muted">{l.action}</div>
+                        {needsReview(l) && (
+                          <form action={acceptLearningAction} className="mt-1 flex items-center gap-2">
+                            <input type="hidden" name="id" value={l.id} />
+                            <Chip tone="amber">Needs review — not used by agents yet</Chip>
+                            <button type="submit" className={btnGhost}>
+                              <CheckCircle2 size={14} aria-hidden /> Accept
+                            </button>
+                          </form>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -183,7 +215,10 @@ export default async function LearningsPage({
 
       <div className={`${infoNoteCls} mt-3 flex items-start gap-2`}>
         <FlaskConical size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden />
-        <p>Human-asserted learnings carry confidence 1.0 and origin user_told — they never decay.</p>
+        <p>
+          Human-asserted learnings carry confidence 1.0 and origin user_told — they never decay.
+          Lessons the nightly learning pass infers stay out of agent prompts until someone accepts them.
+        </p>
       </div>
     </div>
   );

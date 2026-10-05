@@ -4,18 +4,50 @@
 //   "copy"       → client-facing articles, briefs, refreshes (claude-haiku-4-5)
 //   "bulk"       → agent loop, skill runs, summaries, reports (gpt-5-nano)
 //   "background" → digests, decay checks (gpt-5-nano:flex)
+//   Phase 7 agent workloads (chat() with native tools):
+//   "lead"       → lead agent, planner (claude-opus-5-5, effort medium)
+//   "subagent"   → researcher, writer, analyst, scheduler, operator (claude-sonnet-5-5)
+//   "code"       → code agent (claude-opus-5-5, effort high)
+//   "code_max"   → code agent escalation (claude-fable-5-1, opt-in retention)
 //
 // getLlmProvider() is kept for back-compat and now resolves the "bulk"
 // workload (the old single-provider default), honoring legacy LLM_MODEL as a
 // bulk override. llmStatus() keeps its old top-level shape (based on bulk,
-// the historical default) and adds per-workload routing detail.
+// the historical default) and adds per-workload routing detail: the routed
+// model, live/mock with the reason, single-key substitution and the armed
+// failover model (Phase 6). Settings → Providers renders it.
 
-import { getLlmProviderFor, llmRoutingStatus, resolveWorkload } from "./router";
+import { getLlmProviderFor, llmRoutingStatus, resolveWorkload, LLM_WORKLOADS } from "./router";
 import type { LlmProvider } from "./types";
 import type { LlmWorkload } from "./router";
 
 export type { LlmProvider, LlmWorkload };
-export { getLlmProviderFor, llmRoutingStatus, WORKLOAD_DEFAULTS, WORKLOAD_MAX_TOKENS } from "./router";
+export type {
+  ChatContentBlock,
+  ChatEffort,
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  ChatStopReason,
+  ChatStreamEvent,
+  ChatToolDef,
+  ChatUsage,
+  ChatUsageContext,
+} from "./types";
+export type { LlmWorkloadStatus } from "./router";
+export {
+  getLlmProviderFor,
+  llmRoutingStatus,
+  workloadForAgent,
+  AGENT_WORKLOADS,
+  LLM_WORKLOADS,
+  WORKLOAD_DEFAULTS,
+  WORKLOAD_EFFORT,
+  WORKLOAD_MAX_TOKENS,
+} from "./router";
+export { LlmProviderError, isRetryableLlmError } from "./errors";
+export { estimateCostMicroUsd, formatMicroUsd, MODEL_PRICES } from "./pricing";
+export { invalidToolResult } from "./tool-input";
 
 /** Back-compat factory. Resolves the "bulk" workload (the pre-D default). */
 export function getLlmProvider(): LlmProvider {
@@ -30,8 +62,7 @@ export function llmStatus() {
   // is live so the mock banner never misleads (T7).
   return {
     name: bulk.name,
-    isLive:
-      routing.copy.isLive || routing.bulk.isLive || routing.background.isLive,
+    isLive: LLM_WORKLOADS.some((w) => routing[w].isLive),
     configured: bulk.configured,
     model: bulk.model,
     routing,

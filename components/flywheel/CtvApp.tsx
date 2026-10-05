@@ -50,7 +50,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   "seat:basis": "Basis (BYO seat)",
 };
 
-const ALERT_ONLY_COPY = "Marketr cannot pause this buy — alerts only.";
+const ALERT_ONLY_COPY = "ShapesOS cannot pause this buy — alerts only.";
 
 async function api(path: string, init?: RequestInit) {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -545,7 +545,7 @@ function IoTab() {
     <div className="flex flex-col gap-4">
       <Panel title="Concierge IO generator">
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{ALERT_ONLY_COPY} Marketr generates the IO + creative brief; you place the buy in the vendor UI.</span></div>
+          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{ALERT_ONLY_COPY} ShapesOS generates the IO + creative brief; you place the buy in the vendor UI.</span></div>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="grid gap-1.5"><Label className={HLABEL}>Campaign id</Label><Input className={HI} value={form.campaignId} onChange={set("campaignId")} /></div>
             <div className="grid gap-1.5"><Label className={HLABEL}>Vendor</Label>

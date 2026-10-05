@@ -1,7 +1,7 @@
 // Marketr — POST /api/missions/:id/resume (editor+)
 //
 // Per-mission kill-switch resume wired to M4's real staleness re-verification
-// (SPEC-PHASE9.md §P9C): budgets, graph data freshness (graph as_of recency),
+// (docs/specs/SPEC-PHASE9.md §P9C): budgets, graph data freshness (graph as_of recency),
 // goal assumptions. Fresh -> back to active with the report on the timeline;
 // stale -> stays paused with a human-review event.
 //

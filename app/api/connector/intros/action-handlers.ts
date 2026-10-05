@@ -2,7 +2,7 @@
 // The governed verbs of the double-opt-in lifecycle. Each Next.js route.ts
 // re-exports one of these as POST. accept/decline are human-only (the
 // store rejects agent actors); make_intro is legal only from
-// side_b_accepted.
+// side_b_accepted. Every actor comes from the session, never the body.
 
 import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/guard";
 import { prisma } from "@/lib/prisma";
@@ -11,15 +11,29 @@ import { ConnectorError } from "@/lib/connector/types";
 import type { IntroActor } from "@/lib/connector/introductions";
 import { introErrorResponse } from "./intro-error";
 
-function actorOf(body: { actor?: unknown }, fallbackIdentity: string): IntroActor {
-  const a = body.actor as { kind?: unknown; identity?: unknown } | undefined;
-  if (a && a.kind === "human") {
-    return { kind: "human", identity: typeof a.identity === "string" ? a.identity : "" };
-  }
-  if (a && a.kind === "agent") {
-    return { kind: "agent", identity: typeof a.identity === "string" ? a.identity : undefined };
-  }
-  return { kind: "human", identity: fallbackIdentity };
+/**
+ * Phase 1: the actor is ALWAYS the signed-in user — never the request body
+ * (a body could claim any identity, or kind "agent"). The person whose
+ * response the operator is recording may still be named in the body
+ * (`actor.identity` / `respondent`, as the UI sends); it is kept as an
+ * attested detail in the event note, attributed to the session user.
+ */
+function sessionActor(user: { id: string; email?: string | null }): IntroActor {
+  return { kind: "human", identity: user.email ?? user.id };
+}
+
+function respondentOf(body: { actor?: unknown; respondent?: unknown }): string | undefined {
+  const fromActor = (body.actor as { identity?: unknown } | undefined)?.identity;
+  const raw = typeof body.respondent === "string" ? body.respondent : fromActor;
+  return typeof raw === "string" && raw.trim() ? raw.trim().slice(0, 200) : undefined;
+}
+
+/** Note with the attested respondent (if any) folded in. */
+function attestedNote(body: { actor?: unknown; respondent?: unknown; note?: unknown }): string | undefined {
+  const respondent = respondentOf(body);
+  const note = noteOf(body);
+  const parts = [respondent ? `Response from ${respondent}.` : undefined, note].filter(Boolean);
+  return parts.length ? parts.join(" ") : undefined;
 }
 
 function sentViaOf(body: { sentVia?: unknown }): string {
@@ -70,13 +84,11 @@ export async function handleDecline(req: Request, id: string) {
 export async function handleAcceptA(req: Request, id: string) {
   try {
     const { workspace, user } = await guardWorkspace({ editor: true });
-    const body = (await readJson(req)) as { actor?: unknown; sentVia?: unknown; note?: unknown };
-    const intro = await store().acceptSideA(
-      workspace.id,
-      id,
-      actorOf(body, user.email ?? user.id),
-      { sentVia: sentViaOf(body), note: noteOf(body) },
-    );
+    const body = (await readJson(req)) as { actor?: unknown; respondent?: unknown; sentVia?: unknown; note?: unknown };
+    const intro = await store().acceptSideA(workspace.id, id, sessionActor(user), {
+      sentVia: sentViaOf(body),
+      note: attestedNote(body),
+    });
     return Response.json(intro);
   } catch (e) {
     if (e instanceof ConnectorError) return introErrorResponse(e);
@@ -88,9 +100,9 @@ export async function handleAcceptA(req: Request, id: string) {
 export async function handleDeclineA(req: Request, id: string) {
   try {
     const { workspace, user } = await guardWorkspace({ editor: true });
-    const body = (await readJson(req)) as { actor?: unknown; note?: unknown };
-    const intro = await store().declineSideA(workspace.id, id, actorOf(body, user.email ?? user.id), {
-      note: noteOf(body),
+    const body = (await readJson(req)) as { actor?: unknown; respondent?: unknown; note?: unknown };
+    const intro = await store().declineSideA(workspace.id, id, sessionActor(user), {
+      note: attestedNote(body),
     });
     return Response.json(intro);
   } catch (e) {
@@ -103,9 +115,9 @@ export async function handleDeclineA(req: Request, id: string) {
 export async function handleAcceptB(req: Request, id: string) {
   try {
     const { workspace, user } = await guardWorkspace({ editor: true });
-    const body = (await readJson(req)) as { actor?: unknown; note?: unknown };
-    const intro = await store().acceptSideB(workspace.id, id, actorOf(body, user.email ?? user.id), {
-      note: noteOf(body),
+    const body = (await readJson(req)) as { actor?: unknown; respondent?: unknown; note?: unknown };
+    const intro = await store().acceptSideB(workspace.id, id, sessionActor(user), {
+      note: attestedNote(body),
     });
     return Response.json(intro);
   } catch (e) {
@@ -118,9 +130,9 @@ export async function handleAcceptB(req: Request, id: string) {
 export async function handleDeclineB(req: Request, id: string) {
   try {
     const { workspace, user } = await guardWorkspace({ editor: true });
-    const body = (await readJson(req)) as { actor?: unknown; note?: unknown };
-    const intro = await store().declineSideB(workspace.id, id, actorOf(body, user.email ?? user.id), {
-      note: noteOf(body),
+    const body = (await readJson(req)) as { actor?: unknown; respondent?: unknown; note?: unknown };
+    const intro = await store().declineSideB(workspace.id, id, sessionActor(user), {
+      note: attestedNote(body),
     });
     return Response.json(intro);
   } catch (e) {

@@ -35,13 +35,13 @@ export default async function ScheduleDetailPage({
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-accent">Automations</Link>
+        <p className="text-xs font-semibold text-muted">
+          <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-focus hover:underline">Automations</Link>
           {" / "}
-          <Link href={`/dashboard/projects/${project.id}/automations/schedules`} className="hover:text-accent">Schedules</Link>
+          <Link href={`/dashboard/projects/${project.id}/automations/schedules`} className="hover:text-focus hover:underline">Schedules</Link>
           {" / "}Detail
         </p>
-        <h1 className="mt-1 font-display text-3xl">Schedule</h1>
+        <h1 className="aos-heading mt-1">Schedule</h1>
       </div>
       <ScheduleDetail
         projectId={project.id}
@@ -50,6 +50,7 @@ export default async function ScheduleDetailPage({
           id: schedule.id,
           triggerType: schedule.triggerType,
           cronExpr: schedule.cronExpr,
+          timezone: schedule.timezone,
           eventSource: schedule.eventSource,
           eventConfig: (schedule.eventConfigJson ?? null) as Record<string, unknown> | null,
           approvalMode: schedule.approvalMode,

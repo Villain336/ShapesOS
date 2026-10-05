@@ -6,7 +6,7 @@ import { ProspectsApp } from "./ProspectsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Prospects — Marketr",
+  title: "Prospects — ShapesOS",
   description: "Prospect lists, waterfall enrichment, AI research, and CRM conversion.",
 };
 

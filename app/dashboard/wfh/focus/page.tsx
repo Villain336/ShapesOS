@@ -15,7 +15,7 @@ import FocusPanel from "./_components/FocusPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH focus time — Marketr",
+  title: "WFH focus time — ShapesOS",
   description: "Protected deep-work blocks with soft or consent-gated hard protection.",
 };
 
