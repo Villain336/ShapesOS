@@ -22,11 +22,12 @@ export default async function NotificationsPage() {
   if (!(await getMembership(user.id, workspace.id))) redirect("/dashboard");
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Notifications</h1>
-        <p className="mt-0.5 text-sm text-muted">
-          {workspace.name} — approvals, decisions, alerts, failed runs and team changes.
+        <p className="mt-1 text-md text-muted">
+          What your agents and team need you to know in {workspace.name}: approvals, decisions, alerts, failed runs and
+          team changes.
         </p>
       </div>
       <NotificationsList />

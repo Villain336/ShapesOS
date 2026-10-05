@@ -375,6 +375,8 @@ export class AdomniAdapter extends VendorAdapterBase {
 // store — because there is no buy-side API.
 // ---------------------------------------------------------------------------
 
+import { fakeOrRefuse } from "@/lib/env/secrets";
+
 export type DoohProviderSelection = DoohVendorName;
 
 export function getDoohProvider(selection: DoohProviderSelection = "fake"): DoohProvider {
@@ -387,6 +389,7 @@ export function getDoohProvider(selection: DoohProviderSelection = "fake"): Dooh
       return new AdomniAdapter();
     case "fake":
     default:
-      return new FakeDoohProvider();
+      // Phase 11 (conncore): fixture inventory is refused in production.
+      return fakeOrRefuse("DOOH inventory", () => new FakeDoohProvider());
   }
 }

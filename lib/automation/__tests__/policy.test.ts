@@ -226,3 +226,92 @@ describe("escalation rules", () => {
     ]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5: per-agent rules + auto-approve.
+// ---------------------------------------------------------------------------
+
+import { ALL_AGENTS, decideAutoApproval } from "../policy";
+
+const agentRow = (
+  agentKey: string,
+  action: string,
+  behavior: "auto" | "ask" | "never",
+  thresholdCents: number | null = null,
+): AutomationRowLike => ({ agentKey, action, behavior, thresholdCents });
+
+describe("per-agent automation rules (Phase 5)", () => {
+  it("an agent's own rule wins over the every-agent rule", () => {
+    const rows = [agentRow(ALL_AGENTS, "publish_owned", "ask"), agentRow("drafter", "publish_owned", "auto")];
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned", "drafter").behavior, "auto");
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned", "drafter").source, "agent");
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned", "researcher").behavior, "ask");
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned").behavior, "ask");
+  });
+
+  it("an agent's 'ask' overrides an every-agent 'auto'", () => {
+    const rows = [agentRow(ALL_AGENTS, "draft_content", "auto"), agentRow("actor", "draft_content", "ask")];
+    assert.equal(resolveAutomationFromRows(rows, "draft_content", "actor").behavior, "ask");
+    assert.equal(resolveAutomationFromRows(rows, "draft_content", "drafter").behavior, "auto");
+  });
+
+  it("another agent's rows never leak into the workspace view (pre-Phase-5 callers)", () => {
+    const rows = [agentRow("drafter", "publish_owned", "auto")];
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned").behavior, "ask");
+    assert.equal(resolveAutomationFromRows(rows, "publish_owned").source, "default");
+  });
+});
+
+describe("decideAutoApproval (Phase 5)", () => {
+  it("asks by default — auto needs an explicit rule, even for Tier 0", () => {
+    const d = decideAutoApproval([], { agentKey: "drafter", action: "draft_content" });
+    assert.equal(d.auto, false);
+    assert.equal(d.tier, 0);
+  });
+
+  it("runs a Tier 0/1 action without asking when the agent's rule says auto", () => {
+    const rows = [agentRow("drafter", "draft_content", "auto"), agentRow("drafter", "publish_owned", "auto")];
+    assert.equal(decideAutoApproval(rows, { agentKey: "drafter", action: "draft_content" }).auto, true);
+    const owned = decideAutoApproval(rows, { agentKey: "drafter", action: "publish_owned" });
+    assert.equal(owned.auto, true);
+    assert.equal(owned.tier, 1);
+    assert.match(owned.reason, /agent drafter/);
+    // The rule is the drafter's: the lead still asks.
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "draft_content" }).auto, false);
+  });
+
+  it("Phase 14: Tier 2 runs without asking only under an auto rule", () => {
+    const rows = [agentRow("drafter", "send_outreach_email", "auto"), agentRow(ALL_AGENTS, "run_workflow", "auto")];
+    const d = decideAutoApproval(rows, { agentKey: "drafter", action: "send_outreach_email" });
+    assert.equal(d.auto, true);
+    assert.equal(d.tier, 2);
+    assert.match(d.reason, /auto-approved by the send_outreach_email rule for agent drafter/);
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "run_workflow" }).auto, true);
+    // Without a rule (or another agent's rule) it asks.
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "send_outreach_email" }).auto, false);
+    assert.equal(decideAutoApproval([], { agentKey: "drafter", action: "send_outreach_email" }).auto, false);
+  });
+
+  it("Tier 3 can never run automatically — kind or description", () => {
+    const rows = [agentRow(ALL_AGENTS, "issue_refund", "auto"), agentRow(ALL_AGENTS, "publish_owned", "auto")];
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "issue_refund" }).auto, false);
+    const sneaky = decideAutoApproval(rows, {
+      agentKey: "lead",
+      action: "publish_owned",
+      description: "publish and then delete the old campaign data",
+    });
+    assert.equal(sneaky.auto, false);
+    assert.equal(sneaky.tier, 3);
+  });
+
+  it("destructive tools always ask", () => {
+    const rows = [agentRow(ALL_AGENTS, "publish_owned", "auto")];
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "publish_owned", destructive: true }).auto, false);
+  });
+
+  it("a Tier 1 amount over the threshold asks", () => {
+    const rows = [agentRow("actor", "update_listing", "auto", 5_000)];
+    assert.equal(decideAutoApproval(rows, { agentKey: "actor", action: "update_listing", amountCents: 4_000 }).auto, true);
+    assert.equal(decideAutoApproval(rows, { agentKey: "actor", action: "update_listing", amountCents: 9_000 }).auto, false);
+  });
+});

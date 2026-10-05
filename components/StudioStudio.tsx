@@ -317,10 +317,10 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
     <div>
       {notice && (
         <div
-          className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${fade} ${
+          className={`mb-4 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm ${fade} ${
             notice.kind === "ok"
-              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
-              : "border-red-200 bg-red-50/40 text-red-700"
+              ? "bg-paper text-ink shadow-hairline"
+              : "bg-failed-tint text-failed-text"
           }`}
         >
           {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <TriangleAlert className="h-4 w-4" />}
@@ -328,13 +328,13 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-1 border-b border-zinc-200">
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-line">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${press} ${
-              tab === t.id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+              tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
           >
             {t.icon}
@@ -347,7 +347,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
       {tab === "domains" && (
         <div className={fade}>
           {!isOwnerAdmin && (
-            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-2.5 text-sm text-amber-700">
+            <p className="mb-4 rounded-lg bg-paper px-4 py-2.5 text-sm text-ink shadow-hairline">
               Domain purchasing needs an owner or admin role. Availability search and the domain list
               are still visible.
             </p>
@@ -355,11 +355,11 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
 
           {/* Porkbun keys */}
           {isOwnerAdmin && (
-            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-zinc-800">
+            <div className="mb-6 rounded-lg bg-paper p-5 shadow-hairline">
+              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
                 <Settings className="h-4 w-4" /> Porkbun API keys
               </h3>
-              <p className="mb-4 text-sm text-zinc-500">
+              <p className="mb-4 text-sm text-muted">
                 {porkbunConfigured
                   ? `Connected (${porkbunHint ?? "key set"}). Get keys at Porkbun → Account → API Access.`
                   : "Bring your own Porkbun API keys — they are encrypted at rest and never shown again."}
@@ -370,19 +370,19 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                   type="password"
                   placeholder="API key"
                   autoComplete="off"
-                  className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                  className="w-56 rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
                 />
                 <input
                   name="secretApiKey"
                   type="password"
                   placeholder="Secret API key"
                   autoComplete="off"
-                  className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                  className="w-56 rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
                 />
                 <button
                   type="submit"
                   disabled={busy}
-                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
+                  className={`rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
                 >
                   Save keys
                 </button>
@@ -392,39 +392,39 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
 
           {/* Search */}
           {porkbunConfigured && (
-            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-800">Check availability</h3>
+            <div className="mb-6 rounded-lg bg-paper p-5 shadow-hairline">
+              <h3 className="mb-3 text-sm font-semibold text-ink">Check availability</h3>
               <div className="flex gap-2">
                 <input
                   value={searchDomain}
                   onChange={(e) => setSearchDomain(e.target.value)}
                   placeholder="yourdomain.com"
-                  className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                  className="flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
                 />
                 <button
                   onClick={searchAvailability}
                   disabled={busy || !searchDomain.trim()}
-                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
+                  className={`rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
                 >
                   Search
                 </button>
               </div>
               {searchResult && (
-                <div className="mt-4 rounded-lg border border-zinc-200 p-4">
+                <div className="mt-4 rounded-lg border border-line p-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-zinc-900">{searchResult.domain}</span>
+                    <span className="font-medium text-ink">{searchResult.domain}</span>
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         searchResult.available
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-zinc-100 text-zinc-500"
+                          ? "bg-ink text-white"
+                          : "bg-canvas text-muted"
                       }`}
                     >
                       {searchResult.available ? "Available" : "Taken"}
                     </span>
                   </div>
                   {searchResult.available && searchResult.priceUsd != null && (
-                    <div className="mt-2 text-sm text-zinc-500">
+                    <div className="mt-2 text-sm text-muted">
                       ${searchResult.priceUsd.toFixed(2)}/yr registration
                       {searchResult.renewalPriceUsd != null &&
                         searchResult.renewalPriceUsd !== searchResult.priceUsd && (
@@ -439,7 +439,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                   {searchResult.available && isOwnerAdmin && !preview && (
                     <button
                       onClick={previewPurchase}
-                      className={`mt-3 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
+                      className={`mt-3 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
                     >
                       Buy this domain
                     </button>
@@ -451,25 +451,25 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
 
           {/* Purchase preview / double confirmation */}
           {preview && (
-            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/20 p-5">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+            <div className="mb-6 rounded-lg bg-paper p-5 shadow-hairline">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
                 <TriangleAlert className="h-4 w-4" /> Confirm purchase
               </h3>
-              <p className="mb-1 text-lg font-semibold text-zinc-900">{preview.domain}</p>
-              <p className="mb-3 text-sm text-zinc-500">
+              <p className="mb-1 text-lg font-semibold text-ink">{preview.domain}</p>
+              <p className="mb-3 text-sm text-muted">
                 ${preview.priceUsd?.toFixed(2)}/yr registration
                 {preview.renewalPriceUsd != null && ` · $${preview.renewalPriceUsd.toFixed(2)}/yr renewal`}
               </p>
-              <p className="mb-2 text-xs uppercase tracking-widest text-zinc-500">Registrant</p>
-              <p className="mb-3 text-sm text-zinc-500">
+              <p className="mb-2 text-xs font-semibold text-muted">Registrant</p>
+              <p className="mb-3 text-sm text-muted">
                 {preview.registrant.firstName} {preview.registrant.lastName} · {preview.registrant.email} ·{" "}
                 {preview.registrant.address}, {preview.registrant.city} {preview.registrant.zip},{" "}
                 {preview.registrant.country}
               </p>
-              <p className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-500">
+              <p className="mb-4 rounded-lg border border-line bg-canvas p-3 text-xs leading-relaxed text-muted">
                 {preview.icannDisclosure}
               </p>
-              <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm text-zinc-500">
+              <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm text-muted">
                 <input
                   type="checkbox"
                   checked={agreeTerms}
@@ -483,13 +483,13 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                 <button
                   onClick={confirmPurchase}
                   disabled={busy || !agreeTerms}
-                  className={`rounded-md bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40 ${press}`}
+                  className={`rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
                 >
                   {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Confirm purchase"}
                 </button>
                 <button
                   onClick={() => setPreview(null)}
-                  className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
+                  className={`rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press`}
                 >
                   Cancel
                 </button>
@@ -499,9 +499,9 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
 
           {/* Registrant */}
           {isOwnerAdmin && (
-            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="mb-1 text-sm font-semibold text-zinc-800">Registrant contact</h3>
-              <p className="mb-4 text-sm text-zinc-500">
+            <div className="mb-6 rounded-lg bg-paper p-5 shadow-hairline">
+              <h3 className="mb-1 text-sm font-semibold text-ink">Registrant contact</h3>
+              <p className="mb-4 text-sm text-muted">
                 Required before any purchase. Porkbun registers with your account&apos;s default
                 contact; this is your review copy and audit record.
               </p>
@@ -522,14 +522,14 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                     name={k}
                     defaultValue={registrant?.[k] ?? (k === "country" ? "US" : "")}
                     placeholder={label}
-                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                    className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
                   />
                 ))}
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
                     disabled={busy}
-                    className={`rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 ${press}`}
+                    className={`rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press`}
                   >
                     Save registrant
                   </button>
@@ -539,11 +539,11 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
           )}
 
           {/* Domain list */}
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-500">
+          <h3 className="mb-3 text-sm font-semibold text-muted">
             Project domains
           </h3>
           {domains.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-dashed border-control p-8 text-center text-sm text-muted">
               No domains yet. Search above to register one through Porkbun.
             </p>
           ) : (
@@ -551,27 +551,34 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
               {domains.map((d) => (
                 <div
                   key={d.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-paper p-4 shadow-hairline"
                 >
                   <div>
-                    <p className="font-medium text-zinc-900">{d.domain}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="font-medium text-ink">{d.domain}</p>
+                    <p className="text-xs text-muted">
                       {d.status}
                       {d.priceUsd != null && ` · $${d.priceUsd.toFixed(2)}`}
                       {d.purchasedAt && ` · bought ${new Date(d.purchasedAt).toLocaleDateString()}`}
                       {d.nameServers.length > 0 && ` · ${d.nameServers.join(", ")}`}
                     </p>
-                    {d.errorDetail && <p className="text-xs text-red-600">{d.errorDetail}</p>}
+                    {d.errorDetail && <p className="text-xs text-failed-text">{d.errorDetail}</p>}
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    className={`inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold ${
                       d.status === "registered"
-                        ? "bg-emerald-50 text-emerald-700"
+                        ? "bg-done text-white"
                         : d.status === "failed"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-zinc-100 text-zinc-500"
+                          ? "bg-failed text-white"
+                          : "bg-canvas text-muted"
                     }`}
                   >
+                    {(d.status === "registered" || d.status === "failed") && (
+                      <span
+                        aria-hidden
+                        className={`aos-shape ${d.status === "registered" ? "aos-shape--done" : "aos-shape--failed"}`}
+                        style={{ color: "inherit" }}
+                      />
+                    )}
                     {d.status}
                   </span>
                 </div>
@@ -585,51 +592,51 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
       {tab === "assets" && (
         <div className={fade}>
           {canEdit && (
-            <form onSubmit={addAsset} className="mb-6 flex flex-wrap gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+            <form onSubmit={addAsset} className="mb-6 flex flex-wrap gap-2 rounded-lg bg-paper p-4 shadow-hairline">
               <input
                 value={newAssetName}
                 onChange={(e) => setNewAssetName(e.target.value)}
                 placeholder="Name"
-                className="w-48 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                className="w-48 rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
               />
               <input
                 value={newAssetUrl}
                 onChange={(e) => setNewAssetUrl(e.target.value)}
                 placeholder="https://… image or file URL"
-                className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                className="flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
               />
               <button
                 type="submit"
                 disabled={busy || !newAssetUrl.trim()}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
+                className={`rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
               >
                 Add asset
               </button>
             </form>
           )}
           {assets.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-dashed border-control p-8 text-center text-sm text-muted">
               No assets yet. Add a URL below.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {assets.map((a) => (
-                <div key={a.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                  <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-lg bg-white outline outline-1 outline-[oklch(0_0_0/0.1)]">
+                <div key={a.id} className="rounded-lg bg-paper p-4 shadow-hairline">
+                  <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-lg bg-paper outline outline-1 outline-[oklch(0_0_0/0.1)]">
                     {a.mimeType?.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/i.test(a.url) ? (
                       <img src={a.url} alt={a.name} className="max-h-full object-contain" />
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-zinc-600" />
+                      <ImageIcon className="h-8 w-8 text-muted" />
                     )}
                   </div>
-                  <p className="text-sm font-medium text-zinc-800">{a.name}</p>
-                  <p className="mb-3 text-xs capitalize text-zinc-500">{a.source}</p>
+                  <p className="text-sm font-medium text-ink">{a.name}</p>
+                  <p className="mb-3 text-xs capitalize text-muted">{a.source}</p>
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={a.url}
                       target="_blank"
                       rel="noreferrer"
-                      className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-800 ${press}`}
+                      className={`inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-ink shadow-control hover:shadow-outline aos-press`}
                     >
                       <Link className="h-3 w-3" /> Open
                     </a>
@@ -637,13 +644,13 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                       <>
                         <button
                           onClick={() => void openUseInSocial(a)}
-                          className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
+                          className={`inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
                         >
                           <Send className="h-3 w-3" /> Use in social post
                         </button>
                         <button
                           onClick={() => deleteAsset(a.id)}
-                          className={`rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 ${press}`}
+                          className={`rounded-full bg-paper px-3 py-1.5 text-xs text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint aos-press`}
                         >
                           <Trash className="h-3 w-3" />
                         </button>
@@ -658,23 +665,23 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
       )}
       {/* Delete confirmation */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-sm rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-900">Delete this asset?</h3>
-            <p className="mt-1 text-sm text-zinc-500">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className={`w-full max-w-sm rounded-lg bg-paper p-6 shadow-overlay ${fade}`}>
+            <h3 className="text-base font-semibold text-ink">Delete this asset?</h3>
+            <p className="mt-1 text-sm text-muted">
               This removes it from the asset library. Posts already using it keep their copy.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
+                className={`rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press`}
               >
                 Cancel
               </button>
               <button
                 onClick={doDeleteAsset}
                 disabled={busy}
-                className={`rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white ${press}`}
+                className={`rounded-full bg-paper px-4 py-2 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint aos-press`}
               >
                 Delete
               </button>
@@ -685,28 +692,28 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
 
       {/* Use in social post */}
       {socialAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-lg rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-900">Use in social post</h3>
-            <p className="mt-1 text-xs text-zinc-500">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className={`w-full max-w-lg rounded-lg bg-paper p-6 shadow-overlay ${fade}`}>
+            <h3 className="text-base font-semibold text-ink">Use in social post</h3>
+            <p className="mt-1 text-xs text-muted">
               Creates a Postiz draft with “{socialAsset.name}” — publish it from the Social tab.
             </p>
             <label className="mt-4 block">
-              <span className="mb-1 block text-xs font-medium text-zinc-500">Post text</span>
+              <span className="mb-1 block text-xs font-medium text-muted">Post text</span>
               <textarea
                 value={socialText}
                 onChange={(e) => setSocialText(e.target.value)}
                 rows={4}
                 placeholder="Write the post…"
-                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink"
               />
             </label>
             <div className="mt-4">
-              <span className="mb-1 block text-xs font-medium text-zinc-500">Postiz channels</span>
+              <span className="mb-1 block text-xs font-medium text-muted">Postiz channels</span>
               {postizChannelsLoading ? (
-                <p className="text-xs text-zinc-500">Loading channels…</p>
+                <p className="text-xs text-muted">Loading channels…</p>
               ) : postizChannels.length === 0 ? (
-                <p className="text-xs text-zinc-500">No Postiz channels connected — connect one under Social first.</p>
+                <p className="text-xs text-muted">No Postiz channels connected — connect one under Social first.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {postizChannels.map((ch) => (
@@ -719,10 +726,10 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                             : [...socialChannelIds, ch.id],
                         )
                       }
-                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                         socialChannelIds.includes(ch.id)
-                          ? "border-violet-600 bg-violet-600 text-white"
-                          : "border-zinc-300 text-zinc-500"
+                          ? "bg-ink text-white"
+                          : "bg-paper text-ink shadow-control hover:shadow-outline"
                       }`}
                     >
                       {ch.name ?? ch.identifier}
@@ -734,14 +741,14 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setSocialAsset(null)}
-                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
+                className={`rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press`}
               >
                 Cancel
               </button>
               <button
                 onClick={submitUseInSocial}
                 disabled={busy || socialChannelIds.length === 0}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
+                className={`rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg`}
               >
                 Create draft
               </button>

@@ -28,12 +28,12 @@ export default async function RankingsPage({
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-600"
+          className="text-sm text-muted hover:text-ink"
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Rank tracking</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="aos-heading mt-1 text-ink">Rank tracking</h1>
+        <p className="mt-1 text-sm text-muted">
           Track positions over time, watch the visibility score, and catch big
           movers.
         </p>

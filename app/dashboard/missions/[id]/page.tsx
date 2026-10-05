@@ -1,4 +1,4 @@
-// Marketr — Growth Mission detail (Phase 9, M4).
+// Marketr — Growth Mission detail (Phase 9, M4; Agentic OS 4d).
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Mission — ShapesOS",
-  description: "Mission detail: goal, event timeline, approval queue, and plan.",
+  description: "Mission detail: the lead agent and its sub-agents, the mission timeline, approvals, and plan.",
 };
 
 export default async function MissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,9 +16,5 @@ export default async function MissionDetailPage({ params }: { params: Promise<{ 
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   const { id } = await params;
-  return (
-    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
-      <MissionDetail missionId={id} />
-    </div>
-  );
+  return <MissionDetail missionId={id} />;
 }

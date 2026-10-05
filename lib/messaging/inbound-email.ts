@@ -15,6 +15,17 @@
 // The reply lands in the same ledger as inbound SMS (outbound_message,
 // direction "inbound", channel "email"), matched to a lead by the sender's
 // address, so it threads in the CRM inbox. Idempotent per Resend email id.
+//
+// Phase 10 (ops-core) — helpdesk: a second signed address per workspace,
+//
+//     support+<workspaceId>-<sig>@<domain>
+//
+// (its own HMAC tag, so a reply address can't be turned into a support one)
+// is the workspace's support inbox: mail to it opens or threads onto an
+// OpsTicket (lib/ops/helpdesk.ts). A reply address that receives mail from
+// an UNKNOWN sender (no lead) — or a subject carrying a ticket token "[#n]"
+// — is routed to the helpdesk too instead of only being counted. Ticket
+// replies go out with the support address as Reply-To.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -35,8 +46,29 @@ function signingSecret(env: NodeJS.ProcessEnv): string {
   return requireSecret("MESSAGING_INBOUND_EMAIL_SECRET", "messaging-inbound-email-dev-secret", env);
 }
 
-function sigFor(workspaceId: string, env: NodeJS.ProcessEnv): string {
-  return createHmac("sha256", signingSecret(env)).update(`inbound-email:${workspaceId}`).digest("hex").slice(0, SIG_HEX);
+function sigFor(workspaceId: string, env: NodeJS.ProcessEnv, tag = "inbound-email"): string {
+  return createHmac("sha256", signingSecret(env)).update(`${tag}:${workspaceId}`).digest("hex").slice(0, SIG_HEX);
+}
+
+// Phase 10 (ops-core): the helpdesk support address (separate HMAC tag).
+const SUPPORT_PREFIX = "support+";
+const SUPPORT_TAG = "support-email";
+
+/** The workspace's signed support address, or null when inbound email is off. */
+export function supportAddressFor(workspaceId: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  const domain = inboundEmailDomain(env);
+  if (!domain || !/^[a-z0-9_]{1,64}$/.test(workspaceId)) return null;
+  return `${SUPPORT_PREFIX}${workspaceId}-${sigFor(workspaceId, env, SUPPORT_TAG)}@${domain}`;
+}
+
+/** supportAddressFor for the send path: misconfiguration drops the Reply-To instead of failing the send. */
+export function supportAddressForSend(workspaceId: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  try {
+    return supportAddressFor(workspaceId, env) ?? undefined;
+  } catch (e) {
+    log.warn("support reply address unavailable", { error: e instanceof Error ? e.message : String(e) });
+    return undefined;
+  }
 }
 
 /** The workspace's Reply-To address, or null when inbound email is off. */
@@ -74,20 +106,29 @@ export function extractAddress(value: unknown): string | null {
  * constant time), or null for any other address.
  */
 export function workspaceForReplyAddress(address: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  return workspaceForSignedAddress(address, LOCAL_PREFIX, "inbound-email", env);
+}
+
+/** Phase 10 (ops-core): the workspace a signed support address belongs to, or null. */
+export function workspaceForSupportAddress(address: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  return workspaceForSignedAddress(address, SUPPORT_PREFIX, SUPPORT_TAG, env);
+}
+
+function workspaceForSignedAddress(address: string, prefix: string, tag: string, env: NodeJS.ProcessEnv): string | null {
   const domain = inboundEmailDomain(env);
   const addr = extractAddress(address);
   if (!domain || !addr) return null;
   const at = addr.lastIndexOf("@");
   if (addr.slice(at + 1) !== domain) return null;
   const local = addr.slice(0, at);
-  if (!local.startsWith(LOCAL_PREFIX)) return null;
-  const rest = local.slice(LOCAL_PREFIX.length);
+  if (!local.startsWith(prefix)) return null;
+  const rest = local.slice(prefix.length);
   const dash = rest.lastIndexOf("-");
   if (dash <= 0) return null;
   const ws = rest.slice(0, dash);
   const sig = rest.slice(dash + 1);
   if (!/^[a-z0-9_]{1,64}$/.test(ws) || sig.length !== SIG_HEX) return null;
-  const expected = Buffer.from(sigFor(ws, env));
+  const expected = Buffer.from(sigFor(ws, env, tag));
   const given = Buffer.from(sig);
   return expected.length === given.length && timingSafeEqual(expected, given) ? ws : null;
 }
@@ -148,7 +189,9 @@ export interface ReceivedEmailEvent {
 export type InboundEmailResult =
   | { action: "logged"; workspaceId: string; leadId: string | null; messageId: string }
   | { action: "duplicate"; workspaceId: string; messageId: string }
-  | { action: "ignored"; reason: string };
+  | { action: "ignored"; reason: string }
+  // Phase 10 (ops-core): routed to the helpdesk.
+  | { action: "ticket_created" | "ticket_threaded"; workspaceId: string; ticketId: string; number: number };
 
 export class InboundEmailFetchError extends Error {
   constructor(message: string) {
@@ -194,13 +237,28 @@ export async function handleInboundEmail(
 
   const candidates = [...(data.to ?? []), ...(data.cc ?? []), ...(data.received_for ?? [])];
   let workspaceId: string | null = null;
+  // Phase 10 (ops-core): a signed support address wins — that mail is a ticket.
+  let toSupport = false;
   for (const c of candidates) {
+    const sws = workspaceForSupportAddress(String(c), env);
+    if (sws) {
+      workspaceId = sws;
+      toSupport = true;
+      break;
+    }
+  }
+  for (const c of toSupport ? [] : candidates) {
     workspaceId = workspaceForReplyAddress(String(c), env);
     if (workspaceId) break;
   }
   if (!workspaceId) return { action: "ignored", reason: "not addressed to a workspace reply address" };
   const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { id: true } });
   if (!ws) return { action: "ignored", reason: "unknown workspace" };
+
+  if (toSupport) {
+    const content = await fetchBody(emailId, env, fetchImpl);
+    return toHelpdesk(workspaceId, emailId, data, content);
+  }
 
   const existing = await prisma.outboundMessage.findFirst({
     where: { workspaceId, direction: "inbound", channel: "email", providerSid: emailId },
@@ -218,6 +276,10 @@ export async function handleInboundEmail(
       })
     : null;
   const subject = (typeof data.subject === "string" ? data.subject : content.subject ?? "").trim().slice(0, 200) || null;
+  // Phase 10 (ops-core): unknown senders and ticket-token replies become
+  // helpdesk tickets instead of being only counted in the inbox.
+  const { ticketNumberFromSubject } = await import("@/lib/ops/helpdesk");
+  if (!lead || ticketNumberFromSubject(subject) != null) return toHelpdesk(workspaceId, emailId, data, content);
   const row = await prisma.outboundMessage.create({
     data: {
       workspaceId,
@@ -240,6 +302,27 @@ export async function handleInboundEmail(
       .catch(() => {});
   }
   return { action: "logged", workspaceId, leadId: lead?.id ?? null, messageId: row.id };
+}
+
+/** Phase 10 (ops-core): hand a verified inbound email to the helpdesk. */
+async function toHelpdesk(
+  workspaceId: string,
+  emailId: string,
+  data: NonNullable<ReceivedEmailEvent["data"]>,
+  content: { text: string; subject: string | null },
+): Promise<InboundEmailResult> {
+  const { routeInboundEmailToTicket } = await import("@/lib/ops/helpdesk");
+  const fromRaw = typeof data.from === "string" ? data.from : "";
+  const name = /^\s*"?([^"<]+?)"?\s*</.exec(fromRaw)?.[1]?.trim() ?? null;
+  const r = await routeInboundEmailToTicket(workspaceId, {
+    emailId,
+    from: extractAddress(fromRaw),
+    fromName: name,
+    subject: (typeof data.subject === "string" ? data.subject : content.subject ?? "").trim().slice(0, 300) || null,
+    text: content.text,
+  });
+  if (r.action === "duplicate") return { action: "duplicate", workspaceId, messageId: r.ticketId };
+  return { action: r.action, workspaceId, ticketId: r.ticketId, number: r.number };
 }
 
 /**

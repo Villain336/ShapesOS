@@ -6,8 +6,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Notice, btnCls, cardCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
+import { Notice, btnCls, cardCls, inputCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
 import TimezoneField, { useBrowserTimeZone } from "./TimezoneField";
+import { Clock } from "lucide-react";
+import { Field } from "@/components/aos/Controls";
 
 interface SkillOption {
   id: string;
@@ -30,6 +32,10 @@ const EVENT_SOURCES = [
   { source: "content_decay", label: "Content decay", description: "A page's traffic decay flag is raised." },
   { source: "content_published", label: "Content published", description: "A content item is published." },
 ] as const;
+
+// Select labels match the kit Field label (text-md, semibold, ink).
+const selectLabelCls = "flex flex-col gap-2 text-md font-semibold text-ink";
+const selectCls = `${inputCls} h-control w-full text-base font-normal`;
 
 const APPROVAL_MODES = [
   { mode: "supervised", label: "Supervised", description: "Notify and wait — every run needs your approval before anything executes." },
@@ -62,6 +68,8 @@ export default function ScheduleWizard({
   const [approvalMode, setApprovalMode] = useState<string>("supervised");
   const [concurrencyLimit, setConcurrencyLimit] = useState(4);
   const [notice, setNotice] = useState<NoticeState | null>(null);
+  // Field-level errors (kit Field: red square + text, aria-invalid).
+  const [cronError, setCronError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -106,7 +114,7 @@ export default function ScheduleWizard({
     };
     if (triggerType === "cron") {
       if (!cronExpr) {
-        setNotice({ kind: "error", message: "Enter a cron expression (5 fields: minute hour day month weekday)." });
+        setCronError("Enter a cron expression (5 fields: minute hour day month weekday).");
         setBusy(false);
         return;
       }
@@ -135,10 +143,10 @@ export default function ScheduleWizard({
       <Notice notice={notice} />
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">1. Skill</h2>
-        <p className="mt-1 text-xs text-zinc-500">Only skills enabled for this project can be scheduled.</p>
+        <h2 className="text-sm font-semibold text-ink">1. Skill</h2>
+        <p className="mt-1 text-xs text-muted">Only skills enabled for this project can be scheduled.</p>
         {skills.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-600">
+          <p className="mt-3 text-sm text-muted">
             No skills are enabled for this project yet. Enable one under the project's skill settings first.
           </p>
         ) : (
@@ -153,17 +161,17 @@ export default function ScheduleWizard({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">2. Trigger</h2>
+        <h2 className="text-sm font-semibold text-ink">2. Trigger</h2>
         <div className="mt-3 flex gap-2">
           {(["cron", "event"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTriggerType(t)}
-              className={`rounded-md border px-4 py-2 text-sm font-medium ${
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 triggerType === t
-                  ? "border-accent bg-accent/10 text-accent-hover"
-                  : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                  ? "bg-ink text-white"
+                  : "bg-paper text-ink shadow-control hover:shadow-outline"
               }`}
             >
               {t === "cron" ? "Schedule" : "Event"}
@@ -173,9 +181,9 @@ export default function ScheduleWizard({
 
         {triggerType === "cron" ? (
           <div className="mt-4 flex flex-col gap-3">
-            <label className={labelCls}>
+            <label className={selectLabelCls}>
               Cadence
-              <select className={`${inputCls} mt-1 w-full`} value={preset} onChange={(e) => setPreset(e.target.value)}>
+              <select className={selectCls} value={preset} onChange={(e) => setPreset(e.target.value)}>
                 {CRON_PRESETS.map((p) => (
                   <option key={p.key} value={p.key}>
                     {p.label}
@@ -184,31 +192,35 @@ export default function ScheduleWizard({
               </select>
             </label>
             {preset === "custom" && (
-              <label className={labelCls}>
-                Cron expression (5 fields)
-                <input
-                  className={`${inputCls} mt-1 w-full font-mono`}
-                  value={customExpr}
-                  onChange={(e) => setCustomExpr(e.target.value)}
-                  placeholder="0 9 * * 1"
-                />
-              </label>
+              <Field
+                label="Cron expression"
+                value={customExpr}
+                onChange={(e) => {
+                  setCustomExpr(e.target.value);
+                  if (cronError) setCronError(null);
+                }}
+                placeholder="0 9 * * 1"
+                leading={<Clock className="size-4" aria-hidden />}
+                inputClassName="aos-mono"
+                helper="5 fields: minute hour day month weekday."
+                error={cronError}
+              />
             )}
             {preset !== "custom" && (
-              <p className="font-mono text-xs text-zinc-500">
-                Expression: <span className="text-zinc-800">{cronExpr}</span>
+              <p className="font-mono text-xs text-muted">
+                Expression: <span className="text-ink">{cronExpr}</span>
               </p>
             )}
             <TimezoneField value={timezone} onChange={setTimezoneChoice} />
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted">
               If the scheduler restarts and misses a window, the run fires once and is marked missed — missed windows are never replayed in bulk.
             </p>
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
-            <label className={labelCls}>
+            <label className={selectLabelCls}>
               Event source
-              <select className={`${inputCls} mt-1 w-full`} value={eventSource} onChange={(e) => setEventSource(e.target.value)}>
+              <select className={selectCls} value={eventSource} onChange={(e) => setEventSource(e.target.value)}>
                 {EVENT_SOURCES.map((s) => (
                   <option key={s.source} value={s.source}>
                     {s.label} — {s.description}
@@ -217,52 +229,56 @@ export default function ScheduleWizard({
               </select>
             </label>
             {eventSource === "rank_drop" && (
-              <label className={labelCls}>
-                Fire when a keyword drops more than (positions)
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  className={`${inputCls} mt-1 w-32`}
-                  value={dropThreshold}
-                  onChange={(e) => setDropThreshold(Number(e.target.value) || 3)}
-                />
-              </label>
+              <Field
+                label="Fire when a keyword drops more than"
+                type="number"
+                min={1}
+                max={100}
+                className="max-w-60"
+                trailing="positions"
+                value={dropThreshold}
+                onChange={(e) => setDropThreshold(Number(e.target.value) || 3)}
+              />
             )}
             {eventSource === "content_decay" && (
-              <label className={labelCls}>
-                Fire when traffic drops more than (percent)
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className={`${inputCls} mt-1 w-32`}
-                  value={minDropPct}
-                  onChange={(e) => setMinDropPct(Number(e.target.value) || 20)}
-                />
-              </label>
+              <Field
+                label="Fire when traffic drops more than"
+                type="number"
+                min={0}
+                max={100}
+                className="max-w-60"
+                trailing="%"
+                value={minDropPct}
+                onChange={(e) => setMinDropPct(Number(e.target.value) || 20)}
+              />
             )}
             {eventSource === "new_backlink" && (
-              <label className={labelCls}>
-                Only for domain (optional)
-                <input className={`${inputCls} mt-1 w-full`} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" />
-              </label>
+              <Field
+                label="Only for domain"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="example.com"
+                helper="Optional. Leave empty for every domain in the project."
+              />
             )}
             {eventSource === "connector_error" && (
-              <label className={labelCls}>
-                Only for connection ID (optional)
-                <input className={`${inputCls} mt-1 w-full font-mono`} value={connectionId} onChange={(e) => setConnectionId(e.target.value)} />
-              </label>
+              <Field
+                label="Only for connection ID"
+                value={connectionId}
+                onChange={(e) => setConnectionId(e.target.value)}
+                inputClassName="aos-mono"
+                helper="Optional. Leave empty for every connection."
+              />
             )}
           </div>
         )}
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">3. Approval mode</h2>
+        <h2 className="text-sm font-semibold text-ink">3. Approval mode</h2>
         <div className="mt-3 flex flex-col gap-2">
           {APPROVAL_MODES.map((m) => (
-            <label key={m.mode} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${approvalMode === m.mode ? "border-accent bg-accent/5" : "border-zinc-200 bg-white"}`}>
+            <label key={m.mode} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${approvalMode === m.mode ? "border-ink bg-hover-paper" : "border-line bg-paper"}`}>
               <input
                 type="radio"
                 name="approvalMode"
@@ -272,8 +288,8 @@ export default function ScheduleWizard({
                 className="mt-1"
               />
               <span>
-                <span className="text-sm font-medium text-zinc-900">{m.label}</span>
-                <span className="block text-xs text-zinc-500">{m.description}</span>
+                <span className="text-sm font-medium text-ink">{m.label}</span>
+                <span className="block text-xs text-muted">{m.description}</span>
               </span>
             </label>
           ))}
@@ -281,18 +297,17 @@ export default function ScheduleWizard({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">4. Parallelism</h2>
-        <label className={labelCls}>
-          Max parallel subagents (1–16, workspace default is 4)
-          <input
-            type="number"
-            min={1}
-            max={16}
-            className={`${inputCls} mt-1 w-32`}
-            value={concurrencyLimit}
-            onChange={(e) => setConcurrencyLimit(Math.min(16, Math.max(1, Number(e.target.value) || 4)))}
-          />
-        </label>
+        <h2 className="text-sm font-semibold text-ink">4. Parallelism</h2>
+        <Field
+          label="Max parallel sub-agents"
+          type="number"
+          min={1}
+          max={16}
+          className="mt-3 max-w-60"
+          value={concurrencyLimit}
+          onChange={(e) => setConcurrencyLimit(Math.min(16, Math.max(1, Number(e.target.value) || 4)))}
+          helper="1 to 16. The workspace default is 4."
+        />
       </section>
 
       <div className="flex gap-2">

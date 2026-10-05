@@ -65,7 +65,7 @@ function StatusShape({ kind, live }: { kind: ShapeKind; live?: boolean }) {
       <path
         d={paths[kind]}
         fill={fills[kind]}
-        {...(kind === "needs" ? { stroke: "#000", strokeWidth: 1 } : {})}
+        {...(kind === "needs" ? { stroke: "var(--aos-ink)", strokeWidth: 1 } : {})}
       />
     </svg>
   );

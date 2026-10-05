@@ -35,6 +35,7 @@ import {
   Users,
   Wrench,
   type LucideIcon,
+  Shapes,
 } from "lucide-react";
 
 export interface SettingsPage {
@@ -121,6 +122,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: "/dashboard/settings/developers", label: "API reference", description: "The public API and webhook events, from the OpenAPI spec.", icon: BookOpen },
       { href: "/dashboard/settings/webhooks", label: "Webhooks", description: "Signed events to your own endpoints, with a delivery log.", icon: Webhook },
       { href: "/dashboard/settings/experiments", label: "Experiments", description: "Feature flags and growth experiments.", icon: FlaskConical },
+      // Phase 4d: the Agentic OS kit rendered from components/aos, every state.
+      { href: "/dashboard/settings/design", label: "Design kit", description: "Every Agentic OS component in every state, next to the kit renders.", icon: Shapes },
     ],
   },
 ];

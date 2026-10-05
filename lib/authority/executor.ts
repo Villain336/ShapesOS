@@ -171,6 +171,32 @@ export function createMemoryMissionApprovalStore(): MissionApprovalStore {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 14 (approvals): a rule may approve a mission approval
+// ---------------------------------------------------------------------------
+
+/**
+ * Approve a PENDING mission approval on an automation rule's authority
+ * (decision from lib/automation/policy.ts decideAutoApproval — never Tier 3,
+ * never destructive). Appends a hash-chained "auto_approved" event naming
+ * the rule. Approvals without a mission can't be chain-logged, so they stay
+ * pending (a person decides). Returns the approval as it now stands.
+ */
+export async function autoApproveMissionApproval(
+  store: MissionApprovalStore,
+  approval: StoredMissionApproval,
+  decision: { auto: boolean; tier: DoATier; reason: string } | null,
+  now: Date = new Date(),
+): Promise<StoredMissionApproval> {
+  if (!decision?.auto || decision.tier === 3 || approval.status !== "pending" || !approval.missionId) return approval;
+  await store.appendEvent(approval.id, approval.workspaceId, "automation", "auto_approved", {
+    rule: decision.reason,
+    tier: decision.tier,
+    actionKind: approval.action,
+  });
+  return store.setStatus(approval.id, approval.workspaceId, "approved", { decidedAt: now });
+}
+
+// ---------------------------------------------------------------------------
 // executeApproved
 // ---------------------------------------------------------------------------
 
@@ -189,6 +215,13 @@ export interface ExecuteApprovedDeps {
   isMissionPaused: (missionId: string, workspaceId: string) => Promise<boolean> | boolean;
   /** Tier settings resolved for this action (M6: from automation_settings). */
   tierSettings?: TierSettings;
+  /**
+   * Phase 14 (approvals): resolve the tier settings for THIS action from the
+   * workspace's automation rules (agent-aware) — production passes
+   * lib/automation/policy.ts automationTierSettingsFor(workspaceId, agentKey).
+   * Wins over `tierSettings`. Tier 3 still always halts.
+   */
+  resolveTierSettings?: (action: TierAction) => Promise<TierSettings> | TierSettings;
   now?: () => Date;
 }
 
@@ -219,7 +252,7 @@ export async function executeApproved(
   const { approvalId, action, workspaceId } = input;
   const { store } = deps;
   const now = deps.now?.() ?? new Date();
-  const tierSettings: TierSettings = { ...defaultTierSettings(), ...deps.tierSettings };
+  let tierSettings: TierSettings = { ...defaultTierSettings(), ...deps.tierSettings };
 
   // (0) Kill switch FIRST: a frozen workspace halts everything.
   if (await deps.isWorkspaceFrozen(workspaceId)) {
@@ -252,6 +285,11 @@ export async function executeApproved(
   }
 
   // (c) DoA tier re-evaluated AT EXECUTION TIME. The agent's label is untrusted.
+  // Phase 14: the automation rules for this action decide the toggle (an
+  // approval a rule granted at Tier 1 halts if the rule was switched off).
+  if (deps.resolveTierSettings) {
+    tierSettings = { ...defaultTierSettings(), ...(await deps.resolveTierSettings(action)) };
+  }
   const tier = evaluateTier(action, tierSettings);
   if (tier === 3) {
     await store.appendEvent(approvalId, workspaceId, "executor", "execution_halted", {

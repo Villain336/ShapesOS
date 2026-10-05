@@ -79,8 +79,8 @@ export default async function AdsPage({ params }: { params: Promise<{ id: string
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight text-ink">Ad factory</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-xl font-heading stretch-heading tracking-heading text-ink">Ad factory</h1>
+        <p className="mt-1 text-sm text-muted">
           Briefs become on-brand ad creatives through the Higgsfield API — review, iterate, then send winners to social.
         </p>
       </div>

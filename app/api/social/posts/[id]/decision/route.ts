@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { hasOtherApprover } from "@/lib/approvals/inbox";
 import { decidePost } from "@/lib/social/publications";
 import { getSocialProvider } from "@/lib/social/provider";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { ForbiddenError } from "@/lib/api/errors";
 import { guardWorkspace, readJson, socialError } from "../../../_lib";
 
@@ -26,7 +26,7 @@ const Body = z.object({
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
-    const rl = checkRateLimit(`postiz-post:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`postiz-post:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
     const v = validateBody(Body, await readJson(req));
     if (!v.ok) return v.error;

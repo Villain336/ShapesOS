@@ -4,9 +4,9 @@
 // Google Ads API over REST (lib/connectors/m21/live/google-ads.ts):
 //   GET  https://googleads.googleapis.com/v25/customers:listAccessibleCustomers
 //     → list_accounts() (+ customer.descriptive_name per account) + health check
-//   POST https://googleads.googleapis.com/v25/customers/{customerId}/googleAds:search
+//   POST https://googleads.googleapis.com/v25/customers/{customerId}/googleAds:searchStream
 //     GAQL FROM campaign → campaign_report(); FROM keyword_view → keyword_report()
-//     (nextPageToken pagination)
+//     (one streamed request; rows bounded by a GAQL LIMIT)
 // Auth: OAuth2 Bearer (scope adwords) + the developer-token header (the
 // app's GOOGLE_ADS_DEVELOPER_TOKEN, or a BYO developerToken in the credential
 // payload) + login-customer-id (projectConfig.loginCustomerId, args, or the

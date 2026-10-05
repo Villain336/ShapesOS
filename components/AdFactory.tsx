@@ -91,12 +91,19 @@ interface Props {
 
 type Tab = "campaigns" | "generate" | "gallery" | "settings";
 
-const STATUS_STYLE: Record<string, string> = {
-  queued: "bg-zinc-100 text-zinc-500",
-  generating: "bg-blue-50 text-blue-700",
-  ready: "bg-emerald-50 text-emerald-700",
-  failed: "bg-red-50 text-red-700",
-  cancelled: "bg-white text-zinc-500",
+// A creative's generation is a run: status shape + label (DESIGN.md status language).
+const STATUS_SHAPE: Record<string, string> = {
+  queued: "aos-shape aos-shape--queued",
+  generating: "aos-shape aos-shape--running aos-is-live",
+  ready: "aos-shape aos-shape--done",
+  failed: "aos-shape aos-shape--failed",
+};
+const STATUS_LABEL: Record<string, string> = {
+  queued: "Queued",
+  generating: "Generating",
+  ready: "Ready",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const CHANNELS = Object.keys(CHANNEL_FORMATS);
@@ -107,14 +114,13 @@ function dollars(cents: number): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const generating = status === "generating" || status === "queued";
+  const shape = STATUS_SHAPE[status];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${STATUS_STYLE[status] ?? "bg-zinc-100 text-zinc-500"}`}
-      style={{ transitionTimingFunction: EASE }}
+      className={`inline-flex h-6 items-center gap-1.5 rounded-full bg-paper px-2 text-xs font-semibold shadow-hairline ${status === "failed" ? "text-failed-text" : status === "cancelled" ? "text-muted" : "text-ink"}`}
     >
-      {generating && <LoaderCircle className="h-3 w-3 animate-spin" />}
-      {status}
+      {shape && <span className={shape} aria-hidden="true" />}
+      {STATUS_LABEL[status] ?? status}
     </span>
   );
 }
@@ -383,25 +389,33 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   ];
 
   const btnPrimary =
-    "inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-accent-hover active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
+    "inline-flex h-control-sm shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
   const btnGhost =
-    "inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 transition-[background-color,border-color,color,transform] duration-150 hover:border-zinc-400 active:scale-[0.96] disabled:opacity-50";
+    "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
   const field =
-    "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition-colors duration-150 focus:border-accent focus:outline-none";
-  const label = "mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500";
+    "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle transition-colors duration-150 focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+  const label = "mb-1 block text-xs font-semibold text-muted";
+  const chip = (on: boolean) =>
+    `inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
+      on ? "bg-ink text-paper" : "bg-paper text-ink shadow-control hover:shadow-outline"
+    }`;
+  const note = "mb-4 flex items-start gap-2 rounded-md bg-paper px-4 py-3 text-sm text-ink shadow-hairline";
+  const card = "rounded-lg bg-paper p-5 shadow-hairline";
+  const cardHeading = "flex items-center gap-2 text-sm font-semibold text-ink";
 
   return (
     <div>
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 border-b border-zinc-200">
+      <div className="mb-6 flex w-fit gap-1 rounded-full bg-paper p-1 shadow-hairline">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
+            aria-pressed={tab === t.key}
+            className={`flex h-8 items-center gap-2 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150 ${
               tab === t.key
-                ? "border-accent text-accent-ink"
-                : "border-transparent text-zinc-500 hover:text-zinc-800"
+                ? "bg-ink text-paper"
+                : "text-muted hover:bg-hover-paper hover:text-ink"
             }`}
             style={{ transitionTimingFunction: EASE }}
           >
@@ -414,13 +428,13 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
       {/* Flash messages */}
       <div key={tab} className="transition-opacity duration-150" style={{ transitionTimingFunction: EASE }}>
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 text-sm text-red-700">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div role="alert" className="mb-4 flex items-start gap-2 rounded-md bg-failed-tint px-4 py-3 text-sm text-failed-text">
+            <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
             {error}
           </div>
         )}
         {notice && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-800">
+          <div className={note}>
             <Check className="mt-0.5 h-4 w-4 shrink-0" />
             {notice}
           </div>
@@ -429,21 +443,22 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
         {tab === "campaigns" && (
           <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Campaigns</h2>
+              <h2 className="text-sm font-semibold text-muted">Campaigns</h2>
               {campaigns.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setActiveCampaignId(c.id)}
-                  className={`w-full rounded-xl border p-4 text-left transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] ${
-                    activeCampaignId === c.id ? "border-accent bg-accent-tint" : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"
+                  aria-pressed={activeCampaignId === c.id}
+                  className={`w-full rounded-lg bg-paper p-4 text-left transition-[background-color,box-shadow] duration-150 ${
+                    activeCampaignId === c.id ? "shadow-outline" : "shadow-hairline hover:bg-hover-paper"
                   }`}
                   style={{ transitionTimingFunction: EASE }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-zinc-900">{c.name}</span>
-                    <span className="shrink-0 text-xs text-zinc-500">{c._count.creatives} creatives</span>
+                    <span className="truncate text-sm font-medium text-ink">{c.name}</span>
+                    <span className="shrink-0 text-xs text-muted">{c._count.creatives} creatives</span>
                   </div>
-                  <div className="mt-1 text-xs text-zinc-500">
+                  <div className="mt-1 text-xs text-muted">
                     Est {dollars(c.spend.estimated)} · Actual {dollars(c.spend.actual)}
                   </div>
                 </button>
@@ -463,21 +478,21 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                 </div>
               )}
               {campaigns.length === 0 && (
-                <p className="text-sm text-zinc-500">No campaigns yet — create one to start generating ads.</p>
+                <p className="text-sm text-muted">No campaigns yet — create one to start generating ads.</p>
               )}
             </div>
 
             <div>
               {activeCampaign ? (
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+                <div className={card}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-zinc-900">{activeCampaign.name}</h3>
-                      {activeCampaign.objective && <p className="mt-1 text-sm text-zinc-500">{activeCampaign.objective}</p>}
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <h3 className="text-lg font-heading stretch-heading tracking-heading text-ink">{activeCampaign.name}</h3>
+                      {activeCampaign.objective && <p className="mt-1 text-sm text-muted">{activeCampaign.objective}</p>}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                         <span>
                           Brand kit:{" "}
-                          <span className={activeCampaign.brandKitId ? "text-emerald-700" : "text-amber-700"}>
+                          <span className={activeCampaign.brandKitId ? "font-semibold text-ink" : "font-semibold text-failed-text"}>
                             {brandKits.find((k) => k.id === activeCampaign.brandKitId)?.name ?? "none — required for generation"}
                           </span>
                         </span>
@@ -501,15 +516,15 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                       { label: "Est. spend", value: dollars(activeCampaign.spend.estimated) },
                       { label: "Actual spend", value: dollars(activeCampaign.spend.actual) },
                     ].map((s) => (
-                      <div key={s.label} className="rounded-lg border border-zinc-300 bg-white p-3">
-                        <div className="text-xs text-zinc-500">{s.label}</div>
-                        <div className="mt-0.5 text-lg font-semibold text-zinc-900 tabular-nums">{s.value}</div>
+                      <div key={s.label} className="rounded-md bg-canvas p-3">
+                        <div className="text-xs text-muted">{s.label}</div>
+                        <div className="mt-0.5 text-lg font-semibold text-ink tabular-nums">{s.value}</div>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-zinc-500">Select a campaign to see details.</p>
+                <p className="text-sm text-muted">Select a campaign to see details.</p>
               )}
             </div>
           </div>
@@ -518,31 +533,31 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
         {tab === "generate" && (
           <div className="max-w-2xl">
             {!activeCampaign && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3 text-sm text-amber-800">
+              <div className={note}>
                 Select a campaign first (Campaigns tab).
               </div>
             )}
             {activeCampaign && !activeCampaign.brandKitId && (
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3 text-sm text-amber-800">
+              <div className={note}>
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 This campaign has no brand kit — generation is blocked until you assign one (edit the campaign).
               </div>
             )}
             {!settings.connected && (
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3 text-sm text-amber-800">
+              <div className={note}>
                 <Key className="mt-0.5 h-4 w-4 shrink-0" />
                 No Higgsfield API key configured — add one in Settings before generating.
               </div>
             )}
             {settings.spend.atCap && (
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 text-sm text-red-700">
+              <div role="alert" className="mb-4 flex items-start gap-2 rounded-md bg-failed-tint px-4 py-3 text-sm text-failed-text">
                 <Wallet className="mt-0.5 h-4 w-4 shrink-0" />
                 Monthly spend cap reached ({dollars(settings.spend.capCents)}). Raise it in Settings to generate more.
               </div>
             )}
 
-            <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Ad brief</h3>
+            <div className={`space-y-4 ${card}`}>
+              <h3 className={cardHeading}>Ad brief</h3>
               {[
                 { key: "product", label: "Product", placeholder: "What are you advertising?" },
                 { key: "audience", label: "Audience", placeholder: "Who is this for?" },
@@ -582,13 +597,12 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         key={t}
                         onClick={() => setGenType(t)}
                         disabled={!canEdit}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
-                          genType === t ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
-                        }`}
+                        aria-pressed={genType === t}
+                        className={`flex-1 ${chip(genType === t)}`}
                         style={{ transitionTimingFunction: EASE }}
                       >
                         {t === "image" ? <ImageIcon className="h-4 w-4" /> : <Clapperboard className="h-4 w-4" />}
-                        {t}
+                        {t === "image" ? "Image" : "Video"}
                       </button>
                     ))}
                   </div>
@@ -602,9 +616,8 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         onClick={() => setAspectRatio(r)}
                         disabled={!canEdit}
                         title={ASPECT_RATIOS[r].label}
-                        className={`rounded-lg border px-3 py-2 text-sm transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
-                          aspectRatio === r ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
-                        }`}
+                        aria-pressed={aspectRatio === r}
+                        className={chip(aspectRatio === r)}
                         style={{ transitionTimingFunction: EASE }}
                       >
                         {r}
@@ -624,9 +637,8 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         setGenChannels(genChannels.includes(ch) ? genChannels.filter((c) => c !== ch) : [...genChannels, ch])
                       }
                       disabled={!canEdit}
-                      className={`rounded-full border px-3 py-1 text-xs transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
-                        genChannels.includes(ch) ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
-                      }`}
+                      aria-pressed={genChannels.includes(ch)}
+                      className={chip(genChannels.includes(ch))}
                       style={{ transitionTimingFunction: EASE }}
                     >
                       {ch}
@@ -646,7 +658,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                   value={variants}
                   onChange={(e) => setVariants(Number(e.target.value))}
                   disabled={!canEdit}
-                  className="w-full accent-white"
+                  className="w-full accent-ink"
                 />
               </div>
 
@@ -671,7 +683,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                 {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                 Generate {variants} variant{variants === 1 ? "" : "s"} (~{dollars(liveEstimate)})
               </button>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted">
                 Estimates are illustrative — actual spend is recorded from provider responses. Every generation is an
                 explicit action; nothing regenerates on its own.
               </p>
@@ -681,28 +693,28 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
         {tab === "gallery" && (
           <div>
-            {!activeCampaign && <p className="text-sm text-zinc-500">Select a campaign to review its creatives.</p>}
+            {!activeCampaign && <p className="text-sm text-muted">Select a campaign to review its creatives.</p>}
             {activeCampaign && activeCampaign.creatives.length === 0 && (
-              <p className="text-sm text-zinc-500">No creatives yet — generate some from the Generate tab.</p>
+              <p className="text-sm text-muted">No creatives yet — generate some from the Generate tab.</p>
             )}
             {activeCampaign && (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {activeCampaign.creatives.map((cr, i) => (
                   <div
                     key={cr.id}
-                    className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50"
+                    className="overflow-hidden rounded-lg bg-paper shadow-hairline"
                     style={{ animation: `adfade 200ms ${EASE} ${Math.min(i, 6) * 50}ms both` }}
                   >
-                    <div className="relative aspect-square bg-white">
+                    <div className="relative aspect-square bg-canvas">
                       {cr.assets.length > 0 ? (
                         cr.type === "video" ? (
-                          <video src={cr.assets[0].url} controls className="h-full w-full object-cover outline outline-1 outline-white/10" />
+                          <video src={cr.assets[0].url} controls className="h-full w-full object-cover outline outline-1 outline-ink/10" />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={cr.assets[0].url} alt={cr.name} className="h-full w-full object-cover outline outline-1 outline-black/10" />
                         )
                       ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-500">
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted">
                           {cr.status === "failed" ? <XCircle className="h-8 w-8" /> : <LoaderCircle className="h-8 w-8 animate-spin" />}
                           <span className="px-4 text-center text-xs">{cr.error ?? "Generating…"}</span>
                         </div>
@@ -710,25 +722,25 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                       <div className="absolute left-2 top-2 flex gap-1">
                         <StatusBadge status={cr.status} />
                         {cr.approved && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                            <Check className="h-3 w-3" /> approved
+                          <span className="inline-flex h-6 items-center gap-1 rounded-full bg-paper px-2 text-xs font-semibold text-ink shadow-hairline">
+                            <Check className="h-3 w-3" /> Approved
                           </span>
                         )}
                         {cr.rejected && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                            rejected
+                          <span className="inline-flex h-6 items-center gap-1 rounded-full bg-paper px-2 text-xs font-semibold text-muted shadow-hairline">
+                            Rejected
                           </span>
                         )}
                       </div>
                     </div>
                     <div className="p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-zinc-900">{cr.name}</span>
-                        <span className="shrink-0 text-xs text-zinc-500 tabular-nums">
+                        <span className="truncate text-sm font-medium text-ink">{cr.name}</span>
+                        <span className="shrink-0 text-xs text-muted tabular-nums">
                           {cr.type} · {cr.aspectRatio} · {dollars(cr.costActualCents || cr.costEstimateCents)}
                         </span>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-xs text-zinc-500" title={cr.prompt}>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted" title={cr.prompt}>
                         {cr.prompt}
                       </p>
                       {canEdit && (
@@ -785,14 +797,14 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         </div>
                       )}
                       {cr.promptHistory.length > 0 && (
-                        <details className="mt-2 text-xs text-zinc-500">
-                          <summary className="cursor-pointer hover:text-zinc-600">
+                        <details className="mt-2 text-xs text-muted">
+                          <summary className="cursor-pointer hover:text-ink">
                             Prompt history ({cr.promptHistory.length})
                           </summary>
                           <ul className="mt-1 space-y-1">
                             {cr.promptHistory.map((h, j) => (
-                              <li key={j} className="rounded bg-white p-2">
-                                <span className="text-zinc-500">{h.at}</span>
+                              <li key={j} className="rounded-sm bg-canvas p-2">
+                                <span className="text-muted">{h.at}</span>
                                 <p className="mt-0.5">{h.prompt}</p>
                               </li>
                             ))}
@@ -809,13 +821,13 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
         {tab === "settings" && (
           <div className="max-w-xl space-y-6">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            <div className={card}>
+              <h3 className={cardHeading}>
                 <Plug className="h-4 w-4" /> Higgsfield API key
               </h3>
               {settings.connected ? (
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <span className="text-sm text-emerald-700">Connected · {settings.hint}</span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink"><Check className="h-4 w-4" aria-hidden="true" />Connected · {settings.hint}</span>
                   {canEdit && (
                     <button onClick={() => void revokeKey()} disabled={busy} className={btnGhost}>
                       Revoke
@@ -840,27 +852,27 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                   </div>
                 </div>
               )}
-              <p className="mt-2 text-xs text-zinc-500">
-                Auth header format: <code className="text-zinc-500">Authorization: Key KEY_ID:KEY_SECRET</code>. The
+              <p className="mt-2 text-xs text-muted">
+                Auth header format: <code className="font-mono text-ink">Authorization: Key KEY_ID:KEY_SECRET</code>. The
                 provider&apos;s image-generation model catalog should be confirmed via{" "}
-                <code className="text-zinc-500">GET /models</code> before production image jobs.
+                <code className="font-mono text-ink">GET /models</code> before production image jobs.
               </p>
             </div>
 
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            <div className={card}>
+              <h3 className={cardHeading}>
                 <Wallet className="h-4 w-4" /> Spend & cap
               </h3>
               <div className="mt-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500">
+                  <span className="text-muted">
                     {settings.spend.period} · spent {dollars(settings.spend.spendCents)} of {dollars(settings.spend.capCents)}
                   </span>
-                  <span className="text-zinc-500 tabular-nums">{dollars(settings.spend.remainingCents)} left</span>
+                  <span className="text-muted tabular-nums">{dollars(settings.spend.remainingCents)} left</span>
                 </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas">
                   <div
-                    className={`h-full rounded-full transition-[width,background-color] duration-300 ${settings.spend.atCap ? "bg-red-500" : "bg-emerald-500"}`}
+                    className={`h-full rounded-full transition-[width,background-color] duration-300 ${settings.spend.atCap ? "bg-failed" : "bg-ink"}`}
                     style={{
                       width: `${Math.min(100, (settings.spend.spendCents / Math.max(1, settings.spend.capCents)) * 100)}%`,
                       transitionTimingFunction: EASE,
@@ -882,7 +894,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                   </button>
                 </div>
               )}
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-2 text-xs text-muted">
                 The cap is enforced server-side: new generations are blocked once it&apos;s reached. Default $50/month.
               </p>
             </div>
@@ -892,10 +904,10 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
       {/* Regenerate modal */}
       {regenId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-            <h3 className="text-sm font-semibold text-zinc-900">Regenerate with edited prompt</h3>
-            <p className="mt-1 text-xs text-zinc-500">The current prompt is preserved in history.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay">
+            <h3 className="text-sm font-semibold text-ink">Regenerate with edited prompt</h3>
+            <p className="mt-1 text-xs text-muted">The current prompt is preserved in history.</p>
             <textarea
               value={regenPrompt ?? ""}
               onChange={(e) => setRegenPrompt(e.target.value)}
@@ -916,26 +928,25 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
       {/* Send-to-social modal */}
       {sendTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-            <h3 className="text-sm font-semibold text-zinc-900">Send to social</h3>
-            <p className="mt-1 text-xs text-zinc-500">Creates a Postiz draft with this creative — publish it from the Social tab.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay">
+            <h3 className="text-sm font-semibold text-ink">Send to social</h3>
+            <p className="mt-1 text-xs text-muted">Creates a Postiz draft with this creative — publish it from the Social tab.</p>
             <label className={`${label} mt-4`}>Post text</label>
             <textarea value={sendText} onChange={(e) => setSendText(e.target.value)} rows={3} className={field} />
             <label className={`${label} mt-4`}>Postiz channels</label>
             {postizChannelsLoading ? (
-              <p className="text-xs text-zinc-500">Loading channels…</p>
+              <p className="text-xs text-muted">Loading channels…</p>
             ) : postizChannels.length === 0 ? (
-              <p className="text-xs text-zinc-500">No Postiz channels connected — connect one under Social first.</p>
+              <p className="text-xs text-muted">No Postiz channels connected — connect one under Social first.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {postizChannels.map((ch) => (
                   <button
                     key={ch.id}
                     onClick={() => setSendChannelIds(sendChannelIds.includes(ch.id) ? sendChannelIds.filter((c) => c !== ch.id) : [...sendChannelIds, ch.id])}
-                    className={`rounded-full border px-3 py-1 text-xs transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
-                      sendChannelIds.includes(ch.id) ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500"
-                    }`}
+                    aria-pressed={sendChannelIds.includes(ch.id)}
+                    className={chip(sendChannelIds.includes(ch.id))}
                     style={{ transitionTimingFunction: EASE }}
                   >
                     {ch.name ?? ch.identifier}

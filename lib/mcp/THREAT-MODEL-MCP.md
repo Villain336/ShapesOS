@@ -153,6 +153,18 @@ workspace (or deleted the workspace).
 - Revoked keys and deleted workspaces fail at the same gate.
 *Tests:* valid key + `mcpEnabled=false` → 403; enable → 200; disable → 403 again.
 
+*Phase 11 (conncore) — default on for paid plans.* `mcpEnabled` is now
+nullable: `null` means the plan default — ON for Pro and Agency (paid plans
+with `api_access`), OFF for trial, starter and self-hosted
+(`lib/mcp/enabled.ts`, `MCP_DEFAULT_ON_PLANS`). An admin's explicit `false` is
+the workspace off switch and always wins; `true` still needs the entitlement;
+`PUT /api/mcp/settings { enabled: null }` returns to the default. The
+migration resets never-touched `false` rows to `null` but keeps `false` for
+workspaces whose audit log shows an admin turned MCP off. Being on exposes no
+data by itself: a caller still needs an API key or an OAuth grant an admin
+created, and every gate above (fresh read per request, entitlement, scopes,
+rate limit, metering) is unchanged.
+
 ### T9 — Unmetered execution (metering service unavailable)
 *Attack/failure:* `lib/metering/service` fails to import (sibling track not yet
 deployed) or `meter()` throws → tool runs for free, ledger silently diverges.
@@ -309,9 +321,17 @@ execution; mock flag present in results.
 - In-memory rate limiting remains the default and is single-instance; hosted
   multi-box deployments must set `MCP_RATE_LIMITER=postgres` (documented).
 - No refresh tokens in v1; OAuth tokens live 1 hour.
-- `degraded` connector-style honesty: vendor-backed tools (rank report, SEO
-  audit, keyword ideas) return clearly-labeled mock data or "live unavailable"
-  — never fabricated data presented as real.
+- `degraded` connector-style honesty: vendor-backed tools return
+  clearly-labeled mock data or "live unavailable" only when the underlying
+  provider is the mock one — never fabricated data presented as real.
+- Phase 6: `run_seo_audit` and `get_keyword_ideas` call the same real
+  implementations as the chat tools — `lib/audit/project-audit.ts`
+  (`runAudit`, real file scan; labelled mock only for demo sites) and
+  `getSeoProvider().keywordIdeas` (DataForSEO when configured, labelled
+  mock otherwise). The runner's single pre-execution charge stays the only
+  ledger write: `runAudit` is called with `skipMetering` so `site_audit` is
+  not charged twice (T14); `serp_calls` usage is recorded like the in-app
+  paths.
 - Sibling contract risk: `meter()`'s per-tool passthrough semantics are
   defined by the metering track; we pass the UNDERLYING action key (e.g.
   `action: "rank_check"` for `get_rank_report`) with `evidenceRef:

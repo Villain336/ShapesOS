@@ -1,11 +1,15 @@
 "use client";
 
 // ShapesOS — Phase 3 (J): notification kind marks + shared client types.
-// Needs-you and failed-run notifications ARE agent states, so they carry the
-// status shape (yellow triangle with its black edge on white; red square).
-// The other kinds are informational and use neutral Lucide icons.
+// Needs-you, failed-run and approved notifications ARE agent states, so they
+// carry the status shape (yellow triangle with its black edge on white; red
+// square; green quarter-disc) — lib/aos/notifications decides. The other
+// kinds are informational and use neutral Lucide icons.
 
-import { CheckCheck, Siren, UserPlus } from "lucide-react";
+import { CheckCheck, Siren, UserPlus, type LucideIcon } from "lucide-react";
+import { StatusShape } from "@/components/aos/StatusShape";
+import { notificationStatus } from "@/lib/aos/notifications";
+import { STATUS_META } from "@/lib/aos/status";
 
 export type NotificationKind =
   | "approval_needed"
@@ -32,40 +36,31 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   invite_accepted: "Team",
 };
 
-export function NotificationIcon({ kind }: { kind: NotificationKind }) {
+/** Neutral lead icon for notifications that are not an agent state. */
+export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, LucideIcon> = {
+  approval_needed: CheckCheck,
+  approval_decided: CheckCheck,
+  alert_fired: Siren,
+  run_failed: Siren,
+  invite_accepted: UserPlus,
+};
+
+export function NotificationIcon({ kind, title = "" }: { kind: NotificationKind; title?: string }) {
   const wrap = "mt-0.5 flex size-6 shrink-0 items-center justify-center";
-  switch (kind) {
-    case "approval_needed":
-      return (
-        <span className={wrap}>
-          <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:14px]" role="img" aria-label="Needs you" />
-        </span>
-      );
-    case "run_failed":
-      return (
-        <span className={wrap}>
-          <span className="aos-shape aos-shape--failed [--aos-shape-size:12px]" role="img" aria-label="Failed" />
-        </span>
-      );
-    case "alert_fired":
-      return (
-        <span className={`${wrap} text-ink`}>
-          <Siren size={16} aria-hidden />
-        </span>
-      );
-    case "invite_accepted":
-      return (
-        <span className={`${wrap} text-ink`}>
-          <UserPlus size={16} aria-hidden />
-        </span>
-      );
-    default:
-      return (
-        <span className={`${wrap} text-ink`}>
-          <CheckCheck size={16} aria-hidden />
-        </span>
-      );
+  const status = notificationStatus({ kind, title });
+  if (status) {
+    return (
+      <span className={wrap}>
+        <StatusShape status={status} size={status === "needs" ? 14 : 12} label={STATUS_META[status].label} />
+      </span>
+    );
   }
+  const Icon = NOTIFICATION_KIND_ICONS[kind] ?? CheckCheck;
+  return (
+    <span className={`${wrap} text-ink`}>
+      <Icon size={16} aria-hidden />
+    </span>
+  );
 }
 
 export function timeAgo(iso: string, now: number = Date.now()): string {

@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import SitesManager from "@/components/SitesManager";
 import HostingManager from "@/components/HostingManager";
 import FixAgentManager from "@/components/FixAgentManager";
+import SiteDrafts from "@/components/SiteDrafts";
 
 export const dynamic = "force-dynamic";
 
@@ -28,15 +29,16 @@ export default async function SitesPage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-muted hover:text-ink">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Sites & landing pages</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="mt-1 text-xl font-heading tracking-heading stretch-heading text-ink">Sites & landing pages</h1>
+        <p className="mt-1 text-sm text-muted">
           Build landing pages from scratch, or connect a GitHub repo, WordPress, Webflow, SFTP host, or uploaded .zip — then edit, deploy, or publish content.
         </p>
       </div>
       <SitesManager projectId={project.id} />
+      <SiteDrafts projectId={project.id} />
       <HostingManager projectId={project.id} />
       <FixAgentManager projectId={project.id} />
     </div>

@@ -10,15 +10,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Download, Plus, Trash2 } from "lucide-react";
-import { FormError, FormNote } from "./FormError";
+import { FormNote } from "./FormError";
+import { Field } from "@/components/aos/Controls";
 import {
   btnDanger,
   btnPrimary,
   btnSecondary,
   cardCls,
   helperCls,
-  inputCls,
-  labelCls,
 } from "./aos";
 
 export interface WorkspaceGeneralProps {
@@ -112,19 +111,19 @@ export default function WorkspaceGeneral(props: WorkspaceGeneralProps) {
         <h2 id="ws-name" className="aos-subheading">Workspace name</h2>
         <form onSubmit={rename} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="flex-1">
-            <label htmlFor="ws-name-input" className="sr-only">Workspace name</label>
-            <input
-              id="ws-name-input"
-              className={inputCls}
+            <Field
+              label="Workspace name"
+              hideLabel
               value={name}
               maxLength={80}
               disabled={!isAdmin}
-              onChange={(e) => setName(e.target.value)}
-              aria-invalid={renameError ? true : undefined}
-              aria-describedby={renameError ? "ws-name-error" : undefined}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (renameError) setRenameError(null);
+              }}
+              helper={isAdmin ? "Up to 80 characters. Members see it in the workspace switcher." : "Only admins can rename the workspace."}
+              error={renameError}
             />
-            {!isAdmin && <p className={helperCls}>Only admins can rename the workspace.</p>}
-            <FormError id="ws-name-error" message={renameError} />
             <FormNote message={renameNote} />
           </div>
           {isAdmin && (
@@ -192,21 +191,19 @@ export default function WorkspaceGeneral(props: WorkspaceGeneralProps) {
           A separate space with its own members, data, and plan. You&rsquo;ll be its owner.
         </p>
         <form onSubmit={create} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
-          <div className="flex-1">
-            <label htmlFor="ws-new-input" className={labelCls}>Name</label>
-            <input
-              id="ws-new-input"
-              className={`${inputCls} mt-1`}
-              value={newName}
-              maxLength={80}
-              placeholder="Acme Plumbing"
-              onChange={(e) => setNewName(e.target.value)}
-              aria-invalid={createError ? true : undefined}
-              aria-describedby={createError ? "ws-new-error" : undefined}
-            />
-            <FormError id="ws-new-error" message={createError} />
-          </div>
-          <button type="submit" className={`${btnPrimary} sm:mt-6`} disabled={creating || !newName.trim()}>
+          <Field
+            className="flex-1"
+            label="Name"
+            value={newName}
+            maxLength={80}
+            placeholder="Acme Plumbing"
+            onChange={(e) => {
+              setNewName(e.target.value);
+              if (createError) setCreateError(null);
+            }}
+            error={createError}
+          />
+          <button type="submit" className={`${btnPrimary} sm:mt-8`} disabled={creating || !newName.trim()}>
             <Plus size={16} aria-hidden />
             {creating ? "Creating" : "Create workspace"}
           </button>
@@ -242,22 +239,22 @@ export default function WorkspaceGeneral(props: WorkspaceGeneralProps) {
             <p className={helperCls}>This is your only workspace. Create or join another one before deleting it.</p>
           ) : (
             <form onSubmit={remove} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
-              <div className="flex-1">
-                <label htmlFor="ws-delete-input" className={labelCls}>
-                  Type <span className="aos-mono">{savedName}</span> to confirm
-                </label>
-                <input
-                  id="ws-delete-input"
-                  className={`${inputCls} mt-1`}
-                  value={confirm}
-                  autoComplete="off"
-                  onChange={(e) => setConfirm(e.target.value)}
-                  aria-invalid={deleteError ? true : undefined}
-                  aria-describedby={deleteError ? "ws-delete-error" : undefined}
-                />
-                <FormError id="ws-delete-error" message={deleteError} />
-              </div>
-              <button type="submit" className={`${btnDanger} sm:mt-6`} disabled={deleting || !confirmMatches}>
+              <Field
+                className="flex-1"
+                label={
+                  <>
+                    Type <span className="aos-mono">{savedName}</span> to confirm
+                  </>
+                }
+                value={confirm}
+                autoComplete="off"
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  if (deleteError) setDeleteError(null);
+                }}
+                error={deleteError}
+              />
+              <button type="submit" className={`${btnDanger} sm:mt-8`} disabled={deleting || !confirmMatches}>
                 <Trash2 size={16} aria-hidden />
                 {deleting ? "Deleting" : "Delete workspace"}
               </button>

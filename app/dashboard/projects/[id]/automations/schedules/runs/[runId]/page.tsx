@@ -8,18 +8,19 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { accessibleWorkspaceWhere, hasPermission } from "@/lib/authz";
 import { getOutputStoreAsync } from "@/lib/scheduler/outputStore";
-import { cardCls } from "@/components/settings/ui";
+import { cardCls } from "@/components/workspace/aos";
 import RunApprovalActions from "@/components/scheduler/RunApprovalActions";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_CLS: Record<string, string> = {
-  succeeded: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  failed: "border-red-200 bg-red-50 text-red-700",
-  running: "border-sky-200 bg-sky-50 text-sky-700",
-  awaiting_approval: "border-amber-200 bg-amber-50 text-amber-800",
-  rejected: "border-zinc-200 bg-zinc-100 text-zinc-600",
-  cancelled: "border-zinc-200 bg-zinc-100 text-zinc-600",
+// Run states carry status color + shape (DESIGN.md); rejected/cancelled are plain.
+const STATUS_CLS: Record<string, { cls: string; shape?: string }> = {
+  succeeded: { cls: "bg-done text-white", shape: "aos-shape--done" },
+  failed: { cls: "bg-failed text-white", shape: "aos-shape--failed" },
+  running: { cls: "bg-running text-white", shape: "aos-shape--running aos-is-live" },
+  awaiting_approval: { cls: "bg-needs text-ink", shape: "aos-shape--needs" },
+  rejected: { cls: "bg-canvas text-muted" },
+  cancelled: { cls: "bg-canvas text-muted" },
 };
 
 export default async function RunDetailPage({
@@ -64,19 +65,22 @@ export default async function RunDetailPage({
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-accent">Automations</Link>
+        <p className="text-xs font-semibold text-muted">
+          <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-focus hover:underline">Automations</Link>
           {" / "}
-          <Link href={`/dashboard/projects/${project.id}/automations/schedules`} className="hover:text-accent">Schedules</Link>
+          <Link href={`/dashboard/projects/${project.id}/automations/schedules`} className="hover:text-focus hover:underline">Schedules</Link>
           {" / Run"}
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl">{run.skill.name}</h1>
-          <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_CLS[run.status] ?? "border-zinc-200 bg-zinc-100 text-zinc-600"}`}>
+          <h1 className="aos-heading">{run.skill.name}</h1>
+          <span className={`inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold ${STATUS_CLS[run.status]?.cls ?? "bg-canvas text-muted"}`}>
+            {STATUS_CLS[run.status]?.shape && (
+              <span aria-hidden className={`aos-shape ${STATUS_CLS[run.status]?.shape}`} style={{ color: "inherit" }} />
+            )}
             {run.status.replace(/_/g, " ")}
           </span>
         </div>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-sm text-muted">
           Trigger: {run.trigger}
           {run.schedule ? ` · schedule ${run.schedule.triggerType}${run.schedule.cronExpr ? ` ${run.schedule.cronExpr}` : ""}${run.schedule.eventSource ? ` ${run.schedule.eventSource}` : ""}` : ""}
           {run.wasMissed ? " · fired from a missed window" : ""}
@@ -84,9 +88,12 @@ export default async function RunDetailPage({
       </div>
 
       {run.status === "awaiting_approval" && canApprove && (
-        <section className={`${cardCls} border-amber-200 bg-amber-50/40`}>
-          <h2 className="text-sm font-semibold text-zinc-900">Approval needed</h2>
-          <p className="mt-1 text-xs text-zinc-600">This supervised run has executed nothing. Approving runs the skill; rejecting discards it.</p>
+        <section className="rounded-lg bg-needs-tint p-5 shadow-hairline">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span aria-hidden className="aos-shape aos-shape--needs aos-shape--edged" />
+            Approval needed
+          </h2>
+          <p className="mt-1 text-xs text-muted">This supervised run has executed nothing. Approving runs the skill; rejecting discards it.</p>
           <div className="mt-3">
             <RunApprovalActions runId={run.id} workspaceId={project.workspaceId} />
           </div>
@@ -94,32 +101,32 @@ export default async function RunDetailPage({
       )}
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">Timeline</h2>
+        <h2 className="text-sm font-semibold text-ink">Timeline</h2>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div>
-            <dt className="text-xs text-zinc-500">Started</dt>
+            <dt className="text-xs text-muted">Started</dt>
             <dd className="mt-0.5">{new Date(run.startedAt).toLocaleString()}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Finished</dt>
+            <dt className="text-xs text-muted">Finished</dt>
             <dd className="mt-0.5">{run.finishedAt ? new Date(run.finishedAt).toLocaleString() : "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Duration</dt>
+            <dt className="text-xs text-muted">Duration</dt>
             <dd className="mt-0.5">{durationMs !== null ? `${(durationMs / 1000).toFixed(1)}s` : "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Credits used</dt>
+            <dt className="text-xs text-muted">Credits used</dt>
             <dd className="mt-0.5 font-medium">{run.creditsUsed}</dd>
           </div>
         </dl>
         {run.error && (
-          <p className="mt-3 rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-700">{run.error}</p>
+          <p className="mt-3 rounded-md bg-failed-tint px-3 py-2 text-sm text-failed-text">{run.error}</p>
         )}
         {run.eventPayload && (
           <div className="mt-4">
-            <h3 className="text-xs font-medium text-zinc-600">Firing event payload</h3>
-            <pre className="mt-1 overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs text-zinc-800">
+            <h3 className="text-xs font-medium text-muted">Firing event payload</h3>
+            <pre className="mt-1 overflow-x-auto rounded-lg border border-line bg-canvas p-3 font-mono text-xs text-ink">
               {JSON.stringify(run.eventPayload, null, 2)}
             </pre>
           </div>
@@ -127,26 +134,26 @@ export default async function RunDetailPage({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">
+        <h2 className="text-sm font-semibold text-ink">
           Subagents ({run.subagents.length})
         </h2>
         {run.subagents.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No subagents in this run.</p>
+          <p className="mt-2 text-sm text-muted">No subagents in this run.</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-3">
             {run.subagents.map((s) => (
-              <li key={s.id} className="rounded-lg border border-zinc-200 bg-white p-3">
+              <li key={s.id} className="rounded-lg border border-line bg-paper p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-zinc-900">{s.taskLabel}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-sm font-medium text-ink">{s.taskLabel}</p>
+                  <p className="text-xs text-muted">
                     {s.status} · {s.creditsUsed} credits
                     {s.finishedAt && s.startedAt ? ` · ${((s.finishedAt.getTime() - s.startedAt.getTime()) / 1000).toFixed(1)}s` : ""}
                   </p>
                 </div>
                 {s.result && (
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-zinc-500 hover:text-accent">View result</summary>
-                    <pre className="mt-1 whitespace-pre-wrap rounded-md bg-zinc-50 p-2 font-mono text-xs text-zinc-800">{s.result}</pre>
+                    <summary className="cursor-pointer text-xs text-muted hover:text-ink">View result</summary>
+                    <pre className="mt-1 whitespace-pre-wrap rounded-md bg-canvas p-2 font-mono text-xs text-ink">{s.result}</pre>
                   </details>
                 )}
               </li>
@@ -156,20 +163,20 @@ export default async function RunDetailPage({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">Output</h2>
+        <h2 className="text-sm font-semibold text-ink">Output</h2>
         {run.outputPath ? (
           <div className="mt-2">
-            <p className="font-mono text-xs text-zinc-500">{run.outputPath}</p>
+            <p className="font-mono text-xs text-muted">{run.outputPath}</p>
             {report ? (
-              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-800">
+              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-paper p-4 text-sm text-ink">
                 {report}
               </pre>
             ) : (
-              <p className="mt-2 text-sm text-zinc-500">Report file not readable yet (filesystem service may not be migrated).</p>
+              <p className="mt-2 text-sm text-muted">Report file not readable yet (filesystem service may not be migrated).</p>
             )}
           </div>
         ) : (
-          <p className="mt-2 text-sm text-zinc-500">No output written for this run.</p>
+          <p className="mt-2 text-sm text-muted">No output written for this run.</p>
         )}
       </section>
     </div>

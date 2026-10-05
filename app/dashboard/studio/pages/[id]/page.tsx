@@ -25,7 +25,7 @@ export default async function PageEditorPage({
   await getOrCreateWorkspace(user.id, user.email);
 
   return (
-    <div className="-mx-4 -my-6 flex h-[calc(100dvh-105px)] flex-col bg-[#FAFAF7] sm:-mx-6 sm:-my-8 md:h-[calc(100dvh-48px)] lg:-mx-10">
+    <div className="-mx-4 -my-6 flex h-[calc(100dvh-105px)] flex-col bg-canvas sm:-mx-6 sm:-my-8 md:h-[calc(100dvh-48px)] lg:-mx-10">
       <div className="min-h-0 flex-1">
         <GrapesEditor pageId={id} />
       </div>

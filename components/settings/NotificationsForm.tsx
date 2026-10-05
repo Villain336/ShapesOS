@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check } from "lucide-react";
+import { SwitchRow } from "@/components/aos/Controls";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -41,36 +42,6 @@ function Notice({ notice }: { notice: NoticeState | null }) {
   );
 }
 
-function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
-        checked ? "bg-ink" : "bg-disabled-fg"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[21px]" : "left-[3px]"
-        }`}
-      />
-    </button>
-  );
-}
-
 interface NotificationDefaults {
   emailDigest: boolean;
   defaultChannels: string[];
@@ -82,6 +53,12 @@ const DEFAULTS: NotificationDefaults = {
 };
 
 const CHANNELS = ["email", "slack", "telegram"] as const;
+
+const CHANNEL_COPY: Record<(typeof CHANNELS)[number], { title: string; description: string }> = {
+  email: { title: "Email", description: "New alert rules notify by email" },
+  slack: { title: "Slack", description: "New alert rules post to Slack" },
+  telegram: { title: "Telegram", description: "New alert rules message Telegram" },
+};
 
 export default function NotificationsForm({ workspaceId }: { workspaceId: string }) {
   const [prefs, setPrefs] = useState<NotificationDefaults>(DEFAULTS);
@@ -174,43 +151,33 @@ export default function NotificationsForm({ workspaceId }: { workspaceId: string
           Defaults applied to new alert rules and workspace digests. Channels
           themselves are configured under Settings → Alerts.
         </p>
-        <div className="mt-4 flex max-w-xl flex-col gap-3">
-          <div className="flex items-start justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-3">
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-ink">Email digest</span>
-              <span className="block text-xs text-muted">
-                Bundle routine notifications into a periodic email digest instead
-                of sending each one immediately.
-              </span>
-            </span>
-            <Switch
+        <div className="mt-4 flex max-w-xl flex-col gap-4">
+          <div className="divide-y divide-line rounded-lg border border-line bg-paper">
+            <SwitchRow
+              title="Email digest"
+              description="Bundle routine notifications into a periodic digest instead of one email each"
               checked={prefs.emailDigest}
               onChange={(v) => setPrefs({ ...prefs, emailDigest: v })}
-              label="Email digest"
+              disabled={busy}
             />
           </div>
-          <fieldset>
-            <legend className="text-sm font-medium text-ink">Default alert channels</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {CHANNELS.map((ch) => {
-                const on = prefs.defaultChannels.includes(ch);
-                return (
-                  <button
-                    key={ch}
-                    type="button"
-                    aria-pressed={on}
-                    aria-label={`${ch} alerts`}
-                    onClick={() => toggleChannel(ch)}
-                    className={`inline-flex h-[26px] items-center gap-2 rounded-full px-3 text-sm font-medium transition-colors ${
-                      on ? "bg-ink text-white" : "bg-canvas text-muted"
-                    }`}
-                  >
-                    {ch}
-                  </button>
-                );
-              })}
+          <section aria-labelledby="notif-channels-h">
+            <h3 id="notif-channels-h" className="text-sm font-semibold text-ink">
+              Default alert channels
+            </h3>
+            <div className="mt-2 divide-y divide-line rounded-lg border border-line bg-paper">
+              {CHANNELS.map((ch) => (
+                <SwitchRow
+                  key={ch}
+                  title={CHANNEL_COPY[ch].title}
+                  description={CHANNEL_COPY[ch].description}
+                  checked={prefs.defaultChannels.includes(ch)}
+                  onChange={() => toggleChannel(ch)}
+                  disabled={busy}
+                />
+              ))}
             </div>
-          </fieldset>
+          </section>
         </div>
         <div className="mt-4 flex gap-2">
           <button onClick={save} disabled={busy} className={btnPrimary}>

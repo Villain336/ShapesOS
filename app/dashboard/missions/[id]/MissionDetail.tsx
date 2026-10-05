@@ -1,6 +1,12 @@
-// Marketr — Mission detail client (Phase 9, M4).
-// Header (goal, status, progress) + icon sub-tabs (Timeline | Approvals | Plan),
-// dense event timeline, approval queue with Approve/Deny, pause/resume.
+// Marketr — Mission detail client (Phase 9, M4; Agentic OS 4d).
+//
+// Kit layout (agent-blocks.png): the mission timeline as a run timeline
+// (each delegation the lead made, then the plan steps still to come, with
+// asks-first chips), next to the lead agent with the sub-agents it
+// delegated to (AgentTree) and the approvals waiting on you as approval
+// cards. Below: the full event log, decided approvals, the plan and Plane
+// tasks. Pause / resume and approve / deny call the same mission APIs as
+// before (editor+, re-checked server-side).
 
 "use client";
 
@@ -8,20 +14,27 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MarketrAgentShell } from "@/components/agents/MarketrAgentShell";
 import {
+  ArrowLeft,
   Check,
-  ChevronLeft,
   ExternalLink,
   History,
   KanbanSquare,
   ListChecks,
   Loader2,
-  Pause,
-  Play,
   ShieldCheck,
   X,
   Zap,
 } from "lucide-react";
 import { closeOnEscape } from "@/lib/ui/keyboard";
+import { toast, toastError } from "@/lib/ui/feedback";
+import { AgentTree, ApprovalCard, Banner, NeutralBadge, RunTimeline, StatusBadge, aosButton } from "@/components/aos";
+import { needsReconnect } from "@/lib/aos/home";
+import type { MissionView } from "@/lib/aos/agents";
+import { approvalQuestion, approveLabelFor, missionAgentIndex } from "@/lib/aos/approvals";
+import { missionLeadNode } from "@/lib/aos/missions";
+import { clockTime, missionTimeline, type PlanStepInput } from "@/lib/aos/runs";
+import { factLines, humanize } from "@/lib/approvals/format";
+import { cn } from "@/lib/utils";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
@@ -45,107 +58,20 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-const badgeBase =
-  "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
-
-function Shape({ extra, size }: { extra: string; size?: string }) {
-  return (
-    <span
-      className={`aos-shape ${extra}${size ? ` [--aos-shape-size:${size}]` : ""}`}
-      style={{ color: "inherit" }}
-      aria-hidden
-    />
-  );
-}
-
-function MissionStatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "active":
-      return (
-        <span className={`${badgeBase} bg-running text-white`}>
-          <Shape extra="aos-shape--running aos-is-live" /> Active
-        </span>
-      );
-    case "paused":
-      return (
-        <span className={`${badgeBase} bg-line text-ink`}>
-          <Shape extra="aos-shape--paused" /> Paused
-        </span>
-      );
-    case "complete":
-      return (
-        <span className={`${badgeBase} bg-done text-white`}>
-          <Shape extra="aos-shape--done" /> Complete
-        </span>
-      );
-    case "planned":
-      return (
-        <span className={`${badgeBase} bg-paper text-ink shadow-outline`}>
-          <Shape extra="aos-shape--queued" /> Planned
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
-          Archived
-        </span>
-      );
-  }
-}
-
-// Approval decisions are genuine agent states: pending needs you, approved is
-// done, denied failed, expired is just a shelf.
-function ApprovalStatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "pending":
-      return (
-        <span className={`${badgeBase} bg-needs text-ink`}>
-          <Shape extra="aos-shape--needs" /> Pending
-        </span>
-      );
-    case "approved":
-      return (
-        <span className={`${badgeBase} bg-done text-white`}>
-          <Shape extra="aos-shape--done" /> Approved
-        </span>
-      );
-    case "denied":
-      return (
-        <span className={`${badgeBase} bg-failed text-white`}>
-          <Shape extra="aos-shape--failed" /> Denied
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
-          Expired
-        </span>
-      );
-  }
-}
-
 function ErrorBox({ message }: { message: string }) {
   return (
-    <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
-      <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
+    <p role="alert" className="flex items-start gap-2 text-md text-failed-text">
+      <span className="mt-1.5 size-2.5 shrink-0 bg-failed" aria-hidden />
       <span>{message}</span>
-    </div>
+    </p>
   );
 }
 
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
-const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
-const btnGhost =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
-const btnDeny =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
-const btnApprove =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
-const btnRun =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+const btnGhost = aosButton({ variant: "secondary", size: "sm" });
+const btnRun = aosButton({ variant: "run", size: "sm" });
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,6 +121,7 @@ interface MissionDetailData {
     goal: { metric?: string; targetValue?: number; unit?: string; timeframeDays?: number; direction?: string; label?: string };
     planSnapshot: { steps?: PlanStep[] };
     termination: { deadlineAt?: string; maxCostCents?: number; maxSteps?: number };
+    createdAt: string | null;
   };
   events: DetailEvent[];
   approvals: DetailApproval[];
@@ -204,6 +131,9 @@ interface MissionDetailData {
   progress: number;
   termination: { done: boolean; reason: string | null };
   nextCheckpoint: string | null;
+  /** Agent state + the lead's delegations (null = archived). */
+  agent: MissionView | null;
+  runs: Array<{ id: string; kind: string; status: string; createdAt: string; endedAt: string | null }>;
 }
 
 function summarizeObservation(obs: Record<string, unknown>): string {
@@ -225,36 +155,34 @@ function fmtCost(cents: number): string {
 
 // ── Sub-tab panels ───────────────────────────────────────────────────────────
 
-function TimelineTab({ events }: { events: DetailEvent[] }) {
+function EventLogTab({ events }: { events: DetailEvent[] }) {
   if (events.length === 0) {
-    return <p className="py-8 text-center text-sm text-subtle">No events yet.</p>;
+    return <p className="py-8 text-center text-md text-muted">No events yet.</p>;
   }
   return (
     <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
       <table className="w-full min-w-[820px] text-left text-sm">
         <thead>
           <tr className="border-b border-line text-xs font-semibold text-muted">
-            <th className="px-3 py-2 font-semibold">Time</th>
-            <th className="px-3 py-2 font-semibold">Step</th>
-            <th className="px-3 py-2 font-semibold">Actor</th>
-            <th className="px-3 py-2 font-semibold">Tool</th>
-            <th className="px-3 py-2 font-semibold">Observation</th>
-            <th className="px-3 py-2 text-right font-semibold">Cost</th>
+            <th className="px-4 py-2.5 font-semibold">Time</th>
+            <th className="px-4 py-2.5 font-semibold">Step</th>
+            <th className="px-4 py-2.5 font-semibold">Actor</th>
+            <th className="px-4 py-2.5 font-semibold">Tool</th>
+            <th className="px-4 py-2.5 font-semibold">Observation</th>
+            <th className="px-4 py-2.5 text-right font-semibold">Cost</th>
           </tr>
         </thead>
         <tbody>
           {events.map((e) => (
             <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
-              <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-muted">
-                {new Date(e.ts).toLocaleString()}
-              </td>
-              <td className="px-3 py-2 font-mono text-xs text-ink">{e.step ?? "—"}</td>
-              <td className="px-3 py-2 text-muted">{e.actor}</td>
-              <td className="px-3 py-2 font-mono text-xs text-muted">{e.tool ?? "—"}</td>
-              <td className="max-w-[380px] truncate px-3 py-2 text-muted" title={summarizeObservation(e.observation)}>
+              <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted tabular-nums">{new Date(e.ts).toLocaleString()}</td>
+              <td className="aos-mono px-4 py-2.5 text-xs text-ink">{e.step ?? "—"}</td>
+              <td className="px-4 py-2.5 text-muted">{e.actor}</td>
+              <td className="aos-mono px-4 py-2.5 text-xs text-muted">{e.tool ?? "—"}</td>
+              <td className="max-w-[380px] truncate px-4 py-2.5 text-muted" title={summarizeObservation(e.observation)}>
                 {summarizeObservation(e.observation)}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-muted">{fmtCost(e.costCents)}</td>
+              <td className="px-4 py-2.5 text-right text-muted tabular-nums">{fmtCost(e.costCents)}</td>
             </tr>
           ))}
         </tbody>
@@ -263,148 +191,83 @@ function TimelineTab({ events }: { events: DetailEvent[] }) {
   );
 }
 
-function ApprovalsTab({
-  missionId,
-  approvals,
-  onDecided,
-}: {
-  missionId: string;
-  approvals: DetailApproval[];
-  onDecided: () => void;
-}) {
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const pending = useMemo(() => approvals.filter((a) => a.status === "pending"), [approvals]);
-  const decided = useMemo(() => approvals.filter((a) => a.status !== "pending"), [approvals]);
-
-  async function decide(approvalId: string, decision: "approved" | "denied") {
-    setBusyId(approvalId);
-    setError(null);
-    try {
-      await api(`/api/missions/${missionId}/approvals/${approvalId}/decide`, {
-        method: "POST",
-        body: JSON.stringify({ decision }),
-      });
-      onDecided();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Decision failed.");
-    } finally {
-      setBusyId(null);
-    }
+function DecidedTab({ approvals }: { approvals: DetailApproval[] }) {
+  if (approvals.length === 0) {
+    return <p className="py-8 text-center text-md text-muted">No decisions yet.</p>;
   }
-
   return (
-    <div className="space-y-4">
-      {error && <ErrorBox message={error} />}
-
-      <div>
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs font-semibold text-muted">Pending</span>
-          {pending.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-needs px-2 py-0.5 text-xs font-semibold text-ink">
-              <Shape extra="aos-shape--needs" size="8px" />
-              {pending.length}
-            </span>
-          )}
-        </div>
-        {pending.length === 0 ? (
-          <p className="rounded-lg bg-paper px-3 py-6 text-center text-sm text-subtle shadow-hairline">
-            No pending approvals — nothing is waiting on you.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {pending.map((a) => (
-              <div key={a.id} className="rounded-lg bg-needs px-3.5 py-3 text-ink">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Shape extra="aos-shape--needs" size="12px" />
-                  <span className="text-sm font-semibold">{a.action}</span>
-                  <Chip>Tier {a.tier}</Chip>
-                  <span className="ml-auto text-xs">
-                    expires {a.expiresAt ? new Date(a.expiresAt).toLocaleString() : "—"}
+    <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-xs font-semibold text-muted">
+            <th className="px-4 py-2.5 font-semibold">Action</th>
+            <th className="px-4 py-2.5 font-semibold">Tier</th>
+            <th className="px-4 py-2.5 font-semibold">Decision</th>
+            <th className="px-4 py-2.5 font-semibold">Decided by</th>
+            <th className="px-4 py-2.5 font-semibold">Decided at</th>
+          </tr>
+        </thead>
+        <tbody>
+          {approvals.map((a) => (
+            <tr key={a.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+              <td className="px-4 py-2.5 font-semibold text-ink">{humanize(a.action)}</td>
+              <td className="px-4 py-2.5">
+                <Chip>Tier {a.tier}</Chip>
+              </td>
+              <td className="px-4 py-2.5">
+                {/* Approved work moves on (done); a denial or expiry is a decision, not an agent state. */}
+                {a.status === "approved" ? (
+                  <StatusBadge status="done" label="Approved" size="sm" />
+                ) : (
+                  <span className="inline-flex h-6 items-center rounded-full bg-paper px-2.5 text-xs font-semibold text-muted shadow-control">
+                    {a.status === "denied" ? "Denied" : "Expired"}
                   </span>
-                </div>
-                <div className="mt-1.5 max-w-full overflow-hidden text-ellipsis font-mono text-[11px]">
-                  {JSON.stringify(a.bindingJson)}
-                </div>
-                <div className="mt-2.5 flex gap-2">
-                  <button onClick={() => void decide(a.id, "approved")} disabled={busyId !== null} className={btnApprove}>
-                    {busyId === a.id ? <Loader2 size={14} className="aos-spin" /> : <Check size={14} />} Approve
-                  </button>
-                  <button onClick={() => void decide(a.id, "denied")} disabled={busyId !== null} className={btnDeny}>
-                    {busyId === a.id ? <Loader2 size={14} className="aos-spin" /> : <X size={14} />} Deny
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {decided.length > 0 && (
-        <div>
-          <div className="mb-2 text-xs font-semibold text-muted">Decided</div>
-          <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-line text-xs font-semibold text-muted">
-                  <th className="px-3 py-2 font-semibold">Action</th>
-                  <th className="px-3 py-2 font-semibold">Tier</th>
-                  <th className="px-3 py-2 font-semibold">Decision</th>
-                  <th className="px-3 py-2 font-semibold">Decided by</th>
-                  <th className="px-3 py-2 font-semibold">Decided at</th>
-                </tr>
-              </thead>
-              <tbody>
-                {decided.map((a) => (
-                  <tr key={a.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                    <td className="px-3 py-2 font-medium text-ink">{a.action}</td>
-                    <td className="px-3 py-2"><Chip>Tier {a.tier}</Chip></td>
-                    <td className="px-3 py-2"><ApprovalStatusBadge status={a.status} /></td>
-                    <td className="max-w-[180px] truncate px-3 py-2 text-muted" title={a.decidedBy ?? ""}>{a.decidedBy ?? "—"}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-muted">
-                      {a.decidedAt ? new Date(a.decidedAt).toLocaleString() : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                )}
+              </td>
+              <td className="max-w-[180px] truncate px-4 py-2.5 text-muted" title={a.decidedBy ?? ""}>
+                {a.decidedBy ?? "—"}
+              </td>
+              <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted tabular-nums">
+                {a.decidedAt ? new Date(a.decidedAt).toLocaleString() : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 function PlanTab({ steps }: { steps: PlanStep[] }) {
   if (steps.length === 0) {
-    return <p className="py-8 text-center text-sm text-subtle">No plan steps.</p>;
+    return <p className="py-8 text-center text-md text-muted">No plan steps.</p>;
   }
   return (
     <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
       <table className="w-full min-w-[680px] text-left text-sm">
         <thead>
           <tr className="border-b border-line text-xs font-semibold text-muted">
-            <th className="px-3 py-2 font-semibold">#</th>
-            <th className="px-3 py-2 font-semibold">Step</th>
-            <th className="px-3 py-2 font-semibold">Executor</th>
-            <th className="px-3 py-2 font-semibold">Kind</th>
-            <th className="px-3 py-2 font-semibold">Tier</th>
-            <th className="px-3 py-2 font-semibold">Checkpoint</th>
+            <th className="px-4 py-2.5 font-semibold">#</th>
+            <th className="px-4 py-2.5 font-semibold">Step</th>
+            <th className="px-4 py-2.5 font-semibold">Executor</th>
+            <th className="px-4 py-2.5 font-semibold">Kind</th>
+            <th className="px-4 py-2.5 font-semibold">Tier</th>
+            <th className="px-4 py-2.5 font-semibold">Checkpoint</th>
           </tr>
         </thead>
         <tbody>
           {steps.map((s) => (
             <tr key={s.key} className="border-b border-line last:border-0 hover:bg-hover-paper">
-              <td className="px-3 py-2 tabular-nums text-subtle">{s.order}</td>
-              <td className="px-3 py-2">
-                <div className="font-medium text-ink">{s.title}</div>
+              <td className="px-4 py-2.5 text-subtle tabular-nums">{s.order}</td>
+              <td className="px-4 py-2.5">
+                <div className="font-semibold text-ink">{s.title}</div>
                 <div className="text-xs text-muted">{s.description}</div>
               </td>
-              <td className="px-3 py-2"><Chip>{s.executor}</Chip></td>
-              <td className="px-3 py-2"><Chip>{s.kind}</Chip></td>
-              <td className="px-3 py-2"><Chip>Tier {s.tier}</Chip></td>
-              <td className="px-3 py-2">
-                {s.checkpointAfter ? <Check size={14} className="text-ink" /> : <span className="text-subtle">—</span>}
+              <td className="px-4 py-2.5"><Chip>{s.executor}</Chip></td>
+              <td className="px-4 py-2.5"><Chip>{s.kind}</Chip></td>
+              <td className="px-4 py-2.5"><Chip>Tier {s.tier}</Chip></td>
+              <td className="px-4 py-2.5">
+                {s.checkpointAfter ? <Check size={14} className="text-ink" aria-label="Checkpoint after this step" /> : <span className="text-subtle">—</span>}
               </td>
             </tr>
           ))}
@@ -597,17 +460,22 @@ function TasksTab() {
 // ── Detail shell ─────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "timeline", label: "Timeline", icon: History },
-  { id: "approvals", label: "Approvals", icon: ShieldCheck },
+  { id: "log", label: "Event log", icon: History },
+  { id: "decided", label: "Decisions", icon: ShieldCheck },
   { id: "plan", label: "Plan", icon: ListChecks },
   { id: "tasks", label: "Tasks", icon: KanbanSquare },
 ] as const;
 
+function planInputs(steps: PlanStep[]): PlanStepInput[] {
+  return steps.map((s) => ({ key: s.key, title: s.title, kind: s.kind, executor: s.executor, tier: s.tier }));
+}
+
 export function MissionDetail({ missionId }: { missionId: string }) {
   const [data, setData] = useState<MissionDetailData | null>(null);
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("timeline");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("log");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"pause" | "resume" | null>(null);
+  const [deciding, setDeciding] = useState<{ id: string; which: "approve" | "deny" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
@@ -633,41 +501,62 @@ export function MissionDetail({ missionId }: { missionId: string }) {
 
   async function pauseResume(action: "pause" | "resume") {
     setBusy(action);
-    setError(null);
     try {
       const r = await api<{ ok: boolean; staleness?: { fresh: boolean; checks: Array<{ name: string; ok: boolean; detail?: string }> } }>(
         `/api/missions/${missionId}/${action}`,
         { method: "POST" },
       );
       if (action === "resume" && r.staleness && !r.staleness.fresh) {
-        setError("Stale — mission stays paused. Human review required.");
+        toastError("Still paused", "Stale data: the mission stays paused until a person reviews it.");
+      } else {
+        toast({ title: action === "pause" ? "Paused" : "Resumed", status: action === "pause" ? "done" : "running" });
       }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : `${action} failed.`);
+      toastError(action === "pause" ? "Couldn't pause" : "Couldn't resume", e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(null);
     }
   }
 
-  const pendingCount = useMemo(
-    () => (data?.approvals ?? []).filter((a) => a.status === "pending").length,
-    [data],
-  );
+  async function decide(a: DetailApproval, which: "approve" | "deny") {
+    setDeciding({ id: a.id, which });
+    try {
+      await api(`/api/missions/${missionId}/approvals/${a.id}/decide`, {
+        method: "POST",
+        body: JSON.stringify({ decision: which === "approve" ? "approved" : "denied" }),
+      });
+      const label = approveLabelFor({ source: "mission", title: humanize(a.action), typeLabel: "Mission" });
+      toast(
+        which === "approve"
+          ? { title: label === "Approve and send" ? "Approved and sent" : label === "Approve and publish" ? "Approved and published" : "Approved", description: humanize(a.action), status: "done" }
+          : { title: "Denied", description: `${humanize(a.action)}. Nothing goes out.`, status: "done" },
+      );
+      await load();
+    } catch (e) {
+      toastError(which === "approve" ? "Couldn't approve" : "Couldn't deny", e instanceof Error ? e.message : "Decision failed.");
+    } finally {
+      setDeciding(null);
+    }
+  }
+
+  const pending = useMemo(() => (data?.approvals ?? []).filter((a) => a.status === "pending"), [data]);
+  const decided = useMemo(() => (data?.approvals ?? []).filter((a) => a.status !== "pending"), [data]);
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-16 text-sm text-muted">
-        <Loader2 size={16} className="aos-spin" /> Loading mission…
+      <div className="flex items-center gap-2 py-16 text-md text-muted">
+        <Loader2 size={16} className="aos-spin" aria-hidden /> Loading mission…
       </div>
     );
   }
 
   if (notFound || !data) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-sm font-medium text-ink">Mission not found.</p>
-        <Link href="/dashboard/missions" className="mt-2 inline-block text-sm text-ink underline hover:text-focus">
+      <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <p className="aos-subheading">Mission not found</p>
+        {error ? <ErrorBox message={error} /> : null}
+        <Link href="/dashboard/missions" className={aosButton({ variant: "secondary", size: "sm" })}>
           Back to missions
         </Link>
       </div>
@@ -675,95 +564,179 @@ export function MissionDetail({ missionId }: { missionId: string }) {
   }
 
   const m = data.mission;
+  const v = data.agent;
   const goal = m.goal;
   const goalLine =
     goal.metric && goal.targetValue !== undefined
       ? `${goal.metric}: target ${goal.targetValue}${goal.unit ? ` ${goal.unit}` : ""} in ${goal.timeframeDays ?? "?"} days (${goal.direction ?? "increase"})`
       : "No goal set";
   const steps = m.planSnapshot.steps ?? [];
+  const timeline = v
+    ? missionTimeline({
+        events: data.events.map((e) => ({ ts: e.ts, actor: e.actor, step: e.step, args: e.args, observation: e.observation })),
+        plan: planInputs(steps),
+        status: v.status,
+      })
+    : null;
+  const waitingAgent = v ? (missionAgentIndex([v])[v.id]?.agent ?? "Strategist") : "Strategist";
+  const latestRun = data.runs[0] ?? null;
+  const startedAt = m.createdAt ? new Date(m.createdAt) : null;
 
   return (
-    <div>
-      <Link href="/dashboard/missions" className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-        <ChevronLeft size={14} /> Missions
+    <div className="flex flex-col gap-6">
+      <Link href="/dashboard/missions" className={aosButton({ variant: "quiet", size: "sm", className: "-ml-3 self-start" })}>
+        <ArrowLeft className="size-4" aria-hidden />
+        Missions
       </Link>
 
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="aos-heading">{m.name}</h1>
-            <MissionStatusBadge status={m.status} />
-            <Chip>{m.businessTypeLabel}</Chip>
+            {v ? <StatusBadge status={v.status} /> : <NeutralBadge label="Archived" />}
           </div>
-          <p className="mt-1 text-sm text-muted">
-            <span className="font-medium text-ink">Goal —</span> {goalLine}
+          <p className="mt-1.5 text-md text-muted">
+            <span className="font-semibold text-ink">{m.businessTypeLabel}</span> · {goalLine}
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-line">
-              <div className="h-full rounded-full bg-ink" style={{ width: `${Math.round(data.progress * 100)}%` }} />
-            </div>
-            <span className="text-[11px] tabular-nums text-muted">
-              {Math.round(data.progress * 100)}% · {data.stepCount}/{data.planStepCount} steps · {fmtCost(data.totalCostCents)} spent
-            </span>
-          </div>
-          {data.nextCheckpoint && (
-            <p className="mt-1 text-xs text-subtle">Next checkpoint: {data.nextCheckpoint}</p>
-          )}
+          <p className="mt-1 text-sm text-muted tabular-nums">
+            {Math.round(data.progress * 100)}% of goal · {data.stepCount}/{data.planStepCount} steps
+            {data.totalCostCents > 0 ? ` · ${fmtCost(data.totalCostCents)} spent` : ""}
+            {data.nextCheckpoint ? ` · Next checkpoint: ${data.nextCheckpoint}` : ""}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowAutomation(true)}
             disabled={m.status === "complete" || m.status === "archived"}
             className={btnGhost}
             title="Trigger an Activepieces webhook flow and log it on this mission"
           >
-            <Zap size={14} /> Automation
+            <Zap size={15} aria-hidden /> Automation
           </button>
-          {m.status === "paused" ? (
-            <button onClick={() => void pauseResume("resume")} disabled={busy !== null} className={btnRun}>
-              {busy === "resume" ? <Loader2 size={14} className="aos-spin" /> : <Play size={14} />} Resume
-            </button>
-          ) : (
-            <button
-              onClick={() => void pauseResume("pause")}
-              disabled={busy !== null || m.status === "complete" || m.status === "archived"}
-              className={btnGhost}
-            >
-              {busy === "pause" ? <Loader2 size={14} className="aos-spin" /> : <Pause size={14} />} Pause
-            </button>
-          )}
+          {latestRun ? (
+            <Link href={`/dashboard/runs/${latestRun.id}`} className={btnGhost}>
+              Open latest run
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {error && (
-        <div className="mb-3"><ErrorBox message={error} /></div>
-      )}
+      {error ? <ErrorBox message={error} /> : null}
 
-      <div className="mb-4 flex gap-1 border-b border-line">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${
-              tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            <Icon size={15} />
-            {label}
-            {id === "approvals" && pendingCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-needs px-1.5 py-0.5 text-[10px] font-semibold text-ink">
-                <Shape extra="aos-shape--needs" size="8px" />
-                {pendingCount}
-              </span>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        {/* Mission timeline: the lead's delegations, then what is still to come. */}
+        <div className="order-2 min-w-0 lg:order-1">
+          {timeline && v ? (
+            <RunTimeline
+              title="Mission timeline"
+              subtitle={startedAt ? `Strategist started this mission at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Strategist leads this mission"}
+              status={v.status}
+              steps={timeline.steps}
+              completed={timeline.completed}
+              busy={busy !== null}
+              pauseLabel="Pause mission"
+              resumeLabel="Resume mission"
+              onPause={m.status === "active" || m.status === "planned" ? () => void pauseResume("pause") : undefined}
+              onResume={m.status === "paused" ? () => void pauseResume("resume") : undefined}
+              headingLevel="h2"
+              emptyText="The lead hasn't handed anything off yet."
+            />
+          ) : (
+            <div className="rounded-lg bg-paper p-5 text-md text-muted shadow-hairline">
+              This mission is archived. Its event log, decisions and plan are below.
+            </div>
+          )}
+        </div>
+
+        <div className="order-1 flex min-w-0 flex-col gap-5 lg:order-2">
+          {v && v.status === "failed" ? (
+            <Banner
+              status="failed"
+              title={`${v.branches.find((b) => b.status === "failed")?.name ?? "Strategist"} stopped`}
+              description={needsReconnect(v.line) ? `${v.line}. Reconnect to resume.` : `${v.line}.`}
+              action={
+                needsReconnect(v.line)
+                  ? { label: "Reconnect", href: "/dashboard/settings/connectors" }
+                  : latestRun
+                    ? { label: "Open run", href: `/dashboard/runs/${latestRun.id}` }
+                    : null
+              }
+            />
+          ) : null}
+          {/* The lead and the sub-agents it delegated to. */}
+          {v ? (
+            <section aria-labelledby="team-h" className="rounded-lg bg-paper p-3 shadow-hairline sm:p-4">
+              <h2 id="team-h" className="px-2.5 pt-1 pb-2 text-sm font-semibold text-muted">
+                Who&apos;s on it
+              </h2>
+              <AgentTree lead={missionLeadNode(v)} branches={v.branches} />
+              {v.branches.length === 0 ? (
+                <p className="px-2.5 pt-1 pb-2 text-sm text-muted">Sub-agents appear here as the lead hands them steps.</p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/* Approvals waiting on you. */}
+          <section id="approvals" aria-labelledby="approvals-h" className="flex scroll-mt-20 flex-col gap-3">
+            <h2 id="approvals-h" className="aos-subheading">
+              {pending.length ? `Waiting on you (${pending.length})` : "Approvals"}
+            </h2>
+            {pending.length === 0 ? (
+              <p className="rounded-lg bg-paper px-4 py-5 text-md text-muted shadow-hairline">Nothing from this mission is waiting on you.</p>
+            ) : (
+              pending.map((a) => {
+                const title = humanize(a.action);
+                const facts = factLines(a.bindingJson);
+                return (
+                  <ApprovalCard
+                    key={a.id}
+                    agent={waitingAgent}
+                    title={approvalQuestion({ source: "mission", title })}
+                    meta={
+                      <span>
+                        Tier {a.tier}
+                        {a.expiresAt ? ` · expires ${new Date(a.expiresAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}
+                      </span>
+                    }
+                    body={`${waitingAgent} paused ${m.name} for your approval. Nothing goes out until you decide.`}
+                    items={facts.lines.map((l, i) => ({ key: `${i}:${l.label}`, label: l.label, detail: l.detail ?? undefined }))}
+                    approveLabel={approveLabelFor({ source: "mission", title, typeLabel: "Mission" })}
+                    busy={deciding?.id === a.id ? deciding.which : null}
+                    onApprove={() => void decide(a, "approve")}
+                    onDeny={() => void decide(a, "deny")}
+                  />
+                );
+              })
             )}
-          </button>
-        ))}
+          </section>
+        </div>
       </div>
 
-      {tab === "timeline" && <TimelineTab events={data.events} />}
-      {tab === "approvals" && <ApprovalsTab missionId={missionId} approvals={data.approvals} onDecided={load} />}
-      {tab === "plan" && <PlanTab steps={steps} />}
-      {tab === "tasks" && <TasksTab />}
+      <div className="flex flex-col gap-4">
+        <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-line px-1" role="tablist" aria-label="Mission records">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                "-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-md font-semibold whitespace-nowrap",
+                tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+              )}
+            >
+              <Icon size={15} aria-hidden />
+              {label}
+              {id === "decided" && decided.length > 0 ? <span className="text-muted tabular-nums">{decided.length}</span> : null}
+            </button>
+          ))}
+        </div>
+
+        {tab === "log" && <EventLogTab events={data.events} />}
+        {tab === "decided" && <DecidedTab approvals={decided} />}
+        {tab === "plan" && <PlanTab steps={steps} />}
+        {tab === "tasks" && <TasksTab />}
+      </div>
 
       {showAutomation && (
         <AutomationModal
@@ -971,21 +944,11 @@ function AutomationModal({
                   Run <span className="font-mono text-xs">{result.runId}</span>
                   {runStatus && (
                     <span className="ml-2">
-                      {runStatus.terminal ? (
-                        runStatus.succeeded ? (
-                          <span className={`${badgeBase} bg-done text-white`}>
-                            <Shape extra="aos-shape--done" /> {runStatus.status}
-                          </span>
-                        ) : (
-                          <span className={`${badgeBase} bg-failed text-white`}>
-                            <Shape extra="aos-shape--failed" /> {runStatus.status}
-                          </span>
-                        )
-                      ) : (
-                        <span className={`${badgeBase} bg-running text-white`}>
-                          <Shape extra="aos-shape--running aos-is-live" /> {runStatus.status}
-                        </span>
-                      )}
+                      <StatusBadge
+                        status={runStatus.terminal ? (runStatus.succeeded ? "done" : "failed") : "running"}
+                        label={runStatus.status}
+                        size="sm"
+                      />
                     </span>
                   )}
                 </p>

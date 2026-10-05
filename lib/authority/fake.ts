@@ -12,6 +12,7 @@
 import { createInstantlyPartner, createSmartleadPartner, parseRelayCampaignIds } from "./outreach/sending";
 import { gbpGetReview, gbpReplyToReview, gbpExecuteSync, planGbpSync } from "@/lib/connectors/m21/live/gbp";
 import type { LiveDeps, TokenSource } from "@/lib/connectors/m21/live/http";
+import { fakeProvidersAllowed } from "@/lib/env/secrets";
 
 export class NotConfiguredError extends Error {
   readonly provider: string;
@@ -99,7 +100,7 @@ export function resolveSendingPartner(
 ): SendingPartner {
   const providerName = cfg.provider ?? "smartlead";
   const { relayCampaignIds: relayRaw, deps } = cfg;
-  if (isFakeProvider(cfg)) return createFakeSendingPartner(providerName);
+  if (isFakeProvider(cfg) && fakeProvidersAllowed()) return createFakeSendingPartner(providerName);
   requireConfigured("Smartlead/Instantly", cfg, "set SMARTLEAD_API_KEY or INSTANTLY_API_KEY in Settings → Authority.");
   const relayCampaignIds = parseRelayCampaignIds(relayRaw);
   if (relayCampaignIds.length === 0) {
@@ -158,7 +159,7 @@ export function createFakeLlmJudge(): LlmJudge {
 }
 
 export function resolveLlmJudge(cfg: ProviderConfig): LlmJudge {
-  if (isFakeProvider(cfg)) return createFakeLlmJudge();
+  if (isFakeProvider(cfg) && fakeProvidersAllowed()) return createFakeLlmJudge();
   requireConfigured("LLM judge", cfg, "set an LLM API key (OpenAI/Anthropic/Google) in Settings → Authority → AEO.");
   throw new Error("unreachable");
 }
@@ -226,7 +227,7 @@ export function createLiveGbpClient(auth: TokenSource, deps: LiveDeps = {}): Gbp
  */
 export function resolveGbpClient(cfg: ProviderConfig & { auth?: TokenSource | null; deps?: LiveDeps }): GbpClient {
   if (cfg.auth) return createLiveGbpClient(cfg.auth, cfg.deps);
-  if (isFakeProvider(cfg)) return createFakeGbpClient();
+  if (isFakeProvider(cfg) && fakeProvidersAllowed()) return createFakeGbpClient();
   requireConfigured("Google Business Profile", cfg, "connect GBP in Settings → Authority → Listings (OAuth: business.manage).");
   throw new NotConfiguredError(
     "Google Business Profile",
@@ -254,7 +255,7 @@ export function resolveLdeClient(cfg: ProviderConfig & { featureFlag?: boolean }
   if (cfg.featureFlag !== true) {
     throw new NotConfiguredError("Local Data Exchange", "the LDE prototype is behind a feature flag — enable it in Settings → Authority → Listings.");
   }
-  if (isFakeProvider(cfg)) return createFakeLdeClient();
+  if (isFakeProvider(cfg) && fakeProvidersAllowed()) return createFakeLdeClient();
   requireConfigured("Local Data Exchange", cfg, "set LDE_API_KEY in Settings → Authority → Listings.");
   throw new Error("unreachable");
 }

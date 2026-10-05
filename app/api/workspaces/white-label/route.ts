@@ -137,7 +137,7 @@ export async function PUT(req: NextRequest) {
       brandColorSet = null;
     } else {
       const clean = sanitizeBrandHex(body.brandColor);
-      if (!clean) return Response.json({ error: "Brand color must be a hex color like #7c3aed." }, { status: 400 });
+      if (!clean) return Response.json({ error: "Brand color must be a hex color like #1f6feb." }, { status: 400 });
       data.whiteLabelBrandColor = clean;
       brandColorSet = clean;
     }

@@ -11,7 +11,7 @@ import {
   scheduleListmonkCampaign,
   sendListmonkCampaign,
 } from "@/lib/integrations/listmonk";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const { workspace } = await guardWorkspace({ editor: true });
     // Send protection: expensive + irreversible sends get a per-workspace
     // write-tier limit, on top of the proxy's write tier.
-    const rl = checkRateLimit(`listmonk-send:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`listmonk-send:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const { id } = await ctx.params;

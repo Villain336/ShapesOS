@@ -125,7 +125,7 @@ function RunningBadge({ children }: { children: React.ReactNode }) {
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-running px-2 py-0.5 text-[10px] font-semibold leading-tight text-white">
       <span
         className="aos-shape aos-shape--running aos-is-live"
-        style={{ color: "#fff" }}
+        style={{ color: "var(--aos-on-running)" }}
         role="img"
         aria-label="Running"
       />

@@ -1,20 +1,26 @@
-// ShapesOS — agent runs index (Phase 3 J).
+// ShapesOS — agent runs index (Phase 3 J; Agentic OS 4d).
 //
 // /dashboard/runs — every recorded agent run in the workspace, newest first,
-// each linking to the run viewer (/dashboard/runs/[runId]). Reads go through
-// the tenant scope (agent_runs is FORCE RLS, fail-closed) plus an explicit
-// workspaceId filter.
+// as a dense list: the run's state (status color + shape + label), the agent
+// that ran it (black monogram tile; mission runs are the lead's), what it
+// was for (its mission), who started it, when and how long. Each row opens
+// the run viewer (/dashboard/runs/[runId]). Reads go through the tenant
+// scope (agent_runs, missions and mission_approvals are FORCE RLS,
+// fail-closed) plus an explicit workspaceId filter.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Film, Workflow } from "lucide-react";
+import { ChevronRight, Film, GitPullRequest, Workflow } from "lucide-react";
 import type { AgentRunStatus as PrismaRunStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { getMembership } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { AgentRunStatus } from "@/lib/agents/runs/types";
-import { RunStatusBadge } from "@/components/runs/RunStatusBadge";
+import { AgentAvatar, FilterPill, NeutralBadge, StatusBadge, aosButton } from "@/components/aos";
+import { missionDisplayName } from "@/lib/aos/missions";
+import { clockTime, runAgentName, runPrompt, runStatus, runTitle } from "@/lib/aos/runs";
+import type { AosStatus } from "@/lib/aos/status";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +29,12 @@ export const metadata = {
   description: "Every agent run in this workspace — status, who started it, duration and recording.",
 };
 
-const STATUS_FILTERS: Array<{ value: AgentRunStatus | "all"; label: string }> = [
+const STATUS_FILTERS: Array<{ value: AgentRunStatus | "all"; label: string; shape?: AosStatus }> = [
   { value: "all", label: "All" },
-  { value: "running", label: "Running" },
-  { value: "queued", label: "Queued" },
-  { value: "failed", label: "Failed" },
-  { value: "succeeded", label: "Succeeded" },
+  { value: "running", label: "Running", shape: "running" },
+  { value: "queued", label: "Queued", shape: "queued" },
+  { value: "failed", label: "Failed", shape: "failed" },
+  { value: "succeeded", label: "Done", shape: "done" },
   { value: "cancelled", label: "Cancelled" },
 ];
 
@@ -43,13 +49,10 @@ function fmtDuration(ms: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function fmtTime(d: Date): string {
-  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function kindLabel(kind: string): string {
-  const t = kind.replace(/_/g, " ");
-  return t[0]!.toUpperCase() + t.slice(1);
+function fmtDay(d: Date): string {
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return `Today ${clockTime(d)}`;
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${clockTime(d)}`;
 }
 
 export default async function RunsIndexPage({
@@ -66,8 +69,8 @@ export default async function RunsIndexPage({
   const raw = Array.isArray(sp.status) ? sp.status[0] : sp.status;
   const status = STATUS_FILTERS.some((f) => f.value === raw && raw !== "all") ? (raw as AgentRunStatus) : null;
 
-  const runs = await withWorkspaceScope(workspace.id, (tx) =>
-    tx.agentRun.findMany({
+  const { runs, counts, missions, pending } = await withWorkspaceScope(workspace.id, async (tx) => {
+    const runs = await tx.agentRun.findMany({
       where: { workspaceId: workspace.id, ...(status ? { status: status as PrismaRunStatus } : {}) },
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
@@ -80,11 +83,34 @@ export default async function RunsIndexPage({
         threadId: true,
         createdAt: true,
         endedAt: true,
+        agentKey: true,
+        parentRunId: true,
+        agentState: true,
         recording: { select: { stepCount: true, videoPath: true } },
         _count: { select: { events: true } },
       },
-    }),
-  );
+    });
+    const missionIds = [...new Set(runs.map((r) => r.missionId).filter((v): v is string => !!v))];
+    const [counts, missions, pending] = await Promise.all([
+      tx.agentRun.groupBy({ by: ["status"], where: { workspaceId: workspace.id }, _count: { _all: true } }),
+      missionIds.length
+        ? tx.mission.findMany({ where: { workspaceId: workspace.id, id: { in: missionIds } }, select: { id: true, goal: true, template: true } })
+        : Promise.resolve([]),
+      missionIds.length
+        ? tx.missionApproval.groupBy({
+            by: ["missionId"],
+            where: { workspaceId: workspace.id, missionId: { in: missionIds }, status: "pending" },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    return { runs, counts, missions, pending };
+  });
+
+  const countBy = new Map(counts.map((c) => [c.status as string, c._count._all]));
+  const total = counts.reduce((n, c) => n + c._count._all, 0);
+  const missionName = new Map(missions.map((m) => [m.id, missionDisplayName(m.goal, m.template)]));
+  const pendingBy = new Map(pending.map((p) => [p.missionId, p._count._all]));
 
   // Who started each run: member name/email; agents and services stay as-is.
   const starterIds = [...new Set(runs.map((r) => r.startedBy).filter((s) => s && !s.includes(":")))];
@@ -100,116 +126,138 @@ export default async function RunsIndexPage({
   const now = Date.now();
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
-      <div>
-        <h1 className="aos-heading">Agent runs</h1>
-        <p className="mt-0.5 text-sm text-muted">
-          {workspace.name} — every recorded agent run. Open one to replay its timeline, video and trace.
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="aos-heading">Runs</h1>
+          <p className="mt-1 text-md text-muted">
+            Every agent run in {workspace.name}. Open one to follow its steps, tool calls and recording.
+          </p>
+        </div>
+        {/* Phase 9 (repos): the repositories agents work on, and their pull requests. */}
+        <Link href="/dashboard/runs/repositories" className={aosButton({ variant: "secondary", size: "sm" })}>
+          <GitPullRequest className="size-4" aria-hidden />
+          Repositories
+        </Link>
       </div>
 
-      <nav aria-label="Filter runs by status" className="flex flex-wrap items-center gap-2">
+      <nav aria-label="Filter runs by status" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {STATUS_FILTERS.map((f) => {
           const active = (f.value === "all" && !status) || f.value === status;
           return (
-            <Link
+            <FilterPill
               key={f.value}
               href={f.value === "all" ? "/dashboard/runs" : `/dashboard/runs?status=${f.value}`}
-              aria-current={active ? "page" : undefined}
-              className={`inline-flex h-chip items-center rounded-full px-3 text-sm font-semibold aos-press ${
-                active ? "bg-ink text-white" : "bg-paper text-ink shadow-control hover:shadow-outline"
-              }`}
+              selected={active}
+              status={f.shape}
+              count={f.value === "all" ? total : (countBy.get(f.value) ?? 0)}
             >
               {f.label}
-            </Link>
+            </FilterPill>
           );
         })}
       </nav>
 
       {runs.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
-          <Workflow size={28} className="text-subtle" />
-          <div className="text-sm font-semibold text-ink">{status ? "No runs with this status" : "No agent runs yet"}</div>
-          <div className="max-w-[360px] text-sm text-muted">
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
+          <Workflow size={28} className="text-subtle" aria-hidden />
+          <h2 className="aos-subheading">{status ? "No runs with this status" : "No agent runs yet"}</h2>
+          <p className="max-w-[44ch] text-md text-muted">
             Runs appear here when a mission, playbook or browser agent works. Start one from{" "}
-            <Link href="/dashboard/missions" className="font-semibold text-ink underline">
+            <Link href="/dashboard/missions" className="font-semibold text-ink underline underline-offset-4">
               Missions
             </Link>
             .
-          </div>
+          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs font-semibold text-muted">
-                <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Run</th>
-                <th className="px-3 py-2 font-semibold">Started by</th>
-                <th className="px-3 py-2 font-semibold">Linked to</th>
-                <th className="px-3 py-2 font-semibold">Started</th>
-                <th className="px-3 py-2 font-semibold">Duration</th>
-                <th className="px-3 py-2 font-semibold">Events</th>
-                <th className="px-3 py-2 text-right font-semibold">
-                  <span className="sr-only">Open</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((r) => {
-                const ended = r.endedAt?.getTime() ?? (r.status === "running" || r.status === "queued" ? now : null);
-                return (
-                  <tr key={r.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                    <td className="px-3 py-2.5 align-top">
-                      <RunStatusBadge status={r.status as AgentRunStatus} />
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <Link href={`/dashboard/runs/${r.id}`} className="font-semibold text-ink hover:underline">
-                        {kindLabel(r.kind)} run
-                      </Link>
-                      <div className="font-mono text-xs text-subtle">{r.id.slice(0, 12)}…</div>
-                    </td>
-                    <td className="max-w-[180px] truncate px-3 py-2.5 align-top text-ink">{starter(r.startedBy)}</td>
-                    <td className="px-3 py-2.5 align-top">
-                      {r.missionId ? (
-                        <Link href={`/dashboard/missions/${r.missionId}`} className="text-ink underline">
-                          Mission
-                        </Link>
-                      ) : r.threadId ? (
-                        <span className="text-muted">Chat thread</span>
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          {/* Column labels (desktop) */}
+          <div
+            aria-hidden
+            className="hidden grid-cols-[132px_minmax(0,1fr)_minmax(0,180px)_120px_88px_64px_20px] items-center gap-4 border-b border-line px-5 py-2.5 text-xs font-semibold text-muted lg:grid"
+          >
+            <span>Status</span>
+            <span>Run</span>
+            <span>Started by</span>
+            <span>Started</span>
+            <span>Duration</span>
+            <span>Events</span>
+            <span />
+          </div>
+          <ul>
+            {runs.map((r) => {
+              const pendingCount = r.missionId ? (pendingBy.get(r.missionId) ?? 0) : 0;
+              const aos = runStatus(r.status, pendingCount);
+              const mName = r.missionId ? (missionName.get(r.missionId) ?? null) : null;
+              const agent = runAgentName(r.kind, r.agentKey);
+              const ended = r.endedAt?.getTime() ?? (r.status === "running" || r.status === "queued" ? now : null);
+              const duration = ended === null ? "—" : fmtDuration(ended - r.createdAt.getTime());
+              return (
+                <li key={r.id} className="relative border-b border-line last:border-0">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-[background-color] duration-150 hover:bg-hover-paper sm:px-5 lg:grid-cols-[132px_minmax(0,1fr)_minmax(0,180px)_120px_88px_64px_20px]">
+                    <div className="order-2 justify-self-end lg:order-none lg:justify-self-start">
+                      {aos ? (
+                        <StatusBadge status={aos} size="sm" label={aos === "done" ? "Done" : undefined} />
                       ) : (
-                        <span className="text-subtle">—</span>
+                        <NeutralBadge label="Cancelled" size="sm" />
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">{fmtTime(r.createdAt)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
-                      {ended === null ? "—" : fmtDuration(ended - r.createdAt.getTime())}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
-                      <span className="inline-flex items-center gap-1.5">
-                        {r._count.events}
-                        {r.recording?.videoPath && <Film size={13} aria-label="Has a recording" />}
+                    </div>
+                    <div className="order-1 flex min-w-0 items-center gap-3 lg:order-none">
+                      <AgentAvatar name={agent} size="md" />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/dashboard/runs/${r.id}`}
+                          className="block truncate text-base leading-5 font-semibold text-ink after:absolute after:inset-0 after:content-['']"
+                        >
+                          {runTitle(r.kind, mName, runPrompt(r.agentState))}
+                        </Link>
+                        <p className="truncate text-sm text-muted">
+                          {agent}
+                          {r.missionId ? (
+                            <>
+                              {" · "}
+                              <Link
+                                href={`/dashboard/missions/${r.missionId}`}
+                                className="relative z-10 font-semibold text-ink underline-offset-4 hover:underline"
+                              >
+                                Mission
+                              </Link>
+                            </>
+                          ) : r.parentRunId ? (
+                            " · Handed off by the lead"
+                          ) : r.threadId ? (
+                            " · Chat thread"
+                          ) : null}
+                          <span className="aos-mono ml-1.5 text-xs text-subtle">{r.id.slice(-8)}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="order-3 col-span-2 text-sm text-muted lg:order-none lg:col-span-1 lg:truncate lg:text-md lg:text-ink">
+                      <span className="lg:hidden">Started by </span>
+                      {starter(r.startedBy)}
+                      <span className="lg:hidden">
+                        {" · "}
+                        {fmtDay(r.createdAt)} · {duration} · {r._count.events} events
                       </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right align-top">
-                      <Link
-                        href={`/dashboard/runs/${r.id}`}
-                        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
-                      >
-                        Open
-                        <ArrowUpRight size={14} />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </span>
+                    <span className="hidden text-md text-muted tabular-nums lg:block">{fmtDay(r.createdAt)}</span>
+                    <span className="hidden text-md text-muted tabular-nums lg:block">{duration}</span>
+                    <span className="hidden items-center gap-1.5 text-md text-muted tabular-nums lg:inline-flex">
+                      {r._count.events}
+                      {r.recording?.videoPath ? <Film size={13} aria-label="Has a recording" /> : null}
+                    </span>
+                    <ChevronRight size={16} className="hidden text-subtle lg:block" aria-hidden />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
-      {runs.length === PAGE_SIZE && (
-        <p className="text-xs text-muted">Showing the latest {PAGE_SIZE} runs. Filter by status to narrow the list.</p>
-      )}
+      {runs.length === PAGE_SIZE ? (
+        <p className="text-sm text-muted">Showing the latest {PAGE_SIZE} runs. Filter by status to narrow the list.</p>
+      ) : null}
     </div>
   );
 }

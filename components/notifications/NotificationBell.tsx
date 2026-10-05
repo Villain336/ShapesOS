@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { invalidateShared, sharedJson } from "@/lib/ui/shared-fetch";
 import { NotificationIcon, timeAgo, type NotificationItem } from "./NotificationIcon";
 
 const POLL_MS = 60_000;
@@ -23,9 +24,10 @@ export function useNotifications(limit = 8) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`/api/notifications?limit=${limit}`, { cache: "no-store" });
+      // Shared: the bell is mounted in both the top bar and the mobile nav.
+      const res = await sharedJson(`/api/notifications?limit=${limit}`);
       if (!res.ok) return;
-      const body = (await res.json()) as { notifications: NotificationItem[]; unread: number };
+      const body = (res.body ?? { notifications: [], unread: 0 }) as { notifications: NotificationItem[]; unread: number };
       setItems(body.notifications ?? []);
       setUnread(Number(body.unread) || 0);
     } catch {
@@ -42,13 +44,15 @@ export function useNotifications(limit = 8) {
       body: JSON.stringify(payload),
     });
     if (!res.ok) return;
+    // The shared list is now stale for every mounted bell.
+    invalidateShared(`/api/notifications?limit=${limit}`);
     const body = (await res.json()) as { unread: number };
     setUnread(Number(body.unread) || 0);
     const now = new Date().toISOString();
     setItems((prev) =>
       prev.map((n) => ("all" in payload || payload.ids.includes(n.id) ? { ...n, readAt: n.readAt ?? now } : n)),
     );
-  }, []);
+  }, [limit]);
 
   useEffect(() => {
     void refresh();
@@ -165,7 +169,7 @@ export function NotificationBell({ className }: { className?: string }) {
                   onClick={() => void openItem(n)}
                   className="flex min-h-11 w-full items-start gap-3 rounded-sm px-3 py-2 text-left hover:bg-hover"
                 >
-                  <NotificationIcon kind={n.kind} />
+                  <NotificationIcon kind={n.kind} title={n.title} />
                   <span className="min-w-0 flex-1">
                     <span className={cn("block truncate text-sm text-ink", !n.readAt && "font-semibold")}>
                       {n.title}
