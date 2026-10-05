@@ -20,6 +20,7 @@
 // unavailable and allowlisted links fail closed.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sharedWindowHit } from "@/lib/api/rate-limit-store";
 
 export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 export const VIEWER_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -159,17 +160,16 @@ export function resolveViewerAccess(input: {
   return { kind: "email-form" };
 }
 
-/** In-process resend throttle: true when a link email may be sent now. */
-const lastSent = new Map<string, number>();
-export function mayResendMagicLink(linkId: string, email: string, now: number): boolean {
-  const k = `${linkId}|${email}`;
-  const prev = lastSent.get(k) ?? 0;
-  if (now - prev < MAGIC_LINK_RESEND_MS) return false;
-  lastSent.set(k, now);
-  if (lastSent.size > 10_000) {
-    for (const [kk, t] of lastSent) if (now - t >= MAGIC_LINK_RESEND_MS) lastSent.delete(kk);
-  }
-  return true;
+/**
+ * Resend throttle: true when a link email may be sent now (one per
+ * MAGIC_LINK_RESEND_MS per link + address). Deploy PR: the window lives in
+ * the shared counter store so the throttle holds across web replicas (it
+ * was a per-process Map, so N replicas allowed N emails); a store error
+ * falls back to the per-process window.
+ */
+export async function mayResendMagicLink(linkId: string, email: string, now: number): Promise<boolean> {
+  const hit = await sharedWindowHit(`funding-magic:${linkId}|${email.trim().toLowerCase()}`, { limit: 1, windowMs: MAGIC_LINK_RESEND_MS }, now);
+  return hit.allowed;
 }
 
 /** Absolute app origin for emailed links — configured, never the Host header. */

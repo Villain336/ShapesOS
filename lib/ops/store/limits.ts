@@ -15,7 +15,7 @@
 // (a person retrying after a declined card isn't challenged on the first
 // try; a script is). Without a provider this step is a documented no-op.
 
-import { sharedCounterStore, withStoreTimeout, storeWarn } from "@/lib/api/rate-limit-store";
+import { __resetLocalWindows, sharedWindowHit } from "@/lib/api/rate-limit-store";
 import { captchaConfig, verifyCaptchaToken } from "@/lib/auth/captcha";
 
 export const STORE_LIMITS = {
@@ -32,27 +32,9 @@ export interface StoreHit {
   retryAfterMs: number;
 }
 
-// Per-process fallback (bounded: oldest key evicted past 10k).
-const localCounts = new Map<string, { n: number; start: number }>();
-
-/** Test seam. */
+/** Test seam: drop the per-process fallback windows. */
 export function __resetStoreLimits(): void {
-  localCounts.clear();
-}
-
-function localHit(key: string, windowMs: number, now: number): { n: number; start: number } {
-  const cur = localCounts.get(key);
-  if (!cur || now - cur.start >= windowMs) {
-    const fresh = { n: 1, start: now };
-    localCounts.set(key, fresh);
-    if (localCounts.size > 10_000) {
-      const oldest = localCounts.keys().next().value;
-      if (oldest) localCounts.delete(oldest);
-    }
-    return fresh;
-  }
-  cur.n += 1;
-  return cur;
+  __resetLocalWindows();
 }
 
 export async function storeHit(kind: keyof typeof STORE_LIMITS, storeId: string, ip: string | null, now: number = Date.now()): Promise<StoreHit> {
@@ -71,19 +53,8 @@ export async function publicEndpointHit(
   ip: string | null,
   now: number = Date.now(),
 ): Promise<StoreHit> {
-  const { limit, windowMs } = rule;
-  const key = `${scope}:${resourceId}:${ip ?? "no-ip"}`;
-  const store = sharedCounterStore();
-  if (store) {
-    try {
-      const hit = await withStoreTimeout(store.hit(key, windowMs, now));
-      return { allowed: hit.count <= limit, count: hit.count, retryAfterMs: hit.count <= limit ? 0 : Math.max(0, hit.windowStart + windowMs - now) };
-    } catch (err) {
-      storeWarn("shop-hit", err);
-    }
-  }
-  const h = localHit(key, windowMs, now);
-  return { allowed: h.n <= limit, count: h.n, retryAfterMs: h.n <= limit ? 0 : Math.max(0, h.start + windowMs - now) };
+  const hit = await sharedWindowHit(`${scope}:${resourceId}:${ip ?? "no-ip"}`, rule, now);
+  return { allowed: hit.allowed, count: hit.count, retryAfterMs: hit.retryAfterMs };
 }
 
 /** CAPTCHA due for this checkout attempt? (never without a provider) */

@@ -530,11 +530,11 @@ describe("pixabay rate limit", () => {
     clearRateLimit();
   });
 
-  it("allows bursts under 100/min and blocks the 101st", () => {
-    for (let i = 0; i < 100; i++) assert.equal(checkRateLimit("ws-1"), true);
-    assert.equal(checkRateLimit("ws-1"), false);
+  it("allows bursts under 100/min and blocks the 101st", async () => {
+    for (let i = 0; i < 100; i++) assert.equal(await checkRateLimit("ws-1"), true);
+    assert.equal(await checkRateLimit("ws-1"), false);
     // A different workspace gets its own budget.
-    assert.equal(checkRateLimit("ws-2"), true);
+    assert.equal(await checkRateLimit("ws-2"), true);
   });
 });
 

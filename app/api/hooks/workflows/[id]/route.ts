@@ -16,7 +16,7 @@
 // existing run) with the JSON body as the trigger payload. Responses carry
 // only the run id and status, never workflow data.
 
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import {
   BodyTooLargeError,
   readCappedText,
@@ -35,7 +35,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!ID_RE.test(id)) return Response.json({ error: "Not found" }, { status: 404 });
 
   // Per-workflow budget at the AI tier (each run can spend): 20/min.
-  const limit = checkRateLimit(`wfhook:${id}`, "ai");
+  // Deploy PR: the shared limiter (holds across replicas; falls back to the
+  // per-process window on a store error).
+  const limit = await checkRateLimitAsync(`wfhook:${id}`, "ai");
   if (!limit.allowed) return tooManyRequests(limit.retryAfterMs);
 
   const signature = req.headers.get(SIGNATURE_HEADER);

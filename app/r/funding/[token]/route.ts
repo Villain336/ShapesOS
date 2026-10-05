@@ -199,7 +199,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       const origin =
         appOriginForLinks() ?? (process.env.NODE_ENV !== "production" ? url.origin : null);
       if (!origin) return unavailablePage();
-      if (viewer.magicToken && mayResendMagicLink(link.id, viewer.email, now.getTime())) {
+      if (viewer.magicToken && (await mayResendMagicLink(link.id, viewer.email, now.getTime()))) {
         const magicUrl = `${origin}${cleanPath}${versionParam ? "&" : "?"}verify=${encodeURIComponent(viewer.magicToken)}`;
         // Not awaited: response timing must not reveal whether the address
         // is allowlisted.

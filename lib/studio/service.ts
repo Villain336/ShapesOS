@@ -5,7 +5,12 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { Prisma, type FileChangeAction } from "@prisma/client";
-import { randomBytes } from "crypto";
+import {
+  memorySingleUseTokens,
+  sharedSingleUseTokens,
+  type MemorySingleUseTokenStore,
+  type SingleUseTokenStore,
+} from "@/lib/api/single-use-tokens";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
 import { queuePostizDraft } from "@/lib/integrations/postiz";
@@ -289,8 +294,16 @@ interface PurchaseConfirmation {
   expiresAt: number;
 }
 
-// Single-use confirmation tokens (5-min TTL). Single-process only — noted in DEPLOY.md.
-const purchaseConfirmations = new Map<string, PurchaseConfirmation>();
+// Single-use confirmation tokens (5-min TTL). Deploy PR: kept in Postgres
+// (single_use_tokens, lib/api/single-use-tokens.ts) so a token issued by one
+// replica is accepted exactly once by whichever replica takes the confirm;
+// an in-process store with the same semantics is used without a database.
+const PURCHASE_PURPOSE = "studio_domain_purchase";
+const PURCHASE_TOKEN_TTL_MS = 5 * 60 * 1000;
+let purchaseTokens: SingleUseTokenStore | null = null;
+function purchaseTokenStore(): SingleUseTokenStore {
+  return (purchaseTokens ??= sharedSingleUseTokens());
+}
 
 export interface PurchasePreview {
   domain: string;
@@ -333,13 +346,11 @@ export async function previewDomainPurchase(
   if (availability.premium) throw new Error("Premium domains cannot be registered via the API.");
   if (availability.priceUsd == null) throw new Error("Could not determine the registration price — try again.");
 
-  const token = randomBytes(24).toString("hex");
-  purchaseConfirmations.set(token, {
-    projectId,
+  const token = await purchaseTokenStore().issue({
     workspaceId,
-    domain: clean,
-    priceCents: Math.round(availability.priceUsd * 100),
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    purpose: PURCHASE_PURPOSE,
+    payload: { projectId, domain: clean, priceCents: Math.round(availability.priceUsd * 100) },
+    expiresAt: new Date(Date.now() + PURCHASE_TOKEN_TTL_MS),
   });
   return {
     domain: clean,
@@ -421,11 +432,23 @@ export async function confirmDomainPurchase(
   actor: Actor = "user",
 ) {
   if (!args.agreeToTerms) throw new Error("You must agree to the terms to register a domain.");
-  const confirmation = purchaseConfirmations.get(args.confirmationToken);
-  purchaseConfirmations.delete(args.confirmationToken);
-  if (!confirmation) throw new Error("Confirmation token expired or invalid — restart the purchase.");
-  if (confirmation.expiresAt < Date.now()) throw new Error("Confirmation token expired — restart the purchase.");
-  if (confirmation.projectId !== projectId || confirmation.workspaceId !== workspaceId) {
+  // Single use on every replica: consuming deletes the token (one statement).
+  const consumed = await purchaseTokenStore().consume({
+    workspaceId,
+    purpose: PURCHASE_PURPOSE,
+    token: args.confirmationToken,
+  });
+  if (consumed.status === "invalid") throw new Error("Confirmation token expired or invalid — restart the purchase.");
+  if (consumed.status === "expired") throw new Error("Confirmation token expired — restart the purchase.");
+  const p = consumed.payload;
+  const confirmation: PurchaseConfirmation = {
+    projectId: String(p.projectId ?? ""),
+    workspaceId,
+    domain: String(p.domain ?? ""),
+    priceCents: Number(p.priceCents),
+    expiresAt: consumed.expiresAt.getTime(),
+  };
+  if (confirmation.projectId !== projectId || !confirmation.domain || !Number.isFinite(confirmation.priceCents)) {
     throw new Error("Confirmation token does not match this project.");
   }
 
@@ -657,16 +680,24 @@ export async function useAssetInSocialPost(
   return draft;
 }
 
-/** Test-only: clear in-memory OAuth/purchase state between fixture runs. */
+/**
+ * Test-only: clear purchase state between fixture runs. Switches the token
+ * store to a fresh in-process one (the fixtures run against a mocked db).
+ */
 export function __resetStudioTestState() {
-  purchaseConfirmations.clear();
+  purchaseTokens = memorySingleUseTokens();
 }
 
 /** Test-only: seed a confirmation token (mirrors previewDomainPurchase). */
 export function __seedPurchaseConfirmation(input: PurchaseConfirmation): string {
-  const token = randomBytes(24).toString("hex");
-  purchaseConfirmations.set(token, input);
-  return token;
+  const store = purchaseTokenStore();
+  if (store.kind !== "memory") throw new Error("__seedPurchaseConfirmation needs __resetStudioTestState() first");
+  return (store as MemorySingleUseTokenStore).issueSync({
+    workspaceId: input.workspaceId,
+    purpose: PURCHASE_PURPOSE,
+    payload: { projectId: input.projectId, domain: input.domain, priceCents: input.priceCents },
+    expiresAt: new Date(input.expiresAt),
+  });
 }
 
 // Keep the mock import referenced so tree-shaking/CI don't flag it unused;

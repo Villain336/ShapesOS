@@ -32,7 +32,7 @@ export async function GET(req: Request) {
       return Response.json({ error: message, code: "pixabay_bad_request" }, { status: 400 });
     }
 
-    if (!checkRateLimit(workspace.id)) {
+    if (!(await checkRateLimit(workspace.id))) {
       return Response.json(
         {
           error: "Pixabay rate limit reached (~100 requests/minute). Wait a bit and try again.",

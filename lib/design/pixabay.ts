@@ -59,6 +59,8 @@ export interface PixabayAsset {
   videoFile?: string;
 }
 
+import { __resetLocalWindows, sharedWindowHit } from "@/lib/api/rate-limit-store";
+
 export const PIXABAY_API_BASE = "https://pixabay.com/api/";
 export const PIXABAY_VIDEO_API_BASE = "https://pixabay.com/api/videos/";
 /** Pixabay caps per_page at 200; we cap lower to keep payloads small. */
@@ -344,28 +346,20 @@ export function clearResponseCache(): void {
   RESPONSE_CACHE.clear();
 }
 
-const REQUEST_TIMES = new Map<string, number[]>();
-
 /**
- * Sliding-window rate guard: at most RATE_LIMIT_PER_MINUTE requests per
- * 60 seconds per workspace. Returns true when the request may proceed,
- * false when the caller should answer 429.
+ * Rate guard: at most RATE_LIMIT_PER_MINUTE requests per minute per
+ * workspace. Returns true when the request may proceed, false when the
+ * caller should answer 429. Deploy PR: a fixed window in the shared counter
+ * store (lib/api/rate-limit-store.ts sharedWindowHit) so the budget holds
+ * across web replicas; a store error falls back to the per-process window.
  */
-export function checkRateLimit(workspaceId: string): boolean {
-  const now = Date.now();
-  const times = (REQUEST_TIMES.get(workspaceId) ?? []).filter((t) => now - t < 60_000);
-  if (times.length >= RATE_LIMIT_PER_MINUTE) {
-    REQUEST_TIMES.set(workspaceId, times);
-    return false;
-  }
-  times.push(now);
-  REQUEST_TIMES.set(workspaceId, times);
-  return true;
+export async function checkRateLimit(workspaceId: string, now: number = Date.now()): Promise<boolean> {
+  return (await sharedWindowHit(`pixabay:${workspaceId}`, { limit: RATE_LIMIT_PER_MINUTE, windowMs: 60_000 }, now)).allowed;
 }
 
-/** Clear rate-limit state. Exported for tests. */
+/** Clear the per-process fallback windows. Exported for tests. */
 export function clearRateLimit(): void {
-  REQUEST_TIMES.clear();
+  __resetLocalWindows();
 }
 
 /**

@@ -193,8 +193,8 @@ describe("export plumbing", () => {
   });
 
   it("one export per key; the slot frees when the stream ends or is cancelled", async () => {
-    assert.ok(claimExportSlot("k1"));
-    assert.ok(!claimExportSlot("k1"));
+    assert.ok(await claimExportSlot("k1"));
+    assert.ok(!(await claimExportSlot("k1")));
     const src = new ReadableStream<Uint8Array>({
       start(c) {
         c.enqueue(new TextEncoder().encode("{}"));
@@ -202,11 +202,11 @@ describe("export plumbing", () => {
       },
     });
     assert.equal(await new Response(releasingStream(src, "k1")).text(), "{}");
-    assert.ok(claimExportSlot("k1"), "released at end of stream");
+    assert.ok(await claimExportSlot("k1"), "released at end of stream");
     const never = new ReadableStream<Uint8Array>({ pull() {} });
     await releasingStream(never, "k1").cancel();
-    assert.ok(claimExportSlot("k1"), "released on cancel");
-    releaseExportSlot("k1");
+    assert.ok(await claimExportSlot("k1"), "released on cancel");
+    await releaseExportSlot("k1");
   });
 
   it("self-service guard: 401 signed out, the session's own account otherwise", async () => {
