@@ -122,6 +122,26 @@ export const TWIN_SITE_LIMITS = {
   agency: null,
 } as const satisfies Record<Plan, number | null>;
 
+/**
+ * Phase 15.4 (zernio): connected social / ad accounts (through the Zernio
+ * platform key) included in the plan each month. Beyond them each account is
+ * metered at ZERNIO_ACCOUNT_MONTH_CREDITS (lib/metering/credits.ts); every
+ * workspace's first ZERNIO_FREE_ACCOUNTS_PER_WORKSPACE are always included.
+ * Agency's are POOLED across the owner's agency client workspaces
+ * (ZERNIO_POOLED_PLANS). self_hosted: your own ZERNIO_API_KEY, no credits.
+ */
+export const ZERNIO_INCLUDED_ACCOUNTS = {
+  self_hosted: null,
+  trial: 2,
+  starter: 3,
+  pro: 10,
+  business: 25,
+  agency: 50,
+} as const satisfies Record<Plan, number | null>;
+
+/** Plans whose included Zernio accounts are one pool shared by the owner's workspaces on that plan. */
+export const ZERNIO_POOLED_PLANS: ReadonlySet<Plan> = new Set<Plan>(["agency"]);
+
 const PRO_FEATURES: readonly Feature[] = ["api_access", "webhooks", "custom_branding", "digital_twin", "payroll", "pos"];
 const BUSINESS_FEATURES: readonly Feature[] = [...PRO_FEATURES, "sso", "scim"];
 

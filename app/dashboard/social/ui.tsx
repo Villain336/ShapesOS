@@ -59,7 +59,8 @@ export interface Post {
   metrics: Metrics | null;
 }
 
-export type ProviderMode = "postiz" | "mock" | "none";
+// Phase 15.4 (zernio): + "zernio" — channels are the workspace's Zernio accounts.
+export type ProviderMode = "postiz" | "mock" | "zernio" | "none";
 
 export async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const isForm = typeof FormData !== "undefined" && opts?.body instanceof FormData;

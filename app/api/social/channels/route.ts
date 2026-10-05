@@ -12,8 +12,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    await guardWorkspace();
-    const provider = getSocialProvider();
+    const { workspace } = await guardWorkspace();
+    const provider = getSocialProvider(workspace.id);
     const maxUploadBytes = socialMaxUploadBytes();
     if (!provider) return Response.json({ mode: "none", channels: [], maxUploadBytes });
     return Response.json({ mode: provider.name, channels: await provider.listChannels(), maxUploadBytes });

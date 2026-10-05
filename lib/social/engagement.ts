@@ -125,13 +125,11 @@ export async function syncSocialWorkspace(
 
 /** Cron sweep: every workspace with posts in flight or recently published. */
 export async function runSocialSync(now: Date = new Date()): Promise<{ workspaces: number } & SyncResult> {
-  const provider = getSocialProvider();
   const total: { workspaces: number } & SyncResult = {
     workspaces: 0,
     refresh: { checked: 0, published: 0, failed: 0 },
     ingest: { posts: 0, rows: 0, errors: 0 },
   };
-  if (!provider) return total;
   const workspaces = await prisma.workspace.findMany({ select: { id: true } });
   const since = new Date(now.getTime() - INGEST_LOOKBACK_DAYS * 86_400_000);
   for (const ws of workspaces) {
@@ -141,6 +139,9 @@ export async function runSocialSync(now: Date = new Date()): Promise<{ workspace
       }),
     );
     if (active === 0) continue;
+    // Phase 15.4 (zernio): the provider is per workspace (Zernio profile).
+    const provider = getSocialProvider(ws.id);
+    if (!provider) continue;
     total.workspaces++;
     try {
       const r = await syncSocialWorkspace(ws.id, provider, now);

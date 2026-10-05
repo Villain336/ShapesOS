@@ -217,6 +217,9 @@ export const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "update campaign budget",
   "money connector write",
   "send payroll to provider",
+  // Phase 15.4 (zernio): resuming a paused ad campaign restarts spend on the
+  // ad network — the words carry no money verb, so it is pinned here.
+  "resume ad campaign",
 ]);
 
 /**

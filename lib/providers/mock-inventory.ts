@@ -246,6 +246,22 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
     envVars: ["COMPOSIO_API_KEY"],
   });
 
+  // Phase 15.4 (zernio): the Zernio platform key (LIVE / pre-added) — ads on 7
+  // networks + social on 16 platforms. lib/zernio/config.ts zernioMode().
+  // (The keys workstream owns this page's layout; this is Zernio's own row.)
+  const zernio = set(env, "ZERNIO_API_KEY");
+  out.push({
+    key: "zernio",
+    label: "Ads and social through Zernio (platform key)",
+    mode: zernio ? "live" : fakeProvidersAllowed(env as NodeJS.ProcessEnv) ? "mock" : "off",
+    detail: zernio
+      ? "Live, pre-added: every workspace gets its own Zernio profile and connects accounts on Settings → Connectors → Zernio."
+      : fakeProvidersAllowed(env as NodeJS.ProcessEnv)
+        ? "Runs on the labelled fake Zernio — connect flows, ads and posts are simulated and marked mock."
+        : "Off — Zernio tools and publishing say \"Zernio is not connected\"; nothing is faked.",
+    envVars: ["ZERNIO_API_KEY", "ZERNIO_BASE_URL"],
+  });
+
   const ap = normalizeEngineUrl(env.ACTIVEPIECES_URL) !== null && set(env, "ACTIVEPIECES_API_KEY");
   out.push({
     key: "activepieces",

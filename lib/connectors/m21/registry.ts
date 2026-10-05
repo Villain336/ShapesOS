@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 27 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 28 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -30,6 +30,13 @@ export interface BuiltinConnectorMeta {
    * modes only for a supported alternative to OAuth (Shopify single store).
    */
   credentialModes?: CredentialMode[];
+  /**
+   * Phase 15.4 (zernio): a PLATFORM key — ShapesOS's own key in env, LIVE /
+   * pre-added for every workspace; the customer brings no credential (the
+   * vault holds nothing; authType is "none"). The card shows the env var's
+   * state instead of a credential form.
+   */
+  platformKey?: { envVar: string; label: string };
 }
 
 // Phase 11 (conncore): Microsoft Graph delegated scopes (offline_access for
@@ -461,6 +468,20 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Gusto OAuth2, one company per connection (a primary or full-access admin authorizes). GUSTO_ENVIRONMENT=demo (default) uses api.gusto-demo.com; production needs Gusto's app approval with employees:read, payrolls:read and payrolls:write.",
   },
+  // Phase 15.4 (zernio): Zernio — ads on 7 networks (Meta, Google, TikTok,
+  // LinkedIn, Pinterest, X, OpenAI) and social publishing on 16 platforms,
+  // through ONE platform key (28th built-in). Each workspace gets its own
+  // Zernio profile; customers connect accounts per platform on the card.
+  {
+    key: "zernio",
+    displayName: "Zernio",
+    authType: "none",
+    description:
+      "Ads on Meta, Google, TikTok, LinkedIn, Pinterest, X and OpenAI, and social publishing on 16 platforms — connect your accounts per platform. Creating ads and raising budgets always ask.",
+    authNote:
+      "Platform key (ZERNIO_API_KEY, LIVE / pre-added) — nothing to paste. Each workspace gets its own Zernio profile; connect accounts per platform on this card.",
+    platformKey: { envVar: "ZERNIO_API_KEY", label: "LIVE / pre-added" },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -536,6 +557,7 @@ import { ShopifyAdapter } from "./native/shopify"; // Phase 11 (bizsync)
 import { QuickbooksAdapter } from "./native/quickbooks"; // Phase 11 (bizsync)
 import { XeroAdapter } from "./native/xero"; // Phase 11 (bizsync)
 import { GustoAdapter } from "./native/gusto"; // Phase 14 (connectors)
+import { ZernioAdapter } from "./native/zernio"; // Phase 15.4 (zernio)
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -570,6 +592,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   xero: () => new XeroAdapter(),
   // Phase 14 (connectors).
   gusto: () => new GustoAdapter(),
+  // Phase 15.4 (zernio): platform key; mock mode is the labelled FAKE Zernio.
+  zernio: () => new ZernioAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -585,7 +609,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 27
+// call the provider; without one they stay in labeled mock mode. All 28
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

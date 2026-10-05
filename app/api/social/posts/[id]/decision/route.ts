@@ -39,7 +39,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       { userId: user.id, role: membership.role, hasOtherApprover: await hasOtherApprover(prisma, workspace.id, user.id) },
       v.data.decision,
       v.data.note ?? null,
-      getSocialProvider(),
+      getSocialProvider(workspace.id),
     );
     return Response.json({ post });
   } catch (e) {

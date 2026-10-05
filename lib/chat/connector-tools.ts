@@ -30,6 +30,7 @@ import { mcpToolAction, mcpToolGroup } from "@/lib/connectors/m21/mcp-policy";
 import type {
   ConnectorAdapter,
   ConnectorToolDef,
+  InvokeResult,
 } from "@/lib/connectors/m21/types";
 import type { ToolContext } from "./tools";
 import { connectorAction, connectorGroup, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
@@ -148,6 +149,12 @@ export async function connectorToolsSection(
     return `${header}\n\nNo connector data sources are bound to this project.`;
   }
   const lines: string[] = [];
+  // Phase 15.4 (zernio): when Zernio is bound it is the preferred ads path
+  // (7 networks, scoped to this workspace's profile, money writes always ask);
+  // the native Meta / Google Ads tools stay as read-only alternatives.
+  if (sources.some((s) => s.source.connectorKey === "zernio" && s.tools)) {
+    lines.push("# For paid ads prefer connector.zernio.* (Meta, Google, TikTok, LinkedIn, Pinterest, X, OpenAI). Creating ads and raising budgets always ask the person.");
+  }
   for (const { source: s, tools, error } of sources) {
     if (!tools) {
       lines.push(`# ${s.displayName} (${s.connectorKey}) — tools unavailable: ${error}`);
@@ -399,8 +406,24 @@ export async function resolveConnectorTool(
   let autoReason: string | null = null;
   // Phase 11 (conncore): a custom MCP tool's action (tier) comes from its
   // tool policy; unmapped → mcp_write (Phase 14: Tier 2, asks unless a rule says auto).
-  const action = builtin ? connectorAction(key, tool) : mcpToolAction(connectorConfig, tool);
+  let action = builtin ? connectorAction(key, tool) : mcpToolAction(connectorConfig, tool);
+  // Phase 15.4 (zernio): the per-call context the optional adapter hooks get.
+  const hookCtx = {
+    workspaceId: ctx.workspaceId,
+    projectId: ctx.projectId,
+    userId: ctx.userId,
+    projectConfig: binding.projectConfig && typeof binding.projectConfig === "object"
+      ? (binding.projectConfig as Record<string, unknown>)
+      : undefined,
+  };
   if (toolDef.mutating && !ctx.confirmed) {
+    // Phase 15.4 (zernio): a built-in adapter may refine the action from
+    // server-side state (a budget change is Tier 3 unless a live read proves
+    // it lowers spend). Errors keep the static (stricter) action.
+    if (builtin && adapter.resolveAction) {
+      const refined = await adapter.resolveAction(tool, args, hookCtx).catch(() => null);
+      if (refined) action = refined;
+    }
     const decision = await autoApprovalFor(ctx.workspaceId, {
       agentKey: ctx.agentKey ?? "lead",
       action,
@@ -408,9 +431,24 @@ export async function resolveConnectorTool(
       destructive: toolDef.destructive === true,
     }).catch(() => null);
     if (!decision?.auto) {
+      // Phase 15.4 (zernio): a dry run before the proposal (an ad create's
+      // validateOnly). A failed dry run is never proposed; a passing one is
+      // shown with the proposal so the person confirms what was validated.
+      let preflightNote = "";
+      if (builtin && adapter.preflight) {
+        const pre: InvokeResult | null = await adapter.preflight(tool, args, hookCtx).catch((err: unknown) => ({
+          ok: false,
+          error: err instanceof Error ? err.message : "the dry run failed",
+        }));
+        if (pre && !pre.ok) {
+          return deny(ctx, toolName, `${toolName} was not proposed: ${pre.error ?? "the dry run failed"}`);
+        }
+        const summary = pre?.data && typeof pre.data === "object" ? (pre.data as { summary?: unknown }).summary : undefined;
+        if (typeof summary === "string" && summary) preflightNote = ` — ${summary}${pre?.mock ? " (MOCK)" : ""}`;
+      }
       return {
         status: "pending_confirmation",
-        resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation`,
+        resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation${preflightNote}`.slice(0, 1000),
         // Phase 14: offered on every Tier 0–2 write (never Tier 3 / destructive).
         ...(decision?.offerAuto ? { autoAction: action } : {}),
       };

@@ -218,6 +218,10 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "google-ads":
     case "meta-ads":
       return "data";
+    // Phase 15.4 (zernio): it acts (ads, budgets) as well as reads, so it is
+    // a connected app (lead + the Operator), not an analytics source.
+    case "zernio":
+      return "connectors";
     default:
       return "connectors";
   }
@@ -298,7 +302,27 @@ export function connectorAction(connectorKey: string, tool: string): string {
       return "send_payroll_to_provider";
     case "gusto.sync_employees":
       return "write_gusto";
+    // Phase 15.4 (zernio): ads are money. Creating an ad is buy_media and
+    // resuming a campaign restarts spend — both Tier 3, never automated. A
+    // budget change is update_campaign_budget (Tier 3) unless the adapter's
+    // live read proves it lowers spend (ZernioAdapter.resolveAction →
+    // lower_campaign_budget, Tier 2). Pausing stops delivery (Tier 2); lead
+    // forms and audiences are Tier 2 writes. Any other Zernio write falls to
+    // money_connector_write (Tier 3) — fail closed.
+    case "zernio.ads_create":
+      return "buy_media";
+    case "zernio.ads_resume":
+      return "resume_ad_campaign";
+    case "zernio.ads_update_budget":
+      return "update_campaign_budget";
+    case "zernio.ads_pause":
+      return "pause_ad_campaign";
+    case "zernio.ads_create_lead_form":
+      return "write_ad_lead_form";
+    case "zernio.ads_create_audience":
+      return "write_ad_audience";
     default:
+      if (connectorKey === "zernio") return "money_connector_write";
       return defaultConnectorWriteAction(connectorKey);
   }
 }

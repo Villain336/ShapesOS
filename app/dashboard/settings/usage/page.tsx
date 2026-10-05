@@ -7,6 +7,8 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import UsageDashboard from "@/components/settings/UsageDashboard";
 import BillingSection from "@/components/settings/BillingSection";
+// Phase 15.4 (zernio): connected Zernio accounts (appended section).
+import ZernioUsageSection from "@/components/settings/ZernioUsageSection";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,7 @@ export default async function UsageSettingsPage() {
       <SettingsNav />
       <UsageDashboard workspaceId={workspace.id} />
       <BillingSection workspaceId={workspace.id} />
+      <ZernioUsageSection workspaceId={workspace.id} />
     </div>
   );
 }

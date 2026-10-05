@@ -17,7 +17,7 @@ export async function POST() {
     const { workspace } = await guardWorkspace({ editor: true });
     const rl = await checkRateLimitAsync(`social-sync:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
-    const provider = getSocialProvider();
+    const provider = getSocialProvider(workspace.id);
     if (!provider) throw new BadRequestError(SOCIAL_NOT_CONNECTED_MESSAGE);
     return Response.json(await syncSocialWorkspace(workspace.id, provider, new Date(), { force: true }));
   } catch (e) {

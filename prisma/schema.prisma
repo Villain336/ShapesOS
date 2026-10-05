@@ -247,6 +247,11 @@ enum FileChangeAction {
   skill_uninstalled
   connector_connected
   connector_disconnected
+  // Phase 15.4 (zernio): a Zernio connect flow started, an account recorded
+  // on the workspace's profile, the connection turned on in every project.
+  zernio_connect_started
+  zernio_account_connected
+  zernio_projects_bound
   connector_reauth
   connector_health_checked
   connector_health_alert

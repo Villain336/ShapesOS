@@ -139,6 +139,14 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "write_google_business_profile", label: "Post on Google Business Profile", description: "Reply to reviews and publish local posts.", group: "connectors" },
   { action: "write_hubspot", label: "Push to HubSpot", description: "Send CRM records to HubSpot.", group: "connectors" },
   { action: "write_shopify", label: "Change Shopify settings", description: "Other Shopify writes, e.g. subscribing the store's webhooks.", group: "connectors" },
+  // Phase 15.4 (zernio): ads through Zernio (lib/connectors/m21/native/zernio.ts).
+  // Creating an ad is buy_media and a budget raise is update_campaign_budget
+  // (both Tier 3, above); resuming restarts spend (Tier 3, TIER3_EXACT_KINDS).
+  { action: "pause_ad_campaign", label: "Pause an ad campaign", description: "Pause a campaign on its ad network so it stops delivering (Zernio).", group: "connectors" },
+  { action: "resume_ad_campaign", label: "Resume an ad campaign", description: "Turn a paused campaign back on (Zernio). It restarts ad spend: never automated.", group: "connectors" },
+  { action: "lower_campaign_budget", label: "Lower a campaign budget", description: "Lower a campaign's budget when a live read confirms it is lower than today's (Zernio). Raising always asks.", group: "connectors" },
+  { action: "write_ad_lead_form", label: "Create ad lead forms", description: "Create a lead form for ads on a Facebook Page or a LinkedIn ad account (Zernio).", group: "connectors" },
+  { action: "write_ad_audience", label: "Create ad audiences", description: "Create a custom audience on an ad account (Zernio).", group: "connectors" },
   { action: "mcp_write", label: "Write through a custom MCP server", description: "A custom MCP server's write tools that have no action of their own.", group: "connectors" },
   { action: "money_connector_write", label: "Write to accounting or payroll apps", description: "Any other write to QuickBooks, Xero or payroll. Money: never automated.", group: "connectors" },
   // Phase 14 (approvals): Slack replies (lib/slack/mention.ts). slack_reply

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   const gate = await cronGate(req);
   if (gate instanceof Response) return gate;
   if (!gate.isCron) {
-    const provider = getSocialProvider();
+    const provider = getSocialProvider(gate.workspaceId);
     if (!provider) return Response.json({ skipped: "no social provider configured" });
     return Response.json(await syncSocialWorkspace(gate.workspaceId!, provider));
   }
