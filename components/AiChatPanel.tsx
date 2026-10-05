@@ -27,6 +27,7 @@ import type { ChatToolCall } from "@/lib/chat/agent";
 import { useChat } from "./chat/ChatContext";
 import AttachmentMenu from "./chat/AttachmentMenu";
 import FeedbackButtons from "@/components/agents/FeedbackButtons";
+import { AutoApproveRow, TaskBar } from "./chat/TaskControls";
 
 /** Pick a vault tool icon from the tool name. */
 function stepIcon(tool: string): ToolStep["icon"] {
@@ -57,9 +58,17 @@ function toolLabels(count: number) {
 }
 
 export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
-  const { messages, sending, sendMessage, session } = useChat();
+  const { messages, sending, sendMessage, session, threadTask } = useChat();
   const canEdit = session?.canEdit ?? false;
   const mockMode = session?.mockMode ?? false;
+  // Phase 5: the last assistant message's pending proposal, when a per-agent
+  // rule could let it run without asking next time (server-marked).
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+  const autoOffer = (() => {
+    const last = messages.find((m) => m.id === lastAssistantId);
+    const call = last?.toolCalls?.find((c) => c.status === "pending_confirmation" && c.autoAction);
+    return call?.autoAction ? { agentKey: call.agentKey ?? threadTask?.agentKey ?? "lead", action: call.autoAction } : null;
+  })();
 
   return (
     <div className="flex h-full min-h-0">
@@ -146,6 +155,9 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                                   />
                                 </div>
                               )}
+                              {m.id === lastAssistantId && autoOffer && canEdit ? (
+                                <AutoApproveRow agentKey={autoOffer.agentKey} action={autoOffer.action} />
+                              ) : null}
                               {/* Phase 13B: explicit feedback affordance on agent outputs */}
                               <div className="mt-1 flex justify-end">
                                 <FeedbackButtons
@@ -188,6 +200,7 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
         <div className="pointer-events-none absolute inset-x-0 bottom-0">
           <div className="mx-auto w-full max-w-3xl px-4 pb-4">
             <div className="pointer-events-auto">
+              {canEdit ? <TaskBar working={sending} /> : null}
               {canEdit ? (
                 <div className="rounded-xl bg-paper p-2 shadow-raised">
                   <AttachmentMenu />

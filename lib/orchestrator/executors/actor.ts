@@ -67,6 +67,8 @@ export async function runActor(input: ActorInput, deps: ActorDeps = {}): Promise
     toolName: input.toolName,
     args: input.args ?? {},
     invokedBy: input.invokedBy ?? `actor${input.missionId ? `:${input.missionId}` : ""}`,
+    // Phase 14: the Operator's own "composio:<toolkit>" rule may apply.
+    agentKey: "actor",
     http: deps.http,
   });
   if (res.outcome === "executed") {

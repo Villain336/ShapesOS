@@ -216,6 +216,12 @@ a {
 a:hover .animated-underline::after,
 a:focus-visible .animated-underline::after { transform: scaleX(1); }
 
+/* A control whose WRAPPER draws the focus state (kit Field: focus border +
+ * halo on the container; the ⌘K search row; the composer prompt) opts out of
+ * the global outline with data-focus-ring="container". Unlayered on purpose:
+ * the global :focus-visible rule in tokens.css is unlayered too. */
+[data-focus-ring="container"]:focus-visible { outline: none; }
+
 /* StreamingText / ContextCards — favicon source avatars */
 .source-avatar { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); }
 

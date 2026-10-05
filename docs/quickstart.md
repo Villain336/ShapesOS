@@ -25,9 +25,10 @@ cp .env.example .env
 openssl rand -base64 32   # → NEXTAUTH_SECRET / AUTH_SECRET
 openssl rand -base64 24   # → ADMIN_PASSWORD (min 20 chars)
 
-# 4. Database (1–2 min). Skip the docker run if you already have Postgres 16.
+# 4. Database (1–2 min). Skip the docker run if you already have Postgres 16
+#    with the pgvector extension installed (the migrations need it).
 docker run -d --name shapes-pg -e POSTGRES_USER=shapes -e POSTGRES_PASSWORD=shapes \
-  -e POSTGRES_DB=shapes -p 127.0.0.1:5433:5432 postgres:16-alpine
+  -e POSTGRES_DB=shapes -p 127.0.0.1:5433:5432 pgvector/pgvector:pg16
 # Migrate as the schema owner…
 DATABASE_URL="postgresql://shapes:shapes@localhost:5433/shapes?schema=public" npm run db:migrate
 # …then create the least-privilege role the app runs as. The app must not
@@ -43,6 +44,25 @@ npm run dev
 ```
 
 **Elapsed: ~7 minutes** on a typical machine (dominated by `npm ci`).
+
+## Demo data for the agent home (dev only, optional)
+
+To see the Agentic OS look with real-shaped data (Overview banners, the lead
+agent with its sub-agents, live activity, the sidebar's "Running now" and usage
+meter), seed the operator's workspace with agent work in every state:
+
+```bash
+SEED_EMAIL="$ADMIN_EMAIL" DATABASE_URL="postgresql://marketr_app:change_me_app@localhost:5433/shapes?schema=public" \
+  npx tsx scripts/dev/seed-demo.mts
+```
+
+It writes missions with orchestrator delegation events (running, needs you,
+failed, done, queued, paused), agent runs, scheduled skills with runs, pending
+approvals, notifications and a credit balance. It refuses to run with
+`NODE_ENV=production`, creates the operator's workspace if it does not exist
+yet, and replaces its own rows on every run (tagged `seed-demo`). Every
+component in every state is also on Settings → Developer → Design kit
+(`/dashboard/settings/design`).
 
 ## What works with zero keys
 

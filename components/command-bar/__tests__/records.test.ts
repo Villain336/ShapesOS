@@ -18,8 +18,8 @@ import { RECORD_KIND_LABELS } from "@/lib/search/kinds";
 const item = (id: string, section: CommandItem["section"]): CommandItem => ({ id, section, title: id, action: "go", href: "/dashboard" });
 
 describe("records section", () => {
-  it("sits between Go and Do", () => {
-    assert.deepEqual(SECTION_ORDER, ["go", "records", "do", "ask"]);
+  it("sits between Go and Do (after the kit's Agents, Actions and Tools)", () => {
+    assert.deepEqual(SECTION_ORDER, ["agents", "actions", "tools", "go", "records", "do", "ask"]);
     assert.equal(SECTION_LABELS.records, "Records");
   });
 

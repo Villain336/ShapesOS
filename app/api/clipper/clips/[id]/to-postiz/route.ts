@@ -14,7 +14,7 @@ import { z } from "zod";
 import { guardWorkspace, readJson, sidecarError } from "../../../../integrations/_lib";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { queueClipDraftToPostiz } from "../../../_postiz-choke";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const { workspace } = await guardWorkspace({ editor: true });
     // Same write-tier protection as the direct Postiz posts route — queueing
     // a draft is still a real-world write against platform quota.
-    const rl = checkRateLimit(`postiz-post:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`postiz-post:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const { id } = await ctx.params;

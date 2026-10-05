@@ -1,14 +1,18 @@
 // ShapesOS — read-only tool allow-list editor for a custom MCP server (H5).
 // Every tool on a custom MCP server is treated as mutating (the agent asks
 // first) unless the server annotates it readOnlyHint or an admin lists it
-// here. Saves via PATCH /api/connectors/mcp/[id] { readOnlyTools }, which is
+// here. Phase 4d: each listed tool is a kit permission row (Ask first /
+// Auto-run). The allow-list has no "Off", so only those two show; switching a
+// tool to Ask first takes it off the list on save, and anything not listed
+// keeps asking first (the default never widens). Saves via PATCH /api/connectors/mcp/[id] { readOnlyTools }, which is
 // gated on the connectors.connect permission and audited. Rendered only on
 // the admin-gated connectors settings page.
 
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { SquareTerminal } from "lucide-react";
+import { FieldMessage, PermissionSegmented, type Permission } from "@/components/aos/Controls";
 
 const labelCls = "mb-1 block text-xs font-medium text-muted";
 const inputCls =
@@ -17,8 +21,7 @@ const btnPrimary =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
-const chipCls =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper py-0.5 pl-2.5 pr-1 font-mono text-xs text-ink shadow-control";
+const ALLOW_LIST_OPTIONS: readonly Permission[] = ["ask", "auto"];
 
 /** Split free text (commas, whitespace, newlines) into tool names; same bounds as the API. */
 export function parseToolNames(input: string): string[] {
@@ -43,7 +46,10 @@ export default function McpReadOnlyToolsEditor({
   onSaved: (tools: string[]) => void;
   onCancel: () => void;
 }) {
-  const [tools, setTools] = useState<string[]>(initial);
+  // Listed tools auto-run; a tool switched to "ask" leaves the list on save.
+  const [rows, setRows] = useState<Array<{ name: string; perm: Permission }>>(() =>
+    initial.map((name) => ({ name, perm: "auto" as Permission })),
+  );
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +58,11 @@ export default function McpReadOnlyToolsEditor({
   function add() {
     const next = parseToolNames(draft);
     if (next.length === 0) return;
-    setTools((prev) => [...new Set([...prev, ...next])].slice(0, 200));
+    setRows((prev) => {
+      const out = prev.map((r) => (next.includes(r.name) ? { ...r, perm: "auto" as Permission } : r));
+      for (const name of next) if (!out.some((r) => r.name === name)) out.push({ name, perm: "auto" });
+      return out.slice(0, 200);
+    });
     setDraft("");
   }
 
@@ -61,7 +71,8 @@ export default function McpReadOnlyToolsEditor({
     setError(null);
     try {
       // Include a typed-but-not-added name so "Save" never silently drops it.
-      const all = [...new Set([...tools, ...parseToolNames(draft)])].slice(0, 200);
+      const listed = rows.filter((r) => r.perm === "auto").map((r) => r.name);
+      const all = [...new Set([...listed, ...parseToolNames(draft)])].slice(0, 200);
       const r = await fetch(
         `/api/connectors/mcp/${encodeURIComponent(connectorId)}?workspaceId=${encodeURIComponent(workspaceId)}`,
         {
@@ -90,28 +101,35 @@ export default function McpReadOnlyToolsEditor({
         data, so it may run them without asking. List a tool only if it never changes anything.
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2" aria-label="Read-only tools">
-        {tools.map((t) => (
-          <span key={t} className={chipCls}>
-            {t}
-            <button
-              type="button"
-              onClick={() => setTools((prev) => prev.filter((x) => x !== t))}
-              aria-label={`Remove ${t}`}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-hover-paper hover:text-ink"
-            >
-              <X size={12} aria-hidden="true" />
-            </button>
-          </span>
-        ))}
-        {tools.length === 0 && (
-          <p className="text-xs text-subtle">No tools listed. Every tool asks first.</p>
-        )}
-      </div>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-xs text-subtle">No tools listed. Every tool asks first.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-line rounded-lg border border-line" aria-label="Tool permissions">
+          {rows.map((r) => (
+            <li key={r.name} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+              <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-canvas">
+                <SquareTerminal className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="aos-mono block truncate text-sm text-ink">{r.name}</span>
+                <span className="block text-xs text-muted">
+                  {r.perm === "auto" ? "Runs without asking (read-only)" : "Asks first. Leaves the list when you save"}
+                </span>
+              </span>
+              <PermissionSegmented
+                label={`${r.name} permission`}
+                value={r.perm}
+                options={ALLOW_LIST_OPTIONS}
+                onChange={(perm) => setRows((prev) => prev.map((x) => (x.name === r.name ? { ...x, perm } : x)))}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className={`${labelCls} min-w-[240px] flex-1`}>
-          Tool names
+          Add read-only tools
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -132,12 +150,7 @@ export default function McpReadOnlyToolsEditor({
         </button>
       </div>
 
-      {error && (
-        <p id={errorId} role="alert" className="mt-2 flex items-center gap-2 text-[13px] text-failed-text">
-          <span className="h-2 w-2 shrink-0 bg-failed" aria-hidden="true" />
-          {error}
-        </p>
-      )}
+      <FieldMessage id={errorId} error={error} className="mt-2" />
 
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={btnGhost}>

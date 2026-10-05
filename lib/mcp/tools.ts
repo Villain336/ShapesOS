@@ -6,9 +6,11 @@
 //   - re-checks its own scope via the runner (T2),
 //   - queries Prisma with workspaceId scoping on every read.
 //
-// Execution honesty: vendor-backed tools (rank report, SEO audit, keyword
-// ideas) return clearly-labeled mock data (`live: false, mock: true`) or
-// "live unavailable" — never fabricated data presented as real.
+// Execution honesty: vendor-backed tools (SEO audit, keyword ideas, SERP,
+// research) call the same real implementations as the in-app paths (Phase 6)
+// and return clearly-labeled mock data (`live: false, mock: true`) only when
+// the underlying provider is the mock one — never fabricated data presented
+// as real.
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +19,10 @@ import type { McpToolName } from "./scopes";
 import { readUsageSummary } from "./metering";
 import { analyzeSerpUnmetered, ActionError } from "@/lib/serp/analyze";
 import { researchKeywordsUnmetered } from "@/lib/keywords/research";
+import { auditProjectSite, AuditTargetError } from "@/lib/audit/project-audit";
+import { getSeoProvider } from "@/lib/providers";
+import type { KeywordIdea } from "@/lib/providers/types";
+import { recordUsage } from "@/lib/usage";
 /* INTEGRATION:activepieces */
 import {
   FlowNotBoundError,
@@ -121,47 +127,90 @@ const tools: ToolDef[] = [
   {
     name: "run_seo_audit",
     description:
-      "On-page SEO audit for a project. In this environment live crawling is unavailable, so it returns clearly-labeled mock findings. Costs 30 credits.",
-    inputSchema: z.object({ projectId: z.string().min(1) }).strict(),
-    inputJsonSchema: {"type":"object","properties":{"projectId":{"type":"string"}},"required":["projectId"],"additionalProperties":false},
+      "On-page SEO audit of one site in a project (the given siteId, else the project's first file-backed site): scans the files and writes the findings to the audit inbox — it never edits site files. Demo/mock sites return clearly-labeled mock findings. Costs 30 credits.",
+    inputSchema: z
+      .object({ projectId: z.string().min(1), siteId: z.string().min(1).optional() })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"projectId":{"type":"string"},"siteId":{"type":"string"}},"required":["projectId"],"additionalProperties":false},
     handler: async (ctx, args) => {
-      const { projectId } = args as { projectId: string };
+      const { projectId, siteId } = args as { projectId: string; siteId?: string };
       const project = await projectInWorkspace(ctx, projectId);
-      // Honest mock (lib/audit/mock.ts convention: mock:true, bannered).
-      return {
-        data: {
-          live: false,
-          mock: true,
-          note: HONEST_MOCK_NOTE,
+      // Phase 6: the same real audit as the chat tool (lib/audit). The runner
+      // already charged site_audit for this call, so runAudit must not
+      // ledger it again (T14 single charge).
+      try {
+        const { site, mock, result } = await auditProjectSite({
           projectId,
-          domain: project.domain,
-          findings: [
-            { category: "missing-title", filePath: "/about.html", detail: "/about.html has no <title> tag.", fixHint: "Add a concise <title> to <head>.", autoFixable: true, mock: true },
-            { category: "missing-meta-description", filePath: "/index.html", detail: "/index.html has no meta description.", fixHint: "Add a ~150 character meta description.", autoFixable: true, mock: true },
-            { category: "missing-alt", filePath: "/index.html", detail: "Hero image has no alt text.", fixHint: "Add descriptive alt text.", autoFixable: true, mock: true },
-          ],
-        },
-      };
+          siteId: siteId ?? null,
+          skipMetering: true,
+        });
+        return {
+          data: {
+            live: !mock,
+            mock,
+            ...(mock ? { note: HONEST_MOCK_NOTE } : {}),
+            projectId,
+            domain: project.domain,
+            siteId: site.id,
+            siteName: site.name,
+            auditId: result.audit.id,
+            issueCount: result.issues.length,
+            findings: result.issues.slice(0, 50).map((i) => ({
+              category: i.category,
+              severity: i.severity,
+              filePath: i.filePath,
+              detail: i.detail,
+              fixHint: i.fixHint,
+              autoFixable: i.autoFixable,
+              ...(mock ? { mock: true } : {}),
+            })),
+          },
+        };
+      } catch (e) {
+        if (e instanceof AuditTargetError) throw new ToolError(e.code, e.message);
+        throw e;
+      }
     },
   },
   {
     name: "get_keyword_ideas",
     description:
-      "Keyword ideas for a seed term. In this environment the keyword data vendor is unavailable, so it returns clearly-labeled mock ideas. Costs 50 credits.",
+      "Keyword ideas for a seed term from the workspace's keyword data provider (volume, difficulty, CPC, intent). When no data vendor is configured the ideas are clearly-labeled mock data. Costs 50 credits.",
     inputSchema: z
       .object({ seed: z.string().min(1).max(200), limit: z.number().int().min(1).max(50).default(10) })
       .strict(),
     inputJsonSchema: {"type":"object","properties":{"seed":{"type":"string"},"limit":{"type":"number"}},"required":["seed"],"additionalProperties":false},
     handler: async (ctx, args) => {
       const { seed, limit } = args as { seed: string; limit: number };
-      void ctx;
-      const ideas = Array.from({ length: limit }, (_, i) => ({
-        phrase: `${seed} ${["guide", "tips", "best", "how to", "services", "near me", "cost", "reviews", "2026", "checklist"][i % 10]}`,
-        volume: null,
-        difficulty: null,
-        mock: true,
-      }));
-      return { data: { live: false, mock: true, note: HONEST_MOCK_NOTE, seed, ideas } };
+      // Phase 6: the same provider as the chat research_keywords tool and
+      // /api/keywords/ideas. The runner already charged keyword_ideas for
+      // this call (T14); serp_calls is recorded exactly like those paths.
+      const provider = getSeoProvider();
+      let ideas: KeywordIdea[];
+      try {
+        ideas = await provider.keywordIdeas({ seed, limit });
+      } catch {
+        throw new ToolError("keyword_provider_failed", "The keyword data provider request failed.");
+      }
+      await recordUsage(ctx.workspaceId, "serp_calls", 1).catch(() => {});
+      const mock = !provider.isLive;
+      return {
+        data: {
+          live: provider.isLive,
+          mock,
+          ...(mock ? { note: HONEST_MOCK_NOTE } : {}),
+          provider: provider.name,
+          seed,
+          ideas: ideas.slice(0, limit).map((i) => ({
+            phrase: i.phrase,
+            volume: i.volume,
+            difficulty: i.difficulty,
+            cpc: i.cpc,
+            intent: i.intent,
+            ...(mock || i.mock ? { mock: true } : {}),
+          })),
+        },
+      };
     },
   },
   {

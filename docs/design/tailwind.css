@@ -46,6 +46,14 @@
   --color-night-soft: var(--aos-night-text-soft);
   --color-night-muted: var(--aos-night-text-muted);
 
+  /* Twin scene clay (Phase 13): neutral greys for the 3D scene and its SVG */
+  --color-clay-0: var(--aos-clay-0);
+  --color-clay-1: var(--aos-clay-1);
+  --color-clay-2: var(--aos-clay-2);
+  --color-clay-3: var(--aos-clay-3);
+  --color-clay-4: var(--aos-clay-4);
+  --color-clay-grid: var(--aos-clay-grid);
+
   --color-focus: var(--aos-focus);
   --color-focus-night: var(--aos-focus-on-night);
 

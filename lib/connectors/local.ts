@@ -93,6 +93,24 @@ export class LocalDirProvider implements SiteFileProvider {
     await fs.writeFile(abs, content, "utf8");
   }
 
+  /**
+   * Phase 9: delete one file (applying a site draft that dropped it).
+   * Files only — never a directory; a missing file is not an error.
+   */
+  async removeFile(path: string): Promise<void> {
+    const p = sanitizePath(path);
+    if (p === "/") throw new Error("Cannot remove the site root");
+    const abs = this.abs(p);
+    try {
+      const st = await fs.stat(abs);
+      if (!st.isFile()) throw new Error(`Not a file: ${p}`);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === "ENOENT") return;
+      throw err;
+    }
+    await fs.unlink(abs);
+  }
+
   async stat(path: string): Promise<FileEntry> {
     const p = sanitizePath(path);
     const abs = this.abs(p);

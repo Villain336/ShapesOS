@@ -1,27 +1,23 @@
-// ShapesOS — unified "needs you" inbox (Phase 3 J).
+// ShapesOS — unified "needs you" inbox (Phase 3 J; Agentic OS 4d).
 //
-// Dense table over GET /api/approvals/inbox. Each row: queue, what it is,
-// who asked, age, risk, and either inline Approve/Deny (when the queue's own
-// API takes a plain POST and the viewer's role may decide) or a Review link
-// to the queue's own approve/deny screen. Inline decisions call the queue's
-// route directly, which re-checks every rule (role, separation of duties,
-// two-person approvals, expiry).
+// Every pending request from GET /api/approvals/inbox as a kit approval
+// card (agent-blocks.png): yellow "Needs your approval" header with the
+// agent that asked, the request, what it covers, then the queue's own
+// decision path —
+//   inline Deny / Edit / Approve when the queue's API takes a plain POST and
+//   the viewer's role may decide (the queue's route re-checks every rule:
+//   role, separation of duties, two-person approvals, expiry);
+//   Review on the queue's own screen otherwise (codes, channels, edits);
+//   the reason + Open when the viewer's role can't decide.
+// Mission requests hang under the lead agent → the sub-agent waiting on
+// them; a needs-you banner sums it up; results come back as toasts.
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import {
-  ArrowUpRight,
-  Check,
-  CheckCircle2,
-  Loader2,
-  Lock,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { Inbox, Loader2, RefreshCw, Search } from "lucide-react";
 import { refreshNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
+import { AgentTree, ApprovalCard, Banner, FilterPill, aosButton } from "@/components/aos";
 import {
   INBOX_SOURCE_LABELS,
   ageLabel,
@@ -30,41 +26,21 @@ import {
   type InboxResult,
   type InboxSourceKey,
 } from "@/lib/approvals/types";
+import {
+  approvalAgent,
+  approvalBody,
+  approvalMode,
+  approvalQuestion,
+  approvalsBanner,
+  approveLabelFor,
+  decisionToast,
+  editLabelFor,
+  groupApprovals,
+  type MissionAgentIndex,
+} from "@/lib/aos/approvals";
+import { toast, toastError } from "@/lib/ui/feedback";
 
 type SourceFilter = InboxSourceKey | "all";
-
-// Risk is a property of the request, not an agent state — neutral chips only.
-function RiskChip({ risk }: { risk: InboxItem["risk"] }) {
-  const label = risk === "high" ? "High" : risk === "medium" ? "Medium" : "Low";
-  return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
-        risk === "high" ? "bg-ink text-white" : "bg-paper text-muted shadow-control"
-      }`}
-    >
-      {label}
-    </span>
-  );
-}
-
-function QueueChip({ item }: { item: InboxItem }) {
-  return (
-    <span className="inline-flex max-w-full items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-ink shadow-control">
-      <span className="truncate">{item.typeLabel}</span>
-    </span>
-  );
-}
-
-const btnApprove =
-  "inline-flex h-control-sm min-w-[96px] items-center justify-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
-const btnDeny =
-  "inline-flex h-control-sm min-w-[80px] items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
-const btnReview =
-  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press";
-const btnOpen =
-  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper";
-const selectCls =
-  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 async function runAction(action: InboxAction): Promise<void> {
   const res = await fetch(action.url, {
@@ -84,26 +60,86 @@ async function runAction(action: InboxAction): Promise<void> {
   }
 }
 
-export default function ApprovalsInbox({ initialSource = "all" }: { initialSource?: SourceFilter }) {
+function cardId(item: InboxItem): string {
+  return `approval-${item.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function ageText(iso: string): string {
+  const a = ageLabel(iso);
+  return a === "just now" || a === "—" ? a : `${a} ago`;
+}
+
+const RISK_TEXT = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
+
+function CardFor({
+  item,
+  missionAgents,
+  busy,
+  onDecide,
+}: {
+  item: InboxItem;
+  missionAgents: MissionAgentIndex;
+  busy: "approve" | "deny" | null;
+  onDecide: (item: InboxItem, which: "approve" | "deny") => void;
+}) {
+  const mode = approvalMode(item);
+  return (
+    <ApprovalCard
+      id={cardId(item)}
+      agent={approvalAgent(item, missionAgents)}
+      title={approvalQuestion(item)}
+      meta={
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span className="font-semibold text-ink">{item.typeLabel}</span>
+          <span aria-hidden>·</span>
+          <span title={new Date(item.createdAt).toLocaleString()}>{ageText(item.createdAt)}</span>
+          <span aria-hidden>·</span>
+          <span className={item.risk === "high" ? "font-semibold text-ink" : undefined}>{RISK_TEXT[item.risk]}</span>
+        </span>
+      }
+      body={approvalBody(item, missionAgents)}
+      items={item.lines.map((l, i) => ({ key: `${i}:${l.label}`, label: l.label, detail: l.detail ?? undefined }))}
+      totalItems={item.lineTotal}
+      showAllHref={item.href}
+      mode={mode}
+      approveLabel={approveLabelFor(item)}
+      editLabel={editLabelFor(item)}
+      editHref={mode === "decide" ? item.href : undefined}
+      reviewHref={item.href}
+      blockedReason={item.blockedReason}
+      openHref={item.href}
+      busy={busy}
+      onApprove={() => onDecide(item, "approve")}
+      onDeny={() => onDecide(item, "deny")}
+    />
+  );
+}
+
+export default function ApprovalsInbox({
+  initialSource = "all",
+  missionAgents = {},
+}: {
+  initialSource?: SourceFilter;
+  missionAgents?: MissionAgentIndex;
+}) {
   const [data, setData] = useState<InboxResult | null>(null);
   const [source, setSource] = useState<SourceFilter>(initialSource);
   const [onlyMine, setOnlyMine] = useState(false);
   const [query, setQuery] = useState("");
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ key: string; which: "approve" | "deny" } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const res = await fetch("/api/approvals/inbox", { cache: "no-store" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Couldn't load approvals.");
       setData(body as InboxResult);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load approvals.");
+      setLoadError(e instanceof Error ? e.message : "Couldn't load approvals.");
     } finally {
       setLoading(false);
     }
@@ -119,7 +155,7 @@ export default function ApprovalsInbox({ initialSource = "all" }: { initialSourc
       if (source !== "all" && i.source !== source) return false;
       if (onlyMine && !i.canDecide) return false;
       if (!q) return true;
-      return [i.title, i.detail, i.typeLabel, i.requester]
+      return [i.title, i.detail, i.typeLabel, i.requester, i.missionName]
         .filter(Boolean)
         .some((s) => (s as string).toLowerCase().includes(q));
     });
@@ -130,12 +166,14 @@ export default function ApprovalsInbox({ initialSource = "all" }: { initialSourc
     [data, source],
   );
 
+  const grouped = useMemo(() => groupApprovals(items, missionAgents), [items, missionAgents]);
+  const banner = useMemo(() => approvalsBanner(data?.items ?? [], missionAgents), [data, missionAgents]);
+  const firstMine = useMemo(() => (data?.items ?? []).find((i) => i.canDecide) ?? null, [data]);
+
   async function decide(item: InboxItem, which: "approve" | "deny") {
     const action = which === "approve" ? item.approve : item.deny;
     if (!action) return;
-    setBusyKey(item.key);
-    setError(null);
-    setNotice(null);
+    setBusy({ key: item.key, which });
     try {
       await runAction(action);
       setData((prev) =>
@@ -148,231 +186,157 @@ export default function ApprovalsInbox({ initialSource = "all" }: { initialSourc
             }
           : prev,
       );
-      setNotice(`${which === "approve" ? "Approved" : "Denied"}: ${item.title}`);
+      toast({ ...decisionToast(item, which), status: "done" });
       refreshNeedsYouCount();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Decision failed.");
+      toastError(which === "approve" ? "Couldn't approve" : "Couldn't deny", e instanceof Error ? e.message : "Decision failed.");
     } finally {
-      setBusyKey(null);
+      setBusy(null);
     }
   }
 
-  if (data === null && !error) {
+  if (data === null && !loadError) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Loader2 size={16} className="aos-spin" />
+      <div className="flex items-center gap-2 text-md text-muted">
+        <Loader2 size={16} className="aos-spin" aria-hidden />
         Loading approvals…
       </div>
     );
   }
 
-  const actionable = data?.actionable ?? 0;
+  const card = (item: InboxItem) => (
+    <CardFor
+      key={item.key}
+      item={item}
+      missionAgents={missionAgents}
+      busy={busy?.key === item.key ? busy.which : null}
+      onDecide={(i, w) => void decide(i, w)}
+    />
+  );
+
+  const filtered = source !== "all" || onlyMine || query.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-3">
-      {actionable > 0 && (
-        <div role="status" className="flex items-center gap-2.5 rounded-lg bg-needs px-4 py-3 text-ink">
-          <span
-            className="aos-shape aos-shape--needs [--aos-shape-size:14px]"
-            style={{ color: "inherit" }}
-            aria-hidden
-          />
-          <p className="text-sm font-semibold">
-            {actionable} approval{actionable === 1 ? "" : "s"} need{actionable === 1 ? "s" : ""} you.
-          </p>
-        </div>
-      )}
+    <div className="flex flex-col gap-5">
+      {banner ? (
+        <Banner
+          status="needs"
+          title={banner.title}
+          description={banner.description}
+          action={firstMine ? { label: "Start with the newest", href: `#${cardId(firstMine)}` } : null}
+        />
+      ) : null}
 
-      {/* Filter toolbar: queue dropdown + scope chip + search + refresh. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor="approvals-source">
-          Queue
-        </label>
-        <select
-          id="approvals-source"
-          value={source}
-          onChange={(e) => setSource(e.target.value as SourceFilter)}
-          className={selectCls}
-        >
-          <option value="all">All queues ({data?.total ?? 0})</option>
+      {/* Filters: queue pills, scope toggle, search, refresh. */}
+      <div className="flex flex-col gap-3">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter by queue">
+          <FilterPill selected={source === "all"} count={data?.total ?? 0} onClick={() => setSource("all")}>
+            All
+          </FilterPill>
           {sourceOptions.map((s) => (
-            <option key={s.source} value={s.source}>
-              {s.label} ({s.total})
-            </option>
+            <FilterPill key={s.source} selected={source === s.source} count={s.total} onClick={() => setSource(s.source)}>
+              {s.label}
+            </FilterPill>
           ))}
-        </select>
-        <button
-          type="button"
-          aria-pressed={onlyMine}
-          onClick={() => setOnlyMine((v) => !v)}
-          className={`inline-flex h-chip items-center gap-1.5 rounded-full px-3 text-sm font-semibold aos-press ${
-            onlyMine ? "bg-ink text-white" : "bg-paper text-ink shadow-control hover:shadow-outline"
-          }`}
-        >
-          Only what I can decide
-        </button>
-        <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search approvals"
-            aria-label="Search approvals"
-            className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper pl-8 pr-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
-          />
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="ml-auto inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press disabled:opacity-60"
-        >
-          <RefreshCw size={14} className={loading ? "aos-spin" : undefined} />
-          {loading ? "Refreshing" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterPill selected={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
+            Only what I can decide
+          </FilterPill>
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-subtle" aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search requests"
+              aria-label="Search approvals"
+              className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper pr-3 pl-9 text-md text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className={aosButton({ variant: "secondary", size: "sm", className: "ml-auto" })}
+          >
+            <RefreshCw size={14} className={loading ? "aos-spin" : undefined} aria-hidden />
+            {loading ? "Refreshing" : "Refresh"}
+          </button>
+        </div>
       </div>
 
-      {notice && (
-        <div role="status" className="flex items-center gap-2 rounded-lg bg-paper px-3 py-2 text-sm text-ink shadow-hairline">
-          <span className="aos-shape aos-shape--done" aria-hidden />
-          {notice}
-          <button onClick={() => setNotice(null)} className="ml-auto text-muted hover:text-ink" aria-label="Dismiss">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
-        >
-          <span className="aos-shape aos-shape--failed [--aos-shape-size:10px]" aria-hidden />
-          {error}
-          <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      {loadError ? (
+        <p role="alert" className="flex items-center gap-2 text-md text-failed-text">
+          <span className="size-2.5 shrink-0 bg-failed" aria-hidden />
+          {loadError} Refresh to try again.
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
-          <CheckCircle2 size={28} className="text-subtle" />
-          <div className="text-sm font-semibold text-ink">
-            {data && data.total > 0 ? "Nothing matches these filters" : "All caught up"}
-          </div>
-          <div className="max-w-[360px] text-sm text-muted">
-            {data && data.total > 0
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
+          <Inbox size={28} className="text-subtle" aria-hidden />
+          <h2 className="aos-subheading">{data && data.total > 0 && filtered ? "No requests match these filters" : "Nothing needs you"}</h2>
+          <p className="max-w-[44ch] text-md text-muted">
+            {data && data.total > 0 && filtered
               ? "Clear the search or pick another queue to see the rest."
-              : "Nothing is waiting on you. When an agent or a teammate needs a sign-off, it shows up here."}
-          </div>
+              : "When an agent or a teammate needs a sign-off, it shows up here. Agents keep working on everything else."}
+          </p>
+          {data && data.total > 0 && filtered ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSource("all");
+                setOnlyMine(false);
+                setQuery("");
+              }}
+              className={aosButton({ variant: "secondary", size: "sm" })}
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-          <table className="w-full min-w-[920px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs font-semibold text-muted">
-                <th className="px-3 py-2 font-semibold">Type</th>
-                <th className="px-3 py-2 font-semibold">Request</th>
-                <th className="px-3 py-2 font-semibold">Requested by</th>
-                <th className="px-3 py-2 font-semibold">Age</th>
-                <th className="px-3 py-2 font-semibold">Risk</th>
-                <th className="px-3 py-2 text-right font-semibold">Decision</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const busy = busyKey === item.key;
-                return (
-                  <tr key={item.key} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                    <td className="max-w-[200px] px-3 py-2.5 align-top">
-                      <QueueChip item={item} />
-                      <div className="mt-1 text-xs text-subtle">{INBOX_SOURCE_LABELS[item.source]}</div>
-                    </td>
-                    <td className="max-w-[340px] px-3 py-2.5 align-top">
-                      <div className="truncate font-medium text-ink" title={item.title}>
-                        {item.title}
-                      </div>
-                      {item.detail && (
-                        <div className="truncate text-xs text-muted" title={item.detail}>
-                          {item.detail}
-                        </div>
-                      )}
-                    </td>
-                    <td className="max-w-[160px] px-3 py-2.5 align-top">
-                      <div className="truncate text-ink">{item.requester ?? "—"}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
-                      <span title={new Date(item.createdAt).toLocaleString()}>{ageLabel(item.createdAt)}</span>
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <RiskChip risk={item.risk} />
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        {item.approve && item.deny ? (
-                          <>
-                            <button
-                              onClick={() => void decide(item, "approve")}
-                              disabled={busy}
-                              aria-label={`Approve ${item.title}`}
-                              className={btnApprove}
-                            >
-                              {busy ? <Loader2 size={15} className="aos-spin" /> : <Check size={15} />}
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => void decide(item, "deny")}
-                              disabled={busy}
-                              aria-label={`Deny ${item.title}`}
-                              className={btnDeny}
-                            >
-                              <X size={15} />
-                              Deny
-                            </button>
-                            <Link href={item.href} className={btnOpen} aria-label={`Open ${item.title}`}>
-                              <ArrowUpRight size={15} />
-                            </Link>
-                          </>
-                        ) : item.canDecide ? (
-                          <Link href={item.href} className={btnReview}>
-                            Review
-                            <ArrowUpRight size={15} />
-                          </Link>
-                        ) : (
-                          <>
-                            <span className="inline-flex items-center gap-1 text-xs text-muted" title={item.blockedReason ?? undefined}>
-                              <Lock size={12} aria-hidden />
-                              <span className="max-w-[180px] truncate">{item.blockedReason}</span>
-                            </span>
-                            <Link href={item.href} className={btnOpen}>
-                              Open
-                              <ArrowUpRight size={15} />
-                            </Link>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {grouped.lead ? (
+            <section aria-labelledby="from-missions-h" className="flex flex-col gap-3">
+              <h2 id="from-missions-h" className="aos-subheading">
+                From your agents
+              </h2>
+              <div className="rounded-lg bg-paper p-3 shadow-hairline sm:p-4">
+                <AgentTree
+                  lead={grouped.lead}
+                  branches={grouped.groups.map((g) => g.node)}
+                  renderBranchContent={(node) => {
+                    const group = grouped.groups.find((g) => g.node.key === node.key);
+                    return group ? <div className="grid gap-4 xl:grid-cols-2">{group.items.map(card)}</div> : null;
+                  }}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {grouped.other.length > 0 ? (
+            <section aria-labelledby="other-requests-h" className="flex flex-col gap-3">
+              <h2 id="other-requests-h" className="aos-subheading">
+                {grouped.lead ? "From your apps and team" : "Requests"}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{grouped.other.map(card)}</div>
+            </section>
+          ) : null}
+        </>
       )}
 
-      {data && data.errors.length > 0 && (
-        <div className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-muted">
-          Couldn't load: {data.errors.map((e) => INBOX_SOURCE_LABELS[e.source]).join(", ")}. The rest of the
-          inbox is up to date — refresh to try again.
-        </div>
-      )}
+      {data && data.errors.length > 0 ? (
+        <p className="rounded-md bg-paper px-4 py-3 text-sm text-muted shadow-hairline">
+          Couldn&apos;t load {data.errors.map((e) => INBOX_SOURCE_LABELS[e.source]).join(", ")}. The rest of the inbox is up
+          to date. Refresh to try again.
+        </p>
+      ) : null}
 
-      <p className="text-xs text-muted">
-        Approve and Deny call each queue's own approval API, which re-checks your role, expiry and
-        separation of duties. Items marked Review open the queue's own screen, for decisions that need
-        more context (one-time codes, send channels, edits).
+      <p className="text-sm text-muted">
+        Approve and Deny call each queue&apos;s own approval API, which re-checks your role, expiry and separation of duties.
+        Review opens the queue&apos;s own screen for decisions that need more context (one-time codes, send channels, edits).
       </p>
     </div>
   );

@@ -110,7 +110,7 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       id: r.id,
       title: `Invoice ${r.id.length > 12 ? `${r.id.slice(0, 8)}…` : r.id}${r.title ? ` · ${r.title}` : ""}`,
       subtitle: [money(r.n), r.sub].filter(Boolean).join(" · ") || null,
-      href: `/dashboard/crm?tab=invoicing&invoice=${encodeURIComponent(r.id)}`,
+      href: `/dashboard/ops/invoices?invoice=${encodeURIComponent(r.id)}`,
     }),
   },
   doc: {
@@ -162,7 +162,7 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       id: r.id,
       title: r.title ?? "Project",
       subtitle: r.sub ? `Client project · ${r.sub}` : "Client project",
-      href: "/dashboard/crm?tab=projects",
+      href: "/dashboard/ops/projects",
     }),
   },
   mission: {

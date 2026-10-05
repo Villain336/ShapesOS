@@ -135,11 +135,13 @@ describe("POST /api/messaging/inbound/email", () => {
     assert.equal(await prisma.outboundMessage.count({ where: { workspaceId: WS, providerSid: `em_${tag}_4` } }), 0);
   });
 
-  it("an unknown sender is logged without a lead", async () => {
+  it("an unknown sender opens a helpdesk ticket instead of only being counted (Phase 10)", async () => {
     const res = await POST(signed(event(`em_${tag}_5`, replyAddressFor(WS)!, "stranger@elsewhere.test")));
-    assert.deepEqual(await res.json(), { ok: true, action: "logged" });
-    const row = await prisma.outboundMessage.findFirst({ where: { workspaceId: WS, providerSid: `em_${tag}_5` } });
-    assert.equal(row?.leadId, null);
+    assert.deepEqual(await res.json(), { ok: true, action: "ticket_created" });
+    assert.equal(await prisma.outboundMessage.count({ where: { workspaceId: WS, providerSid: `em_${tag}_5` } }), 0);
+    const msg = await withWorkspaceScope(WS, (tx) => tx.opsTicketMessage.findFirst({ where: { providerSid: `em_${tag}_5` } }));
+    assert.equal(msg?.fromEmail, "stranger@elsewhere.test");
+    assert.equal(msg?.direction, "inbound");
   });
 
   it("fails closed without a webhook secret", async () => {

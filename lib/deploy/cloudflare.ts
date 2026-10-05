@@ -6,6 +6,8 @@
 //   2. POST /pages/projects/:name/deployments with multipart form data
 //      (manifest.json describing each file's sha256 + a blob per file)
 // Returns the live *.pages.dev URL.
+// Phase 9: rollback() — POST /pages/projects/:name/deployments/:id/rollback
+// makes an earlier deployment the live production one again.
 //
 // NOTE: live API is untested from this sandbox (no network egress). Shapes
 // follow the documented Cloudflare API (api.cloudflare.com, Pages).
@@ -17,6 +19,7 @@ import {
   type DeployResult,
   type DeployTarget,
   type DeploymentSummary,
+  type DeployPlace,
   type CloudflareConfig,
 } from "./types";
 
@@ -24,6 +27,16 @@ const API = "https://api.cloudflare.com/client/v4";
 
 function sha256(content: string): string {
   return createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+/** The Pages project name a site name maps to (lowercase, [a-z0-9-], ≤ 63). */
+export function pagesProjectSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 63);
 }
 
 interface CfEnvelope {
@@ -79,12 +92,7 @@ export class CloudflarePagesDeployTarget implements DeployTarget {
 
   /** Ensure the Pages project exists; return its name. */
   private async ensureProject(name: string): Promise<string> {
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 63);
+    const slug = pagesProjectSlug(name);
     if (!slug) throw new Error("Could not derive a Cloudflare Pages project name.");
     try {
       await this.api(`${this.projectPath()}/${slug}`);
@@ -101,10 +109,10 @@ export class CloudflarePagesDeployTarget implements DeployTarget {
     }
   }
 
-  async deploy(files: DeployFile[], opts?: { projectName?: string }): Promise<DeployResult> {
+  async deploy(files: DeployFile[], opts?: { projectName?: string; project?: string | null }): Promise<DeployResult> {
     if (!files.length) throw new Error("Nothing to deploy — the site has no files.");
     const projectName = await this.ensureProject(
-      (opts?.projectName ?? this.cfg.projectName).trim() || "marketr-site",
+      (opts?.project || opts?.projectName || this.cfg.projectName).trim() || "marketr-site",
     );
 
     // Direct-upload: manifest maps path → sha256 (Cloudflare's format).
@@ -138,6 +146,7 @@ export class CloudflarePagesDeployTarget implements DeployTarget {
       url,
       status: normalizeStatus(latestStage?.status ?? stage?.status ?? d.status),
       mock: false,
+      project: projectName,
     };
   }
 
@@ -171,6 +180,26 @@ export class CloudflarePagesDeployTarget implements DeployTarget {
       url: d.url ? String(d.url) : null,
       status: normalizeStatus(
         (d.latest_stage as Record<string, unknown> | undefined)?.status ?? d.status,
+      ),
+      mock: false,
+    };
+  }
+
+  async rollback(deploymentId: string, place: DeployPlace): Promise<DeploymentSummary> {
+    if (!deploymentId) throw new Error("A deployment id is required to roll back.");
+    const projectName =
+      (place.project ?? "").trim() || this.cfg.projectName.trim() || pagesProjectSlug(place.projectName ?? "");
+    if (!projectName) throw new Error("A Pages project name is required to roll back.");
+    const body = await this.api(
+      `${this.projectPath()}/${encodeURIComponent(projectName)}/deployments/${encodeURIComponent(deploymentId)}/rollback`,
+      { method: "POST" },
+    );
+    const d = (body.result ?? {}) as Record<string, unknown>;
+    return {
+      id: String(d.id ?? deploymentId),
+      url: d.url ? String(d.url) : null,
+      status: normalizeStatus(
+        (d.latest_stage as Record<string, unknown> | undefined)?.status ?? d.status ?? "READY",
       ),
       mock: false,
     };

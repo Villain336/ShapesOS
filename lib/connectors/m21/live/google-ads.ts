@@ -1,7 +1,11 @@
-// ShapesOS — Phase 4b live Google Ads client (REST, GAQL search).
+// ShapesOS — Phase 4b live Google Ads client (REST, GAQL searchStream).
 //   GET  https://googleads.googleapis.com/{v}/customers:listAccessibleCustomers
-//   POST https://googleads.googleapis.com/{v}/customers/{customerId}/googleAds:search
-//        body { query, pageToken? } → { results[], nextPageToken? }
+//   POST https://googleads.googleapis.com/{v}/customers/{customerId}/googleAds:searchStream
+//        body { query } → JSON array of batches [{ results[], fieldMask, requestId }]
+// Phase 6: searchStream replaces paged googleAds:search — one request per
+// report, row count bounded by a GAQL LIMIT (added when the query has none).
+// An error raised after streaming began arrives as an { error } element of
+// the array with HTTP 200; it is classified like a non-2xx response.
 // Headers on every call: Authorization: Bearer <token>, developer-token,
 // and login-customer-id when the account is reached through a manager (MCC).
 // Version v25 verified against the Google Ads API release notes (2026-10);
@@ -11,6 +15,7 @@
 
 import {
   liveRequest,
+  scrubMessage,
   ConnectorApiError,
   defaultClassify,
   type Classification,
@@ -79,12 +84,17 @@ function adsHeaders(auth: GoogleAdsAuth): Record<string, string> {
   };
 }
 
-interface SearchResponse<R> {
+interface SearchStreamBatch<R> {
   results?: R[];
-  nextPageToken?: string;
+  error?: unknown;
 }
 
-/** googleAds:search with nextPageToken pagination (capped at maxRows). */
+/** Append a GAQL LIMIT when the query has none, so the stream is bounded. */
+export function withGaqlLimit(query: string, maxRows: number): string {
+  return /\bLIMIT\s+\d+\s*$/i.test(query.trim()) ? query.trim() : `${query.trim()} LIMIT ${maxRows}`;
+}
+
+/** googleAds:searchStream — every batch flattened, capped at maxRows. */
 export async function googleAdsSearch<R = Record<string, unknown>>(
   auth: GoogleAdsAuth,
   customerId: string,
@@ -92,24 +102,28 @@ export async function googleAdsSearch<R = Record<string, unknown>>(
   deps: LiveDeps = {},
   maxRows = 2_000,
 ): Promise<R[]> {
+  const res = await liveRequest<SearchStreamBatch<R>[] | SearchStreamBatch<R> | null>(
+    {
+      provider: PROVIDER,
+      method: "POST",
+      url: `${googleAdsBase()}/customers/${customerId}/googleAds:searchStream`,
+      headers: adsHeaders(auth),
+      json: { query: withGaqlLimit(query, maxRows) },
+      auth,
+      classify: classifyGoogleAds,
+    },
+    deps,
+  );
+  const batches = Array.isArray(res) ? res : res ? [res] : [];
   const out: R[] = [];
-  let pageToken: string | undefined;
-  for (let page = 0; page < 20; page++) {
-    const res = await liveRequest<SearchResponse<R>>(
-      {
-        provider: PROVIDER,
-        method: "POST",
-        url: `${googleAdsBase()}/customers/${customerId}/googleAds:search`,
-        headers: adsHeaders(auth),
-        json: pageToken ? { query, pageToken } : { query },
-        auth,
-        classify: classifyGoogleAds,
-      },
-      deps,
-    );
-    out.push(...(res.results ?? []));
-    pageToken = res.nextPageToken || undefined;
-    if (!pageToken || out.length >= maxRows) break;
+  for (const batch of batches) {
+    if (batch?.error) {
+      const c = classifyGoogleAds(500, { error: batch.error });
+      const secrets = [auth.token, auth.developerToken];
+      const detail = c.message ? `: ${scrubMessage(c.message, secrets)}` : "";
+      throw new ConnectorApiError(PROVIDER, c.code, `${PROVIDER} stream failed${detail}`);
+    }
+    out.push(...(batch?.results ?? []));
   }
   return out.slice(0, maxRows);
 }

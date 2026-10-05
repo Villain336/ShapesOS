@@ -6,9 +6,11 @@
 //   POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
 //     → query_performance() (dimension query) and page_performance()
 //       (dimension page), paged by startRow
-// Auth: OAuth2 Bearer (scope webmasters.readonly), refresh-on-401 through
-// the vault; 429/5xx/quota-403 back off and retry. The bulk snapshot cron
-// keeps its own client (lib/intelligence/gsc/client.ts).
+// Auth: OAuth2 Bearer (scope webmasters — read + sitemap submit since Phase 11;
+// older connections hold webmasters.readonly), refresh-on-401 through
+// the vault; 429/5xx/quota-403 back off and retry. Phase 6: the HTTP client
+// is the one in lib/intelligence/gsc/api.ts, shared with the bulk snapshot
+// cron (lib/intelligence/gsc/client.ts) — there is no second GSC client.
 // Docs: https://developers.google.com/webmaster-tools/v1/searchanalytics/query
 //
 // MOCK MODE (no credential): deterministic demo rows for a demo property;
@@ -23,7 +25,7 @@ import type {
 } from "../types";
 import { strProp, numProp, mockOk, liveOk, fail } from "../types";
 import { clampInt, isIsoDate, liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
-import { gscListSites, gscQuery, normalizeProperty, shapeGscRow } from "../live/search-console";
+import { gscListSites, gscQuery, normalizeProperty, shapeGscRow } from "@/lib/intelligence/gsc/api";
 
 interface GscRow {
   query: string;

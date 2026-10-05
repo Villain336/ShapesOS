@@ -19,6 +19,12 @@
 //
 // Rate bounds: max 500 messages per call, metadata fetched sequentially.
 // Auth: OAuth2 Bearer <redacted> refresh via lib/vault/refresh.ts.
+//
+// Phase 11 (conncore): send_email and reply_to_message (scope gmail.send)
+// are MUTATING tools — the chat confirmation gate asks before each one
+// (connectorAction → "send_outreach_email", Tier 2: always asks). The live
+// calls are in lib/connectors/m21/live/gmail.ts. Without a credential the
+// tools fail "not connected" (no mock send exists).
 
 import type {
   ConnectorAdapter,
@@ -27,7 +33,10 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { fail, liveOk, strProp } from "../types";
+import { boolProp, fail, liveOk, strProp } from "../types";
+import { liveFailure, tokenSourceFrom, type LiveDeps } from "../live/http";
+import { gmailProfile, gmailReply, gmailSend } from "../live/gmail";
+import { MimeInputError } from "../live/mime";
 
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const MAX_MESSAGES_HARD_CAP = 500;
@@ -98,8 +107,43 @@ export class GmailAdapter implements ConnectorAdapter {
     properties: {},
   };
 
+  constructor(private readonly deps: LiveDeps = {}) {}
+
   listTools(): ConnectorToolDef[] {
     return [
+      // Phase 11 (conncore): gated writes.
+      {
+        name: "send_email",
+        description:
+          "Send an email from the connected Gmail account. Plain-text body (optional HTML alternative). Asks for confirmation first.",
+        mutating: true,
+        argsSchema: {
+          type: "object",
+          properties: {
+            to: strProp("Recipient address(es), comma-separated."),
+            cc: strProp("Cc address(es), comma-separated (optional)."),
+            subject: strProp("Subject line."),
+            body: strProp("Plain-text body."),
+            html: strProp("Optional HTML version of the body."),
+          },
+          required: ["to", "subject", "body"],
+        },
+      },
+      {
+        name: "reply_to_message",
+        description:
+          "Reply in the same Gmail thread to a message (by Gmail message id): Re: subject, threaded headers. Asks for confirmation first.",
+        mutating: true,
+        argsSchema: {
+          type: "object",
+          properties: {
+            messageId: strProp("Gmail message id to reply to."),
+            body: strProp("Plain-text reply body."),
+            replyAll: boolProp("Also copy the original To/Cc recipients (default false)."),
+          },
+          required: ["messageId", "body"],
+        },
+      },
       {
         name: "list_network_contacts",
         description:
@@ -124,6 +168,9 @@ export class GmailAdapter implements ConnectorAdapter {
     credential: DecryptedCredential | null,
     _ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    if (tool === "send_email" || tool === "reply_to_message") {
+      return this.write(tool, args, credential, _ctx);
+    }
     if (tool !== "list_network_contacts") {
       return fail(`Unknown tool "${tool}" for the Gmail connector.`);
     }
@@ -243,6 +290,40 @@ export class GmailAdapter implements ConnectorAdapter {
       return liveOk(result);
     } catch (err) {
       return fail(err instanceof Error ? err.message : "Gmail import failed.");
+    }
+  }
+
+  /** Phase 11 (conncore): send / reply (gated upstream by the confirmation gate). */
+  private async write(
+    tool: "send_email" | "reply_to_message",
+    args: Record<string, unknown>,
+    credential: DecryptedCredential | null,
+    ctx: InvokeContext,
+  ): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) {
+      return { ok: false, mock: false, errorCode: "not_connected", error: "Gmail is not connected. Connect Gmail to send email." };
+    }
+    try {
+      if (tool === "send_email") {
+        return liveOk(await gmailSend(auth, { to: args.to, cc: args.cc, bcc: args.bcc, subject: args.subject, body: args.body, html: args.html }, this.deps));
+      }
+      return liveOk(await gmailReply(auth, { messageId: args.messageId, body: args.body, html: args.html, replyAll: args.replyAll }, this.deps));
+    } catch (err) {
+      if (err instanceof MimeInputError || (err instanceof Error && / is required\.$| must be /.test(err.message))) {
+        return { ok: false, mock: false, errorCode: "bad_request", error: err.message };
+      }
+      return liveFailure(err, "Gmail");
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) return { ok: false, errorCode: "not_connected", error: "Gmail is not connected." };
+    try {
+      return liveOk(await gmailProfile(auth, this.deps));
+    } catch (err) {
+      return liveFailure(err, "Gmail");
     }
   }
 }

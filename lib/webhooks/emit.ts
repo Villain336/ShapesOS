@@ -71,34 +71,80 @@ export async function emitWebhookEvent<T extends WebhookEventType>(
       return NONE;
     }
     const data = parsed.data as Record<string, unknown>;
-    return await withWorkspaceScope(input.workspaceId, async (tx) => {
-      const endpoints = await tx.webhookEndpoint.findMany({
-        where: { workspaceId: input.workspaceId, enabled: true, ...(input.endpointId ? { id: input.endpointId } : {}) },
-        select: { id: true, events: true },
-      });
-      const targets = endpoints.filter((e) => endpointWants(e.events, input.type));
-      if (targets.length === 0) return NONE;
-      // Entitlement read only once there is something to deliver.
-      const ws = await tx.workspace.findUnique({ where: { id: input.workspaceId }, select: { plan: true } });
-      if (!planHasFeature(ws?.plan, "webhooks")) return NONE;
-
-      const envelope = buildEnvelope(input.type, input.workspaceId, data, now);
-      const rows = await tx.webhookDelivery.createManyAndReturn({
-        data: targets.map((e) => ({
-          workspaceId: input.workspaceId,
-          endpointId: e.id,
-          eventId: envelope.id,
-          eventType: input.type,
-          dedupKey: input.dedupKey ? input.dedupKey.slice(0, 200) : null,
-          payload: envelope as unknown as Prisma.InputJsonValue,
-          nextAttemptAt: now,
-        })),
-        skipDuplicates: true,
-        select: { id: true },
-      });
-      return { eventId: envelope.id, enqueued: rows.length, deliveryIds: rows.map((r) => r.id) };
-    });
+    return await withWorkspaceScope(input.workspaceId, (tx) => enqueueDeliveries(tx, input, data, now));
   } catch (e) {
+    warn(input.type, e);
+    return NONE;
+  }
+}
+
+type ScopedTx = Parameters<Parameters<typeof withWorkspaceScope>[1]>[0];
+
+/** One durable delivery row per enabled, subscribed endpoint (in the caller's tx). */
+async function enqueueDeliveries<T extends WebhookEventType>(
+  tx: ScopedTx,
+  input: EmitInput<T>,
+  data: Record<string, unknown>,
+  now: Date,
+): Promise<EmitResult> {
+  const endpoints = await tx.webhookEndpoint.findMany({
+    where: { workspaceId: input.workspaceId, enabled: true, ...(input.endpointId ? { id: input.endpointId } : {}) },
+    select: { id: true, events: true },
+  });
+  const targets = endpoints.filter((e) => endpointWants(e.events, input.type));
+  if (targets.length === 0) return NONE;
+  // Entitlement read only once there is something to deliver.
+  const ws = await tx.workspace.findUnique({ where: { id: input.workspaceId }, select: { plan: true } });
+  if (!planHasFeature(ws?.plan, "webhooks")) return NONE;
+
+  const envelope = buildEnvelope(input.type, input.workspaceId, data, now);
+  const rows = await tx.webhookDelivery.createManyAndReturn({
+    data: targets.map((e) => ({
+      workspaceId: input.workspaceId,
+      endpointId: e.id,
+      eventId: envelope.id,
+      eventType: input.type,
+      dedupKey: input.dedupKey ? input.dedupKey.slice(0, 200) : null,
+      payload: envelope as unknown as Prisma.InputJsonValue,
+      nextAttemptAt: now,
+    })),
+    skipDuplicates: true,
+    select: { id: true },
+  });
+  return { eventId: envelope.id, enqueued: rows.length, deliveryIds: rows.map((r) => r.id) };
+}
+
+/**
+ * Phase 11 (conncore): emit INSIDE the caller's workspace-scoped transaction
+ * (transactional outbox): the delivery rows commit — or roll back — with the
+ * business write, so an event exists exactly when its write does. Never
+ * throws; a failure is contained in a SAVEPOINT so it can't poison the
+ * caller's transaction (the write still commits, the event is skipped and
+ * logged).
+ */
+export async function emitWebhookEventInTx<T extends WebhookEventType>(
+  tx: ScopedTx,
+  input: EmitInput<T>,
+  now: Date = new Date(),
+): Promise<EmitResult> {
+  if (!input.workspaceId) return NONE;
+  const parsed = WEBHOOK_EVENT_SCHEMAS[input.type].safeParse(input.data);
+  if (!parsed.success) {
+    warn(input.type, `invalid data (${parsed.error.issues[0]?.path.join(".") ?? "?"})`);
+    return NONE;
+  }
+  try {
+    await tx.$executeRawUnsafe("SAVEPOINT shapes_webhook_emit");
+  } catch (e) {
+    warn(input.type, e);
+    return NONE;
+  }
+  try {
+    const out = await enqueueDeliveries(tx, input, parsed.data as Record<string, unknown>, now);
+    await tx.$executeRawUnsafe("RELEASE SAVEPOINT shapes_webhook_emit");
+    return out;
+  } catch (e) {
+    await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT shapes_webhook_emit").catch(() => undefined);
     warn(input.type, e);
     return NONE;
   }

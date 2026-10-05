@@ -5,7 +5,8 @@
 "use client";
 
 import { useId, useMemo, useSyncExternalStore } from "react";
-import { inputCls, labelCls } from "@/components/settings/ui";
+import { Globe } from "lucide-react";
+import { Field } from "@/components/aos/Controls";
 
 const FALLBACK_ZONES = [
   "UTC",
@@ -61,25 +62,24 @@ export default function TimezoneField({
   const listId = useId();
   const zones = useMemo(() => zoneList(), []);
   return (
-    <label className={labelCls}>
-      Timezone
-      <input
-        className={`${inputCls} mt-1 w-64 ${className}`}
+    <>
+      <Field
+        label="Timezone"
+        className={`w-full max-w-72 ${className}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         list={listId}
         placeholder="UTC"
         autoComplete="off"
         spellCheck={false}
+        leading={<Globe className="size-4" aria-hidden />}
+        helper="The schedule runs on this zone's wall clock, including daylight saving changes."
       />
       <datalist id={listId}>
         {zones.map((z) => (
           <option key={z} value={z} />
         ))}
       </datalist>
-      <span className="mt-1 block text-xs font-normal text-muted">
-        The schedule runs on this zone&apos;s wall clock, including daylight saving changes.
-      </span>
-    </label>
+    </>
   );
 }

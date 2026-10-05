@@ -19,6 +19,7 @@ import {
   computeGbpLift,
 } from "@/lib/media/lift";
 import { FakePlatformSpendFeed, reconcileBuy } from "@/lib/media/reconciliation";
+import { FakeProviderRefusedError } from "@/lib/env/secrets";
 import { buildReportCard, ATTRIBUTION_CAVEATS } from "@/lib/media/report";
 
 export const metadata = { title: "Offline Attribution — ShapesOS" };
@@ -63,7 +64,11 @@ export default async function MediaAttributionPage({
   let lift = null;
   let direct = null;
   let gbp = null;
+  // Phase 11 (conncore): the lift fixture is refused in production — the
+  // panel then says "not connected" instead of showing fabricated lift.
+  let liftUnavailable: string | null = null;
   if (liftReady) {
+    try {
     const provider = new FakeLiftProvider();
     const query = {
       brandQuery: sp.brandQuery!,
@@ -79,6 +84,10 @@ export default async function MediaAttributionPage({
       computeDirectTrafficLift(provider, query),
       computeGbpLift(provider, query),
     ]);
+    } catch (err) {
+      if (!(err instanceof FakeProviderRefusedError)) throw err;
+      liftUnavailable = err.message;
+    }
   }
 
   const recon = buyId
@@ -235,6 +244,9 @@ export default async function MediaAttributionPage({
             </button>
           </form>
 
+          {liftUnavailable && (
+            <p className="mt-4 rounded-xl border border-line bg-white p-4 text-sm text-muted">{liftUnavailable}</p>
+          )}
           {lift && (
             <div className="mt-4 rounded-xl border border-line bg-white p-4">
               <p className="text-sm font-medium">{lift.verdict}</p>
