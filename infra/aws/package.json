@@ -9,11 +9,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc --noEmit -p tsconfig.json",
-    "test": "tsc --noEmit -p tsconfig.json && tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && tsx --test test/*.test.ts && tsx bin/write-bootstrap.ts --check",
     "synth": "cdk synth --quiet",
     "cdk": "cdk",
-    "bootstrap-template": "tsx bin/write-bootstrap.ts"
+    "bootstrap-template": "tsx bin/write-bootstrap.ts",
+    "secret-skeleton": "tsx bin/secret-skeleton.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "2.272.0",
