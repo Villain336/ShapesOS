@@ -332,6 +332,41 @@ describe("removing members and automated provisioning", () => {
   });
 });
 
+describe("subscription webhooks with a seat line", () => {
+  it("customer.subscription.updated reads the plan from the base-fee item, not items[0], and records the interval", async () => {
+    process.env.STRIPE_PRICE_PRO_ANNUAL = "price_FAKE_pro_year";
+    process.env.STRIPE_PRICE_SEAT_PRO_ANNUAL = "price_FAKE_seat_pro_year";
+    try {
+      const { syncSubscriptionFromStripe, getSubscriptionRow } = await import("@/lib/metering/billing");
+      // FAKE subscription object (shape per stripe.com/docs/api/subscriptions/object):
+      // the seat line first, the annual Pro base fee second.
+      const sub = {
+        id: SUB_ID,
+        object: "subscription",
+        customer: "cus_FAKE_p153",
+        status: "active",
+        cancel_at_period_end: false,
+        items: {
+          data: [
+            { id: "si_FAKE_seat", price: { id: "price_FAKE_seat_pro_year" }, quantity: 2 },
+            { id: "si_FAKE_base", price: { id: "price_FAKE_pro_year" }, quantity: 1, current_period_end: 1_900_000_000 },
+          ],
+        },
+      } as unknown as Stripe.Subscription;
+      const r = await syncSubscriptionFromStripe(sub, false);
+      assert.equal(r.ok, true);
+      const row = await getSubscriptionRow(WS);
+      assert.equal(row?.planId, "pro");
+      assert.equal(row?.interval, "year");
+      assert.equal((await prisma.workspace.findUniqueOrThrow({ where: { id: WS } })).plan, "pro");
+    } finally {
+      delete process.env.STRIPE_PRICE_PRO_ANNUAL;
+      delete process.env.STRIPE_PRICE_SEAT_PRO_ANNUAL;
+      await prisma.$executeRaw`UPDATE billing_subscriptions SET billing_interval = 'month' WHERE workspace_id = ${WS}`;
+    }
+  });
+});
+
 describe("no billable subscription", () => {
   it("a paid plan without a subscription keeps the included seats as a hard limit (403, never a charge)", async () => {
     sessionWs = WS_NOSUB;
