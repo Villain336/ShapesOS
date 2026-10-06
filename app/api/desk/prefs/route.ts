@@ -44,7 +44,8 @@ export async function PATCH(req: Request) {
     }
     const current = sanitizeOverrides((await getUserPreferences(ctx.userId)).shortcuts);
     const r = rebind(current, body.data.shortcut.id, body.data.shortcut.combo);
-    if (!r.ok) return Response.json({ error: r.error }, { status: 400 });
+    // code + values let the cheat-sheet say why in the person's language.
+    if (!r.ok) return Response.json({ error: r.error, code: r.code, values: r.values ?? {} }, { status: 400 });
     const stored = Object.fromEntries(Object.entries(r.overrides).map(([id, c]) => [id, toStoredBinding(c)]));
     const prefs = await setUserPreference(ctx.userId, "shortcuts", stored);
     return Response.json({ shortcuts: prefs.shortcuts, voice: prefs.voice }, { headers: NO_STORE });

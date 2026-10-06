@@ -22,6 +22,11 @@ import { allNavItems, navItemVisible } from "@/lib/nav/config";
 import { appForHref, RECENTS_SHOWN, type RecentItem } from "@/lib/desktop/recents";
 import { OPEN_SWITCHER_EVENT, splitHref } from "./events";
 import { useDock, type DockState } from "./useDock";
+// Phase 18.1 (integration): the switcher in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { createTranslator, navText, type Catalogue, type Translator } from "@/lib/i18n";
+
+const EN_T: Translator = createTranslator("en");
 
 export interface SwitcherOpenDetail {
   /** The modifier to hold ("Control", "Alt", "Meta", "Shift"); null = a click (stays open). */
@@ -37,21 +42,38 @@ export interface SwitcherEntry {
   hint: string;
 }
 
-/** The switcher's list: recents (newest first, not the current page), then pins, then a few apps. PURE. */
+/**
+ * The switcher's list: recents (newest first, not the current page), then
+ * pins, then a few apps. PURE. `i18n` localizes app names and hints (an app
+ * is always called by its nav label; a record keeps its own title).
+ */
 export function switcherEntries(
   recents: readonly RecentItem[],
   pinned: readonly string[],
   pathname: string,
   role: string | null | undefined,
   max = RECENTS_SHOWN,
+  i18n: { t: Translator; messages?: Catalogue } = { t: EN_T },
 ): SwitcherEntry[] {
+  const { t, messages } = i18n;
+  const label = (href: string, fallback: string) => (messages ? navText(messages, href).label : undefined) ?? fallback;
   const out: SwitcherEntry[] = [];
   const seen = new Set<string>([pathname]);
   for (const r of recents) {
     if (seen.has(r.href)) continue;
     seen.add(r.href);
     const app = appForHref(r.href);
-    out.push({ href: r.href, title: r.title, kind: r.kind, hint: r.kind === "record" ? (app ? `${app.label} record` : "Record") : "App" });
+    out.push({
+      href: r.href,
+      title: r.kind === "app" ? label(r.href, r.title) : r.title,
+      kind: r.kind,
+      hint:
+        r.kind === "record"
+          ? app
+            ? t("desk.switcher.recordOf", { app: label(app.href, app.label) })
+            : t("desk.switcher.record")
+          : t("desk.switcher.app"),
+    });
     if (out.length >= max) return out;
   }
   const items = allNavItems().filter((i) => navItemVisible(i, role));
@@ -60,7 +82,7 @@ export function switcherEntries(
     const item = byHref.get(href);
     if (!item || seen.has(href)) continue;
     seen.add(href);
-    out.push({ href, title: item.label, kind: "app", hint: pinned.includes(href) ? "Pinned" : "App" });
+    out.push({ href, title: label(href, item.label), kind: "app", hint: pinned.includes(href) ? t("desk.switcher.pinned") : t("desk.switcher.app") });
     if (out.length >= max) return out;
   }
   return out;
@@ -70,13 +92,17 @@ export function AppSwitcher({ role, initialDock }: { role?: string | null; initi
   const router = useRouter();
   const pathname = usePathname();
   const dock = useDock(initialDock ?? null);
+  const { t, messages } = useI18n();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const hold = useRef<SwitcherOpenDetail>({ holdKey: null, cycleKey: null });
   const listRef = useRef<HTMLUListElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
 
-  const entries = useMemo(() => switcherEntries(dock.recents, dock.pinned, pathname, role), [dock.recents, dock.pinned, pathname, role]);
+  const entries = useMemo(
+    () => switcherEntries(dock.recents, dock.pinned, pathname, role, RECENTS_SHOWN, { t, messages }),
+    [dock.recents, dock.pinned, pathname, role, t, messages],
+  );
   const entriesRef = useRef(entries);
   const activeRef = useRef(active);
   useEffect(() => {
@@ -172,18 +198,18 @@ export function AppSwitcher({ role, initialDock }: { role?: string | null; initi
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <ArrowLeftRight className="size-4 text-muted" aria-hidden />
           <h2 id="switcher-title" className="flex-1 text-base font-bold stretch-heading text-ink">
-            Switch app
+            {t("desk.switcher.title")}
           </h2>
           <KeyCaps keys={["esc"]} />
         </div>
         {entries.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">Nothing recent yet. Pages and records you open show up here.</p>
+          <p className="px-4 py-6 text-sm text-muted">{t("desk.switcher.empty")}</p>
         ) : (
           <ul
             ref={listRef}
             role="listbox"
             tabIndex={-1}
-            aria-label="Recent apps and records"
+            aria-label={t("desk.switcher.listLabel")}
             aria-activedescendant={activeId}
             className="max-h-[60vh] overflow-y-auto p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset"
           >
@@ -214,14 +240,14 @@ export function AppSwitcher({ role, initialDock }: { role?: string | null; initi
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2.5 text-xs text-muted">
           <span className="inline-flex items-center gap-1.5">
-            <KeyCaps keys={["Tab"]} /> Next
+            <KeyCaps keys={["Tab"]} /> {t("desk.switcher.next")}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <KeyCaps keys={["↵"]} /> Open
+            <KeyCaps keys={["↵"]} /> {t("desk.switcher.open")}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <KeyCaps keys={["⇧", "↵"]} />
-            <Columns2 className="size-3.5" aria-hidden /> Open beside this page
+            <Columns2 className="size-3.5" aria-hidden /> {t("desk.switcher.openBeside")}
           </span>
         </div>
       </div>

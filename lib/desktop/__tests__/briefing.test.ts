@@ -47,6 +47,11 @@ describe("the prompt", () => {
     assert.match(p, /Never invent/);
     assert.ok(!p.includes("Alvarez"), "first name only");
   });
+  it("is written in the member's language (English when unset)", () => {
+    assert.match(p, /Write in English/);
+    assert.match(buildBriefingPrompt({ ...input, language: "es" }), /Write in Spanish/);
+    assert.match(buildBriefingPrompt({ ...input, language: "xx" }), /Write in English/);
+  });
   it("says so when a source is empty instead of leaving a gap", () => {
     const empty = buildBriefingPrompt({ ...input, calendar: [], calendarConnected: false, needsYou: { count: 0, items: [] }, metrics: [] });
     assert.match(empty, /no calendar connected/);

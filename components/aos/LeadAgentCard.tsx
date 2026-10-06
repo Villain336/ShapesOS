@@ -7,8 +7,10 @@
 import Link from "next/link";
 import type { AgentTree as AgentTreeData } from "@/lib/aos/agents";
 import { LEAD_AGENT } from "@/lib/aos/agents";
-import { progressFraction, stepCounter } from "@/lib/aos/run-steps";
+import { progressFraction, stepNumbers } from "@/lib/aos/run-steps";
 import { cn } from "@/lib/utils";
+// Phase 18.1 (integration): the card's words in the person's language (English by default).
+import { createTranslator, type Translator } from "@/lib/i18n";
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentTree } from "./AgentTree";
 import { aosButton } from "./button";
@@ -16,24 +18,30 @@ import { CroppedShape, statusSurface } from "./CroppedShape";
 import { StatusBadge } from "./StatusBadge";
 import { ToolChip } from "./ToolChip";
 
+const EN: Translator = createTranslator("en");
+
 export function LeadAgentCard({
   tree,
   action,
   maxBranches = 6,
   className,
+  t = EN,
 }: {
   tree: AgentTreeData;
   action?: { label: string; href: string } | null;
   maxBranches?: number;
   className?: string;
+  /** The person's translator; English when absent. */
+  t?: Translator;
 }) {
   const { lead, branches } = tree;
   const p = lead.progress;
+  const step = p ? stepNumbers(p.done, p.total) : null;
   return (
-    <article className={cn("overflow-hidden rounded-lg bg-paper shadow-hairline", className)} aria-label={`${lead.name}, lead agent`}>
+    <article className={cn("overflow-hidden rounded-lg bg-paper shadow-hairline", className)} aria-label={t("kit.leadAgentAria", { name: lead.name })}>
       <div className={cn("relative h-[104px] overflow-hidden", statusSurface(lead.status))}>
         <CroppedShape status={lead.status} />
-        <StatusBadge status={lead.status} tone="ink" className="absolute bottom-4 left-5" />
+        <StatusBadge status={lead.status} label={t(`status.${lead.status}`)} tone="ink" className="absolute bottom-4 left-5" />
       </div>
       <div className="px-5 pt-4">
         <div className="flex items-start gap-3">
@@ -41,7 +49,7 @@ export function LeadAgentCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2">
               <h2 className="text-xl leading-tight font-bold stretch-heading tracking-heading text-ink">{lead.name}</h2>
-              <span className="text-sm font-semibold text-muted">{LEAD_AGENT.role}</span>
+              <span className="text-sm font-semibold text-muted">{LEAD_AGENT.role === "Lead agent" ? t("kit.leadRole") : LEAD_AGENT.role}</span>
             </div>
             <p className="mt-1 text-md text-muted">{lead.line}</p>
           </div>
@@ -55,7 +63,7 @@ export function LeadAgentCard({
           <div className="mt-3 rounded-md bg-canvas px-3.5 py-3">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="min-w-0 truncate font-semibold text-ink">{lead.missionName}</span>
-              {p ? <span className="shrink-0 text-muted tabular-nums">{stepCounter(p.done, p.total)}</span> : null}
+              {p ? <span className="shrink-0 text-muted tabular-nums">{step ? t("kit.step", step) : t("kit.noSteps")}</span> : null}
             </div>
             {p ? (
               <div className="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden>
@@ -75,9 +83,9 @@ export function LeadAgentCard({
       </div>
       <div className="px-3 pt-3 pb-3">
         {branches.length ? (
-          <AgentTree lead={lead} branches={branches} showLead={false} trunkOffset={27} maxBranches={maxBranches} />
+          <AgentTree lead={lead} branches={branches} showLead={false} trunkOffset={27} maxBranches={maxBranches} t={t} />
         ) : (
-          <p className="px-2 pb-2 text-md text-muted">No sub-agents are working right now.</p>
+          <p className="px-2 pb-2 text-md text-muted">{t("kit.noSubAgents")}</p>
         )}
       </div>
       {action ? (

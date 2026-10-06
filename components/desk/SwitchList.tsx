@@ -14,11 +14,14 @@ import { appForHref } from "@/lib/desktop/recents";
 import { splitHref } from "./events";
 import { switcherEntries } from "./AppSwitcher";
 import { useDock, type DockState } from "./useDock";
+// Phase 18.1 (integration): in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export function SwitchList({ role, initialDock }: { role: string; initialDock: DockState }) {
   const router = useRouter();
+  const { t, messages } = useI18n();
   const dock = useDock(initialDock);
-  const entries = switcherEntries(dock.recents, dock.pinned, "/dashboard/switch", role, 12);
+  const entries = switcherEntries(dock.recents, dock.pinned, "/dashboard/switch", role, 12, { t, messages });
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
   useEffect(() => listRef.current?.focus(), []);
@@ -34,13 +37,13 @@ export function SwitchList({ role, initialDock }: { role: string; initialDock: D
   return (
     <div className="flex flex-col gap-4">
       {entries.length === 0 ? (
-        <p className="rounded-lg bg-paper p-6 text-sm text-muted shadow-hairline">Nothing recent yet. Pages and records you open show up here.</p>
+        <p className="rounded-lg bg-paper p-6 text-sm text-muted shadow-hairline">{t("desk.switcher.empty")}</p>
       ) : (
         <ul
           ref={listRef}
           role="listbox"
           tabIndex={0}
-          aria-label="Recent apps and records"
+          aria-label={t("desk.switcher.listLabel")}
           aria-activedescendant={`switch-opt-${active}`}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
@@ -82,16 +85,16 @@ export function SwitchList({ role, initialDock }: { role: string; initialDock: D
       )}
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span className="inline-flex items-center gap-1.5">
-          <KeyCaps keys={["↑", "↓"]} /> Move
+          <KeyCaps keys={["↑", "↓"]} /> {t("desk.switcher.move")}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <KeyCaps keys={["↵"]} /> Open
+          <KeyCaps keys={["↵"]} /> {t("desk.switcher.open")}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <KeyCaps keys={["⇧", "↵"]} />
-          <Columns2 className="size-3.5" aria-hidden /> Open beside the last page
+          <Columns2 className="size-3.5" aria-hidden /> {t("desk.switcher.openBesideLast")}
         </span>
-        <span>Anywhere: hold ⌃ and press Tab (or ⌃`).</span>
+        <span>{t("desk.switcher.anywhere")}</span>
       </p>
     </div>
   );

@@ -44,7 +44,12 @@ export interface BriefingInput {
   needsYou: { count: number; items: string[] };
   overnight: { finished: number; failed: number; waiting: number; running: number; highlights: string[] };
   metrics: { label: string; value: string }[];
+  /** Phase 18.1 (integration): the member's language preference ("en" | "es"); English when unset. */
+  language?: string | null;
 }
+
+/** Languages the briefing can be written in (the shell's languages, lib/i18n). */
+const BRIEFING_LANGUAGES: Record<string, string> = { en: "English", es: "Spanish (tú form)" };
 
 /** What the briefing was written from (counts only — stored with it, shown as provenance). */
 export function briefingSources(input: BriefingInput): Record<string, number | boolean> {
@@ -77,6 +82,7 @@ export function buildBriefingPrompt(input: BriefingInput): string {
     "- At most 6 short lines. Start with one sentence that says what matters most today, then '- ' bullets.",
     "- Plain, calm, specific. Sentence case. No greetings beyond the first name, no emojis, no hype, no headings.",
     "- Put anything waiting on the member first. Times are in the member's time zone.",
+    `- Write in ${BRIEFING_LANGUAGES[input.language ?? "en"] ?? "English"}, the member's language. Keep names, titles and numbers from the facts exactly as given.`,
     "",
     `Member: ${who ?? "(name unknown)"}`,
     `Workspace: ${input.workspaceName}`,

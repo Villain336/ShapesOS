@@ -33,18 +33,21 @@ import { Desktop } from "@/components/desktop/Desktop";
 import type { WidgetId } from "@/lib/desktop/widgets";
 import { DEFAULT_TIME_ZONE } from "@/lib/time/zoned";
 import { prisma } from "@/lib/prisma";
+// Phase 18.1 (integration): Home in the person's language (lib/i18n).
+import { getI18n } from "@/lib/i18n/server";
+import type { InboxSourceKey } from "@/lib/approvals/types";
 
 export const dynamic = "force-dynamic";
 
-/** Approvals waiting on this member, grouped by queue (best effort). */
-async function approvalsSummary(userId: string, workspaceId: string) {
+/** Approvals waiting on this member, grouped by queue (best effort), queue names translated. */
+async function approvalsSummary(userId: string, workspaceId: string, sourceLabel: (source: InboxSourceKey, fallback: string) => string) {
   try {
     const viewer = await resolveInboxViewer(userId, workspaceId);
     if (!viewer) return { actionable: 0, sources: [] as string[] };
     const inbox = await loadInbox(viewer, { limitPerSource: 25 });
     return {
       actionable: inbox.actionable,
-      sources: inbox.sources.filter((s) => s.actionable > 0).map((s) => s.label),
+      sources: inbox.sources.filter((s) => s.actionable > 0).map((s) => sourceLabel(s.source, s.label)),
     };
   } catch {
     return { actionable: 0, sources: [] as string[] };
@@ -61,17 +64,22 @@ export default async function DashboardPage() {
   if (needsOnboarding(workspace, me?.role)) redirect("/dashboard/welcome");
   const role = me?.role ?? "viewer";
   const now = new Date();
+  const { t, locale } = await getI18n();
+  const sourceLabel = (source: InboxSourceKey, fallback: string) => {
+    const label = t(`approvals.sources.${source}`);
+    return label === `approvals.sources.${source}` ? fallback : label;
+  };
 
   const [desk, prefs, activity, approvals] = await Promise.all([
     getDesk(workspace.id, user.id, role),
     getUserPreferences(user.id).catch(() => ({ timeZone: null })),
     safeAgentActivity(workspace.id),
-    approvalsSummary(user.id, workspace.id),
+    approvalsSummary(user.id, workspace.id, sourceLabel),
   ]);
   const placed = desk.layout.widgets.map((w) => w.widget);
   const [results, lastRun] = await Promise.all([
     loadWidgets(
-      { workspaceId: workspace.id, userId: user.id, role, now, timeZone: prefs.timeZone ?? DEFAULT_TIME_ZONE, workspaceName: workspace.name },
+      { workspaceId: workspace.id, userId: user.id, role, now, timeZone: prefs.timeZone ?? DEFAULT_TIME_ZONE, workspaceName: workspace.name, t, locale },
       placed,
     ),
     prisma.workflowRun.findFirst({
@@ -81,14 +89,14 @@ export default async function DashboardPage() {
     }).catch(() => null),
   ]);
   const contents: Partial<Record<WidgetId, React.ReactNode>> = {};
-  for (const id of placed) contents[id] = renderWidget(id, results[id] as never);
+  for (const id of placed) contents[id] = renderWidget(id, results[id] as never, { t, locale });
 
   // ── banners: only when something needs the member ──────────
   const tree = activity?.tree ?? null;
   const failedSchedules: FailedWork[] = (activity?.schedules ?? [])
     .filter((s) => s.status === "failed")
-    .map((s) => ({ key: `schedule:${s.id}`, name: s.name, detail: s.error ?? "The last scheduled run failed", href: s.href }));
-  const banners = deriveBanners({ approvals, failed: [...failedWorkFromTree(tree), ...failedSchedules] });
+    .map((s) => ({ key: `schedule:${s.id}`, name: s.name, detail: s.error ?? t("home.banners.scheduleFailed"), href: s.href }));
+  const banners = deriveBanners({ approvals, failed: [...failedWorkFromTree(tree), ...failedSchedules] }, t);
   const provider = providerStatus();
 
   return (
@@ -98,17 +106,17 @@ export default async function DashboardPage() {
         <div className="min-w-0">
           <h1 className="aos-heading">{workspace.name}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
-            <span>Plan</span>
+            <span>{t("home.plan")}</span>
             <ValuePill>{workspace.plan}</ValuePill>
             <span aria-hidden className="text-subtle">·</span>
-            <span>Data</span>
-            <ValuePill>{provider.isLive ? "DataForSEO (live)" : "Mock"}</ValuePill>
+            <span>{t("home.data")}</span>
+            <ValuePill>{provider.isLive ? t("home.dataLive") : t("home.dataMock")}</ValuePill>
             {lastRun ? (
               <>
                 <span aria-hidden className="text-subtle">·</span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="size-3.5" aria-hidden />
-                  Last automation “{lastRun.workflow.name}” ran {timeAgo(lastRun.startedAt, now)}
+                  {t("home.lastAutomation", { name: lastRun.workflow.name, ago: timeAgo(lastRun.startedAt, now, locale) })}
                 </span>
               </>
             ) : null}
@@ -118,7 +126,7 @@ export default async function DashboardPage() {
       </div>
 
       {banners.length ? (
-        <div className="flex flex-col gap-2.5" aria-label="Needs your attention">
+        <div className="flex flex-col gap-2.5" aria-label={t("home.attention")}>
           {banners.map((b) => (
             <Banner key={b.key} status={b.status as "needs" | "failed"} title={b.title} description={b.description} action={b.action} />
           ))}

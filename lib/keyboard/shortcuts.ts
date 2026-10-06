@@ -323,7 +323,15 @@ export function findClashes(bindings: readonly Binding[]): Clash[] {
   return out;
 }
 
-export type RebindResult = { ok: true; overrides: Record<string, string> } | { ok: false; error: string };
+/**
+ * Why a rebinding was refused: `error` is the English sentence (API
+ * responses, logs); `code` + `values` let the UI say it in the person's
+ * language (desk.shortcuts.errors.<code> in lib/i18n).
+ */
+export type RebindErrorCode = "unknown" | "fixed" | "invalid" | "reserved" | "navigation" | "modifier" | "taken" | "clash";
+export type RebindResult =
+  | { ok: true; overrides: Record<string, string> }
+  | { ok: false; error: string; code: RebindErrorCode; values?: Record<string, string> };
 
 /**
  * Rebind `id` to `combo` on top of `current` overrides. Refuses (and changes
@@ -333,8 +341,8 @@ export type RebindResult = { ok: true; overrides: Record<string, string> } | { o
  */
 export function rebind(current: Readonly<Record<string, string>>, id: string, combo: string | null): RebindResult {
   const def = SHORTCUTS_BY_ID.get(id);
-  if (!def) return { ok: false, error: "That shortcut does not exist." };
-  if (!def.rebindable) return { ok: false, error: `${def.label} can't be changed.` };
+  if (!def) return { ok: false, code: "unknown", error: "That shortcut does not exist." };
+  if (!def.rebindable) return { ok: false, code: "fixed", values: { id }, error: `${def.label} can't be changed.` };
   const next: Record<string, string> = { ...sanitizeOverrides(current) };
   if (combo === null) {
     delete next[id];
@@ -343,16 +351,16 @@ export function rebind(current: Readonly<Record<string, string>>, id: string, co
     try {
       canonical = canonicalCombo(combo);
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "That is not a shortcut." };
+      return { ok: false, code: "invalid", error: err instanceof Error ? err.message : "That is not a shortcut." };
     }
     const steps = parseCombo(canonical);
-    if (isReserved(steps)) return { ok: false, error: `${canonical} belongs to the browser.` };
+    if (isReserved(steps)) return { ok: false, code: "reserved", values: { combo: canonical }, error: `${canonical} belongs to the browser.` };
     const first = steps[0]!;
     const bare = !first.mod && !first.ctrl && !first.alt;
-    if (bare && BARE_FORBIDDEN.has(first.key)) return { ok: false, error: `${canonical} is needed to move around the page.` };
+    if (bare && BARE_FORBIDDEN.has(first.key)) return { ok: false, code: "navigation", values: { combo: canonical }, error: `${canonical} is needed to move around the page.` };
     if (bare && !first.shift && steps.length === 1 && first.key.length === 1 && def.scope !== "global") {
       // Single letters only make sense as global "press when not typing" keys.
-      return { ok: false, error: "Use a modifier (Ctrl, Alt or ⌘) for this one." };
+      return { ok: false, code: "modifier", error: "Use a modifier (Ctrl, Alt or ⌘) for this one." };
     }
     if (canonical === canonicalCombo(def.combo)) delete next[id];
     else next[id] = canonical;
@@ -365,7 +373,10 @@ export function rebind(current: Readonly<Record<string, string>>, id: string, co
     const mine = effectiveCombo(id, next);
     const theirs = all.find((b) => b.id === otherId && combosClash(parseCombo(b.combo), parseCombo(mine)))?.combo ?? mine;
     const label = other ? `"${other.label}"` : "another shortcut";
-    return { ok: false, error: theirs === mine ? `${mine} is already ${label}.` : `${mine} clashes with ${theirs} (${label}).` };
+    const values = { combo: mine, theirs, otherId: other ? otherId : "" };
+    return theirs === mine
+      ? { ok: false, code: "taken", values, error: `${mine} is already ${label}.` }
+      : { ok: false, code: "clash", values, error: `${mine} clashes with ${theirs} (${label}).` };
   }
   return { ok: true, overrides: next };
 }

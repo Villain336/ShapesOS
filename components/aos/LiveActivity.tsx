@@ -7,13 +7,16 @@
 
 import Link from "next/link";
 import { Square } from "lucide-react";
-import { AOS_COLOR_STATUSES, STATUS_META, type AosStatus, type StatusCounts } from "@/lib/aos/status";
-import { ofCaption, progressFraction } from "@/lib/aos/run-steps";
+import { AOS_COLOR_STATUSES, type AosStatus, type StatusCounts } from "@/lib/aos/status";
+import { progressFraction } from "@/lib/aos/run-steps";
 import { cn } from "@/lib/utils";
+// Phase 18.1 (integration): status words and captions in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { StatusShape } from "./StatusShape";
 
 export function LiveCounts({ counts, className }: { counts: StatusCounts; className?: string }) {
-  const summary = AOS_COLOR_STATUSES.map((s) => `${counts[s]} ${STATUS_META[s].label.toLowerCase()}`).join(", ");
+  const { t } = useI18n();
+  const summary = AOS_COLOR_STATUSES.map((s) => `${counts[s]} ${t(`status.${s}`).toLowerCase()}`).join(", ");
   return (
     <div
       role="img"
@@ -48,6 +51,8 @@ export interface LiveChip {
 }
 
 export function LiveRunStrip({ run, chips = [], className }: { run: LiveRun; chips?: LiveChip[]; className?: string }) {
+  const { t } = useI18n();
+  const ofCaption = (done: number, total: number) => t("kit.of", { done: Math.max(0, Math.floor(done)), total: Math.max(0, Math.floor(total)) });
   const status = run.status ?? "running";
   const title = run.href ? (
     <Link href={run.href} className="hover:underline">
@@ -59,7 +64,7 @@ export function LiveRunStrip({ run, chips = [], className }: { run: LiveRun; chi
   return (
     <div className={cn("aos-night w-full rounded-xl p-5 shadow-toast", className)}>
       <div className="flex items-center gap-3">
-        <StatusShape status={status} size={9} tone="night" label={STATUS_META[status].label} className="self-start mt-1.5" />
+        <StatusShape status={status} size={9} tone="night" label={t(`status.${status}`)} className="self-start mt-1.5" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-base leading-5 font-semibold text-paper">{title}</div>
           {run.subtitle ? <div className="truncate text-sm text-night-soft">{run.subtitle}</div> : null}
@@ -69,7 +74,7 @@ export function LiveRunStrip({ run, chips = [], className }: { run: LiveRun; chi
           <button
             type="button"
             onClick={run.onStop}
-            aria-label={run.stopLabel ?? "Stop run"}
+            aria-label={run.stopLabel ?? t("kit.stopRun")}
             className="aos-press flex size-9 shrink-0 items-center justify-center rounded-full bg-failed text-paper"
           >
             <Square className="size-3 fill-current" aria-hidden />

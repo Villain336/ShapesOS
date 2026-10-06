@@ -10,6 +10,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { movePin, togglePin, type NavPrefs } from "@/lib/desktop/nav-overlay";
 import type { RecentItem } from "@/lib/desktop/recents";
+// Phase 18.1 (integration): its one message in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export const DOCK_CHANGED_EVENT = "shapes:dock-changed";
 
@@ -31,6 +33,7 @@ function fetchDock(): Promise<DockState | null> {
 }
 
 export function useDock(initial: DockState | null) {
+  const { t } = useI18n();
   const [state, setState] = useState<DockState>(initial ?? { pinned: [], recents: [] });
   const [error, setError] = useState<string | null>(null);
 
@@ -62,13 +65,13 @@ export function useDock(initial: DockState | null) {
         body: JSON.stringify({ pinned: next.pinned }),
       });
       const body = (await res.json().catch(() => ({}))) as { pinned?: string[]; error?: string };
-      if (!res.ok || !body.pinned) throw new Error(body.error ?? "Pins were not saved.");
+      if (!res.ok || !body.pinned) throw new Error(body.error ?? t("desk.dock.notSaved"));
       notifyDockChanged({ pinned: body.pinned });
     } catch (err) {
       setState((s) => ({ ...s, pinned: prev.pinned }));
-      setError(err instanceof Error ? err.message : "Pins were not saved.");
+      setError(err instanceof Error ? err.message : t("desk.dock.notSaved"));
     }
-  }, []);
+  }, [t]);
 
   const toggle = useCallback(
     (href: string) => {

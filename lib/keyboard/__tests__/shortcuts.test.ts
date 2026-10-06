@@ -173,4 +173,19 @@ describe("matching", () => {
     assert.throws(() => parseCombo("Ctrl+"));
     assert.throws(() => parseCombo("Banana+K"));
   });
+
+  it("a refusal carries a code and values the UI can translate", () => {
+    const clash = rebind({}, "task.new", "Mod+K");
+    assert.equal(clash.ok, false);
+    if (!clash.ok) {
+      assert.equal(clash.code, "taken");
+      assert.equal(clash.values?.otherId, "palette.toggle");
+    }
+    const reserved = rebind({}, "task.new", "Mod+W");
+    assert.ok(!reserved.ok && reserved.code === "reserved" && reserved.values?.combo === "Mod+W");
+    const fixed = rebind({}, "switcher.next", "Mod+Y");
+    assert.ok(!fixed.ok && fixed.code === "fixed");
+    const unknown = rebind({}, "no.such", "Mod+Y");
+    assert.ok(!unknown.ok && unknown.code === "unknown");
+  });
 });

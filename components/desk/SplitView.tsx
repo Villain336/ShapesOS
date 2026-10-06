@@ -19,6 +19,8 @@ import { aosButton } from "@/components/aos/button";
 import { allNavItems, navItemVisible } from "@/lib/nav/config";
 import { RATIO_MAX, RATIO_MIN, RATIO_STEP, clampRatio, nudgeRatio, sanitizePaneHref, splitUrl, swapPanes, type SplitState } from "@/lib/desktop/split";
 import { recentTitle, type RecentItem } from "@/lib/desktop/recents";
+// Phase 18.1 (integration): split view in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export const SPLIT_COMMAND_EVENT = "shapes:split-command";
 export type SplitCommand = "swap" | "close" | "focus-left" | "focus-right" | "shrink-left" | "grow-left";
@@ -26,11 +28,12 @@ export type SplitCommand = "swap" | "close" | "focus-left" | "focus-right" | "sh
 type Side = "left" | "right";
 
 function PaneChooser({ side, value, recents, role, onChange }: { side: Side; value: string; recents: RecentItem[]; role: string; onChange: (href: string) => void }) {
+  const { t, nav } = useI18n();
   const apps = allNavItems().filter((i) => navItemVisible(i, role));
   const known = new Set([...recents.map((r) => r.href), ...apps.map((a) => a.href)]);
   return (
     <label className="flex min-w-0 items-center gap-2">
-      <span className="sr-only">{side === "left" ? "Left pane" : "Right pane"} shows</span>
+      <span className="sr-only">{t("desk.split.paneShows", { pane: side === "left" ? t("desk.split.leftPane") : t("desk.split.rightPane") })}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -38,18 +41,18 @@ function PaneChooser({ side, value, recents, role, onChange }: { side: Side; val
       >
         {!known.has(value) ? <option value={value}>{value}</option> : null}
         {recents.length ? (
-          <optgroup label="Recent">
+          <optgroup label={t("desk.split.recent")}>
             {recents.map((r) => (
               <option key={`r:${r.href}`} value={r.href}>
-                {r.title}
+                {r.kind === "app" ? nav(r.href, { label: r.title, description: "" }).label : r.title}
               </option>
             ))}
           </optgroup>
         ) : null}
-        <optgroup label="Apps">
+        <optgroup label={t("desk.split.apps")}>
           {apps.map((a) => (
             <option key={`a:${a.href}`} value={a.href}>
-              {a.label}
+              {nav(a.href, a).label}
             </option>
           ))}
         </optgroup>
@@ -60,6 +63,8 @@ function PaneChooser({ side, value, recents, role, onChange }: { side: Side; val
 
 export function SplitView({ initial, recents, role }: { initial: SplitState; recents: RecentItem[]; role: string }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const paneName = (side: Side) => (side === "left" ? t("desk.split.leftPane") : t("desk.split.rightPane"));
   const [state, setState] = useState(initial);
   // What each pane was told to load (state.left/right track where it is now:
   // a link inside a pane changes the URL, not the iframe's src — no reload).
@@ -167,7 +172,7 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
     const href = state[side];
     return (
       <section
-        aria-label={side === "left" ? "Left pane" : "Right pane"}
+        aria-label={paneName(side)}
         data-testid={`split-pane-${side}`}
         className={cn("flex min-h-[50dvh] min-w-0 flex-col overflow-hidden rounded-lg bg-paper shadow-hairline md:min-h-0", focused === side && "ring-2 ring-ink")}
         style={{ flexBasis: `${side === "left" ? state.ratio : 100 - state.ratio}%` }}
@@ -181,17 +186,17 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
             sync({ ...state, [side]: clean });
           }} />
           <span className="min-w-0 flex-1 truncate text-sm text-muted">{titles[side]}</span>
-          <a href={href} target="_top" className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover" aria-label={`Open ${titles[side] || href} as a full page`} title="Open as a full page">
+          <a href={href} target="_top" className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover" aria-label={t("desk.split.openFull", { title: titles[side] || href })} title={t("desk.split.openFullHint")}>
             <ExternalLink className="size-4" aria-hidden />
           </a>
-          <button type="button" onClick={() => closePane(side)} className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover" aria-label={`Close the ${side} pane`} title="Close pane (⌃⌥W)">
+          <button type="button" onClick={() => closePane(side)} className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover" aria-label={side === "left" ? t("desk.split.closeLeft") : t("desk.split.closeRight")} title={t("desk.split.closeHint")}>
             <X className="size-4" aria-hidden />
           </button>
         </header>
         <iframe
           ref={frames[side]}
           src={srcs[side]}
-          title={titles[side] || (side === "left" ? "Left pane" : "Right pane")}
+          title={titles[side] || paneName(side)}
           onLoad={() => onPaneLoad(side)}
           onFocus={() => setFocused(side)}
           className={cn("min-h-0 w-full flex-1 border-0 bg-canvas", dragging && "pointer-events-none")}
@@ -203,11 +208,11 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
   return (
     <div className="flex h-full flex-col gap-3 p-3 md:p-4">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <h1 className="aos-subheading">Split view</h1>
+        <h1 className="aos-subheading">{t("desk.split.title")}</h1>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => run("swap")} className={aosButton({ variant: "secondary", size: "sm" })} title="Swap panes (⌃⌥S)">
+          <button type="button" onClick={() => run("swap")} className={aosButton({ variant: "secondary", size: "sm" })} title={t("desk.split.swapHint")}>
             <ArrowLeftRight className="size-4" aria-hidden />
-            Swap
+            {t("desk.split.swap")}
           </button>
         </div>
       </div>
@@ -216,7 +221,7 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize panes"
+          aria-label={t("desk.split.resize")}
           aria-valuenow={state.ratio}
           aria-valuemin={RATIO_MIN}
           aria-valuemax={RATIO_MAX}

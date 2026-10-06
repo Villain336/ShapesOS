@@ -98,9 +98,14 @@ function runLabel(r: { kind: string; agentKey: string | null; agentState: unknow
 
 export async function gatherBriefingInput(workspaceId: string, userId: string, now: Date, timeZone: string): Promise<BriefingInput> {
   const tz = resolveTimeZone(timeZone);
-  const [ws, member] = await Promise.all([
+  const [ws, member, language] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
     prisma.workspaceMember.findFirst({ where: { workspaceId, userId }, select: { name: true, role: true } }),
+    // Phase 18.1 (integration): written in the member's language preference (English when unset).
+    import("@/lib/preferences")
+      .then((m) => m.getUserPreferences(userId))
+      .then((p) => p.language)
+      .catch(() => null),
   ]);
   const role = member?.role ?? "viewer";
   const ctx: LoaderContext = { workspaceId, userId, role, now, timeZone: tz, workspaceName: ws?.name ?? "Workspace" };
@@ -136,6 +141,7 @@ export async function gatherBriefingInput(workspaceId: string, userId: string, n
   }
   if (inbox && inbox.unreadThreads > 0) metrics.push({ label: "Unread conversations", value: String(inbox.unreadThreads) });
   return {
+    language,
     memberName: member?.name ?? null,
     workspaceName: ctx.workspaceName,
     day: localDay(now, tz),

@@ -35,6 +35,11 @@ import { DEFAULT_TIME_ZONE, resolveTimeZone, startOfZonedDay } from "@/lib/time/
 import { CLOSED_STAGES, DEFAULT_STAGES, parseStages } from "@/lib/crm/stages";
 import type { TwinKpi } from "@/lib/twin/types";
 import type { WidgetId } from "./widgets";
+// Phase 18.1 (integration): widget text in the person's language (English when absent).
+import { createTranslator, type Translator } from "@/lib/i18n";
+import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/i18n/locales";
+
+const EN_T: Translator = createTranslator("en");
 
 export interface LoaderContext {
   workspaceId: string;
@@ -44,21 +49,40 @@ export interface LoaderContext {
   /** The member's IANA time zone (WS=find's preference; UTC until known). */
   timeZone: string;
   workspaceName: string;
+  /** The person's translator (lib/i18n getI18n); English when absent (the briefing's gather). */
+  t?: Translator;
+  /** The person's language, for relative times. */
+  locale?: Locale;
+}
+
+function tr(ctx: Pick<LoaderContext, "t">): Translator {
+  return ctx.t ?? EN_T;
+}
+
+function ago(ctx: Pick<LoaderContext, "locale" | "now">, d: Date): string {
+  return timeAgo(d, ctx.now, ctx.locale);
 }
 
 export type LoadResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-async function safe<T>(label: string, fn: () => Promise<T>): Promise<LoadResult<T>> {
+async function safe<T>(id: WidgetId, t: Translator, fn: () => Promise<T>): Promise<LoadResult<T>> {
   try {
     return { ok: true, data: await fn() };
   } catch (err) {
-    console.warn(`[desktop] ${label} widget did not load:`, err instanceof Error ? err.message : err);
-    return { ok: false, error: `${label} could not load right now.` };
+    console.warn(`[desktop] ${id} widget did not load:`, err instanceof Error ? err.message : err);
+    return { ok: false, error: t("desk.desktop.couldNotLoad", { widget: t(`desk.widgets.${id}.title`) }) };
   }
 }
 
-const relFmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-export function timeAgo(d: Date, now = new Date()): string {
+const relFmts = new Map<string, Intl.RelativeTimeFormat>();
+/** "3 hours ago" / "hace 3 horas" — in the person's language (English by default). */
+export function timeAgo(d: Date, now = new Date(), locale: Locale = DEFAULT_LOCALE): string {
+  const tag = INTL_LOCALE[locale] ?? INTL_LOCALE[DEFAULT_LOCALE];
+  let relFmt = relFmts.get(tag);
+  if (!relFmt) {
+    relFmt = new Intl.RelativeTimeFormat(tag, { numeric: "auto" });
+    relFmts.set(tag, relFmt);
+  }
   const sec = Math.round((d.getTime() - now.getTime()) / 1000);
   const abs = Math.abs(sec);
   if (abs < 60) return relFmt.format(sec, "second");
@@ -87,9 +111,9 @@ async function loadNeedsYou(ctx: LoaderContext): Promise<NeedsYouData> {
     items: inbox.items.slice(0, 6).map((i) => ({
       key: i.key,
       title: i.title,
-      source: INBOX_SOURCE_LABELS[i.source] ?? i.typeLabel,
+      source: INBOX_SOURCE_LABELS[i.source] ? tr(ctx)(`approvals.sources.${i.source}`) : i.typeLabel,
       href: i.href ?? "/dashboard/approvals",
-      ago: timeAgo(new Date(i.createdAt), ctx.now),
+      ago: ago(ctx, new Date(i.createdAt)),
       canDecide: i.canDecide,
     })),
   };
@@ -108,7 +132,7 @@ export interface AgentsData {
   } | null;
 }
 
-function liveRunFor(tree: AgentTree): NonNullable<AgentsData["live"]> {
+function liveRunFor(tree: AgentTree, t: Translator = EN_T): NonNullable<AgentsData["live"]> {
   const running = tree.branches.find((b) => b.status === "running");
   const mission = running?.missionId ? tree.missions.find((m) => m.id === running.missionId) : tree.missions.find((m) => m.status === "running");
   const run = running
@@ -122,7 +146,7 @@ function liveRunFor(tree: AgentTree): NonNullable<AgentsData["live"]> {
     .map((b) => ({
       key: b.key,
       status: b.status,
-      label: `${b.name} ${b.status === "needs" ? "needs you" : "failed"}`,
+      label: b.status === "needs" ? t("desk.views.chipNeedsYou", { name: b.name }) : t("desk.views.chipFailed", { name: b.name }),
       href: b.status === "needs" ? "/dashboard/approvals" : (b.href ?? undefined),
     }));
   return { run, chips };
@@ -132,8 +156,14 @@ async function loadAgents(ctx: LoaderContext): Promise<AgentsData> {
   const activity = await safeAgentActivity(ctx.workspaceId);
   const tree = activity?.tree ?? null;
   if (!tree) return { tree: null, leadAction: null, live: null };
-  const leadAction = tree.lead.status === "needs" ? { label: "Review all", href: "/dashboard/approvals" } : tree.lead.href ? { label: "Open mission", href: tree.lead.href } : null;
-  return { tree, leadAction, live: liveRunFor(tree) };
+  const t = tr(ctx);
+  const leadAction =
+    tree.lead.status === "needs"
+      ? { label: t("desk.views.reviewAll"), href: "/dashboard/approvals" }
+      : tree.lead.href
+        ? { label: t("desk.views.openMission"), href: tree.lead.href }
+        : null;
+  return { tree, leadAction, live: liveRunFor(tree, t) };
 }
 
 export interface RunningData {
@@ -170,46 +200,48 @@ function missionTools(m: MissionView): string[] {
   return [...seen].slice(0, 3);
 }
 
-function missionCard(m: MissionView, now: Date): WorkCard {
+function missionCard(m: MissionView, ctx: Pick<LoaderContext, "t" | "locale" | "now">): WorkCard {
+  const t = tr(ctx);
   const team = m.branches.map((b) => b.name);
   const action =
     m.status === "needs"
-      ? { label: "Review", href: "/dashboard/approvals" }
+      ? { label: t("desk.views.review"), href: "/dashboard/approvals" }
       : m.status === "failed" && m.runId
-        ? { label: "Open run", href: `/dashboard/runs/${m.runId}` }
-        : { label: "Open mission", href: m.href };
+        ? { label: t("desk.views.openRun"), href: `/dashboard/runs/${m.runId}` }
+        : { label: t("desk.views.openMission"), href: m.href };
   return {
     key: `m:${m.id}`,
     status: m.status,
     title: m.name,
-    eyebrow: team.length ? `Mission · Strategist → ${team.join(", ")}` : "Mission · Strategist",
+    eyebrow: team.length ? t("desk.views.eyebrowMissionTeam", { team: team.join(", ") }) : t("desk.views.eyebrowMission"),
     description: m.line,
     tools: missionTools(m),
-    meta: m.progress ? stepCounter(m.progress.done, m.progress.total) : `Updated ${timeAgo(new Date(m.updatedAt), now)}`,
+    meta: m.progress ? stepCounter(m.progress.done, m.progress.total) : t("desk.views.updatedAgo", { ago: ago(ctx, new Date(m.updatedAt)) }),
     action,
   };
 }
 
-function scheduleCard(s: ScheduleWork, now: Date): WorkCard {
+function scheduleCard(s: ScheduleWork, ctx: Pick<LoaderContext, "t" | "locale" | "now">): WorkCard {
+  const t = tr(ctx);
   const meta =
     s.status === "failed"
-      ? `Stopped ${timeAgo(new Date(s.updatedAt), now)}`
+      ? t("desk.views.stoppedAgo", { ago: ago(ctx, new Date(s.updatedAt)) })
       : s.status === "running"
-        ? "Running now"
+        ? t("desk.views.runningNow")
         : s.status === "needs"
-          ? "Waiting for your approval"
+          ? t("desk.views.waitingApproval")
           : s.status === "queued"
-            ? "Queued"
-            : `Ran ${timeAgo(new Date(s.updatedAt), now)}`;
+            ? t("desk.views.queued")
+            : t("desk.views.ranAgo", { ago: ago(ctx, new Date(s.updatedAt)) });
   return {
     key: `s:${s.id}`,
     status: s.status,
     title: s.name,
-    eyebrow: "Schedule",
+    eyebrow: t("desk.views.eyebrowSchedule"),
     description: s.status === "failed" && s.error ? s.error : s.description,
     tools: s.tools,
     meta,
-    action: s.status === "needs" ? { label: "Review", href: "/dashboard/approvals" } : { label: "Open run", href: s.href },
+    action: s.status === "needs" ? { label: t("desk.views.review"), href: "/dashboard/approvals" } : { label: t("desk.views.openRun"), href: s.href },
   };
 }
 
@@ -218,8 +250,8 @@ async function loadWork(ctx: LoaderContext): Promise<{ cards: WorkCard[] }> {
   const missions = activity?.tree?.missions ?? [];
   const schedules = activity?.schedules ?? [];
   const cards = [
-    ...missions.slice(0, 8).map((m) => ({ status: m.status, updatedAt: m.updatedAt, card: missionCard(m, ctx.now) })),
-    ...schedules.slice(0, 6).map((s) => ({ status: s.status, updatedAt: s.updatedAt, card: scheduleCard(s, ctx.now) })),
+    ...missions.slice(0, 8).map((m) => ({ status: m.status, updatedAt: m.updatedAt, card: missionCard(m, ctx) })),
+    ...schedules.slice(0, 6).map((s) => ({ status: s.status, updatedAt: s.updatedAt, card: scheduleCard(s, ctx) })),
   ]
     .sort(byStatusThenRecent)
     .map((w) => w.card);
@@ -299,14 +331,15 @@ async function loadKeyNumbers(ctx: LoaderContext): Promise<KeyNumbersData> {
   const s = await overviewStats(ctx.workspaceId);
   const scores = [...s.scoreByProject.values()];
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+  const t = tr(ctx);
   return {
     items: [
-      { label: "Projects", value: String(s.projects.length), href: "/dashboard/projects" },
-      { label: "Keywords", value: String(s.totalKeywords), href: "/dashboard/projects" },
-      { label: "Content pieces", value: String(s.totalContent), href: "/dashboard/projects" },
-      { label: "Visibility (avg)", value: avg === null ? "—" : `${avg}/100`, href: "/dashboard/projects" },
+      { label: t("desk.views.statProjects"), value: String(s.projects.length), href: "/dashboard/projects" },
+      { label: t("desk.views.statKeywords"), value: String(s.totalKeywords), href: "/dashboard/projects" },
+      { label: t("desk.views.statContent"), value: String(s.totalContent), href: "/dashboard/projects" },
+      { label: t("desk.views.statVisibility"), value: avg === null ? "—" : `${avg}/100`, href: "/dashboard/projects" },
     ],
-    lastAutomation: s.lastRun ? { name: s.lastRun.workflow.name, ago: timeAgo(s.lastRun.startedAt, ctx.now) } : null,
+    lastAutomation: s.lastRun ? { name: s.lastRun.workflow.name, ago: ago(ctx, s.lastRun.startedAt) } : null,
   };
 }
 
@@ -319,21 +352,22 @@ async function loadSuggestions(ctx: LoaderContext): Promise<SuggestionsData> {
   const s = await overviewStats(ctx.workspaceId);
   const provider = providerStatus();
   const items: SuggestionsData["items"] = [];
+  const t = tr(ctx);
   const first = s.projects[0];
   if (!first) {
-    items.push({ icon: "project", text: "Add your first project to unlock keyword research.", href: "/dashboard/projects", cta: "Add a project" });
+    items.push({ icon: "project", text: t("desk.views.suggestFirstProject"), href: "/dashboard/projects", cta: t("desk.views.suggestFirstProjectCta") });
     return { items };
   }
   if (s.totalKeywords === 0) {
-    items.push({ icon: "keywords", text: "Run keyword research to find terms worth ranking for.", href: `/dashboard/projects/${first.id}/keywords`, cta: "Research keywords" });
+    items.push({ icon: "keywords", text: t("desk.views.suggestKeywords"), href: `/dashboard/projects/${first.id}/keywords`, cta: t("desk.views.suggestKeywordsCta") });
   } else if (s.totalContent === 0) {
-    items.push({ icon: "content", text: `Turn ${s.totalKeywords} saved keywords into content briefs.`, href: `/dashboard/projects/${first.id}/content`, cta: "Create a brief" });
+    items.push({ icon: "content", text: t("desk.views.suggestBriefs", { count: s.totalKeywords }), href: `/dashboard/projects/${first.id}/content`, cta: t("desk.views.suggestBriefsCta") });
   }
   if (s.pendingApprovals === 0 && !s.lastRun) {
-    items.push({ icon: "autopilot", text: "Put refreshes and fixes on autopilot with supervised runs.", href: `/dashboard/projects/${first.id}/autopilot`, cta: "Set up autopilot" });
+    items.push({ icon: "autopilot", text: t("desk.views.suggestAutopilot"), href: `/dashboard/projects/${first.id}/autopilot`, cta: t("desk.views.suggestAutopilotCta") });
   }
   if (!provider.isLive) {
-    items.push({ icon: "data", text: "Connect DataForSEO for live search data instead of mock results.", href: "/dashboard/settings/providers", cta: "Connect data" });
+    items.push({ icon: "data", text: t("desk.views.suggestData"), href: "/dashboard/settings/providers", cta: t("desk.views.suggestDataCta") });
   }
   return { items };
 }
@@ -362,15 +396,16 @@ async function loadAttention(ctx: LoaderContext): Promise<AttentionData> {
         })
       : Promise.resolve([]),
   ]);
+  const t = tr(ctx);
   const rows: AttentionData["rows"] = [];
   if (s.pendingApprovals > 0 && s.firstPending) {
     rows.push({
       key: "approvals",
       icon: "drafts",
-      title: `${s.pendingApprovals} draft${s.pendingApprovals === 1 ? "" : "s"} waiting for review`,
-      meta: "Autopilot generated these. Approve or reject to keep it moving",
+      title: t("desk.views.drafts", { count: s.pendingApprovals }),
+      meta: t("desk.views.draftsMeta"),
       href: `/dashboard/projects/${s.firstPending.projectId}/autopilot`,
-      cta: "Review drafts",
+      cta: t("desk.views.draftsCta"),
     });
   }
   if (s.openDecay > 0) {
@@ -378,24 +413,24 @@ async function loadAttention(ctx: LoaderContext): Promise<AttentionData> {
     rows.push({
       key: "decay",
       icon: "decay",
-      title: `${s.openDecay} page${s.openDecay === 1 ? "" : "s"} losing traffic`,
-      meta: "Content decay engine flagged pages worth refreshing",
+      title: t("desk.views.decay", { count: s.openDecay }),
+      meta: t("desk.views.decayMeta"),
       href: p ? `/dashboard/projects/${p.id}/decay` : "/dashboard",
-      cta: "See pages",
+      cta: t("desk.views.decayCta"),
     });
   }
   for (const e of radarEvents) {
     rows.push({
       key: `radar-${e.id}`,
       icon: "radar",
-      title: `Competitor move: ${e.competitorDomain}`,
-      meta: `${e.project.domain} · ${timeAgo(e.detectedAt, ctx.now)}`,
+      title: t("desk.views.radar", { domain: e.competitorDomain }),
+      meta: `${e.project.domain} · ${ago(ctx, e.detectedAt)}`,
       href: `/dashboard/projects/${e.project.id}?tab=competitors`,
-      cta: "Investigate",
+      cta: t("desk.views.radarCta"),
     });
   }
   for (const a of recentAlerts) {
-    rows.push({ key: `alert-${a.id}`, icon: "alert", title: a.title, meta: timeAgo(a.createdAt, ctx.now), href: a.link ?? "/dashboard/alerts", cta: "Open" });
+    rows.push({ key: `alert-${a.id}`, icon: "alert", title: a.title, meta: ago(ctx, a.createdAt), href: a.link ?? "/dashboard/alerts", cta: t("desk.views.open") });
   }
   return { rows: rows.slice(0, 8) };
 }
@@ -435,7 +470,8 @@ async function connectorEvents(
     select: { id: true },
   });
   if (!conn) return { connected: false, items: [], error: null };
-  const name = connectorKey === "google-calendar" ? "Google Calendar" : "Outlook Calendar";
+  const t = tr(ctx);
+  const name = connectorKey === "google-calendar" ? t("desk.views.sourceGoogle") : t("desk.views.sourceOutlook");
   try {
     const { getAdapterForConnection } = await import("@/lib/connectors/m21");
     const { getDecryptedCredential } = await import("@/lib/vault/refresh");
@@ -445,14 +481,14 @@ async function connectorEvents(
       workspaceId: ctx.workspaceId,
       userId: ctx.userId,
     });
-    if (!res.ok) return { connected: true, items: [], error: `${name}: ${res.error ?? "the request failed"}. Reconnect it in Settings → Connectors.` };
+    if (!res.ok) return { connected: true, items: [], error: t("desk.views.calendarFailed", { name, error: res.error ?? t("desk.views.requestFailed") }) };
     const rows = Array.isArray(res.data) ? (res.data as Array<Record<string, unknown>>) : [];
     return {
       connected: true,
       error: null,
       items: rows.slice(0, 20).map((e, i) => ({
         id: `${connectorKey}:${String(e.id ?? i)}`,
-        title: typeof e.title === "string" && e.title.trim() ? e.title : "(no title)",
+        title: typeof e.title === "string" && e.title.trim() ? e.title : t("desk.views.noTitle"),
         start: typeof e.start === "string" ? e.start : from.toISOString(),
         end: typeof e.end === "string" ? e.end : null,
         source: connectorKey === "google-calendar" ? "google" : "outlook",
@@ -461,7 +497,7 @@ async function connectorEvents(
       })),
     };
   } catch (err) {
-    return { connected: true, items: [], error: `${name} did not answer (${err instanceof Error ? err.message.slice(0, 120) : "error"}).` };
+    return { connected: true, items: [], error: t("desk.views.calendarNoAnswer", { name, error: err instanceof Error ? err.message.slice(0, 120) : "error" }) };
   }
 }
 
@@ -482,7 +518,7 @@ export async function loadCalendar(ctx: LoaderContext): Promise<CalendarData> {
   const items: CalendarItem[] = [
     ...bookings.map((b) => ({
       id: `booking:${b.id}`,
-      title: `${b.page?.title ?? "Booking"} with ${b.name}`,
+      title: tr(ctx)("desk.views.bookingWith", { page: b.page?.title ?? tr(ctx)("desk.views.sourceBooking"), name: b.name }),
       start: b.startAt.toISOString(),
       end: b.endAt.toISOString(),
       source: "booking" as const,
@@ -520,8 +556,8 @@ async function loadInboxWidget(ctx: LoaderContext): Promise<InboxData> {
       leadId: t.leadId,
       name: t.leadName,
       snippet: t.lastSnippet,
-      channel: t.lastChannel === "sms" ? "Text" : t.lastChannel === "email" ? "Email" : t.lastChannel,
-      ago: timeAgo(new Date(t.lastMessageAt), ctx.now),
+      channel: t.lastChannel === "sms" ? tr(ctx)("desk.views.channelText") : t.lastChannel === "email" ? tr(ctx)("desk.views.channelEmail") : t.lastChannel,
+      ago: ago(ctx, new Date(t.lastMessageAt)),
       unread: t.unreadCount,
     })),
   };
@@ -650,7 +686,7 @@ export const WIDGET_LOADERS: { [K in WidgetId]: (ctx: LoaderContext) => Promise<
 /** Load the data for the widgets on a desktop (only those placed; in parallel). */
 export async function loadWidgets(ctx: LoaderContext, ids: readonly WidgetId[]): Promise<{ [K in WidgetId]?: LoadResult<WidgetDataMap[K]> }> {
   const entries = await Promise.all(
-    [...new Set(ids)].map(async (id) => [id, await safe(id, () => (WIDGET_LOADERS[id] as (c: LoaderContext) => Promise<unknown>)(ctx))] as const),
+    [...new Set(ids)].map(async (id) => [id, await safe(id, tr(ctx), () => (WIDGET_LOADERS[id] as (c: LoaderContext) => Promise<unknown>)(ctx))] as const),
   );
   return Object.fromEntries(entries) as { [K in WidgetId]?: LoadResult<WidgetDataMap[K]> };
 }

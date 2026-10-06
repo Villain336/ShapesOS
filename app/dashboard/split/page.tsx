@@ -10,13 +10,14 @@ import { getMembership } from "@/lib/authz";
 import { listRecents } from "@/lib/desktop/store.server";
 import { parseSplit } from "@/lib/desktop/split";
 import { SplitView } from "@/components/desk/SplitView";
+import { getI18n } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Split view — ShapesOS",
-  description: "Two pages side by side, or a page next to the Assistant.",
-};
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: `${t("desk.split.title")} — ShapesOS`, description: t("desk.split.metaDescription") };
+}
 
 export default async function SplitPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();

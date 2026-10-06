@@ -25,20 +25,14 @@ import { confirmAction, toast, toastError } from "@/lib/ui/feedback";
 import { FOCUS_PRESETS } from "@/lib/desktop/focus";
 import type { ControlState } from "@/lib/desktop/control.server";
 import { CONTROL_CHANGED_EVENT, OPEN_CONTROL_CENTER_EVENT, TOGGLE_FOCUS_EVENT, notifyControlChanged } from "./events";
+// Phase 18.1 (integration): Control Center in the person's language and time zone.
+import { useI18n } from "@/components/i18n/I18nProvider";
+import type { Translator } from "@/lib/i18n";
 
-function clock(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-async function call<T>(url: string, init: RequestInit): Promise<T> {
+async function call<T>(url: string, init: RequestInit, t: Translator): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init.headers ?? {}) } });
   const body = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status}).`);
+  if (!res.ok) throw new Error(body.error ?? t("desk.control.requestFailed", { status: res.status }));
   return body;
 }
 
@@ -66,6 +60,8 @@ export function useControlState() {
 
 export function ControlCenter() {
   const router = useRouter();
+  const { t, format, ctx } = useI18n();
+  const clock = (iso: string | null) => (iso ? format.date(iso, "time") || iso : "");
   const { state, setState, refresh } = useControlState();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,24 +78,26 @@ export function ControlCenter() {
     async (on: boolean, mins = minutes) => {
       setBusy("focus");
       try {
-        const body = await call<ControlState["focus"] & { released?: number }>("/api/desk/focus", {
-          method: "PUT",
-          body: JSON.stringify(on ? { minutes: mins } : { on: false }),
-        });
+        const body = await call<ControlState["focus"] & { released?: number }>(
+          "/api/desk/focus",
+          { method: "PUT", body: JSON.stringify(on ? { minutes: mins } : { on: false }) },
+          t,
+        );
         setState((s) => (s ? { ...s, focus: { on: body.on, until: body.until, startedAt: body.startedAt, queued: body.queued } } : s));
         toast(
           on
-            ? { title: `Focus on until ${clock(body.until)}`, description: "Notifications wait until then. Proposals wait in Needs you." }
-            : { title: "Focus off", description: body.released ? `${body.released} notification${body.released === 1 ? "" : "s"} delivered.` : undefined },
+            ? { title: t("desk.control.focusOnToast", { time: clock(body.until) }), description: t("desk.control.focusOnToastBody") }
+            : { title: t("desk.control.focusOffToast"), description: body.released ? t("desk.control.delivered", { count: body.released }) : undefined },
         );
         notifyControlChanged();
       } catch (err) {
-        toastError("Focus did not change", err instanceof Error ? err.message : undefined);
+        toastError(t("desk.control.focusNotChanged"), err instanceof Error ? err.message : undefined);
       } finally {
         setBusy(null);
       }
     },
-    [minutes, setState],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [minutes, setState, t],
   );
 
   useEffect(() => {
@@ -145,20 +143,20 @@ export function ControlCenter() {
 
   async function pauseAll() {
     const ok = await confirmAction({
-      title: "Pause all agents?",
-      description: `Every live run in this workspace${state?.liveRuns ? ` (${state.liveRuns})` : ""} is told to stop now and ends at its next step, and no agent can start until someone resumes. Proposals waiting for approval are dropped. This is recorded in the audit trail.`,
-      confirmLabel: "Pause all agents",
+      title: t("desk.control.confirmTitle"),
+      description: t("desk.control.confirmBody", { count: state?.liveRuns ?? 0 }),
+      confirmLabel: t("desk.control.pauseAll"),
       destructive: true,
     });
     if (!ok) return;
     setBusy("pause");
     try {
-      const body = await call<{ stopped: string[] }>("/api/desk/agents", { method: "POST", body: JSON.stringify({ action: "pause" }) });
-      toast({ title: "Agents paused", description: `${body.stopped.length} run${body.stopped.length === 1 ? "" : "s"} asked to stop.` });
+      const body = await call<{ stopped: string[] }>("/api/desk/agents", { method: "POST", body: JSON.stringify({ action: "pause" }) }, t);
+      toast({ title: t("desk.control.pausedToast"), description: t("desk.control.pausedToastBody", { count: body.stopped.length }) });
       notifyControlChanged();
       router.refresh();
     } catch (err) {
-      toastError("Agents were not paused", err instanceof Error ? err.message : undefined);
+      toastError(t("desk.control.notPaused"), err instanceof Error ? err.message : undefined);
     } finally {
       setBusy(null);
     }
@@ -167,12 +165,12 @@ export function ControlCenter() {
   async function resume() {
     setBusy("pause");
     try {
-      await call("/api/desk/agents", { method: "POST", body: JSON.stringify({ action: "resume" }) });
-      toast({ title: "Agents resumed" });
+      await call("/api/desk/agents", { method: "POST", body: JSON.stringify({ action: "resume" }) }, t);
+      toast({ title: t("desk.control.resumedToast") });
       notifyControlChanged();
       router.refresh();
     } catch (err) {
-      toastError("Agents were not resumed", err instanceof Error ? err.message : undefined);
+      toastError(t("desk.control.notResumed"), err instanceof Error ? err.message : undefined);
     } finally {
       setBusy(null);
     }
@@ -181,10 +179,10 @@ export function ControlCenter() {
   async function setVoice(enabled: boolean) {
     setBusy("voice");
     try {
-      const body = await call<{ voice: { enabled: boolean } }>("/api/desk/prefs", { method: "PATCH", body: JSON.stringify({ voice: { enabled } }) });
+      const body = await call<{ voice: { enabled: boolean } }>("/api/desk/prefs", { method: "PATCH", body: JSON.stringify({ voice: { enabled } }) }, t);
       setState((s) => (s ? { ...s, voice: body.voice } : s));
     } catch (err) {
-      toastError("Voice setting not saved", err instanceof Error ? err.message : undefined);
+      toastError(t("desk.control.voiceNotSaved"), err instanceof Error ? err.message : undefined);
     } finally {
       setBusy(null);
     }
@@ -205,19 +203,19 @@ export function ControlCenter() {
         }}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`Control Center${paused ? ", agents paused" : ""}${focusOn ? ", focus on" : ""}`}
-        title="Control Center (⌥⇧C)"
+        aria-label={t("desk.control.triggerLabel", { paused: paused ? "yes" : "no", focus: focusOn ? "yes" : "no" })}
+        title={t("desk.control.hint")}
         data-testid="control-center-trigger"
         className={cn(
           "relative inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-ink transition-[background-color] duration-150 ease-aos hover:bg-hover",
           open && "bg-hover",
         )}
       >
-        {paused ? <StatusShape status="paused" size={12} label="Agents paused" /> : <SlidersHorizontal className="size-4" aria-hidden />}
+        {paused ? <StatusShape status="paused" size={12} label={t("desk.control.agentsPaused")} /> : <SlidersHorizontal className="size-4" aria-hidden />}
         {focusOn ? (
           <span className="inline-flex items-center gap-1">
             <BellOff className="size-4" aria-hidden />
-            <span className="hidden lg:inline">Focus</span>
+            <span className="hidden lg:inline">{t("desk.control.focus")}</span>
           </span>
         ) : null}
       </button>
@@ -226,46 +224,52 @@ export function ControlCenter() {
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="Control Center"
+          aria-label={t("desk.control.title")}
           tabIndex={-1}
           data-testid="control-center"
           className="absolute top-full right-0 z-50 mt-2 w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg bg-paper text-ink shadow-raised outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <span className="text-base font-bold stretch-heading">Control Center</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close Control Center" className="flex size-8 items-center justify-center rounded-full hover:bg-hover">
+            <span className="text-base font-bold stretch-heading">{t("desk.control.title")}</span>
+            <button type="button" onClick={() => setOpen(false)} aria-label={t("desk.control.close")} className="flex size-8 items-center justify-center rounded-full hover:bg-hover">
               <X className="size-4" aria-hidden />
             </button>
           </div>
           {!state ? (
-            <p className="px-4 py-6 text-sm text-muted">Loading…</p>
+            <p className="px-4 py-6 text-sm text-muted">{t("desk.control.loading")}</p>
           ) : (
             <div className="max-h-[70vh] overflow-y-auto">
               {/* Agents */}
               <section className={row} aria-labelledby="cc-agents">
                 <div className="flex items-center justify-between gap-3">
                   <h3 id="cc-agents" className="flex items-center gap-2 text-sm font-semibold">
-                    {paused || state.liveRuns > 0 ? <StatusShape status={paused ? "paused" : "running"} size={10} label={paused ? "Paused" : "Running"} /> : null}
-                    {paused ? "Agents paused" : state.liveRuns > 0 ? `${state.liveRuns} agent run${state.liveRuns === 1 ? "" : "s"} live` : "No agents running"}
+                    {paused || state.liveRuns > 0 ? (
+                      <StatusShape status={paused ? "paused" : "running"} size={10} label={paused ? t("desk.control.paused") : t("desk.control.running")} />
+                    ) : null}
+                    {paused
+                      ? t("desk.control.agentsPaused")
+                      : state.liveRuns > 0
+                        ? t("desk.control.liveRuns", { count: state.liveRuns })
+                        : t("desk.control.noAgents")}
                   </h3>
                   {state.canPause ? (
                     paused ? (
                       <button type="button" onClick={() => void resume()} disabled={busy === "pause"} className={aosButton({ variant: "run", size: "xs" })}>
-                        {busy === "pause" ? "Resuming" : "Resume"}
+                        {busy === "pause" ? t("desk.control.resuming") : t("desk.control.resume")}
                       </button>
                     ) : (
                       <button type="button" onClick={() => void pauseAll()} disabled={busy === "pause"} className={aosButton({ variant: "stop", size: "xs" })} data-testid="pause-all">
-                        {busy === "pause" ? "Pausing" : "Pause all agents"}
+                        {busy === "pause" ? t("desk.control.pausing") : t("desk.control.pauseAll")}
                       </button>
                     )
                   ) : null}
                 </div>
                 <p className="text-xs text-muted">
                   {paused
-                    ? `Since ${clock(state.paused!.at)}. Nothing new starts until ${state.canPause ? "you resume" : "an admin resumes"}.`
+                    ? t(state.canPause ? "desk.control.pausedSince" : "desk.control.pausedSinceAdmin", { time: clock(state.paused!.at) })
                     : state.canPause
-                      ? "Tells every run to stop now and blocks new ones until you resume."
-                      : "Only admins can pause every agent."}
+                      ? t("desk.control.pauseHelp")
+                      : t("desk.control.pauseAdminsOnly")}
                 </p>
               </section>
 
@@ -274,25 +278,27 @@ export function ControlCenter() {
                 <div className="flex items-center justify-between gap-3">
                   <h3 id="cc-focus" className="flex items-center gap-2 text-sm font-semibold">
                     <BellOff className="size-4 text-muted" aria-hidden />
-                    Do not disturb
+                    {t("desk.control.dnd")}
                   </h3>
-                  <Switch checked={focusOn} onChange={(v) => void setFocus(v)} disabled={busy === "focus"} label="Do not disturb" />
+                  <Switch checked={focusOn} onChange={(v) => void setFocus(v)} disabled={busy === "focus"} label={t("desk.control.dnd")} />
                 </div>
                 {focusOn ? (
                   <p className="text-xs text-muted">
-                    On until {clock(state.focus.until)}. {state.focus.queued > 0 ? `${state.focus.queued} notification${state.focus.queued === 1 ? "" : "s"} waiting. ` : ""}Agent proposals wait in Needs you.
+                    {t("desk.control.onUntil", { time: clock(state.focus.until) })}{" "}
+                    {state.focus.queued > 0 ? `${t("desk.control.waiting", { count: state.focus.queued })} ` : ""}
+                    {t("desk.control.proposalsWait")}
                   </p>
                 ) : (
                   <label className="flex items-center gap-2 text-xs text-muted">
-                    For
+                    {t("desk.control.for")}
                     <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="h-8 rounded-md border-[1.5px] border-control bg-paper px-2 text-sm text-ink focus:border-focus focus:outline-none">
                       {FOCUS_PRESETS.map((p) => (
                         <option key={p.minutes} value={p.minutes}>
-                          {p.label}
+                          {p.minutes < 60 ? t("desk.control.minutes", { count: p.minutes }) : t("desk.control.hours", { count: p.minutes / 60 })}
                         </option>
                       ))}
                     </select>
-                    — notifications wait, nothing is lost.
+                    {t("desk.control.nothingLost")}
                   </label>
                 )}
               </section>
@@ -301,15 +307,15 @@ export function ControlCenter() {
               <section className={row} aria-labelledby="cc-auto">
                 <h3 id="cc-auto" className="flex items-center gap-2 text-sm font-semibold">
                   <ShieldCheck className="size-4 text-muted" aria-hidden />
-                  Auto-approve
+                  {t("desk.control.autoApprove")}
                 </h3>
                 <p className="text-sm text-ink">
-                  {state.autoApprove.auto} run on their own · {state.autoApprove.ask} ask first · {state.autoApprove.never} never
+                  {t("desk.control.autoSummary", { auto: state.autoApprove.auto, ask: state.autoApprove.ask, never: state.autoApprove.never })}
                 </p>
                 <p className="text-xs text-muted">
-                  Money and irreversible actions always ask.{" "}
+                  {t("desk.control.moneyAsks")}{" "}
                   <Link href="/dashboard/settings/automation" className="font-semibold text-ink hover:underline" onClick={() => setOpen(false)}>
-                    Automation settings
+                    {t("desk.control.automationSettings")}
                   </Link>
                 </p>
               </section>
@@ -319,11 +325,11 @@ export function ControlCenter() {
                 <div className="flex items-center justify-between gap-3">
                   <h3 id="cc-voice" className="flex items-center gap-2 text-sm font-semibold">
                     <Mic className="size-4 text-muted" aria-hidden />
-                    Voice
+                    {t("desk.control.voice")}
                   </h3>
-                  <Switch checked={state.voice.enabled} onChange={(v) => void setVoice(v)} disabled={busy === "voice"} label="Voice" />
+                  <Switch checked={state.voice.enabled} onChange={(v) => void setVoice(v)} disabled={busy === "voice"} label={t("desk.control.voice")} />
                 </div>
-                <p className="text-xs text-muted">Saved for voice mode. Nothing listens until voice mode ships.</p>
+                <p className="text-xs text-muted">{t("desk.control.voiceHelp")}</p>
               </section>
 
               {/* Spend today */}
@@ -331,16 +337,14 @@ export function ControlCenter() {
                 <div className="flex items-center justify-between gap-3">
                   <h3 id="cc-spend" className="flex items-center gap-2 text-sm font-semibold">
                     <Wallet className="size-4 text-muted" aria-hidden />
-                    Spend today
+                    {t("desk.control.spendToday")}
                   </h3>
-                  <span className="text-base font-bold tabular-nums">
-                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(state.spendToday.usd)}
-                  </span>
+                  <span className="text-base font-bold tabular-nums">{format.number(state.spendToday.usd, { style: "currency", currency: "USD" })}</span>
                 </div>
                 <p className="text-xs text-muted">
-                  {state.spendToday.credits.toLocaleString()} credit{state.spendToday.credits === 1 ? "" : "s"} since midnight UTC.{" "}
+                  {t("desk.control.creditsToday", { count: state.spendToday.credits, zone: ctx.timeZone || "UTC" })}{" "}
                   <Link href="/dashboard/settings/usage" className="font-semibold text-ink hover:underline" onClick={() => setOpen(false)}>
-                    Usage
+                    {t("desk.control.usage")}
                   </Link>
                 </p>
               </section>

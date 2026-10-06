@@ -49,6 +49,9 @@ import {
   type DesktopLayout,
   type Placement,
 } from "@/lib/desktop/layout";
+// Phase 18.1 (integration): the desktop's chrome in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { widgetText, type Translator } from "@/lib/i18n";
 
 export const DESKTOP_EDIT_EVENT = "shapes:desktop-edit";
 const GAP_PX = 16;
@@ -69,6 +72,8 @@ export function Desktop({
   contents: Partial<Record<WidgetId, ReactNode>>;
 }) {
   const router = useRouter();
+  const { t, messages } = useI18n();
+  const titleOf = (id: WidgetId) => widgetText(messages, id).title ?? WIDGETS[id].title;
   const [layout, setLayout] = useState(initialLayout);
   const [isCustom, setIsCustom] = useState(customized);
   const [editing, setEditing] = useState(false);
@@ -108,7 +113,7 @@ export function Desktop({
             body: JSON.stringify({ layout: next }),
           });
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          if (!res.ok) throw new Error(body.error ?? "The layout was not saved.");
+          if (!res.ok) throw new Error(body.error ?? t("desk.desktop.notSaved"));
           setSave("saved");
           setSaveError(null);
           setIsCustom(true);
@@ -116,45 +121,46 @@ export function Desktop({
           if (next.widgets.some((w) => !loadedIds.current.has(w.widget))) router.refresh();
         } catch (err) {
           setSave("error");
-          setSaveError(err instanceof Error ? err.message : "The layout was not saved.");
+          setSaveError(err instanceof Error ? err.message : t("desk.desktop.notSaved"));
         }
       }, SAVE_DEBOUNCE_MS);
     },
-    [router],
+    [router, t],
   );
 
   const commit = useCallback(
     (next: DesktopLayout, message: string) => {
       const v = validateLayout(next, role);
       if (!v.ok) {
-        setAnnounce(v.issues[0]?.message ?? "That change doesn't fit.");
+        // The engine's reasons are English; the live region says it in the person's language.
+        setAnnounce(t("desk.desktop.doesntFit"));
         return;
       }
       setLayout(v.layout);
       setAnnounce(message);
       persist(v.layout);
     },
-    [persist, role],
+    [persist, role, t],
   );
 
   const describe = (p: Placement | undefined) =>
-    p ? `${WIDGETS[p.widget].title}: column ${p.x + 1}, row ${p.y + 1}, ${p.w} wide, ${p.h} tall.` : "";
+    p ? t("desk.desktop.position", { title: titleOf(p.widget), x: p.x + 1, y: p.y + 1, w: p.w, h: p.h }) : "";
 
   const move = (id: string, dx: number, dy: number) => {
     const next = moveBy(layout, id, dx, dy);
-    commit(next, `Moved ${describe(next.widgets.find((w) => w.id === id))}`);
+    commit(next, t("desk.desktop.moved", { position: describe(next.widgets.find((w) => w.id === id)) }));
   };
   const resize = (id: string, dw: number, dh: number) => {
     const next = resizeBy(layout, id, dw, dh);
-    commit(next, `Resized ${describe(next.widgets.find((w) => w.id === id))}`);
+    commit(next, t("desk.desktop.resized", { position: describe(next.widgets.find((w) => w.id === id)) }));
   };
   const remove = (id: string) => {
     const p = layout.widgets.find((w) => w.id === id);
-    commit(removeWidget(layout, id), `Removed ${p ? WIDGETS[p.widget].title : "the widget"}.`);
+    commit(removeWidget(layout, id), p ? t("desk.desktop.removed", { title: titleOf(p.widget) }) : t("desk.desktop.removedWidget"));
   };
   const add = (id: WidgetId) => {
     const next = addWidget(layout, id);
-    commit(next, `Added ${WIDGETS[id].title}. ${describe(next.widgets.find((w) => w.widget === id))}`);
+    commit(next, t("desk.desktop.added", { title: titleOf(id), position: describe(next.widgets.find((w) => w.widget === id)) }));
   };
 
   async function reset() {
@@ -163,15 +169,15 @@ export function Desktop({
     try {
       const res = await fetch("/api/desk/layout", { method: "DELETE" });
       const body = (await res.json().catch(() => ({}))) as { layout?: DesktopLayout; error?: string };
-      if (!res.ok || !body.layout) throw new Error(body.error ?? "The desktop was not reset.");
+      if (!res.ok || !body.layout) throw new Error(body.error ?? t("desk.desktop.notReset"));
       setLayout(body.layout);
       setIsCustom(false);
       setSave("saved");
-      setAnnounce("Desktop reset to the default for your role.");
+      setAnnounce(t("desk.desktop.resetDone"));
       router.refresh();
     } catch (err) {
       setSave("error");
-      setSaveError(err instanceof Error ? err.message : "The desktop was not reset.");
+      setSaveError(err instanceof Error ? err.message : t("desk.desktop.notReset"));
     }
   }
 
@@ -215,7 +221,7 @@ export function Desktop({
       setDrag(null);
       if (latest) {
         const p = latest.widgets.find((w) => w.id === id);
-        commit(latest, `${mode === "move" ? "Moved" : "Resized"} ${describe(p)}`);
+        commit(latest, t(mode === "move" ? "desk.desktop.moved" : "desk.desktop.resized", { position: describe(p) }));
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -247,15 +253,11 @@ export function Desktop({
   const ordered = useMemo(() => [...shown.widgets].sort(byReadingOrder), [shown]);
 
   return (
-    <section aria-label="Desktop" className="flex flex-col gap-3">
+    <section aria-label={t("desk.desktop.region")} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted" aria-live="polite">
-          {editing
-            ? "Drag a widget by its grip, or focus it and use the arrow keys (Shift + arrows to resize, Delete to remove)."
-            : isCustom
-              ? "Your desktop"
-              : "The default desktop for your role. Arrange it any way you like."}
-          {save === "saving" ? " · Saving…" : save === "saved" && editing ? " · Saved" : ""}
+          {editing ? t("desk.desktop.editHelp") : isCustom ? t("desk.desktop.yours") : t("desk.desktop.roleDefault")}
+          {save === "saving" ? t("desk.desktop.savingSuffix") : save === "saved" && editing ? t("desk.desktop.savedSuffix") : ""}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {editing ? (
@@ -263,18 +265,19 @@ export function Desktop({
               <DropdownMenu>
                 <DropdownMenuTrigger className={aosButton({ variant: "secondary", size: "sm" })} disabled={addable.length === 0}>
                   <Plus className="size-4" aria-hidden />
-                  Add widget
+                  {t("desk.desktop.addWidget")}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" sideOffset={6} className="w-80 rounded-lg bg-paper p-1.5 text-ink shadow-raised ring-0">
-                  <DropdownMenuLabel className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">Add to your desktop</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">{t("desk.desktop.addTo")}</DropdownMenuLabel>
                   {addable.map((w) => {
                     const Icon = w.icon;
+                    const text = widgetText(messages, w.id);
                     return (
                       <DropdownMenuItem key={w.id} className="min-h-12 gap-3 rounded-sm px-3" onClick={() => add(w.id)}>
                         <Icon className="size-4 shrink-0" aria-hidden />
                         <span className="min-w-0 flex-1">
-                          <span className="block text-base font-semibold">{w.title}</span>
-                          <span className="block truncate text-xs text-muted">{w.description}</span>
+                          <span className="block text-base font-semibold">{text.title ?? w.title}</span>
+                          <span className="block truncate text-xs text-muted">{text.description ?? w.description}</span>
                         </span>
                       </DropdownMenuItem>
                     );
@@ -283,17 +286,17 @@ export function Desktop({
               </DropdownMenu>
               <button type="button" onClick={() => void reset()} className={aosButton({ variant: "quiet", size: "sm" })} disabled={!isCustom}>
                 <RotateCcw className="size-4" aria-hidden />
-                Reset to default
+                {t("desk.desktop.reset")}
               </button>
               <button type="button" onClick={() => setEditing(false)} className={aosButton({ variant: "primary", size: "sm" })}>
                 <Check className="size-4" aria-hidden />
-                Done
+                {t("desk.desktop.done")}
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => setEditing(true)} className={aosButton({ variant: "secondary", size: "sm" })} title="Edit desktop (⌥⇧E)">
+            <button type="button" onClick={() => setEditing(true)} className={aosButton({ variant: "secondary", size: "sm" })} title={t("desk.desktop.editHint")}>
               <LayoutGrid className="size-4" aria-hidden />
-              Edit desktop
+              {t("desk.desktop.edit")}
             </button>
           )}
         </div>
@@ -311,14 +314,14 @@ export function Desktop({
 
       {layout.widgets.length === 0 ? (
         <div className="flex flex-col items-start gap-3 rounded-lg bg-paper p-6 shadow-hairline">
-          <p className="aos-subheading">Your desktop is empty</p>
-          <p className="text-sm text-muted">Add the widgets you want to see first thing, or go back to the default.</p>
+          <p className="aos-subheading">{t("desk.desktop.emptyTitle")}</p>
+          <p className="text-sm text-muted">{t("desk.desktop.emptyBody")}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setEditing(true)} className={aosButton({ variant: "primary", size: "sm" })}>
-              <Plus className="size-4" aria-hidden /> Add widgets
+              <Plus className="size-4" aria-hidden /> {t("desk.desktop.addWidgets")}
             </button>
             <button type="button" onClick={() => void reset()} className={aosButton({ variant: "secondary", size: "sm" })}>
-              Reset to default
+              {t("desk.desktop.reset")}
             </button>
           </div>
         </div>
@@ -332,6 +335,7 @@ export function Desktop({
       >
         {ordered.map((p) => {
           const def = WIDGETS[p.widget];
+          const title = titleOf(p.widget);
           const Icon = def.icon;
           const content = contents[p.widget];
           const active = drag?.id === p.id;
@@ -340,8 +344,8 @@ export function Desktop({
               key={p.id}
               data-widget={p.widget}
               data-pos={`${p.x},${p.y},${p.w},${p.h}`}
-              aria-label={`${def.title} widget`}
-              aria-roledescription={editing ? "movable widget" : undefined}
+              aria-label={t("desk.desktop.widgetLabel", { title })}
+              aria-roledescription={editing ? t("desk.desktop.movable") : undefined}
               aria-describedby={editing ? `desk-help` : undefined}
               tabIndex={editing ? 0 : undefined}
               onKeyDown={(e) => onWidgetKey(e, p.id)}
@@ -356,8 +360,8 @@ export function Desktop({
                 {editing ? (
                   <button
                     type="button"
-                    aria-label={`Drag ${def.title}`}
-                    title="Drag to move"
+                    aria-label={t("desk.desktop.drag", { title })}
+                    title={t("desk.desktop.dragToMove")}
                     onPointerDown={(e) => startDrag(e, p.id, "move")}
                     className="-ml-1.5 flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-full text-muted hover:bg-hover active:cursor-grabbing"
                   >
@@ -366,17 +370,18 @@ export function Desktop({
                 ) : (
                   <Icon className="size-4 shrink-0 text-muted" aria-hidden />
                 )}
-                <h2 className="min-w-0 flex-1 truncate text-base font-bold stretch-heading tracking-heading text-ink">{def.title}</h2>
+                <h2 className="min-w-0 flex-1 truncate text-base font-bold stretch-heading tracking-heading text-ink">{title}</h2>
                 {editing ? null : (
                   <Link href={def.href} className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold text-ink hover:bg-hover">
-                    Open
+                    {t("desk.desktop.open")}
                   </Link>
                 )}
               </header>
               {editing ? (
                 <div className="shrink-0 border-b border-line px-3 pb-2">
                   <WidgetEditButtons
-                    title={def.title}
+                    t={t}
+                    title={title}
                     onMove={(dx, dy) => move(p.id, dx, dy)}
                     onResize={(dw, dh) => resize(p.id, dw, dh)}
                     onRemove={() => remove(p.id)}
@@ -384,13 +389,13 @@ export function Desktop({
                 </div>
               ) : null}
               <div className={cn("min-h-0 flex-1 overflow-auto px-4 pb-4", editing && "pointer-events-none select-none opacity-70")} aria-hidden={editing || undefined}>
-                {content ?? <p className="text-sm text-muted">{editing ? "Loads when you're done editing." : "Loading…"}</p>}
+                {content ?? <p className="text-sm text-muted">{editing ? t("desk.desktop.loadsAfterEdit") : t("desk.desktop.loading")}</p>}
               </div>
               {editing ? (
                 <button
                   type="button"
-                  aria-label={`Resize ${def.title}`}
-                  title="Drag to resize"
+                  aria-label={t("desk.desktop.resize", { title })}
+                  title={t("desk.desktop.dragToResize")}
                   onPointerDown={(e) => startDrag(e, p.id, "resize")}
                   className="hidden size-6 shrink-0 cursor-nwse-resize touch-none self-end text-muted md:flex md:items-center md:justify-center"
                 >
@@ -404,18 +409,20 @@ export function Desktop({
         })}
       </div>
       <p id="desk-help" className="sr-only">
-        Arrow keys move the widget one cell. Shift and an arrow key resizes it. Delete removes it.
+        {t("desk.desktop.keyboardHelp")}
       </p>
     </section>
   );
 }
 
 function WidgetEditButtons({
+  t,
   title,
   onMove,
   onResize,
   onRemove,
 }: {
+  t: Translator;
   title: string;
   onMove: (dx: number, dy: number) => void;
   onResize: (dw: number, dh: number) => void;
@@ -423,26 +430,26 @@ function WidgetEditButtons({
 }) {
   const btn = "flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover";
   return (
-    <div className="flex flex-wrap items-center gap-0.5" role="group" aria-label={`Arrange ${title}`}>
-      <button type="button" className={btn} aria-label={`Move ${title} left`} onClick={() => onMove(-1, 0)}>
+    <div className="flex flex-wrap items-center gap-0.5" role="group" aria-label={t("desk.desktop.arrange", { title })}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.moveLeft", { title })} onClick={() => onMove(-1, 0)}>
         <ArrowLeft className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={btn} aria-label={`Move ${title} up`} onClick={() => onMove(0, -1)}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.moveUp", { title })} onClick={() => onMove(0, -1)}>
         <ArrowUp className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={btn} aria-label={`Move ${title} down`} onClick={() => onMove(0, 1)}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.moveDown", { title })} onClick={() => onMove(0, 1)}>
         <ArrowDown className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={btn} aria-label={`Move ${title} right`} onClick={() => onMove(1, 0)}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.moveRight", { title })} onClick={() => onMove(1, 0)}>
         <ArrowRight className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={btn} aria-label={`Make ${title} smaller`} onClick={() => onResize(-1, -1)}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.smaller", { title })} onClick={() => onResize(-1, -1)}>
         <Minimize2 className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={btn} aria-label={`Make ${title} bigger`} onClick={() => onResize(1, 1)}>
+      <button type="button" className={btn} aria-label={t("desk.desktop.bigger", { title })} onClick={() => onResize(1, 1)}>
         <Maximize2 className="size-3.5" aria-hidden />
       </button>
-      <button type="button" className={cn(btn, "text-failed-text hover:bg-failed-tint")} aria-label={`Remove ${title}`} onClick={onRemove}>
+      <button type="button" className={cn(btn, "text-failed-text hover:bg-failed-tint")} aria-label={t("desk.desktop.remove", { title })} onClick={onRemove}>
         <X className="size-3.5" aria-hidden />
       </button>
     </div>

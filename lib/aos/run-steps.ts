@@ -75,11 +75,17 @@ export function progressFraction(done: number, total: number): number {
   return Math.min(Math.max(done / total, 0), 1);
 }
 
+/** The step being worked on (1-based, never past the end); null when there are no steps. */
+export function stepNumbers(completed: number, total: number): { current: number; total: number } | null {
+  if (total <= 0) return null;
+  return { current: Math.min(clampCompleted(completed, total) + 1, total), total };
+}
+
 /** "Step 3 of 7": the step being worked on (1-based), never past the end. */
 export function stepCounter(completed: number, total: number): string {
-  if (total <= 0) return "No steps yet";
-  const current = Math.min(clampCompleted(completed, total) + 1, total);
-  return `Step ${current} of ${total}`;
+  const n = stepNumbers(completed, total);
+  if (!n) return "No steps yet";
+  return `Step ${n.current} of ${n.total}`;
 }
 
 /** "7 of 12" progress caption. */

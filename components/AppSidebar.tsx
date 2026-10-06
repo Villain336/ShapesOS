@@ -66,13 +66,13 @@ import { useDock, type DockState } from "@/components/desk/useDock";
 import { openAppSwitcher } from "@/components/desk/events";
 import { useInPane, useLocalFlag, writeLocalFlag } from "@/components/desk/useInPane";
 import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
-import { STATUS_META } from "@/lib/aos/status";
 // Phase 18.1 (WS=find, i18n): shell strings and nav labels in the person's
 // language. Edits in this file are limited to t() calls and the localized
 // nav overlay (lib/nav/i18n.ts) — WS=desk owns the dock/pins changes here.
 import { useMemo } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { localizeNavGroups } from "@/lib/nav/i18n";
+import { navText } from "@/lib/i18n";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
@@ -398,9 +398,9 @@ function NavRow({
         <button
           type="button"
           onClick={() => onTogglePin(item.href)}
-          aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+          aria-label={pinned ? t("desk.dock.unpin", { label: item.label }) : t("desk.dock.pin", { label: item.label })}
           aria-pressed={pinned}
-          title={pinned ? "Unpin" : "Pin to the top"}
+          title={pinned ? t("desk.dock.unpinHint") : t("desk.dock.pinHint")}
           className={cn(
             "absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100",
             active ? "text-ink hover:bg-hover" : "text-night-soft hover:bg-night-raised hover:text-paper",
@@ -435,14 +435,14 @@ function DockSections({
   const [editing, setEditing] = useState(false);
   const recentsCollapsed = useLocalFlag(RECENTS_COLLAPSE_KEY);
   const current = activeNavHref(pathname);
-  const { messages } = useI18n(); // p18-find i18n: pins carry the localized labels
+  const { t, messages } = useI18n(); // p18-find i18n: pins carry the localized labels
   const localized = useMemo(() => localizeNavGroups(NAV_GROUPS, messages), [messages]);
   const pins = pinnedNavItems({ pinned: dock.pinned }, role, localized);
   const recents = dock.recents.filter((r) => r.href !== pathname);
   if (collapsed) {
     if (pins.length === 0) return null;
     return (
-      <div role="group" aria-label="Pinned" className="border-t border-night-line pt-3">
+      <div role="group" aria-label={t("desk.dock.pinned")} className="border-t border-night-line pt-3">
         <ul className="flex flex-col items-center gap-0.5">
           {pins.map((item) => (
             <NavRow key={item.href} item={item} active={item.href === current} collapsed count={item.badge === "needs-you" ? needsYou : 0} onNavigate={onNavigate} />
@@ -457,7 +457,7 @@ function DockSections({
         <div role="group" aria-labelledby={`${uid}-pinned`} data-testid="dock-pinned">
           <div className="mb-1 flex items-center justify-between px-3">
             <span id={`${uid}-pinned`} className="text-xs font-semibold text-night-muted">
-              Pinned
+              {t("desk.dock.pinned")}
             </span>
             <button
               type="button"
@@ -465,7 +465,7 @@ function DockSections({
               aria-pressed={editing}
               className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
             >
-              {editing ? "Done" : "Reorder"}
+              {editing ? t("desk.dock.done") : t("desk.dock.reorder")}
             </button>
           </div>
           <ul className="flex flex-col gap-0.5">
@@ -474,13 +474,13 @@ function DockSections({
                 <li key={item.href} className="flex h-10 items-center gap-2 rounded-full px-3 text-base text-night-soft">
                   <item.icon aria-hidden className="size-[18px] shrink-0" />
                   <span className="min-w-0 flex-1 truncate text-paper">{item.label}</span>
-                  <button type="button" onClick={() => dock.move(item.href, -1)} disabled={i === 0} aria-label={`Move ${item.label} up`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
+                  <button type="button" onClick={() => dock.move(item.href, -1)} disabled={i === 0} aria-label={t("desk.dock.moveUp", { label: item.label })} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
                     <ArrowUp className="size-3.5" aria-hidden />
                   </button>
-                  <button type="button" onClick={() => dock.move(item.href, 1)} disabled={i === pins.length - 1} aria-label={`Move ${item.label} down`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
+                  <button type="button" onClick={() => dock.move(item.href, 1)} disabled={i === pins.length - 1} aria-label={t("desk.dock.moveDown", { label: item.label })} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
                     <ArrowDown className="size-3.5" aria-hidden />
                   </button>
-                  <button type="button" onClick={() => dock.toggle(item.href)} aria-label={`Unpin ${item.label}`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper">
+                  <button type="button" onClick={() => dock.toggle(item.href)} aria-label={t("desk.dock.unpin", { label: item.label })} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper">
                     <PinOff className="size-3.5" aria-hidden />
                   </button>
                 </li>
@@ -510,7 +510,7 @@ function DockSections({
               aria-expanded={!recentsCollapsed}
               className="flex items-center gap-1 rounded-full text-xs font-semibold text-night-muted hover:text-paper"
             >
-              Recent
+              {t("desk.dock.recent")}
               <ChevronDown aria-hidden className={cn("size-3 transition-transform duration-150", recentsCollapsed && "-rotate-90")} />
             </button>
             <button
@@ -519,10 +519,10 @@ function DockSections({
                 onNavigate?.();
                 openAppSwitcher();
               }}
-              title="Switch app (⌃Tab)"
+              title={t("desk.dock.switchHint")}
               className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
             >
-              Switch
+              {t("desk.dock.switch")}
             </button>
           </div>
           {recentsCollapsed ? null : (
@@ -538,7 +538,7 @@ function DockSections({
                       className="flex h-9 items-center gap-3 rounded-full px-3 text-sm text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
                     >
                       <Icon aria-hidden className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{r.title}</span>
+                      <span className="min-w-0 flex-1 truncate">{r.kind === "app" ? (navText(messages, r.href).label ?? r.title) : r.title}</span>
                     </Link>
                   </li>
                 );
@@ -635,7 +635,7 @@ function RunningNow({ tree, collapsed, onNavigate }: { tree: SidebarTree; collap
               <RailTip label={tip}>
                 <Link
                   href={n.href ?? "/dashboard/runs"}
-                  aria-label={`${tip}. ${STATUS_META[n.status].label}`}
+                  aria-label={`${tip}. ${t(`status.${n.status}`)}`}
                   onClick={onNavigate}
                   className="flex size-10 items-center justify-center rounded-full hover:bg-night-hover"
                 >
@@ -657,7 +657,7 @@ function RunningNow({ tree, collapsed, onNavigate }: { tree: SidebarTree; collap
         {tree ? <span className="text-xs font-semibold text-night-muted tabular-nums">{live}</span> : null}
       </div>
       {tree ? (
-        <AgentTree lead={tree.lead} branches={tree.branches} tone="night" maxBranches={MAX_RUNNING_ROWS - 1} onNavigate={onNavigate} />
+        <AgentTree lead={tree.lead} branches={tree.branches} tone="night" maxBranches={MAX_RUNNING_ROWS - 1} onNavigate={onNavigate} t={t} />
       ) : (
         <p className="px-2 pb-2 text-xs text-night-muted">{t("shell.nothingRunning")}</p>
       )}
@@ -927,7 +927,7 @@ export function MobileNav({
         {lead ? (
           <Link
             href={lead.href ?? "/dashboard"}
-            aria-label={`${lead.name}: ${STATUS_META[lead.status].label}. ${lead.line}`}
+            aria-label={`${lead.name}: ${t(`status.${lead.status}`)}. ${lead.line}`}
             className="flex size-10 items-center justify-center rounded-full hover:bg-hover"
           >
             <StatusShape status={lead.status} size={12} />

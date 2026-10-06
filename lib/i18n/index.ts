@@ -82,3 +82,19 @@ export function settingsPageText(messages: Catalogue, href: string): { label?: s
   const pages = (messages.settings.pages as Record<string, { label: string; description: string } | undefined>) ?? {};
   return pages[href] ?? {};
 }
+
+/** Phase 18.1 (integration): a desktop widget's title/description in the active catalogue. */
+export function widgetText(messages: Catalogue, id: string): { title?: string; description?: string } {
+  const widgets = (messages.desk?.widgets as Record<string, { title: string; description: string } | undefined>) ?? {};
+  return widgets[id] ?? {};
+}
+
+/**
+ * Phase 18.1 (integration): a keyboard shortcut's label/hint in the active
+ * catalogue, keyed by its registry id (ids contain dots, so this reads the
+ * record directly instead of going through a dotted message key).
+ */
+export function shortcutText(messages: Catalogue, id: string): { label?: string; hint?: string } {
+  const items = (messages.desk?.shortcuts?.items as Record<string, { label: string; hint?: string } | undefined>) ?? {};
+  return items[id] ?? {};
+}
