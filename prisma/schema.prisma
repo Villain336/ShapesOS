@@ -1185,6 +1185,8 @@ model Workspace {
   storeItems                  WorkspaceStoreItem[]
   storePublications           StorePublication[]          @relation("StorePublicationTarget")
   storePublicationsSent       StorePublication[]          @relation("StorePublicationAgency")
+  // Phase 19A (WS=server): the agentic cursor's pending actions.
+  cursorProposals             CursorProposal[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -9492,6 +9494,9 @@ enum AgentRunKind {
   follow_up
   // Phase 5: one assistant/task turn (lead agent or a sub-agent).
   chat
+  // Phase 19A (WS=server): one agentic-cursor conversation (ShapesOS Desktop),
+  // or an agent-mode run the cursor started ("do it in the background").
+  cursor
 
   @@map("AgentRunKind")
 }
@@ -9551,6 +9556,11 @@ model AgentRun {
   allowedTools      String[]  @default([]) @map("allowed_tools")
   cancelRequestedAt DateTime? @map("cancel_requested_at")
   cancelRequestedBy String?   @map("cancel_requested_by")
+  // Phase 19A (WS=server): a user-set spend cap for the whole run, micro-USD
+  // (1 USD = 1,000,000). Null = the platform limits only. Enforced before
+  // every model call in lib/agents/loop.ts and in the Phase 16 budget split
+  // (children's shares never sum past it).
+  budgetMicroUsd    Int?      @map("budget_micro_usd")
 
   recording AgentRunRecording?
   events    AgentRunEvent[]
@@ -9562,6 +9572,8 @@ model AgentRun {
   sandbox   AgentRunSandbox?
   // Deploy PR: the live-watch frame relay row while the run is watched.
   watchFrame AgentRunWatchFrame?
+  // Phase 19A (WS=server): actions the cursor's brain proposed in this run.
+  cursorProposals CursorProposal[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
@@ -17895,4 +17907,47 @@ model StorePublication {
   @@index([workspaceId, status])
   @@index([agencyWorkspaceId, createdAt])
   @@map("store_publications")
+}
+
+// ============================================================================
+// Phase 19A (WS=server): the agentic cursor (ShapesOS Desktop).
+// One row per tool call the cursor's brain proposed that the gate held for a
+// person's OK (executeTool → pending_confirmation). The tier, the destructive
+// flag and voiceApprovable are computed SERVER-side from the tool registry
+// when the proposal is made (and again at decision time); a spoken "yes"
+// never approves Tier 3 or destructive actions (POST /api/cursor/approve →
+// 403 voice_not_allowed). Arguments are what the model proposed; no
+// screenshot or image is ever stored here. FORCE RLS on app.workspace_id.
+// ============================================================================
+
+model CursorProposal {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId           String    @map("run_id")
+  run             AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  // The person the proposal was made for (only they can decide it).
+  userId          String    @map("user_id")
+  projectId       String?   @map("project_id")
+  // Canonical tool name (lib/chat/tools.ts) and the model's arguments.
+  tool            String    @db.VarChar(200)
+  args            Json      @default("{}")
+  summary         String    @db.VarChar(500)
+  tier            Int
+  destructive     Boolean   @default(false)
+  voiceApprovable Boolean   @default(false) @map("voice_approvable")
+  // The registry element the proposal card sits next to (uiMap id), if any.
+  elementId       String?   @map("element_id") @db.VarChar(200)
+  // pending | executed | rejected | failed | expired
+  status          String    @default("pending") @db.VarChar(16)
+  decidedVia      String?   @map("decided_via") @db.VarChar(8)
+  decidedBy       String?   @map("decided_by")
+  decidedAt       DateTime? @map("decided_at")
+  resultSummary   String?   @map("result_summary") @db.VarChar(1000)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiresAt       DateTime  @map("expires_at")
+
+  @@index([workspaceId, userId, status])
+  @@index([runId])
+  @@map("cursor_proposals")
 }
