@@ -420,6 +420,13 @@ export const TABLE = [
     (k) => [k, { cls: "exclude", why: "defaults (25 s / 8 s) fit Render's and ECS's 30 s stop timeout" }],
   ),
 
+  // --- Phase 17 (latency) --------------------------------------------------
+  ["DATABASE_POOL_SIZE", { cls: "exclude", why: "Prisma's default pool fits 2-4 web replicas + a worker on the 200-connection plan (docs/deploy/RENDER.md §6); set it only when pg_stat_activity gets tight" }],
+  ["MEMORY_WARM_AT_BOOT", { cls: "exclude", why: "default on (warm the recall embedder at boot)" }],
+  ...["LATENCY_RUNS", "LATENCY_SLACK", "LATENCY_STRICT", "LATENCY_ASSERT", "LATENCY_BASE_URL", "LATENCY_PORT", "LATENCY_DEV", "LATENCY_LOG_DIR", "LATENCY_APP_DATABASE_URL"].map(
+    (k) => [k, { cls: "exclude", why: "the latency battery (scripts/verify/latency.mts) only; never read by the app" }],
+  ),
+
   // --- dev, test and eval only ------------------------------------------
   ...["E2E_BASE_URL", "E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD", "E2E_EDITOR_EMAIL",
     "SMOKE_APP_DATABASE_URL", "SMOKE_PORT_A", "SMOKE_PORT_B", "SMOKE_GRACE_MS", "SMOKE_REAL_S3", "SMOKE_SKIP_WORKER", "E2E_MOCK_OAUTH", "SEED_EMAIL", "MEMORY_TEST_MODE", "GRAPH_WEBHOOK_TEST_SECRETS", "OPS_SCRATCH", "EVAL_HUMAN", "EVAL_RESULTS_PATH", "EVAL_WORKSPACE_ID", "HOME", "FONTCONFIG_FILE",

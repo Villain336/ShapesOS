@@ -254,14 +254,17 @@ export async function listAgentRunEventsPage(
 ) {
   const limit = Math.min(Math.max(Math.floor(opts.limit ?? RUN_EVENTS_PAGE), 1), 500);
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const where = {
-      runId,
-      workspaceId,
-      type: { notIn: NOT_TIMELINE },
-      ...(typeof opts.beforeSeq === "number" ? { seq: { lt: opts.beforeSeq } } : {}),
-    };
     const [rows, total] = await Promise.all([
-      tx.agentRunEvent.findMany({ where, orderBy: { seq: "desc" }, take: limit + 1 }),
+      tx.agentRunEvent.findMany({
+        where: {
+          runId,
+          workspaceId,
+          type: { notIn: NOT_TIMELINE },
+          ...(typeof opts.beforeSeq === "number" ? { seq: { lt: opts.beforeSeq } } : {}),
+        },
+        orderBy: { seq: "desc" },
+        take: limit + 1,
+      }),
       typeof opts.beforeSeq === "number"
         ? Promise.resolve(null)
         : tx.agentRunEvent.count({ where: { runId, workspaceId, type: { notIn: NOT_TIMELINE } } }),
