@@ -187,6 +187,37 @@ jobs:
             test-results
           retention-days: 7
 
+  infra:
+    # Deploy PR: hosting as code never rots. The AWS CDK app (infra/aws, its
+    # own package) type-checks, its assertion tests pass and it synthesizes
+    # with NO AWS credentials; render.yaml validates against Render's schema
+    # and the repo rules; the env plan covers every .env.example key.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: infra/aws/package-lock.json
+
+      - name: Install (infra/aws only)
+        working-directory: infra/aws
+        run: npm ci
+
+      - name: CDK tests (types, assertions, bootstrap template fresh)
+        working-directory: infra/aws
+        run: npm test
+
+      - name: cdk synth (no credentials)
+        working-directory: infra/aws
+        run: npx cdk synth --quiet
+
+      - name: render.yaml (schema + repo rules + env groups)
+        run: node scripts/ci/validate-render-blueprint.mjs
+
   compose:
     # Phase 6: the self-host compose file. Validates `docker compose config`
     # with throwaway secrets, then brings up the pgvector `db` and runs the

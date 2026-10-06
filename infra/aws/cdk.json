@@ -1,0 +1,25 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "watch": {
+    "include": [
+      "bin/**",
+      "lib/**"
+    ]
+  },
+  "context": {
+    "region": "us-east-1",
+    "domain": "shapesos.com",
+    "natGateway": false,
+    "imageTag": "latest",
+    "logRetentionDays": 30,
+    "monthlyBudgetUsd": 2000,
+    "githubRepo": "Villain336/ShapesOS",
+    "githubEnvironment": "production",
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/aws-ecs:arnFormatIncludesClusterName": true,
+    "@aws-cdk/aws-rds:databaseProxyUniqueResourceName": true,
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

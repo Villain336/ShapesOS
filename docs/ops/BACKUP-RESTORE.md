@@ -37,6 +37,16 @@ docker compose exec backup shapesos-backup      # take one now
 
 The host needs `pg_dump` / `pg_restore` at the server's major version (16), and `curl` if you upload.
 
+### On Render (hosted)
+
+Render's database owner is not a superuser and has no `BYPASSRLS`, so `pg_dump` as that user stops at the first `FORCE ROW LEVEL SECURITY` table ("query would be affected by row-level security policy" — reproduced with a non-superuser owner on PostgreSQL 16). The hosted setup therefore uses three layers (docs/deploy/RENDER.md §12):
+
+1. Render's point-in-time recovery (last 7 days on a Pro workspace).
+2. Render's logical exports (kept 7 days).
+3. The `shapesos-backup` cron job (`render.yaml`, daily 03:17 UTC) runs `shapesos-backup` with `BACKUP_SOURCE=render-export`: it asks Render for an export (`POST /v1/postgres/{id}/export`), waits for its download URL, downloads it, checks it unpacks (`tar -tzf`), writes a `.sha256`, and uploads both to `BACKUP_S3_BUCKET` (Cloudflare R2, region `auto`) with the same SigV4 upload. The Render API key goes to curl on stdin and is never sent to the download URL.
+
+On AWS (docs/deploy/AWS.md), RDS keeps 35 days of automated backups with point-in-time restore; take snapshots for longer retention.
+
 ### Settings
 
 | Variable | Default | Meaning |
@@ -50,6 +60,9 @@ The host needs `pg_dump` / `pg_restore` at the server's major version (16), and 
 | `BACKUP_S3_REGION` | `us-east-1` | SigV4 region. |
 | `BACKUP_S3_PREFIX` | `backups/` | Key prefix. |
 | `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | (unset) | Required when the bucket is set. |
+| `BACKUP_SOURCE` | `pg_dump` | `render-export`: copy Render's own export instead of running `pg_dump`. |
+| `RENDER_API_KEY` / `RENDER_POSTGRES_ID` | (unset) | `render-export` only: an API key and the database id (`dpg-…`). |
+| `BACKUP_EXPORT_TIMEOUT_SECONDS` / `BACKUP_EXPORT_POLL_SECONDS` | `3600` / `15` | `render-export` only: how long to wait for the export, and how often to look. |
 
 **Why the schema owner?** The runtime app role (`marketr_app`) is subject to `FORCE ROW LEVEL SECURITY` on the tenant tables. `pg_dump` refuses to dump rows that a policy would hide, rather than silently skipping them. Only the owner or superuser sees every tenant.
 
@@ -100,6 +113,22 @@ ALTER DATABASE marketr_restored RENAME TO marketr;
 ```
 
 Keep `marketr_before_restore` until you've checked the restored data.
+
+### Restoring a Render export
+
+A Render export (from R2 `shapesos-backups/render/`, or downloaded from the dashboard) is a `.dir.tar.gz` of `pg_dump`'s directory format:
+
+```sh
+sha256sum -c shapesos-render-dpg-xxxx-20261006T031700Z.dir.tar.gz.sha256
+mkdir restore && tar -xzf shapesos-render-dpg-xxxx-20261006T031700Z.dir.tar.gz -C restore
+ls restore/*/                       # the database directory: toc.dat + data files
+psql "postgresql://…/postgres" -c 'CREATE DATABASE shapesos_restored'
+pg_restore --exit-on-error --no-owner --no-acl --format=directory \
+  --dbname="postgresql://…/shapesos_restored" restore/<timestamp>/<database>
+DATABASE_URL="postgresql://…/shapesos_restored" APP_DB_USER=shapesos_app APP_DB_PASSWORD=… sh scripts/db/migrate.sh
+```
+
+Restore as a user that can create the extensions and bypass row-level security while loading (a superuser locally; on Render, restore into a new database through point-in-time recovery instead — it needs no `pg_restore`). Render documents the same `pg_restore` flags ([backups](https://render.com/docs/postgresql-backups)).
 
 ### Checks after a restore
 

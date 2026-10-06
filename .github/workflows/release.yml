@@ -1,0 +1,183 @@
+# ShapesOS release: build the images for one commit, push them to GHCR, then
+# (after the owner approves the `production` environment) migrate, deploy to
+# Render, smoke-test and roll back on failure. Guide: docs/deploy/RENDER.md.
+#
+# Runs after `ci` succeeds on a push to main, or by hand (Actions → release →
+# Run workflow). A manual run is a dry run by default: it builds and pushes
+# the `:<sha>` images and stops (no `:latest`, no deploy).
+#
+# Settings (Settings → Secrets and variables → Actions; nothing is hardcoded):
+#   secrets.RENDER_API_KEY            Render API key (Account settings → API keys)
+#   vars.RENDER_WEB_SERVICE_ID        srv-… of shapesos-web
+#   vars.RENDER_WORKER_SERVICE_ID     srv-… of shapesos-worker
+#   vars.RENDER_MIGRATE_SERVICE_ID    crn-… of shapesos-migrate
+#   vars.APP_URL                      https://app.shapesos.com (baked into the
+#                                     runner bundle; smoke-tested at /api/health)
+# Images go to ghcr.io/<owner>/shapesos-{runner,worker,migrate,backup} with
+# the job's GITHUB_TOKEN (packages: write).
+#
+# Runner size: the production build peaks at ~8–13 GB. A standard runner for a
+# private repository has 2 CPUs / 8 GB / 14 GB SSD
+# (https://docs.github.com/en/actions/reference/runners/github-hosted-runners),
+# so this builds with the CI memory settings (LOW_MEMORY_BUILD=1: no Turbopack
+# source maps or disk cache, no second type check) and frees disk first. If it
+# still runs out, use a larger runner (GitHub Team/Enterprise) or build on
+# Render; see docs/deploy/RENDER.md "Build capacity".
+
+name: release
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and push the images only (no :latest, no deploy)
+        type: boolean
+        default: true
+
+permissions: {}
+
+env:
+  # The commit that ci tested (workflow_run) or the selected ref (dispatch).
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  build:
+    # workflow_run also fires for ci runs of pull requests — including a fork
+    # whose branch is named "main". Release only a successful ci run of a push
+    # to this repository's main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      deploy: ${{ steps.mode.outputs.deploy }}
+      registry: ${{ steps.mode.outputs.registry }}
+    steps:
+      - name: Release mode
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REF: ${{ github.ref }}
+        run: |
+          deploy=true
+          if [ "$EVENT" = workflow_dispatch ]; then
+            if [ "$DRY_RUN" = true ]; then deploy=false; fi
+            # Only main ships to production.
+            if [ "$deploy" = true ] && [ "$REF" != refs/heads/main ]; then
+              echo "::error::Only main can be deployed; run with dry_run on other branches."
+              exit 1
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "Release $RELEASE_SHA (deploy: $deploy)" >> "$GITHUB_STEP_SUMMARY"
+          # GHCR names are lowercase: ghcr.io/<owner>/shapesos-<target>.
+          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "REGISTRY=ghcr.io/$owner" >> "$GITHUB_ENV"
+          echo "CACHE_REF=ghcr.io/$owner/shapesos-buildcache" >> "$GITHUB_ENV"
+          echo "registry=ghcr.io/$owner" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+
+      - name: Free disk space (the images share a ~3 GB node_modules layer)
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force >/dev/null || true
+          df -h /
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Two passes so the next build doesn't share memory with the others; the
+      # second pass reuses the deps stage from the first.
+      - name: Build and push worker, migrate, backup
+        uses: docker/bake-action@v7
+        env:
+          TAG: ${{ env.RELEASE_SHA }}
+          LATEST: ${{ steps.mode.outputs.deploy }}
+          GIT_COMMIT: ${{ env.RELEASE_SHA }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        with:
+          source: .
+          files: docker-bake.hcl
+          targets: worker,migrate,backup
+          push: true
+
+      - name: Build and push runner (next build)
+        uses: docker/bake-action@v7
+        env:
+          TAG: ${{ env.RELEASE_SHA }}
+          LATEST: ${{ steps.mode.outputs.deploy }}
+          GIT_COMMIT: ${{ env.RELEASE_SHA }}
+          APP_URL: ${{ vars.APP_URL }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        with:
+          source: .
+          files: docker-bake.hcl
+          targets: runner
+          push: true
+
+      - name: Images
+        run: |
+          for t in runner worker migrate backup; do
+            echo "- \`$REGISTRY/shapesos-$t:$RELEASE_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    # The owner approves every production release (required reviewer on the
+    # `production` environment; limit its deployment branches to main).
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Migrate, deploy, smoke test (rolls back on failure)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          WEB: ${{ vars.RENDER_WEB_SERVICE_ID }}
+          WORKER: ${{ vars.RENDER_WORKER_SERVICE_ID }}
+          MIGRATE: ${{ vars.RENDER_MIGRATE_SERVICE_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+          REGISTRY: ${{ needs.build.outputs.registry }}
+        run: >-
+          node scripts/deploy/render-release.mjs
+          --sha "$RELEASE_SHA" --registry "$REGISTRY"
+          --web-service "$WEB" --worker-service "$WORKER" --migrate-service "$MIGRATE"
+          --health-url "${APP_URL%/}/api/health"
