@@ -158,6 +158,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // Reminders are the person's own to-dos — Tier 1 (TIER1_KINDS).
   { action: "create_reminder", label: "Add a reminder", description: "Add a to-do with a due time to the person's own Reminders list." },
   { action: "complete_reminder", label: "Complete a reminder", description: "Tick one of the person's own reminders done." },
+  // Contacts: merging two people's cards (each record stays in its own app) — Tier 1.
+  { action: "confirm_contact_merge", label: "Merge contacts", description: "Confirm a merge suggestion so two contact cards become one (the records stay in their own apps; a person can unlink).", group: "ops" },
 ];
 
 

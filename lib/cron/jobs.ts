@@ -166,6 +166,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
     timeoutMs: SHORT,
   },
+  // Phase 18.2 (WS=comms): Contacts — link new people records, refresh merge suggestions.
+  {
+    key: "comms-contacts",
+    path: "/api/cron/comms-contacts",
+    cron: "10,40 * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. Opening Contacts syncs on demand, so the sweep only keeps the address book and Spotlight current for workspaces nobody opened; twice an hour, off the busy :00 and :30 minutes. Suggestions only — nothing merges without a person.",
+    timeoutMs: SHORT,
+  },
   // Phase 13 (twincore): digital twin conditions → alerts + editor notifications.
   {
     key: "twin-alerts",

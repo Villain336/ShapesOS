@@ -212,3 +212,5 @@ lib/search/__tests__/spotlight-db.test.ts
 lib/notifications/__tests__/focus-channels-db.test.ts
 # Phase 18.2 (comms): Reminders — personal project-less OpsTasks (owner-only; never in the generic ops task list or PATCH), repeat roll-forward in the owner's zone, due → one reminder_due notification per occurrence (held under focus, no duplicate, re-armed by a new due time), create_reminder asks unless a Tier-1 rule says auto and is denied outside the grant.
 lib/comms/__tests__/reminders-db.test.ts
+# Phase 18.2 (comms): Contacts — the sync gives every record of the four people stores its own identity and never merges (idempotent), suggestions never cross workspaces (FORCE RLS), confirm merges with who/when, reject is remembered for every record pair across the two people (an agent's re-proposal is refused), unlink undoes, the timeline reads linked activity, Spotlight's contact kind returns one result per person, suggest_merge never merges and confirm_merge asks without a rule.
+lib/comms/__tests__/contacts-db.test.ts

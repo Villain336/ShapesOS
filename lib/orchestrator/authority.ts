@@ -70,6 +70,9 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   // assigned to them) — no money, no audience, reversible (reopen / remove).
   "create_reminder",
   "complete_reminder",
+  // Phase 18.2 (WS=comms): confirming a Contacts merge suggestion links two
+  // records as one person — internal, no audience, reversible (unlink).
+  "confirm_contact_merge",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

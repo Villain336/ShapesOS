@@ -59,6 +59,7 @@ import {
   Zap,
   // Phase 18.2 (WS=comms): the communication apps.
   ListTodo,
+  BookUser,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
@@ -103,6 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, description: "Home: what needs attention", keywords: "home dashboard main" },
       // Phase 18.2 (WS=comms): the everyday communication apps.
+      { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, description: "One address book for everyone you know", keywords: "people address book person contact cards duplicates merge leads network investors" },
       { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },
     ],
   },

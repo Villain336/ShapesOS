@@ -353,6 +353,16 @@ enum FileChangeAction {
   // the approved extra-seat ceiling (summaries carry counts and prices only).
   seat_charge_confirmed
   seat_ceiling_changed
+  // Phase 18.2 (WS=comms): a person confirmed / rejected a contact merge or
+  // unlinked a record; sent mail from the Mail app; saved a calendar event;
+  // created / revoked a private calendar feed.
+  contact_merge_confirmed
+  contact_merge_rejected
+  contact_unlinked
+  mail_sent
+  calendar_event_saved
+  calendar_feed_created
+  calendar_feed_revoked
 }
 
 // ---------------------------------------------------------------------------

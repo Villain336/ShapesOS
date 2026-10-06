@@ -84,6 +84,7 @@ export const es: Catalogue = {
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
       // Phase 18.2 (WS=comms)
+      "/dashboard/contacts": { label: "Contactos", description: "Una libreta de direcciones para todas las personas que conoces" },
       "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
       "/dashboard/prospects": { label: "Prospectos", description: "Listas de prospectos y enriquecimiento" },
       "/dashboard/nurture": { label: "Seguimiento", description: "Secuencias de seguimiento y difusiones" },
@@ -312,6 +313,8 @@ export const es: Catalogue = {
         close_ticket: "Cerrar si está resuelto",
         summarize: "Resumir",
         seo_audit: "Hacer una auditoría SEO",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Buscar otros registros de esta persona",
       },
     },
   },

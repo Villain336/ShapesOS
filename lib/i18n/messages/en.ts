@@ -88,6 +88,7 @@ export const en = {
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
+      "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
@@ -317,6 +318,8 @@ export const en = {
         close_ticket: "Close if resolved",
         summarize: "Summarize",
         seo_audit: "Run an SEO audit",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Find other records of this person",
       },
     },
   },
