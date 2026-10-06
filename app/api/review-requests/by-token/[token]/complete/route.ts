@@ -14,7 +14,7 @@ export async function POST(
 ) {
   const { token } = await ctx.params;
   const clean = token.trim().slice(0, 64);
-  if (!checkReviewPageRateLimit(clean, clientIp(req))) {
+  if (!(await checkReviewPageRateLimit(clean, clientIp(req)))) {
     return Response.json({ error: "Too many requests" }, { status: 429 });
   }
   const updated = await markCompletedByToken(clean);

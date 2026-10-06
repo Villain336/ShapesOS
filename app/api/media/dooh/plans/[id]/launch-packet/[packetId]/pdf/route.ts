@@ -2,11 +2,9 @@
 // Serves the compiled launch-packet PDF bytes (viewer+).
 
 import type { NextRequest } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { mediaGuard } from "../../../../../../_lib";
 import { SqlDoohPlanStore, SqlLaunchPacketStore, buyingTablesReady } from "@/lib/media/buying-store";
-import { launchPacketStorageDir } from "@/lib/media/launch-packet";
+import { readLaunchPacketPdf } from "@/lib/media/launch-packet";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +26,9 @@ export async function GET(
   const packet = packets.find((p) => p.id === packetId);
   if (!packet) return new Response("Packet not found", { status: 404 });
 
-  const pdfPath = path.join(launchPacketStorageDir(), `${plan.id}-v${packet.version}.pdf`);
-  let bytes: Buffer;
-  try {
-    bytes = await fs.readFile(pdfPath);
-  } catch {
-    return new Response("Packet PDF not found on disk", { status: 404 });
-  }
+  // Shared blob store (deploy PR); older packets resolve by their legacy key.
+  const bytes = await readLaunchPacketPdf(gate.workspaceId, plan.id, packet.version).catch(() => null);
+  if (!bytes) return new Response("Packet PDF not found in storage", { status: 404 });
   return new Response(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/pdf",

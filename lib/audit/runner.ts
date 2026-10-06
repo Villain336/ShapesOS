@@ -13,9 +13,8 @@
 // applies fixes, audit-logs each one (actor: fix_agent), then re-scans the
 // touched files to verify.
 
-import { promises as fs } from "fs";
-import { join } from "path";
 import { prisma } from "@/lib/prisma";
+import { blobGet, blobPath, blobPut, encodeBlobSegment } from "@/lib/filesystem/storage";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { getLlmProviderFor } from "@/lib/llm";
 import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
@@ -23,8 +22,6 @@ import { CATEGORY_MAP } from "./categories";
 import { scanSite } from "./scanner";
 import { planFix } from "./fixer";
 
-const SNAPSHOT_ROOT =
-  process.env.FIX_SNAPSHOT_DIR?.trim() || join(process.cwd(), ".data", "fix-snapshots");
 
 export interface RunInput {
   siteId: string;
@@ -52,20 +49,23 @@ export interface RunResult {
   summary: string;
 }
 
-async function snapshotPath(runId: string): Promise<string> {
-  await fs.mkdir(SNAPSHOT_ROOT, { recursive: true });
-  return join(SNAPSHOT_ROOT, `${runId}.json`);
+// Rollback snapshots live in the shared blob store (namespace "fix-snapshots",
+// <runId>.json — deploy PR), so a revert works on whichever replica takes the
+// request; with MARKETR_STORAGE=local that is FIX_SNAPSHOT_DIR / .data/fix-snapshots
+// as before. FixRun.snapshotRef stays the run id.
+function snapshotKey(runId: string): string {
+  return blobPath(`${encodeBlobSegment(runId)}.json`);
 }
 
 export async function saveSnapshot(runId: string, files: Record<string, string>): Promise<string> {
-  const path = await snapshotPath(runId);
-  await fs.writeFile(path, JSON.stringify({ runId, files }), "utf8");
+  await blobPut("fix-snapshots", snapshotKey(runId), JSON.stringify({ runId, files }), "application/json");
   return runId;
 }
 
 export async function loadSnapshot(runId: string): Promise<Record<string, string>> {
-  const path = await snapshotPath(runId);
-  const raw = JSON.parse(await fs.readFile(path, "utf8")) as { files: Record<string, string> };
+  const bytes = await blobGet("fix-snapshots", snapshotKey(runId));
+  if (!bytes) throw new Error(`Snapshot for fix run ${runId} is missing from storage`);
+  const raw = JSON.parse(bytes.toString("utf8")) as { files: Record<string, string> };
   return raw.files ?? {};
 }
 

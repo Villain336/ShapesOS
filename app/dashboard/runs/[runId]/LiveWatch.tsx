@@ -5,6 +5,9 @@
 // as they arrive (latest-wins — a slow tab skips to the newest frame).
 // Rendered by the run viewer ONLY while the run is running; finished runs
 // never mount this component (the WebM below is the permanent record).
+// Deploy PR: the connection goes through openLiveStream (lib/ui/live-stream.ts)
+// — a server that is shutting down sends `reconnect` and the view carries on
+// from another replica; a dropped connection retries with backoff.
 
 "use client";
 
@@ -12,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Radio, VideoOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/aos/StatusBadge";
+import { openLiveStream } from "@/lib/ui/live-stream";
 
 type WatchState = "connecting" | "live" | "unavailable" | "ended";
 
@@ -31,44 +35,48 @@ export function LiveWatch({ runId }: { runId: string }) {
   const [status, setStatus] = useState("running");
   const [state, setState] = useState<WatchState>("connecting");
   const [endReason, setEndReason] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
   const stateRef = useRef<WatchState>("connecting");
   stateRef.current = state;
 
   useEffect(() => {
-    const es = new EventSource(`/api/agent-runs/${encodeURIComponent(runId)}/watch`);
-
-    const onFrame = (e: Event) => {
-      setFrame(`data:image/jpeg;base64,${(e as MessageEvent).data}`);
-      setState("live");
+    let unmounted = false;
+    const stream = openLiveStream(`/api/agent-runs/${encodeURIComponent(runId)}/watch`, {
+      events: {
+        frame: (data) => {
+          setFrame(`data:image/jpeg;base64,${data}`);
+          setState("live");
+        },
+        status: (data) => {
+          try {
+            setStatus(JSON.parse(data).status as string);
+          } catch {
+            // Malformed status payload — keep the last known status.
+          }
+        },
+        end: (data) => {
+          try {
+            setEndReason((JSON.parse(data).reason as string) ?? null);
+          } catch {
+            setEndReason(null);
+          }
+        },
+      },
+      onEnd: () => "stop",
+      // The first failure before anything arrived means no stream exists (404).
+      maxInitialFailures: 1,
+      onState: (s) => {
+        if (unmounted) return;
+        setReconnecting(s === "reconnecting");
+        if (s === "closed") setState("ended");
+        // Never connected → no stream for this run; dropped for good → ended.
+        if (s === "failed") setState(stateRef.current === "connecting" ? "unavailable" : "ended");
+      },
+    });
+    return () => {
+      unmounted = true;
+      stream.close();
     };
-    const onStatus = (e: Event) => {
-      try {
-        setStatus(JSON.parse((e as MessageEvent).data).status as string);
-      } catch {
-        // Malformed status payload — keep the last known status.
-      }
-    };
-    const onEnd = (e: Event) => {
-      try {
-        setEndReason((JSON.parse((e as MessageEvent).data).reason as string) ?? null);
-      } catch {
-        setEndReason(null);
-      }
-      setState("ended");
-      es.close();
-    };
-    const onError = () => {
-      // A failure before the first frame means no stream exists (404);
-      // a failure mid-stream means the connection dropped.
-      setState(stateRef.current === "connecting" ? "unavailable" : "ended");
-      es.close();
-    };
-
-    es.addEventListener("frame", onFrame);
-    es.addEventListener("status", onStatus);
-    es.addEventListener("end", onEnd);
-    es.onerror = onError;
-    return () => es.close();
   }, [runId]);
 
   return (
@@ -86,7 +94,7 @@ export function LiveWatch({ runId }: { runId: string }) {
           ) : (
             <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
               <Radio className="size-3.5" aria-hidden />
-              {state === "ended" ? "Ended" : status}
+              {state === "ended" ? "Ended" : reconnecting ? "Reconnecting" : status}
             </span>
           )}
         </span>

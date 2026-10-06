@@ -1,0 +1,304 @@
+# ShapesOS on Render — Blueprint (infrastructure as code).
+# Spec: https://render.com/docs/blueprint-spec · JSON schema:
+# https://render.com/schema/render.yaml.json (checked in CI by
+# scripts/ci/validate-render-blueprint.mjs against the copy in
+# infra/render/render.yaml.schema.json).
+# Step-by-step guide: docs/deploy/RENDER.md.
+#
+# What runs where:
+#   shapesos-web      Next standalone server (Dockerfile `runner` target): the
+#                     website (shapesos.com) and the OS (app.shapesos.com),
+#                     2+ instances, autoscaled on CPU; also runs the in-app
+#                     cron (one replica claims each slot via an advisory lock).
+#   shapesos-worker   agent worker (Dockerfile `worker` target): claims agent
+#                     jobs (SKIP LOCKED leases); scale it for heavy runs.
+#   shapesos-migrate  holds the `migrate` image and the database OWNER URL;
+#                     release.yml runs `sh scripts/db/migrate.sh` on it as a
+#                     one-off job before web and worker deploy. Its schedule is
+#                     a formality (Render cron jobs need one); a scheduled run
+#                     is a no-op `prisma migrate deploy`.
+#   shapesos-backup   nightly copy of Render's own logical export to R2
+#                     (scripts/ops/backup.sh BACKUP_SOURCE=render-export).
+#   shapesos-db       Render Postgres 16, private network only.
+#
+# Images are prebuilt by .github/workflows/release.yml and pulled from GHCR
+# (private): add a registry credential named `ghcr-shapesos` in Workspace
+# Settings first (GitHub user + a classic token with read:packages,
+# https://render.com/docs/deploying-an-image#credentials-for-private-images).
+# Image-backed services never auto-deploy; release.yml deploys an exact
+# `:<git sha>` tag through the API. `:latest` here is only what the very
+# first Blueprint apply pulls.
+#
+# The app never connects as the database owner (owners would skip FORCE ROW
+# LEVEL SECURITY): web and worker get the private host/port/name plus the
+# shapesos-db-app role, and scripts/deploy/with-runtime-env.sh composes
+# DATABASE_URL at start (Blueprints have no variable interpolation,
+# https://render.com/docs/blueprint-spec#variable-interpolation). The migrate
+# job creates that role (scripts/db/create-app-role.sql) on every release.
+
+services:
+  - type: web
+    name: shapesos-web
+    runtime: image
+    image:
+      url: ghcr.io/villain336/shapesos-runner:latest
+      creds:
+        fromRegistryCreds:
+          name: ghcr-shapesos
+    region: virginia
+    plan: 2c-4g
+    # Autoscaling needs a Pro workspace (https://render.com/docs/scaling).
+    scaling:
+      minInstances: 2
+      maxInstances: 4
+      targetCPUPercent: 70
+    # Liveness only (no database I/O): a database blip must not restart every
+    # instance. Readiness (/api/health) is what release.yml smoke-tests.
+    # Render sends a verified custom domain as Host; proxy.ts never
+    # redirects /api (https://render.com/docs/health-checks).
+    healthCheckPath: /api/health/live
+    # SIGTERM → drain open streams and in-flight requests; Render waits this
+    # long before SIGKILL (default 30, max 300;
+    # https://render.com/docs/deploys#graceful-shutdown).
+    maxShutdownDelaySeconds: 120
+    dockerCommand: sh scripts/deploy/with-runtime-env.sh node server.js
+    # Root domain → Render also adds www.shapesos.com redirecting to it
+    # (https://render.com/docs/custom-domains).
+    domains:
+      - shapesos.com
+      - app.shapesos.com
+    envVars:
+      - key: SHAPESOS_DB_HOST
+        fromDatabase:
+          name: shapesos-db
+          property: host
+      - key: SHAPESOS_DB_PORT
+        fromDatabase:
+          name: shapesos-db
+          property: port
+      - key: SHAPESOS_DB_NAME
+        fromDatabase:
+          name: shapesos-db
+          property: database
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=3072
+      - fromGroup: shapesos-db-app
+      - fromGroup: shapesos-shared
+      - fromGroup: shapesos-web
+
+  - type: worker
+    name: shapesos-worker
+    runtime: image
+    image:
+      url: ghcr.io/villain336/shapesos-worker:latest
+      creds:
+        fromRegistryCreds:
+          name: ghcr-shapesos
+    region: virginia
+    plan: 1c-2g
+    numInstances: 1
+    # Running agent jobs keep heartbeating while they finish; a job still
+    # running at SIGKILL resumes on another worker when its lease expires.
+    maxShutdownDelaySeconds: 300
+    dockerCommand: sh scripts/deploy/with-runtime-env.sh node node_modules/tsx/dist/cli.mjs scripts/worker.mts
+    envVars:
+      - key: SHAPESOS_DB_HOST
+        fromDatabase:
+          name: shapesos-db
+          property: host
+      - key: SHAPESOS_DB_PORT
+        fromDatabase:
+          name: shapesos-db
+          property: port
+      - key: SHAPESOS_DB_NAME
+        fromDatabase:
+          name: shapesos-db
+          property: database
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=1536
+      - fromGroup: shapesos-db-app
+      - fromGroup: shapesos-shared
+      - fromGroup: shapesos-worker
+
+  - type: cron
+    name: shapesos-migrate
+    runtime: image
+    image:
+      url: ghcr.io/villain336/shapesos-migrate:latest
+      creds:
+        fromRegistryCreds:
+          name: ghcr-shapesos
+    region: virginia
+    plan: 1c-2g
+    # Required by Render; once a year. Real runs are one-off jobs started by
+    # release.yml (https://render.com/docs/one-off-jobs).
+    schedule: "0 5 1 1 *"
+    envVars:
+      # The OWNER's private connection string: migrations need it. Only this
+      # service has it.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shapesos-db
+          property: connectionString
+      - fromGroup: shapesos-db-app
+
+  - type: cron
+    name: shapesos-backup
+    runtime: image
+    image:
+      url: ghcr.io/villain336/shapesos-backup:latest
+      creds:
+        fromRegistryCreds:
+          name: ghcr-shapesos
+    region: virginia
+    plan: 0.5c-512mb
+    schedule: "17 3 * * *"
+    # One backup per run (the image's default CMD loops forever).
+    dockerCommand: shapesos-backup
+    envVars:
+      - key: BACKUP_SOURCE
+        value: render-export
+      - key: BACKUP_DIR
+        value: /backups
+      - key: BACKUP_RETENTION_DAYS
+        value: "1"
+      - key: BACKUP_S3_BUCKET
+        value: shapesos-backups
+      - key: BACKUP_S3_REGION
+        value: auto
+      - key: BACKUP_S3_PREFIX
+        value: render/
+      # Prompted once, when the Blueprint is first applied.
+      - key: RENDER_POSTGRES_ID
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: BACKUP_S3_ENDPOINT
+        sync: false
+      - key: BACKUP_S3_ACCESS_KEY
+        sync: false
+      - key: BACKUP_S3_SECRET_KEY
+        sync: false
+
+databases:
+  - name: shapesos-db
+    databaseName: shapesos
+    user: shapesos_owner
+    region: virginia
+    # 2 CPU / 8 GB RAM, max 200 connections
+    # (https://render.com/docs/blueprint-spec#database-fields). Point-in-time
+    # recovery covers the last 7 days on a Pro workspace
+    # (https://render.com/docs/postgresql-backups).
+    plan: 2c-8g
+    postgresMajorVersion: "16"
+    diskSizeGB: 50
+    storageAutoscalingEnabled: true
+    # Private network only; add your IP here (or in the dashboard) for a
+    # restore drill, then remove it.
+    ipAllowList: []
+
+# BEGIN generated env groups — edit scripts/deploy/render-env.mjs, then run
+# `node scripts/deploy/render-env.mjs --write`. Secrets you paste are NOT listed
+# here (Render ignores sync: false inside env groups); they are in
+# docs/deploy/RENDER.md, "Values you paste". Render keeps a variable that a
+# Blueprint sync doesn't mention, so pasted values survive every sync.
+envVarGroups:
+  # Runtime database role (web, worker and the migrate job).
+  - name: shapesos-db-app
+    envVars:
+      - key: APP_DB_USER
+        value: "shapesos_app"
+      - key: APP_DB_PASSWORD
+        generateValue: true
+  # Web and worker.
+  - name: shapesos-shared
+    # Plus 119 keys you paste in the dashboard (15 before the first deploy):
+    # docs/deploy/RENDER.md, "Values you paste".
+    envVars:
+      - key: NEXTAUTH_URL
+        value: "https://app.shapesos.com"
+      - key: AUTH_URL
+        value: "https://app.shapesos.com"
+      - key: APP_URL
+        value: "https://app.shapesos.com"
+      - key: APP_PUBLIC_URL
+        value: "https://app.shapesos.com"
+      - key: APP_BASE_URL
+        value: "https://app.shapesos.com"
+      - key: MARKETR_BASE_URL
+        value: "https://app.shapesos.com"
+      - key: NEXT_PUBLIC_APP_URL
+        value: "https://app.shapesos.com"
+      - key: DEPLOYMENT_MODE
+        value: "hosted"
+      - key: RATE_LIMIT_STORE
+        value: "postgres"
+      - key: MARKETR_STORAGE
+        value: "s3"
+      - key: MARKETR_S3_REGION
+        value: "auto"
+      - key: MARKETR_S3_BUCKET
+        value: "shapesos-files"
+      - key: MARKETR_S3_FORCE_PATH_STYLE
+        value: "true"
+      - key: SANDBOX_PROVIDER
+        value: "e2b"
+      - key: ALLOW_FAKE_PROVIDERS
+        value: "0"
+      - key: ALLOW_UNSIGNED_WEBHOOKS
+        value: "false"
+      - key: SENTRY_ENVIRONMENT
+        value: "production"
+      - key: OTEL_SERVICE_NAME
+        value: "shapesos"
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: MARKETR_CREDENTIALS_KEY
+        generateValue: true
+      - key: MARKETR_APPROVAL_SECRET
+        generateValue: true
+      - key: AUTHORITY_APPROVAL_SECRET
+        generateValue: true
+      - key: MESSAGING_UNSUBSCRIBE_SECRET
+        generateValue: true
+      - key: MESSAGING_INBOUND_EMAIL_SECRET
+        generateValue: true
+      - key: PAYLOAD_SECRET
+        generateValue: true
+      - key: PIXEL_SIGNING_SECRET
+        generateValue: true
+      - key: SRA_SIGNING_SECRET
+        generateValue: true
+      - key: ACTION_OAUTH_STATE_SECRET
+        generateValue: true
+      - key: FEATURE_GBP_MANAGEMENT
+        value: "false"
+  # Web service only.
+  - name: shapesos-web
+    # Plus 28 keys you paste in the dashboard (1 before the first deploy):
+    # docs/deploy/RENDER.md, "Values you paste".
+    envVars:
+      - key: WEBSITE_HOST
+        value: "shapesos.com"
+      - key: APP_HOST
+        value: "app.shapesos.com"
+      - key: TRUSTED_PROXY_HOPS
+        value: "2"
+      - key: CRON_RUNNER
+        value: "internal"
+      - key: CRON_SECRET
+        generateValue: true
+      - key: REMINDERS_CRON_SECRET
+        generateValue: true
+      - key: AGENT_WORKER
+        value: "external"
+      - key: KEEP_ALIVE_TIMEOUT
+        value: "310000"
+      - key: CALLRAIL_WEBHOOK_SECRET
+        generateValue: true
+  # Worker only.
+  - name: shapesos-worker
+    envVars:
+      - key: AGENT_WORKER_CONCURRENCY
+        value: "6"
+# END generated env groups

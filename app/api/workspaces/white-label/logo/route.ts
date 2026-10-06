@@ -3,18 +3,17 @@
 // DELETE /api/workspaces/white-label/logo  (clears the logo; admin+)
 //
 // Reuses the brand-kit logo upload pattern: magic-byte validation (never the
-// browser-declared MIME), malware screening, rejection auditing. Stored under
-// <REPORT_STORAGE_DIR>/logos/wl-<workspaceId>.<ext>; served publicly by
-// GET /api/public/workspaces/[id]/logo for the review landing page.
+// browser-declared MIME), malware screening, rejection auditing. Stored in
+// the shared blob store (namespace "logos", <workspaceId>/wl-<workspaceId>.<ext>
+// — deploy PR); served publicly by GET /api/public/workspaces/[id]/logo for
+// the review landing page.
 
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { reportStorageDir } from "@/lib/pdf/generate";
-import { resolveWithinDir, validateUploadBuffer } from "@/lib/security/upload-safety";
+import { deleteLogo, logoBlobPathFor, storeLogo } from "@/lib/brand-logo";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 import { EntitlementError, entitlementDenied, featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
@@ -71,14 +70,11 @@ export async function POST(req: NextRequest) {
   const screen = await screenUploadBuffer(buf);
   if (!screen.ok) return reject(screen.reason, screen.status);
 
-  const dir = path.join(reportStorageDir(), "logos");
-  await fs.mkdir(dir, { recursive: true });
   // Extension comes from the sniffed bytes, not the upload name.
-  const filename = storedFilename(workspace.id, check.ext);
-  const abs = resolveWithinDir(dir, filename);
-  await fs.writeFile(abs, buf);
-
-  const logoPath = path.relative(process.cwd(), abs);
+  const logoPath = await storeLogo(workspace.id, storedFilename(workspace.id, check.ext), buf);
+  if (workspace.whiteLabelLogoUrl && logoBlobPathFor(workspace.whiteLabelLogoUrl) !== logoBlobPathFor(logoPath)) {
+    await deleteLogo(workspace.whiteLabelLogoUrl);
+  }
   await prisma.workspace.update({
     where: { id: workspace.id },
     data: { whiteLabelLogoUrl: logoPath },
@@ -92,15 +88,8 @@ export async function DELETE() {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   if (!(await requireWorkspaceRole(user.id, workspace.id, "admin"))) return forbidden();
 
-  const dir = path.join(reportStorageDir(), "logos");
-  if (workspace.whiteLabelLogoUrl) {
-    try {
-      const abs = resolveWithinDir(dir, path.basename(workspace.whiteLabelLogoUrl));
-      await fs.unlink(abs);
-    } catch {
-      // DB row and disk can drift; clearing the field is what matters.
-    }
-  }
+  // DB row and storage can drift; clearing the field is what matters.
+  if (workspace.whiteLabelLogoUrl) await deleteLogo(workspace.whiteLabelLogoUrl);
   await prisma.workspace.update({
     where: { id: workspace.id },
     data: { whiteLabelLogoUrl: null },

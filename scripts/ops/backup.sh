@@ -30,6 +30,21 @@
 #   BACKUP_S3_PREFIX       default backups/
 #   BACKUP_S3_ACCESS_KEY / BACKUP_S3_SECRET_KEY
 #
+# Hosted on Render (BACKUP_SOURCE=render-export, the shapesos-backup cron job
+# in render.yaml): Render's database owner is not a superuser and has no
+# BYPASSRLS, so pg_dump as that user stops at the first FORCE ROW LEVEL
+# SECURITY table ("query would be affected by row-level security policy").
+# Instead this asks Render for a logical export of the whole database
+# (POST /v1/postgres/{id}/export, https://render.com/docs/postgresql-backups),
+# waits for it, downloads it, checks it unpacks, and uploads it with the same
+# S3 upload as below (e.g. to a Cloudflare R2 bucket; region "auto").
+#   BACKUP_SOURCE           pg_dump (default) | render-export
+#   RENDER_API_KEY          render-export: a Render API key (sent on stdin to curl)
+#   RENDER_POSTGRES_ID      render-export: the database id (dpg-…)
+#   BACKUP_EXPORT_TIMEOUT_SECONDS  render-export: how long to wait (default 3600)
+#   BACKUP_EXPORT_POLL_SECONDS     render-export: poll interval (default 15)
+#   RENDER_API_BASE         tests only (default https://api.render.com/v1)
+#
 # Exit status is non-zero when the dump, the check or a configured upload
 # fails, so cron / the compose service log shows it.
 set -eu
@@ -85,9 +100,84 @@ backup_once() {
 
   if [ "$KEEP_DAYS" -gt 0 ]; then
     # -mtime +N: older than N whole days.
-    pruned=$(find "$DIR" -maxdepth 1 -type f \( -name 'shapesos-*.dump' -o -name 'shapesos-*.dump.sha256' \) -mtime +"$KEEP_DAYS" -print -delete | wc -l | tr -d ' ')
+    pruned=$(find "$DIR" -maxdepth 1 -type f \( -name 'shapesos-*.dump' -o -name 'shapesos-*.dump.sha256' -o -name 'shapesos-*.dir.tar.gz' -o -name 'shapesos-*.dir.tar.gz.sha256' \) -mtime +"$KEEP_DAYS" -print -delete | wc -l | tr -d ' ')
     log info "retention applied" ",\"keepDays\":$KEEP_DAYS,\"deleted\":$pruned"
   fi
+}
+
+# Render API call: the key goes to curl on stdin (a config line), never argv.
+render_api() {
+  method="$1"
+  path="$2"
+  printf 'header = "Authorization: Bearer %s"\n' "$RENDER_API_KEY" |
+    curl --fail --silent --show-error --config - -X "$method" \
+      -H 'Accept: application/json' "${RENDER_API_BASE:-https://api.render.com/v1}${path}"
+}
+
+# Export ids from a List Postgres exports response (an array of exports, or of
+# {cursor, <export>} wrappers like Render's other list endpoints).
+export_rows() {
+  jq -r '.[] | (if has("id") then . else ([.[] | objects | select(has("id"))][0] // {}) end)
+         | select(.id != null) | [.id, (.url // "")] | @tsv'
+}
+
+render_export_once() {
+  [ -n "${RENDER_API_KEY:-}" ] || fail "BACKUP_SOURCE=render-export needs RENDER_API_KEY"
+  [ -n "${RENDER_POSTGRES_ID:-}" ] || fail "BACKUP_SOURCE=render-export needs RENDER_POSTGRES_ID"
+  command -v jq >/dev/null 2>&1 || fail "jq is needed for BACKUP_SOURCE=render-export"
+  case "$KEEP_DAYS" in '' | *[!0-9]*) fail "BACKUP_RETENTION_DAYS must be a whole number" ;; esac
+  timeout_s="${BACKUP_EXPORT_TIMEOUT_SECONDS:-3600}"
+  case "$timeout_s" in '' | *[!0-9]*) fail "BACKUP_EXPORT_TIMEOUT_SECONDS must be a whole number" ;; esac
+  path="/postgres/${RENDER_POSTGRES_ID}/export"
+  # Capture first: in a pipeline the curl status would be lost (no pipefail in sh).
+  json="$(render_api GET "$path")" || fail "listing Render exports failed"
+  before="$(printf '%s' "$json" | export_rows | cut -f1)" || fail "unexpected Render export list"
+  render_api POST "$path" >/dev/null || fail "starting a Render export failed"
+  started=$(date +%s)
+  log info "render export requested" ",\"postgres\":\"${RENDER_POSTGRES_ID}\""
+  url=""
+  while [ -z "$url" ]; do
+    if [ $(($(date +%s) - started)) -ge "$timeout_s" ]; then
+      fail "the Render export did not finish within ${timeout_s}s"
+    fi
+    sleep "${BACKUP_EXPORT_POLL_SECONDS:-15}"
+    json="$(render_api GET "$path")" || fail "listing Render exports failed"
+    rows="$(printf '%s' "$json" | export_rows)" || fail "unexpected Render export list"
+    url="$(printf '%s\n' "$rows" | while IFS="$(printf '\t')" read -r id u; do
+      [ -n "$id" ] || continue
+      if ! printf '%s\n' "$before" | grep -qx "$id" && [ -n "$u" ]; then printf '%s' "$u"; break; fi
+    done)"
+  done
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir -p "$DIR"
+  name="shapesos-render-${RENDER_POSTGRES_ID}-${stamp}.dir.tar.gz"
+  final="$DIR/$name"
+  tmp="$DIR/.${name}.partial"
+  trap 'rm -f "$tmp"' EXIT INT TERM
+  # The export URL carries its own authorization; the API key is not sent.
+  curl --fail --silent --show-error --location -o "$tmp" "$url" || fail "downloading the Render export failed"
+  tar -tzf "$tmp" >/dev/null 2>&1 || fail "the Render export does not unpack"
+  mv "$tmp" "$final"
+  trap - EXIT INT TERM
+  (cd "$DIR" && sha256sum "$name" >"$name.sha256")
+  bytes=$(wc -c <"$final" | tr -d ' ')
+  log info "backup written" ",\"file\":\"$name\",\"bytes\":$bytes,\"seconds\":$(($(date +%s) - started)),\"source\":\"render-export\""
+  if [ -n "${BACKUP_S3_BUCKET:-}" ]; then
+    upload "$final" "$name"
+    upload "$final.sha256" "$name.sha256"
+  fi
+  if [ "$KEEP_DAYS" -gt 0 ]; then
+    pruned=$(find "$DIR" -maxdepth 1 -type f \( -name 'shapesos-*.dir.tar.gz' -o -name 'shapesos-*.dir.tar.gz.sha256' \) -mtime +"$KEEP_DAYS" -print -delete | wc -l | tr -d ' ')
+    log info "retention applied" ",\"keepDays\":$KEEP_DAYS,\"deleted\":$pruned"
+  fi
+}
+
+run_once() {
+  case "${BACKUP_SOURCE:-pg_dump}" in
+    pg_dump) backup_once ;;
+    render-export) render_export_once ;;
+    *) fail "BACKUP_SOURCE must be pg_dump or render-export" ;;
+  esac
 }
 
 upload() {
@@ -112,9 +202,9 @@ if [ "${1:-}" = "--loop" ]; then
   case "$INTERVAL" in '' | *[!0-9]*) fail "BACKUP_INTERVAL_SECONDS must be a whole number" ;; esac
   while true; do
     # A failed run is logged and retried next interval; the loop keeps going.
-    (backup_once) || log error "backup run failed; retrying next interval"
+    (run_once) || log error "backup run failed; retrying next interval"
     sleep "$INTERVAL"
   done
 else
-  backup_once
+  run_once
 fi

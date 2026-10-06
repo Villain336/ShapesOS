@@ -20,14 +20,30 @@
 // when saturated. Cross-process queuing is slice 7/8 scope.
 
 import { promises as fs } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { chromium } from "playwright";
 import type { Browser, BrowserContext, CDPSession, Page } from "playwright";
 import type { AgentRunEventInput } from "./types";
 import { attachWatch } from "./watch";
 
-/** Repo-local host-owned artifact root (gitignored). */
+/**
+ * Legacy artifact root (gitignored): recordings made before the deploy PR
+ * live here, and it is the "run-recordings" blob namespace's directory with
+ * MARKETR_STORAGE=local. New recordings are written to a scratch directory
+ * (scratchArtifactDir) and published to the shared blob store on stop
+ * (lib/agents/runs/artifacts.ts publishRecordingArtifacts).
+ */
 export const ARTIFACT_ROOT = path.join(process.cwd(), ".run-artifacts");
+
+/**
+ * Scratch directory for one live recording (class b: Playwright writes the
+ * WebM and trace here while the run works; the lifecycle uploads and removes
+ * it). Under os.tmpdir() so it never lands in an image layer or a shared path.
+ */
+export function scratchArtifactDir(runId: string): string {
+  return path.join(os.tmpdir(), "shapes-run-artifacts", runId.replace(/[^A-Za-z0-9_-]/g, "_"));
+}
 
 /** Recording video size (matches the dashboard viewer surface). */
 export const RECORDING_VIDEO_SIZE = { width: 1280, height: 800 } as const;
@@ -255,7 +271,7 @@ export function _activeRecordingCountForTests(): number {
 
 export interface RecorderOptions {
   runId: string;
-  /** Artifact directory override; defaults to .run-artifacts/<runId>. */
+  /** Artifact directory override; defaults to a scratch dir (scratchArtifactDir). */
   artifactDir?: string;
   /** Injected launcher (tests); production uses playwrightLauncher. */
   launcher?: BrowserLauncher;
@@ -268,6 +284,11 @@ export interface RecorderOptions {
    * permanent record.
    */
   watch?: boolean;
+  /**
+   * Deploy PR: the run's workspace. With it the live watch is also relayed
+   * through Postgres so a web replica (not just this process) can serve it.
+   */
+  workspaceId?: string;
   /** Timeline sink — lifecycle.ts persists these as AgentRunEvent rows. */
   onTimelineEvent?: (event: AgentRunEventInput) => void | Promise<void>;
   /** Phase 8: per-request URL guard (SSRF) handed to the browser context. */
@@ -296,8 +317,8 @@ export interface StoppedRecording {
  * idempotent-ish: it always releases the slot and closes the browser.
  */
 export class AgentRunRecorder {
-  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest">> &
-    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest"> & { artifactDir: string };
+  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest" | "workspaceId">> &
+    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest" | "workspaceId"> & { artifactDir: string };
   private browser: RecorderBrowser | null = null;
   private context: RecorderContext | null = null;
   private slotHeld = false;
@@ -309,7 +330,7 @@ export class AgentRunRecorder {
 
   constructor(options: RecorderOptions) {
     if (!options.runId) throw new Error("AgentRunRecorder: runId is required");
-    const artifactDir = options.artifactDir ?? path.join(ARTIFACT_ROOT, options.runId);
+    const artifactDir = options.artifactDir ?? scratchArtifactDir(options.runId);
     this.opts = { ...options, artifactDir };
     this.tracePath = path.join(artifactDir, "trace.zip");
   }
@@ -339,7 +360,7 @@ export class AgentRunRecorder {
       // is a no-op (null) when the page cannot screencast — the run
       // proceeds unwatched rather than failing.
       if (this.opts.watch) {
-        this.watchDetach = await attachWatch(page, this.opts.runId);
+        this.watchDetach = await attachWatch(page, this.opts.runId, this.opts.workspaceId);
       }
       await this.emitTimeline({
         type: "browser",

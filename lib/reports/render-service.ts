@@ -13,6 +13,11 @@
 // Sandboxing: the Python driver pins base_url to the template directory and
 // installs a url_fetcher that allows ONLY file:// URLs inside the template
 // dir (plus data: URIs) — no network, no filesystem escape.
+//
+// Storage (deploy PR): WeasyPrint writes into a per-render scratch directory
+// under os.tmpdir() (class b, removed in `finally`); the PDF is then stored in
+// the shared blob store (namespace "report-engine", <workspaceId>/report-<stamp>.pdf)
+// and `pdfPath` is that blob ref, readable from every replica.
 
 import { execFile } from "node:child_process";
 import { accessSync, constants as fsConstants, promises as fs } from "node:fs";
@@ -20,6 +25,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { blobPut, workspaceBlobPath } from "@/lib/filesystem/storage";
 import { assertFiguresGrounded, type ReportFigure } from "./figures";
 import { buildBrandOverrideCss, type ReportBrandKitInput } from "./brand-css";
 import { resolveTemplate } from "./templates/registry";
@@ -57,6 +63,8 @@ export interface RenderReportInput {
   figures: ReportFigure[];
   /** Render a DRAFT badge (pre-approval previews). Final reports omit it. */
   draft?: boolean;
+  /** Owning workspace (blob key prefix); previews without one go under "previews". */
+  workspaceId?: string;
 }
 
 export interface RenderReportResult {
@@ -130,10 +138,6 @@ doc.write_pdf(job["out_path"])
 print(len(doc.pages))
 `;
 
-function reportsDir(): string {
-  return path.join(process.cwd(), ".data", "reports", "report-engine");
-}
-
 /**
  * Render a branded report to PDF. Throws on unlinted templates or ungrounded
  * figures — the guardrails run BEFORE any PDF bytes are produced.
@@ -161,11 +165,10 @@ export async function renderReportPdf(input: RenderReportInput): Promise<RenderR
     `<style>\n${template.css}\n${buildBrandOverrideCss(input.brandKit)}\n</style>\n</head>`,
   );
 
-  const dir = reportsDir();
-  await fs.mkdir(dir, { recursive: true });
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "marketr-report-"));
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const outPath = path.join(dir, `report-${stamp}.pdf`);
-  const jobPath = path.join(os.tmpdir(), `marketr-report-job-${stamp}.json`);
+  const jobPath = path.join(dir, `job-${stamp}.json`);
 
   const job = JSON.stringify({
     html,
@@ -175,26 +178,35 @@ export async function renderReportPdf(input: RenderReportInput): Promise<RenderR
   await fs.writeFile(jobPath, job, "utf8");
 
   let stdout: string;
+  let bytes: Buffer;
   try {
-    ({ stdout } = await execFileAsync(WEASYPRINT_PYTHON, ["-c", DRIVER, jobPath], {
-      timeout: 120_000,
-      maxBuffer: 8 * 1024 * 1024,
-    }));
-  } catch (err) {
-    throw new Error(
-      `WeasyPrint render failed (python: ${WEASYPRINT_PYTHON}): ${err instanceof Error ? err.message : String(err)}`,
-    );
+    try {
+      ({ stdout } = await execFileAsync(WEASYPRINT_PYTHON, ["-c", DRIVER, jobPath], {
+        timeout: 120_000,
+        maxBuffer: 8 * 1024 * 1024,
+      }));
+    } catch (err) {
+      throw new Error(
+        `WeasyPrint render failed (python: ${WEASYPRINT_PYTHON}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    bytes = await fs.readFile(outPath);
   } finally {
-    await fs.unlink(jobPath).catch(() => undefined);
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
 
   const pageCount = Number.parseInt(stdout.trim(), 10);
-  const stat = await fs.stat(outPath);
+  const pdfPath = await blobPut(
+    "report-engine",
+    workspaceBlobPath(input.workspaceId ?? "previews", `report-${stamp}.pdf`),
+    bytes,
+    "application/pdf",
+  );
   return {
-    pdfPath: outPath,
+    pdfPath,
     templateName: template.name,
     templateVersion: template.version,
     pageCount: Number.isFinite(pageCount) ? pageCount : 0,
-    sizeBytes: stat.size,
+    sizeBytes: bytes.length,
   };
 }

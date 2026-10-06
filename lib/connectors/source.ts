@@ -17,7 +17,7 @@ import { getSiteFileProvider } from "@/lib/sitefiles";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { GitHubSiteFileProvider } from "./github";
 import { MockGitHubConnector } from "./mock-github";
-import { LocalDirProvider, siteWorkingDir } from "./local";
+import { siteWorkingCopy, type WorkingCopyProvider } from "./local";
 import { WordPressConnector } from "./wordpress";
 import type { SafeFetchOptions } from "./safe-fetch";
 import { MockWordPressConnector } from "./mock-wordpress";
@@ -60,9 +60,13 @@ export async function ownedSite(userId: string, projectId: unknown, siteId: unkn
 
 export type OwnedSite = NonNullable<Awaited<ReturnType<typeof ownedSite>>>;
 
-/** The provider the IDE edits: always the local working copy. */
-export async function getSiteIdeProvider(site: OwnedSite): Promise<LocalDirProvider> {
-  const provider = new LocalDirProvider(siteWorkingDir(site.id));
+/**
+ * The provider the IDE edits: always the site's working copy — a local
+ * directory on a single box, the shared blob store when MARKETR_STORAGE=s3
+ * (deploy PR: every replica edits the same copy).
+ */
+export async function getSiteIdeProvider(site: OwnedSite): Promise<WorkingCopyProvider> {
+  const provider = siteWorkingCopy(site.id);
   await provider.ensureRoot();
   return provider;
 }

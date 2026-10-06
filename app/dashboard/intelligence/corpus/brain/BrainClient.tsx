@@ -137,7 +137,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
         const res = await fetch(`/api/corpus/remove?sourceId=${encodeURIComponent(selected.id)}`, {
           method: "DELETE",
         });
-        if (!res.ok) throw new Error("unflag failed");
+        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "unflag failed");
         setActionMsg({ tone: "green", text: "Removal flag cleared." });
       } else {
         const res = await fetch("/api/corpus/remove", {
@@ -145,14 +145,16 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId: selected.id, reason: flagReason || "Flagged from the Knowledge Brain." }),
         });
-        if (!res.ok) throw new Error("flag failed");
+        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "flag failed");
         setActionMsg({ tone: "green", text: "Source flagged for removal — takes effect on the next rebuild." });
         setFlagReason("");
       }
       await fetchGraph();
       setActivityKey((k) => k + 1);
-    } catch {
-      setActionMsg({ tone: "red", text: "Action failed — please retry." });
+    } catch (e) {
+      // A read-only (multi-instance) install explains why in the error itself.
+      const msg = e instanceof Error && !/^(un)?flag failed$/.test(e.message) ? e.message : "Action failed — please retry.";
+      setActionMsg({ tone: "red", text: msg });
     } finally {
       setFlagging(false);
     }

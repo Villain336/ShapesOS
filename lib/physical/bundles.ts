@@ -44,6 +44,7 @@ import { ATTRIBUTION_MODELS, type AttributionModel } from "@/lib/attribution/mod
 import { createLeadRecord } from "@/lib/crm/leads";
 import { normalizePhone } from "@/lib/calls/inbound";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
+import { __resetLocalWindows, sharedWindowHit } from "@/lib/api/rate-limit-store";
 
 export type BundleWithNumber = AttributionBundle & {
   number: { id: string; e164: string; status: string } | null;
@@ -534,32 +535,23 @@ export async function redeemPromoCode(input: RedeemInput): Promise<RedeemResult>
 }
 
 // ---------------------------------------------------------------------------
-// Per-code+IP rate limiter for the public redeem endpoint (10/min).
-// In-memory fixed windows, single-instance by design — same stance as
-// lib/api/rate-limit.ts. The proxy's write tier (60/min/IP) is the outer
-// bound; this is the tighter per-code bound.
+// Per-code+IP rate limiter for the public redeem endpoint (10/min). The
+// proxy's write tier (60/min/IP) is the outer bound; this is the tighter
+// per-code bound. Deploy PR: the fixed window lives in the shared counter
+// store (lib/api/rate-limit-store.ts sharedWindowHit) so it holds across
+// replicas, failing open to the per-process window on a store error.
 // ---------------------------------------------------------------------------
 
-const REDEEM_BUCKETS = new Map<string, { count: number; resetAt: number }>();
-const REDEEM_LIMIT = 10;
-const REDEEM_WINDOW_MS = 60_000;
+export const REDEEM_LIMIT = { limit: 10, windowMs: 60_000 } as const;
 
-export function checkRedeemRateLimit(code: string, ip: string): boolean {
-  const key = `${code.trim().toUpperCase()}|${ip.trim().toLowerCase()}`;
-  const now = Date.now();
-  const cur = REDEEM_BUCKETS.get(key);
-  if (!cur || now >= cur.resetAt) {
-    REDEEM_BUCKETS.set(key, { count: 1, resetAt: now + REDEEM_WINDOW_MS });
-    return true;
-  }
-  if (cur.count >= REDEEM_LIMIT) return false;
-  cur.count += 1;
-  return true;
+export async function checkRedeemRateLimit(code: string, ip: string, now: number = Date.now()): Promise<boolean> {
+  const key = `bundle-redeem:${code.trim().toUpperCase()}|${ip.trim().toLowerCase()}`;
+  return (await sharedWindowHit(key, REDEEM_LIMIT, now)).allowed;
 }
 
-/** Test hook: clear redeem rate-limit state. */
+/** Test hook: clear the per-process fallback windows. */
 export function resetRedeemRateLimits(): void {
-  REDEEM_BUCKETS.clear();
+  __resetLocalWindows();
 }
 
 // ---------------------------------------------------------------------------

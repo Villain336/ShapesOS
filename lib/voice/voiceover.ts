@@ -3,8 +3,11 @@
 // VoiceoverJob: script → (pronunciation snapshot) → VoiceStudio → audio
 // bytes → workspace file store → ready | failed. Audio is stored with the
 // EXISTING workspace file store (lib/filesystem/storage.ts — UUID keys,
-// LocalDiskAdapter), the same pattern 13C uses for outputRef/file refs:
-// the job's audioRef IS the storage key. No new storage invented.
+// getStorageAdapter(): local disk or the shared S3 bucket per
+// MARKETR_STORAGE — deploy PR; it used to pin LocalDiskAdapter, so a
+// voiceover rendered on the worker was invisible to the web replicas), the
+// same pattern 13C uses for outputRef/file refs: the job's audioRef IS the
+// storage key. No new storage invented.
 //
 // Lifecycle: pending → processing (progress 0→1) → ready | failed.
 // create() validates; process() runs the render; attachToClip() links the
@@ -14,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { LocalDiskAdapter } from "@/lib/filesystem/storage";
+import { getStorageAdapter } from "@/lib/filesystem/storage";
 import {
   synthesizeWithKnownVoice,
   isBackendDown,
@@ -27,7 +30,11 @@ import {
 } from "./pronunciation";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
-const adapter = new LocalDiskAdapter();
+const adapter = {
+  put: (key: string, bytes: Buffer, mime: string) => getStorageAdapter().put(key, bytes, mime),
+  get: (key: string) => getStorageAdapter().get(key),
+  delete: (key: string) => getStorageAdapter().delete(key),
+};
 
 export interface VoiceoverJobRow {
   id: string;

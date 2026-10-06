@@ -187,7 +187,7 @@ describe("figure grounding eval: render service never renders invented numbers",
     assert.ok(result.pdfPath);
     assert.ok(result.sizeBytes > 10_000, `PDF suspiciously small: ${result.sizeBytes}`);
     // Cleanup: the eval must not leave PDFs behind.
-    const { promises: fs } = await import("node:fs");
-    await fs.unlink(result.pdfPath).catch(() => undefined);
+    const { deleteStoredRef } = await import("@/lib/filesystem/storage");
+    await deleteStoredRef(result.pdfPath, "report-engine").catch(() => undefined);
   });
 });

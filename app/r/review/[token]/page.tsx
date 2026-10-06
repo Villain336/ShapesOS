@@ -25,7 +25,7 @@ export default async function ReviewLandingPage({
   const { headers } = await import("next/headers");
   const h = await headers();
   const ip = clientIpFromHeaders(h) ?? "unknown";
-  if (!checkReviewPageRateLimit(clean, ip)) {
+  if (!(await checkReviewPageRateLimit(clean, ip))) {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
         <p className="text-sm text-muted">Too many requests — please try again in a minute.</p>

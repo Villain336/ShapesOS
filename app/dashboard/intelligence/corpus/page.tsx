@@ -1,17 +1,17 @@
 // Marketr — Phase 10 M9: Expert corpus browser (server page).
-// Reads the workspace-agnostic corpus manifest (data/corpus/manifest.json)
-// on the server and hands it to CorpusClient for tabs/tables.
+// Reads the workspace-agnostic corpus manifest (corpusDir()/manifest.json —
+// data/corpus on a single box; the refreshed read cache of the published
+// snapshot on a shared install, deploy PR) and hands it to CorpusClient.
 // House style per StudioApp.tsx (diffed class-by-class).
 
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import fs from "node:fs";
-import path from "node:path";
 import { Brain } from "lucide-react";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { CorpusClient } from "./CorpusClient";
-import type { CorpusManifest } from "@/lib/intelligence/corpus/types";
+import { loadManifest } from "@/lib/intelligence/corpus/store";
+import { ensureCorpusFresh } from "@/lib/intelligence/corpus/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -21,16 +21,6 @@ export const metadata = {
     "ShapesOS's expert knowledge base: licensed marketing sources, Tier 1S original syntheses, chunk counts, licenses, and eval precision.",
 };
 
-function readManifest(): CorpusManifest | null {
-  try {
-    const p = path.join(process.cwd(), "data", "corpus", "manifest.json");
-    if (!fs.existsSync(p)) return null;
-    return JSON.parse(fs.readFileSync(p, "utf8")) as CorpusManifest;
-  } catch {
-    return null;
-  }
-}
-
 export default async function CorpusPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -38,7 +28,8 @@ export default async function CorpusPage() {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "viewer");
   if (!membership) redirect("/dashboard");
 
-  const manifest = readManifest();
+  await ensureCorpusFresh();
+  const manifest = loadManifest();
 
   return (
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">

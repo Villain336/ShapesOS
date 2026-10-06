@@ -1,10 +1,14 @@
-# Marketr — First Real Deployment (Launchabl internal beta)
+# Deploying ShapesOS
 
-**Goal:** get Marketr running on real infrastructure with a real database, live API keys, and real
-third-party connections, then exercise the full loop end-to-end:
-research → content → publishing → ranking → site-fix.
+**Hosted production (shapesos.com, app.shapesos.com) is on Render.** Start here:
 
-**Status:** SPEC — not yet executed. Nothing here runs until Tico approves.
+- [docs/deploy/RENDER.md](docs/deploy/RENDER.md): the Render setup, release, rollback, backups and restore, step by step.
+- [docs/deploy/OWNER-CHECKLIST.md](docs/deploy/OWNER-CHECKLIST.md): the ~45 minutes only the owner can do (accounts, payment, domain, keys).
+- [docs/deploy/AWS.md](docs/deploy/AWS.md): when and how to move to AWS (the CDK app in `infra/aws`).
+
+The code lives on GitHub (`Villain336/ShapesOS`). CI, the release workflow and the container images are all built from it; releases are a merge to `main` plus the owner's approval of the `production` environment.
+
+The rest of this file is the **self-host runbook**: one machine with Docker Compose (the setup an operator uses to run their own ShapesOS). Its sections (§1a database image and storage, §1b roles and secrets, §3.8 cron) are referenced from the code and tests, and still apply to self-hosting.
 
 ---
 
@@ -131,8 +135,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
 
 1. **Provision:** fresh Ubuntu 24.04, create deploy user, install Docker + Caddy.
 2. **DNS:** A record `marketr.launchabl.com` → VPS IP. Confirm propagation.
-3. **Code:** `git clone` the vault repo to `/opt/marketr` (local-only remote — this stays private;
-   no GitHub remote is created).
+3. **Code:** `git clone` the repository (`https://github.com/Villain336/ShapesOS`, private — use a
+   deploy key or a token with read access) to `/opt/marketr`.
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
 5. **Start:** set the §1b secrets, then `docker compose up -d --build` (§1a covers what the defaults do).
 6. **Migrations:** watch the `migrate` service logs — `scripts/db/migrate.sh` (`prisma migrate deploy`) must apply all migrations cleanly
@@ -250,10 +254,9 @@ Run in order; each step must pass before the next.
 
 ## 4c. Studio environment requirements (milestone 22: Porkbun domains)
 
-- **Single-instance limitation:** domain-purchase confirmation tokens live in
-  process memory (5-minute TTL). The purchase confirm MUST hit the same app
-  instance — run a single app container (or sticky sessions) until these move
-  to Redis/shared storage.
+- **Purchase confirmation tokens** (5-minute TTL) live in Postgres
+  (`single_use_tokens`, stored hashed and consumed once), so the confirm may
+  hit any app instance — no sticky sessions needed.
 - **Porkbun:** API keys are entered per-workspace in the Studio → Domains tab
   (encrypted with `MARKETR_CREDENTIALS_KEY`; only the key tail is shown back).
   Porkbun registration uses the account's default registrant contact — the
@@ -344,8 +347,9 @@ Run in order; each step must pass before the next.
 
 ## 6. Rollback
 
-- Every milestone is a git commit; tag the deploy: `git tag deploy-2026-09-21 && git push` — **no, vault rule:**
-  tags stay local too. Rollback = `git checkout <previous-commit> && docker compose up -d --build`.
+- Every milestone is a git commit; tag what you deploy (`git tag deploy-2026-09-21 && git push --tags`).
+  Rollback = `git checkout <previous-tag> && docker compose up -d --build`. (Hosted: roll back in the
+  release workflow or the Render dashboard — docs/deploy/RENDER.md §11.)
 - Database: restore from the nightly `pg_dump`. Migrations are forward-only; a code rollback with a
   newer DB schema is safe as long as no migration is reverted (none planned).
 
@@ -357,10 +361,8 @@ the loop.
 
 ---
 
-## Decisions needed from Tico
+## Decisions
 
-1. **VPS provider** — default to Hetzner unless you prefer otherwise.
-2. **Domain/subdomain** — default `marketr.launchabl.com`.
-3. **API keys** — DataForSEO + one LLM key, via Secure Vault when you're ready.
-4. **Test targets** — which staging SFTP host / WP install / Webflow workspace to point at.
-5. **Timing** — say the word and the §1a volume fix + full runbook gets executed.
+The hosting decision is made (owner, 2026-10-05): Render now, AWS-ready, move when a trigger in
+docs/deploy/AWS.md hits. For a self-hosted machine the choices are yours: provider, domain, and
+which keys to set (docs/KEYS.md lists every key and where it comes from).

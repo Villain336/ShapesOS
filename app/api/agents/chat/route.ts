@@ -74,27 +74,32 @@ export async function POST(req: Request) {
     data: { threadId: thread.id, role: "user", content },
   });
 
-  const events = streamChatTurnAgui({
-    projectId: thread.projectId,
-    workspaceId: thread.project.workspaceId,
-    userId: user.id,
-    role: membership.role,
-    threadId: thread.id,
-    userContent: content,
-    attachmentIds,
-    // Phase 16 slice 4: UI→agent shared state (may be absent).
-    incomingState: (state ?? undefined) as import("@/lib/agents/agui/shared-state").SharedAgentState | undefined,
-  });
-
-  // Title the thread once the stream completes (best-effort, non-blocking).
-  const tracked = (async function* () {
-    try {
-      yield* events;
-    } finally {
-      // Awaited so the client's re-read of the thread sees the new title.
-      await maybeAutoTitle(thread.id, content).catch(() => undefined);
-    }
-  })();
-
-  return aguiStreamResponse(tracked);
+  // Deploy PR: the SSE layer hands the adapter its hooks — every frame gets
+  // the run cursor as its id, and a draining server ends the stream with
+  // `event: reconnect` (resume on GET /api/agents/chat/stream).
+  return aguiStreamResponse(
+    (hooks) =>
+      (async function* () {
+        try {
+          yield* streamChatTurnAgui(
+            {
+              projectId: thread.projectId,
+              workspaceId: thread.project.workspaceId,
+              userId: user.id,
+              role: membership.role,
+              threadId: thread.id,
+              userContent: content,
+              attachmentIds,
+              // Phase 16 slice 4: UI→agent shared state (may be absent).
+              incomingState: (state ?? undefined) as import("@/lib/agents/agui/shared-state").SharedAgentState | undefined,
+            },
+            { onCursor: hooks.onCursor, shouldReconnect: hooks.shouldReconnect },
+          );
+        } finally {
+          // Title the thread once the stream completes (best-effort).
+          // Awaited so the client's re-read of the thread sees the new title.
+          await maybeAutoTitle(thread.id, content).catch(() => undefined);
+        }
+      })(),
+  );
 }

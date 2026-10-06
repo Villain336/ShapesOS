@@ -8,9 +8,8 @@
 // The brief is a PLANNING document — estimates only, no spend authorized,
 // no API send path. Copy never implies Marketr mailed anything.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { ReactElement } from "react";
+import { blobGetFirst, blobPath, blobPut, encodeBlobSegment, localBlobDir, workspaceBlobPath } from "@/lib/filesystem/storage";
 import { Document, Page, View, Text as SpanText, Image as PdfImage } from "@/lib/pdf-primitives";
 import { PdfcnThemeProvider } from "@/components/pdf/theme-provider";
 import { professionalTheme } from "@/components/pdf/theme-professional";
@@ -45,10 +44,18 @@ import {
 } from "@/lib/mail/eddm";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
+/**
+ * Local directory of the "eddm-briefs" blob namespace (MARKETR_STORAGE=local;
+ * EDDM_BRIEF_STORAGE_DIR, default .data/eddm-briefs). Deploy PR: briefs are
+ * stored through the shared blob layer as <workspaceId>/<orderId>.pdf.
+ */
 export function eddmBriefStorageDir(): string {
-  const override = (process.env.EDDM_BRIEF_STORAGE_DIR ?? "").trim();
-  if (override) return override;
-  return path.join(process.cwd(), ".data", "eddm-briefs");
+  return localBlobDir("eddm-briefs");
+}
+
+/** The stored brief PDF for an order (new workspace-scoped key, then the legacy one). */
+export async function readEddmBriefPdf(workspaceId: string, orderId: string): Promise<Buffer | null> {
+  return blobGetFirst("eddm-briefs", [workspaceBlobPath(workspaceId, `${orderId}.pdf`), blobPath(encodeBlobSegment(orderId) + ".pdf")]);
 }
 
 export interface EddmBriefCreative {
@@ -305,6 +312,7 @@ export interface GenerateEddmBriefInput {
 }
 
 export interface GenerateEddmBriefResult {
+  /** Blob ref of the stored brief ("blob:eddm-briefs/…"); served by briefPdfUrl. */
   pdfPath: string;
   briefPdfUrl: string;
   qrSlug: string;
@@ -396,10 +404,7 @@ export async function generateEddmBriefPdf(
   });
   const pdf = await renderPdf(element);
 
-  const dir = eddmBriefStorageDir();
-  await fs.mkdir(dir, { recursive: true });
-  const pdfPath = path.join(dir, `${order.id}.pdf`);
-  await fs.writeFile(pdfPath, pdf);
+  const pdfPath = await blobPut("eddm-briefs", workspaceBlobPath(input.workspaceId, `${order.id}.pdf`), Buffer.from(pdf), "application/pdf");
 
   const briefPdfUrl = `/api/eddm/orders/${order.id}/brief-pdf`;
   await prisma.eddmOrder.update({

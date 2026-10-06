@@ -4,8 +4,13 @@
 // Runs are long (prompts × reps × engines, official APIs). The run executes
 // in the background; the response returns the run id immediately. Progress
 // is read back via /api/intelligence/geo/summary (latestRunAt / runCount).
+// Deploy PR: the background run is handed to Next's after() and tracked by
+// the shutdown path (lib/runtime/shutdown.ts), so a deploy's SIGTERM waits
+// for it within SHUTDOWN_GRACE_MS instead of cutting it at once.
 
+import { after } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { trackBackgroundWork } from "@/lib/runtime/shutdown";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { runPanel, type GeoEngine } from "@/lib/intelligence/geo/runner";
 import { GEO_ENGINES } from "@/lib/intelligence/geo/panels";
@@ -48,6 +53,8 @@ export async function POST(req: Request) {
       inFlight.delete(runId);
     });
   inFlight.set(runId, promise);
+  trackBackgroundWork(promise);
+  after(() => promise);
 
   return Response.json(
     {

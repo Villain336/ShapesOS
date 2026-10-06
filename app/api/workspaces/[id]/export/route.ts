@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!ws) return Response.json({ error: "Workspace not found." }, { status: 404 });
 
     const slot = `workspace:${ws.id}`;
-    if (!claimExportSlot(slot)) {
+    if (!(await claimExportSlot(slot))) {
       return Response.json({ error: "An export of this workspace is already running. Try again when it finishes." }, { status: 429 });
     }
     try {
@@ -40,7 +40,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         },
       });
     } catch (err) {
-      releaseExportSlot(slot);
+      await releaseExportSlot(slot);
       throw err;
     }
     const now = new Date();

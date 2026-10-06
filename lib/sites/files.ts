@@ -1,15 +1,16 @@
 // ShapesOS — Phase 9 (sites): a SiteBuilder site's files as one snapshot.
 //
-// The canonical store of a site's files is its LOCAL WORKING COPY
-// (lib/connectors/local.ts siteWorkingDir — the builder, the IDE, the fix
-// agent and every hosting deploy read and write it). This module reads it as
+// The canonical store of a site's files is its WORKING COPY
+// (lib/connectors/local.ts siteWorkingCopy — the builder, the IDE, the fix
+// agent and every hosting deploy read and write it; a local directory on a
+// single box, the shared blob store with MARKETR_STORAGE=s3). This module reads it as
 // a list of text files, fingerprints it (so an agent draft can tell whether
 // the site moved on since it was checked out) and writes a snapshot back.
 // Sites are text-only by construction (LocalDirProvider refuses binaries and
 // files over 200 KB), and so are snapshots.
 
 import { createHash } from "node:crypto";
-import { LocalDirProvider, siteWorkingDir } from "@/lib/connectors/local";
+import { siteWorkingCopy, type WorkingCopyProvider } from "@/lib/connectors/local";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 
 export interface SiteFile {
@@ -64,14 +65,14 @@ export function assertSnapshotSize(files: readonly SiteFile[]): void {
   }
 }
 
-export function workingCopy(siteId: string): LocalDirProvider {
-  return new LocalDirProvider(siteWorkingDir(siteId));
+export function workingCopy(siteId: string): WorkingCopyProvider {
+  return siteWorkingCopy(siteId);
 }
 
 /** Every text file of a site's working copy (unreadable ones are listed, not fatal). */
 export async function readSiteWorkingCopy(
   siteId: string,
-  provider: LocalDirProvider = workingCopy(siteId),
+  provider: WorkingCopyProvider = workingCopy(siteId),
 ): Promise<{ files: SiteFile[]; skipped: SkippedFile[] }> {
   const files: SiteFile[] = [];
   const skipped: SkippedFile[] = [];
@@ -96,7 +97,7 @@ export async function readSiteWorkingCopy(
 export async function writeSiteWorkingCopy(
   siteId: string,
   files: readonly SiteFile[],
-  provider: LocalDirProvider = workingCopy(siteId),
+  provider: WorkingCopyProvider = workingCopy(siteId),
 ): Promise<{ written: number; removed: string[] }> {
   await provider.ensureRoot();
   const keep = new Set<string>();

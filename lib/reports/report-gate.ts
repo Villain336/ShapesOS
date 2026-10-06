@@ -200,6 +200,7 @@ export async function approveReportSend(
 
   try {
     const rendered = await renderReportPdf({
+      workspaceId: args.workspaceId,
       templateName: row.templateName,
       templateVersion: row.templateVersion,
       brandKit,
