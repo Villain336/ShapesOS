@@ -284,7 +284,10 @@ function SettingsApp() {
                 <span className="row-title">
                   {p.title}: {permissionText(s)}
                 </span>
-                <span className="helper">{p.why}</span>
+                <span className="helper">
+                  {p.why}
+                  {p.kind === "screen" && s !== "granted" && st.platform === "darwin" ? " After you allow it, quit and reopen ShapesOS: macOS applies screen recording on restart." : ""}
+                </span>
               </div>
               {s === "granted" ? (
                 <ShieldCheck size={20} aria-label="Allowed" />
