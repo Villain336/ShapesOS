@@ -49,7 +49,7 @@ import type {
 import { BriefingBody } from "./BriefingBody";
 // Phase 18.1 (integration): every view gets the person's translator + locale
 // (app/dashboard/page.tsx → getI18n); English when rendered without one.
-import { createTranslator, type Translator } from "@/lib/i18n";
+import { createTranslator, toolLabel, type Translator } from "@/lib/i18n";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/i18n/locales";
 
 export interface ViewI18n {
@@ -226,7 +226,18 @@ function WorkView({ data, i18n: { t } }: ViewProps<{ cards: WorkCard[] }>) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {data.cards.map((c) => (
-        <AgentCard key={c.key} status={c.status} badgeLabel={t(`status.${c.status}`)} title={c.title} eyebrow={c.eyebrow} description={c.description} tools={c.tools} meta={c.meta} action={c.action} />
+        <AgentCard
+          key={c.key}
+          status={c.status}
+          badgeLabel={t(`status.${c.status}`)}
+          title={c.title}
+          eyebrow={c.eyebrow}
+          description={c.description}
+          tools={c.tools}
+          toolLabels={Object.fromEntries(c.tools.map((tool) => [tool, toolLabel(t, tool)]))}
+          meta={c.meta}
+          action={c.action}
+        />
       ))}
     </div>
   );

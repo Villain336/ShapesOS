@@ -83,6 +83,13 @@ export function settingsPageText(messages: Catalogue, href: string): { label?: s
   return pages[href] ?? {};
 }
 
+/** Phase 18.1 (integration): an agent tool chip's name in the active language (unknown names unchanged). */
+export function toolLabel(t: Translator, name: string): string {
+  const key = `kit.tools.${name}`;
+  const out = t(key as MessageKey);
+  return out === key ? name : out;
+}
+
 /** Phase 18.1 (integration): a desktop widget's title/description in the active catalogue. */
 export function widgetText(messages: Catalogue, id: string): { title?: string; description?: string } {
   const widgets = (messages.desk?.widgets as Record<string, { title: string; description: string } | undefined>) ?? {};

@@ -15,6 +15,8 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { cn } from "@/lib/utils";
 import { feedback, type FeedbackState, type ToastRecord } from "@/lib/ui/feedback";
 import { ToastView } from "@/components/aos/Toast";
+// Phase 18.1 (integration): the toast region's name in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 const EMPTY: FeedbackState = { toasts: [], confirm: null };
 
@@ -116,6 +118,7 @@ function ToastItem({ t }: { t: ToastRecord }) {
 }
 
 export function FeedbackHost() {
+  const { t: tr } = useI18n();
   const state = useSyncExternalStore(
     (fn) => feedback.subscribe(fn),
     () => feedback.getState(),
@@ -127,7 +130,7 @@ export function FeedbackHost() {
     <>
       <ConfirmDialog state={state} />
       <section
-        aria-label="Notifications"
+        aria-label={tr("kit.toasts")}
         aria-live="polite"
         className="pointer-events-none fixed right-4 bottom-4 z-[95] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
       >

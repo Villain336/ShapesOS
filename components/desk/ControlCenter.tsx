@@ -146,6 +146,7 @@ export function ControlCenter() {
       title: t("desk.control.confirmTitle"),
       description: t("desk.control.confirmBody", { count: state?.liveRuns ?? 0 }),
       confirmLabel: t("desk.control.pauseAll"),
+      cancelLabel: t("common.cancel"),
       destructive: true,
     });
     if (!ok) return;

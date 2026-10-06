@@ -10,7 +10,7 @@ import { LEAD_AGENT } from "@/lib/aos/agents";
 import { progressFraction, stepNumbers } from "@/lib/aos/run-steps";
 import { cn } from "@/lib/utils";
 // Phase 18.1 (integration): the card's words in the person's language (English by default).
-import { createTranslator, type Translator } from "@/lib/i18n";
+import { createTranslator, toolLabel, type Translator } from "@/lib/i18n";
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentTree } from "./AgentTree";
 import { aosButton } from "./button";
@@ -76,8 +76,8 @@ export function LeadAgentCard({
           </div>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {LEAD_AGENT.tools.map((t) => (
-            <ToolChip key={t} name={t} variant="tag" />
+          {LEAD_AGENT.tools.map((tool) => (
+            <ToolChip key={tool} name={tool} label={toolLabel(t, tool)} variant="tag" />
           ))}
         </div>
       </div>

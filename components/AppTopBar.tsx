@@ -35,6 +35,8 @@ export function AppTopBar() {
       {onSplit ? null : (
         <Link
           href={splitHref(pathname)}
+          // Split view loads two panes; never prefetch it from every page.
+          prefetch={false}
           aria-label={t("desk.split.openHere")}
           title={t("desk.split.openHint")}
           className="inline-flex size-10 items-center justify-center rounded-full text-ink transition-[background-color] duration-150 ease-aos hover:bg-hover"

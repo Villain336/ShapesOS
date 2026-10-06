@@ -128,7 +128,14 @@ export default async function DashboardPage() {
       {banners.length ? (
         <div className="flex flex-col gap-2.5" aria-label={t("home.attention")}>
           {banners.map((b) => (
-            <Banner key={b.key} status={b.status as "needs" | "failed"} title={b.title} description={b.description} action={b.action} />
+            <Banner
+              key={b.key}
+              status={b.status as "needs" | "failed"}
+              statusLabel={t(`status.${b.status as "needs" | "failed"}`)}
+              title={b.title}
+              description={b.description}
+              action={b.action}
+            />
           ))}
         </div>
       ) : null}

@@ -531,6 +531,16 @@ export const en = {
     subAgentRow: "{name}: {status}. {line}",
     noSubAgents: "No sub-agents are working right now.",
     stopRun: "Stop run",
+    toasts: "Notifications",
+    // Agent tool chips (lib/aos/agents + activity TOOL_NAMES), keyed by their English name.
+    tools: {
+      "Web search": "Web search",
+      Email: "Email",
+      Calendar: "Calendar",
+      Files: "Files",
+      Memory: "Memory",
+      "Code runner": "Code runner",
+    },
     newTask: "New task",
     newTaskHint: "New task (⌘N)",
     projectForm: {

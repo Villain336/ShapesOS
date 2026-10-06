@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { aosButton } from "@/components/aos/button";
 import { allNavItems, navItemVisible } from "@/lib/nav/config";
 import { RATIO_MAX, RATIO_MIN, RATIO_STEP, clampRatio, nudgeRatio, sanitizePaneHref, splitUrl, swapPanes, type SplitState } from "@/lib/desktop/split";
-import { recentTitle, type RecentItem } from "@/lib/desktop/recents";
+import { classifyRecent, recentTitle, type RecentItem } from "@/lib/desktop/recents";
 // Phase 18.1 (integration): split view in the person's language.
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -63,7 +63,12 @@ function PaneChooser({ side, value, recents, role, onChange }: { side: Side; val
 
 export function SplitView({ initial, recents, role }: { initial: SplitState; recents: RecentItem[]; role: string }) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, nav } = useI18n();
+  // An app pane is named by its nav label in the person's language; a record by its own title.
+  const paneTitle = (pathname: string, docTitle: string) => {
+    const title = recentTitle(pathname, docTitle);
+    return classifyRecent(pathname) === "app" ? nav(pathname, { label: title, description: "" }).label : title;
+  };
   const paneName = (side: Side) => (side === "left" ? t("desk.split.leftPane") : t("desk.split.rightPane"));
   const [state, setState] = useState(initial);
   // What each pane was told to load (state.left/right track where it is now:
@@ -140,7 +145,7 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
       const doc = frame?.contentDocument;
       if (!loc) return;
       // The same naming rule as recents: an app by its nav label, a record by its own title.
-      if (doc) setTitles((t) => ({ ...t, [side]: recentTitle(loc.pathname, doc.title) }));
+      if (doc) setTitles((prev) => ({ ...prev, [side]: paneTitle(loc.pathname, doc.title) }));
       const href = sanitizePaneHref(`${loc.pathname}${loc.search}`);
       if (href && href !== stateRef.current[side]) sync({ ...stateRef.current, [side]: href });
     } catch {
