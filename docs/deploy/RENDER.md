@@ -291,7 +291,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (253 keys)</summary>
+<details><summary>Not set on Render, on purpose (254 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -306,6 +306,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | hosted deployment | `MARKETR_SELF_HOSTED` |
 | default http://127.0.0.1:$PORT is right | `CRON_RUNNER_ORIGIN` |
 | set per service in render.yaml (heap sized to the plan) | `NODE_OPTIONS` |
+| default 120 reads/min per person per web instance; set it in shapesos-web only if many people share one IP | `RATE_LIMIT_READ_PER_MIN` |
 | local disk path; hosted files live in R2 (MARKETR_STORAGE=s3) | `MARKETR_STORAGE_DIR` |
 | legacy fallback for AUTH_SECRET; leave unset so there is one session secret | `NEXTAUTH_SECRET` |
 | OpenAI-compatible override; OPENAI_API_KEY is used on hosted | `LLM_API_KEY` |
@@ -477,7 +478,7 @@ Restore drill (quarterly, and after major upgrades):
 - **Database**: `plan: 2c-8g` → `4c-16g` (400 connections). Read replicas and high availability (`highAvailability: enabled`, Pro workspace) when uptime needs it.
 - **Long requests**: Render allows HTTP responses up to 100 minutes ([Render vs Vercel](https://render.com/docs/render-vs-vercel-comparison)); Cloudflare closes a proxied connection idle for ~100 s, which the SSE heartbeats (every 15 s) prevent.
 - **Shutdown**: `maxShutdownDelaySeconds` is 120 s on web and 300 s (the maximum) on worker: Render sends SIGTERM, waits, then SIGKILL ([deploys](https://render.com/docs/deploys#graceful-shutdown)).
-- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check). If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
+- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check), plus extra swap (`scripts/ci/add-swap.sh`) because the compile peaks at ~10 GB: past 8 GB it pages out instead of killing the runner, at some cost in build time. If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
 
 ## 15. HIPAA, and when to move to AWS
 

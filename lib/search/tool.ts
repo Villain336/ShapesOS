@@ -15,7 +15,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { RECORD_KINDS, type RecordKind } from "./kinds";
 import { RECORD_MIN_ROLE, spotlight } from "./records";
 import { roleAtLeast } from "@/lib/authz";
-import { storedText } from "./text-index";
+import { storedText } from "./stored-text";
 
 const MAX_RESULTS = 25;
 

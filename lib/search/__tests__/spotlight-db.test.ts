@@ -252,4 +252,27 @@ describe("Spotlight (DB)", () => {
     assert.match(bad.summary, /record must look like/);
     assert.equal(search_workspace.kind, "safe");
   });
+
+  it("the upload write hook indexes a new file in the background (lazy-loaded indexer)", async () => {
+    process.env.SPOTLIGHT_INDEX_ON_WRITE = "on";
+    try {
+      const file = await writeFile({
+        workspaceId: WS,
+        logicalPath: `/files/hook-${RUN}.txt`,
+        kind: "file",
+        bytes: Buffer.from("Codeword cardamonite arrives through the write hook."),
+        mimeType: "text/plain",
+        createdBy: ANA,
+      });
+      let status: string | undefined;
+      for (let i = 0; i < 100 && status !== "indexed"; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        status = (await withWorkspaceScope(WS, (tx) => tx.searchText.findFirst({ where: { workspaceId: WS, fileId: file.id }, select: { status: true } })))?.status;
+      }
+      assert.equal(status, "indexed", "the hook indexed the file without an explicit call");
+      assert.ok((await find("cardamonite")).hits.some((h) => h.id === file.id));
+    } finally {
+      process.env.SPOTLIGHT_INDEX_ON_WRITE = "off";
+    }
+  });
 });
