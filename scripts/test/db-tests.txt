@@ -186,3 +186,5 @@ lib/zernio/__tests__/zernio-routes-db.test.ts
 lib/runtime/__tests__/agent-drain-db.test.ts
 # Phase 17 (latency): async usage metering through the agent_jobs outbox — background ledger write, crash between ledger and run event retried once, dead writer's row finished by a worker, replays idempotent, 0-credit events never take the balance lock, cap still checked before the call.
 lib/llm/__tests__/usage-outbox-db.test.ts
+# Phase 17 (latency): ops overview payments as one SQL aggregate per kind == the in-memory sum (5,200 seeded rows, beyond the old 5,000-row read), RLS-scoped.
+lib/ops/__tests__/overview-payments-db.test.ts
