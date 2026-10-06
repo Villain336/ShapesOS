@@ -353,6 +353,23 @@ enum FileChangeAction {
   // the approved extra-seat ceiling (summaries carry counts and prices only).
   seat_charge_confirmed
   seat_ceiling_changed
+  // Phase 18.2 (WS=content): notes, file versions / sharing / access, the
+  // terminal and the Store. Summaries carry names and ids, never tokens,
+  // passwords or command output.
+  note_created
+  doc_version_restored
+  file_version_created
+  file_version_restored
+  file_share_created
+  file_share_revoked
+  file_access_changed
+  terminal_session_started
+  terminal_session_ended
+  store_item_installed
+  store_item_removed
+  store_item_published
+  store_publication_accepted
+  store_publication_declined
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,6 +1146,20 @@ model Workspace {
   // Phase 18.1 (WS=find): Spotlight's text index (file contents, docs).
   searchTexts                 SearchText[]
   searchTextChunks            SearchTextChunk[]
+  // Phase 18.2 (WS=content): Notes links, document versions + collab state,
+  // file versions / share links / ACL / annotations, terminal sessions, Store.
+  noteLinks                   NoteLink[]
+  univerDocVersions           UniverDocVersion[]
+  univerDocCollabStates       UniverDocCollabState[]
+  workspaceFileVersions       WorkspaceFileVersion[]
+  workspaceFileShares         WorkspaceFileShare[]
+  workspaceFileAcls           WorkspaceFileAcl[]
+  workspaceFileAnnotations    WorkspaceFileAnnotation[]
+  terminalSessions            TerminalSession[]
+  terminalCommands            TerminalCommand[]
+  storeItems                  WorkspaceStoreItem[]
+  storePublications           StorePublication[]          @relation("StorePublicationTarget")
+  storePublicationsSent       StorePublication[]          @relation("StorePublicationAgency")
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -3766,6 +3797,14 @@ model WorkspaceFile {
   cadModelVersions           CadModelVersion[]
   // Phase 18.1 (WS=find): the text extracted from this file for Spotlight.
   searchText                 SearchText?
+  // Phase 18.2 (WS=content): the current version number (every overwrite
+  // keeps the previous blob as a WorkspaceFileVersion), per-file share links,
+  // per-member access overrides and PDF annotations.
+  version                    Int                         @default(1)
+  versions                   WorkspaceFileVersion[]
+  shareLinks                 WorkspaceFileShare[]
+  acl                        WorkspaceFileAcl[]
+  annotations                WorkspaceFileAnnotation[]
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
@@ -3777,6 +3816,9 @@ model WorkspaceQuota {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   limitBytes  BigInt    @map("limit_bytes")
   usedBytes   BigInt    @default(0) @map("used_bytes")
+  // Phase 18.2 (WS=content): previous versions kept per file (older ones are
+  // purged and their bytes freed). The workspace's Files retention setting.
+  versionRetention Int  @default(20) @map("version_retention")
 
   @@map("workspace_quotas")
 }
@@ -9347,6 +9389,18 @@ model UniverDoc {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   // Phase 18.1 (WS=find): the doc's text for Spotlight.
   searchText  SearchText?
+  // Phase 18.2 (WS=content): Notes live here too (kind "note", snapshot =
+  // the Tiptap block editor's JSON) — no third document store. Who made it
+  // (a "private" note is theirs alone), pinned, folder and tags; the records
+  // a note is linked to; version history (idle snapshots + named versions);
+  // and the live-collaboration (yjs) state.
+  createdBy   String?   @map("created_by")
+  pinnedAt    DateTime? @map("pinned_at")
+  folder      String?   @db.VarChar(120)
+  tags        String[]  @default([])
+  noteLinks   NoteLink[]
+  versions    UniverDocVersion[]
+  collabState UniverDocCollabState?
 
   @@index([workspaceId, kind, updatedAt])
   @@map("univer_docs")
@@ -17258,4 +17312,262 @@ model SearchTextChunk {
   @@unique([searchTextId, idx])
   @@index([workspaceId])
   @@map("search_text_chunks")
+}
+
+// ============================================================================
+// Phase 18.2 (WS=content): Notes, document versions, live collaboration,
+// Files (versions, share links, per-file access, PDF annotations), the
+// Terminal and the Store. Every table carries workspace_id, cascades from the
+// workspace and is FORCE RLS on app.workspace_id (migration
+// 20261021200000_p182_content_apps); the two public lookups (a file share
+// link by its token hash) go through a SELECT-only route policy.
+// ============================================================================
+
+// A note (UniverDoc kind "note") linked to any record Spotlight knows
+// (record_kind = a lib/search/kinds.ts RecordKind: lead, deal, ticket, …).
+// The record's page lists its notes; the link never copies the record.
+model NoteLink {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  docId       String    @map("doc_id")
+  doc         UniverDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  recordKind  String    @map("record_kind") @db.VarChar(40)
+  recordId    String    @map("record_id") @db.VarChar(64)
+  // The record's title when linked (display only; the record stays the truth).
+  label       String?   @db.VarChar(200)
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([docId, recordKind, recordId])
+  @@index([workspaceId, recordKind, recordId])
+  @@map("note_links")
+}
+
+// Version history for Office docs and notes: an idle snapshot ("auto"), a
+// person's named version ("named"), or the state saved just before a restore
+// ("restore"). Restoring writes the old snapshot back as a NEW doc version.
+model UniverDocVersion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  docId       String    @map("doc_id")
+  doc         UniverDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  // The doc's version counter this snapshot was taken at.
+  docVersion  Int       @map("doc_version")
+  // auto | named | restore
+  kind        String    @db.VarChar(16)
+  name        String?   @db.VarChar(120)
+  title       String
+  snapshot    Json
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, docId, createdAt])
+  @@map("univer_doc_versions")
+}
+
+// The live-collaboration document (yjs update, binary) of a note or doc. The
+// collab server (lib/collab/server.ts) loads it, stores it on idle and also
+// writes the plain snapshot back to univer_docs.snapshot, so readers that
+// don't speak yjs (Spotlight, agents, export) always see the latest text.
+model UniverDocCollabState {
+  docId       String    @id @map("doc_id")
+  doc         UniverDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  state       Bytes
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("univer_doc_collab_states")
+}
+
+// A previous version of a workspace file: the bytes it had before an
+// overwrite or a restore (opaque storage key, never serialized). The current
+// bytes stay on WorkspaceFile; version numbers are per file and never reused.
+model WorkspaceFileVersion {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fileId      String        @map("file_id")
+  file        WorkspaceFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  version     Int
+  storageKey  String        @unique @map("storage_key")
+  filename    String        @db.VarChar(255)
+  mimeType    String        @map("mime_type")
+  sizeBytes   Int           @map("size_bytes")
+  // Who wrote these bytes, and when (the version's own creation).
+  createdBy   String        @map("created_by")
+  createdAt   DateTime      @map("created_at")
+  // When a newer version replaced it, and by whom.
+  replacedAt  DateTime      @default(now()) @map("replaced_at")
+  replacedBy  String        @map("replaced_by")
+
+  @@unique([fileId, version])
+  @@index([workspaceId, fileId])
+  @@map("workspace_file_versions")
+}
+
+// A per-file share link (the share-link pattern: random token returned once,
+// SHA-256 at rest; expiring; optional password (scrypt); view-only or
+// download; revocable). Resolved by the public /r/file/<token> route through
+// the SELECT-only app.file_share_route policy.
+model WorkspaceFileShare {
+  id           String        @id @default(cuid())
+  workspaceId  String        @map("workspace_id")
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fileId       String        @map("file_id")
+  file         WorkspaceFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  tokenHash    String        @unique @map("token_hash")
+  // Last 4 characters of the token, to tell links apart in the list.
+  tokenHint    String        @map("token_hint") @db.VarChar(8)
+  // view | download
+  access       String        @default("view") @db.VarChar(16)
+  passwordHash String?       @map("password_hash")
+  expiresAt    DateTime?     @map("expires_at")
+  revokedAt    DateTime?     @map("revoked_at")
+  revokedBy    String?       @map("revoked_by")
+  createdBy    String        @map("created_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  openCount    Int           @default(0) @map("open_count")
+  lastOpenedAt DateTime?     @map("last_opened_at")
+
+  @@index([workspaceId, fileId])
+  @@map("workspace_file_shares")
+}
+
+// A member's access override on one file: owner | editor | viewer. Never
+// wider than the member's workspace role allows (lib/files/acl.ts); admins
+// and owners are never narrowed.
+model WorkspaceFileAcl {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fileId      String        @map("file_id")
+  file        WorkspaceFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId      String        @map("user_id")
+  role        String        @db.VarChar(16)
+  grantedBy   String        @map("granted_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@unique([fileId, userId])
+  @@index([workspaceId, userId])
+  @@map("workspace_file_acls")
+}
+
+// A PDF highlight or comment, stored per file version (never burned into
+// the PDF; exportable as JSON). rects are page-relative fractions (0..1).
+model WorkspaceFileAnnotation {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fileId      String        @map("file_id")
+  file        WorkspaceFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileVersion Int           @map("file_version")
+  page        Int
+  // highlight | comment
+  kind        String        @db.VarChar(16)
+  rects       Json
+  quote       String?       @db.Text
+  body        String?       @db.Text
+  authorId    String        @map("author_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@index([workspaceId, fileId, fileVersion])
+  @@map("workspace_file_annotations")
+}
+
+// A person's terminal on a workspace sandbox (lib/terminal). Commands typed
+// by a person are not agent actions (no tier prompt) but every one is
+// recorded here (terminal_commands) and the session start/end is audited.
+model TerminalSession {
+  id           String            @id @default(cuid())
+  workspaceId  String            @map("workspace_id")
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId       String            @map("user_id")
+  provider     String            @db.VarChar(16)
+  sandboxId    String            @map("sandbox_id")
+  // Provider credential for reattaching (secrets() envelope), when it has one.
+  secretEnc    String?           @map("secret_enc")
+  // active | ended
+  status       String            @default("active") @db.VarChar(16)
+  startedAt    DateTime          @default(now()) @map("started_at")
+  lastActiveAt DateTime          @default(now()) @map("last_active_at")
+  endedAt      DateTime?         @map("ended_at")
+  endedReason  String?           @map("ended_reason")
+  commands     TerminalCommand[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, userId, startedAt])
+  @@map("terminal_sessions")
+}
+
+model TerminalCommand {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sessionId   String          @map("session_id")
+  session     TerminalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String          @map("user_id")
+  command     String          @db.Text
+  exitCode    Int?            @map("exit_code")
+  timedOut    Boolean         @default(false) @map("timed_out")
+  durationMs  Int?            @map("duration_ms")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, sessionId, createdAt])
+  @@map("terminal_commands")
+}
+
+// The Store's per-workspace state for catalogue items whose kind has no
+// install state of its own (mission templates: built in, so "removed" is the
+// row), plus where an installed item came from (an agency publication).
+model WorkspaceStoreItem {
+  id            String    @id @default(cuid())
+  workspaceId   String    @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind          String    @db.VarChar(32)
+  itemKey       String    @map("item_key") @db.VarChar(120)
+  // installed | removed
+  state         String    @db.VarChar(16)
+  // builtin | agency
+  source        String    @default("builtin") @db.VarChar(16)
+  publicationId String?   @map("publication_id")
+  updatedBy     String    @map("updated_by")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, kind, itemKey])
+  @@map("workspace_store_items")
+}
+
+// An agency workspace publishing a mini-app, skill or mission template to one
+// of its client workspaces (the Phase 15.2 agency link: the client's
+// credit_pool_owner_id). The client's admin accepts (installs) or declines.
+// workspace_id is the CLIENT (it owns the decision); the agency sees and
+// revokes its outgoing rows through agency_workspace_id.
+model StorePublication {
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation("StorePublicationTarget", fields: [workspaceId], references: [id], onDelete: Cascade)
+  agencyWorkspaceId String    @map("agency_workspace_id")
+  agencyWorkspace   Workspace @relation("StorePublicationAgency", fields: [agencyWorkspaceId], references: [id], onDelete: Cascade)
+  kind              String    @db.VarChar(32)
+  itemKey           String    @map("item_key") @db.VarChar(120)
+  title             String    @db.VarChar(200)
+  // The published content (mini-app spec, SKILL.md + declared tools, or the
+  // template key) — a copy, so the client installs exactly what was offered.
+  payload           Json
+  // pending | accepted | declined | revoked
+  status            String    @default("pending") @db.VarChar(16)
+  publishedBy       String    @map("published_by")
+  decidedBy         String?   @map("decided_by")
+  decidedAt         DateTime? @map("decided_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, status])
+  @@index([agencyWorkspaceId, createdAt])
+  @@map("store_publications")
 }
