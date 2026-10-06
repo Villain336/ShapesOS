@@ -100,7 +100,7 @@ export function ElementsPanel() {
                 className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-line bg-paper text-ink hover:border-line-strong hover:bg-hover-paper"
               >
                 {c.icon}
-                <span className="text-[10px] font-medium text-muted">{c.label}</span>
+                <span className="text-[0.625rem] font-medium text-muted">{c.label}</span>
               </button>
             ))}
             <button
@@ -109,10 +109,10 @@ export function ElementsPanel() {
               className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-line bg-paper text-ink hover:border-line-strong hover:bg-hover-paper"
             >
               <QrCode className="h-6 w-6" />
-              <span className="text-[10px] font-medium text-muted">QR code</span>
+              <span className="text-[0.625rem] font-medium text-muted">QR code</span>
             </button>
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-muted">
+          <p className="pt-2 text-[0.6875rem] leading-snug text-muted">
             Charts and QR codes drop in with starter content — edit data, colors, and links from the toolbar once selected.
           </p>
         </div>
@@ -132,7 +132,7 @@ export function ElementsPanel() {
               </button>
             ))}
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-muted">
+          <p className="pt-2 text-[0.6875rem] leading-snug text-muted">
             Icons drop in ink — recolor them from the toolbar.
           </p>
         </div>

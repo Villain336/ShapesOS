@@ -54,7 +54,7 @@ const chip =
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimarySm =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover";
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

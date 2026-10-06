@@ -449,7 +449,7 @@ function TasksTab() {
           </table>
         </div>
       )}
-      <p className="mt-2 text-[11px] leading-snug text-subtle">
+      <p className="mt-2 text-[0.6875rem] leading-snug text-subtle">
         Live from your Plane sidecar — tasks are managed in Plane; this tab is a
         read-only window into the selected project.
       </p>
@@ -867,7 +867,7 @@ function AutomationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="w-full max-w-lg rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}

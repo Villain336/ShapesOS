@@ -117,18 +117,18 @@ export function CommentsPanel({ designId }: { designId: string }) {
       </div>
       <div className="space-y-3 px-3 pb-4">
         {error && (
-          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] text-failed-text">
             {error}
           </p>
         )}
         {loading ? (
-          <p className="flex items-center gap-2 text-[12px] text-muted">
+          <p className="flex items-center gap-2 text-[0.75rem] text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading comments…
           </p>
         ) : comments.length === 0 ? (
           <div className="rounded-md border border-dashed border-line bg-canvas p-4 text-center">
             <MessageSquare className="mx-auto mb-1 h-5 w-5 text-subtle" />
-            <p className="text-[12px] text-muted">
+            <p className="text-[0.75rem] text-muted">
               No comments yet. Feedback from reviewers lands here.
             </p>
           </div>
@@ -142,10 +142,10 @@ export function CommentsPanel({ designId }: { designId: string }) {
                 }`}
               >
                 <div className="mb-1 flex items-center gap-1.5">
-                  <span className="text-[12px] font-semibold text-ink">
+                  <span className="text-[0.75rem] font-semibold text-ink">
                     {c.authorName}
                   </span>
-                  <span className="text-[10px] text-subtle">
+                  <span className="text-[0.625rem] text-subtle">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </span>
                   <span className="ml-auto flex items-center gap-0.5">
@@ -174,7 +174,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
                   </span>
                 </div>
                 <p
-                  className={`whitespace-pre-wrap text-[12px] ${
+                  className={`whitespace-pre-wrap text-[0.75rem] ${
                     c.resolved ? "text-subtle line-through" : "text-ink"
                   }`}
                 >
@@ -190,7 +190,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
             placeholder="Add a comment…"
-            className="min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+            className="min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
           />
           <button
             onClick={() => void addComment()}
@@ -205,7 +205,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
             )}
           </button>
         </div>
-        <p className="text-[11px] leading-snug text-subtle">
+        <p className="text-[0.6875rem] leading-snug text-subtle">
           Comments are visible to the workspace and read-only on public share links.
         </p>
       </div>

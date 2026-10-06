@@ -91,14 +91,14 @@ interface Props {
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const thCls =
-  "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted";
-const tdCls = "px-3 py-2 text-[13px] text-ink";
+  "px-3 py-2 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-muted";
+const tdCls = "px-3 py-2 text-[0.8125rem] text-ink";
 const tabBase =
-  "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium";
+  "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium";
 
 function pct(n: number) {
   return `${(n * 100).toFixed(0)}%`;
@@ -131,7 +131,7 @@ function CiBar({ s }: { s: HonestShareJson }) {
 function Chip({ tone, children }: { tone?: "violet" | "amber" | "green" | "slate" | "red"; children: React.ReactNode }) {
   void tone;
   return (
-    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
@@ -227,7 +227,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             <h1 className="text-xl font-bold tracking-tight text-ink">
               AI visibility — honest intelligence
             </h1>
-            <p className="mt-0.5 max-w-3xl text-[13px] text-muted">
+            <p className="mt-0.5 max-w-3xl text-[0.8125rem] text-muted">
               Versioned buyer-prompt panels run against official LLM APIs (N reps), reported as
               per-engine estimated ranges with confidence intervals. No single AI-visibility
               score exists here by design.
@@ -253,7 +253,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
               title="Project that citation-gap briefs belong to"
               className={`${inputCls} w-40`}
             />
-            <button type="submit" className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white hover:bg-night-hover">
+            <button type="submit" className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-hover">
               Set
             </button>
           </form>
@@ -332,12 +332,12 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                           <div className="flex items-center gap-2">
                             <span>{pct(e.unmentioned.unmentionedShare)}</span>
                             {e.unmentioned.unstable ? (
-                              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[10px] font-semibold leading-tight text-ink">
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-ink">
                                 <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden />
                                 unstable &gt;30%
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink">
+                              <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink">
                                 <CheckCircle2 className="h-3 w-3" /> stable
                               </span>
                             )}
@@ -478,7 +478,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   ))}
                 </select>
                 <input name="brand" defaultValue={brand} placeholder="Brand name for matching" className={inputCls} />
-                <div className="flex flex-wrap gap-3 text-[13px] text-muted">
+                <div className="flex flex-wrap gap-3 text-[0.8125rem] text-muted">
                   {["openai", "anthropic", "gemini", "perplexity"].map((eng) => (
                     <label key={eng} className="flex items-center gap-1.5 capitalize">
                       <input type="checkbox" name="engines" value={eng} defaultChecked className="accent-ink" />
@@ -490,7 +490,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   <button type="submit" className={btnPrimary}>Run panel</button>
                 </div>
                 {runMsg && <p className="text-xs text-muted">{runMsg}</p>}
-                <p className="text-[11px] text-subtle">
+                <p className="text-[0.6875rem] text-subtle">
                   Official APIs only (BYO keys). Engines without a key are skipped, never faked. Every
                   call is metered (ai_prompt).
                 </p>
@@ -503,7 +503,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
               <h3 className="text-sm font-semibold text-ink">
                 Active panel — {activePanel.engine} · v{activePanel.promptSetVersion} (frozen)
               </h3>
-              <ol className="mt-2 list-decimal space-y-1 pl-5 text-[13px] text-muted">
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-[0.8125rem] text-muted">
                 {activePanel.prompts.map((p, i) => (
                   <li key={i}>{p}</li>
                 ))}
@@ -526,7 +526,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             <button onClick={loadGaps} disabled={gapsLoading || !activePanel || !ownedDomain} className={btnGhost}>
               Reload gaps
             </button>
-            <span className="text-[11px] text-subtle">
+            <span className="text-[0.6875rem] text-subtle">
               “Build brief” opens the project&apos;s content engine with the gap prefilled.
             </span>
           </div>
@@ -573,11 +573,11 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                       <td className={tdCls}>
                         <a
                           href={g.handoff.briefBuilderUrl}
-                          className="inline-flex items-center gap-1 text-[13px] font-medium text-ink"
+                          className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-ink"
                         >
                           Build brief <ExternalLink className="h-3.5 w-3.5" />
                         </a>
-                        <p className="mt-1 max-w-[220px] text-[11px] text-subtle">
+                        <p className="mt-1 max-w-[220px] text-[0.6875rem] text-subtle">
                           Missing: {g.handoff.suggestedBrief.structuredFactsMissing.slice(0, 2).join("; ")}
                         </p>
                       </td>
@@ -603,7 +603,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             <button onClick={loadFirstParty} disabled={fpLoading || !brand} className={btnPrimary}>
               Load first-party signals
             </button>
-            <label className="flex items-center gap-1.5 text-[13px] text-muted">
+            <label className="flex items-center gap-1.5 text-[0.8125rem] text-muted">
               <input
                 type="checkbox"
                 checked={licensedNews}
@@ -614,18 +614,18 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             </label>
             {!brand && <span className="text-xs text-subtle">Set a brand name above first.</span>}
           </div>
-          <p className="text-[11px] text-subtle">
+          <p className="text-[0.6875rem] text-subtle">
             Licensed news is off by default — it requires M3_LICENSED_NEWS_PROVIDER=newsapi and
             M3_NEWSAPI_KEY on the server. When enabled, every query is metered via M6.
           </p>
           {fp && !fp.error && (
             <>
               <div className="overflow-hidden rounded-xl border border-line bg-white">
-                <div className="border-b border-line bg-canvas px-4 py-2 text-[13px] font-semibold text-ink">
+                <div className="border-b border-line bg-canvas px-4 py-2 text-[0.8125rem] font-semibold text-ink">
                   GSC — AI Overview impressions
                 </div>
                 {fp.gsc.noAioRowsFlagged ? (
-                  <p className="p-4 text-[13px] text-muted">{fp.gsc.note}</p>
+                  <p className="p-4 text-[0.8125rem] text-muted">{fp.gsc.note}</p>
                 ) : (
                   <table className="w-full border-collapse">
                     <thead>
@@ -654,7 +654,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
 
               <div className="rounded-xl border border-line bg-canvas p-4">
                 <h3 className="text-sm font-semibold text-ink">GA4 — AI-referrer traffic</h3>
-                <p className="mt-1 text-[13px] text-muted">{fp.ga4.note}</p>
+                <p className="mt-1 text-[0.8125rem] text-muted">{fp.ga4.note}</p>
                 {fp.ga4.perHost.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {fp.ga4.perHost.map((h: any) => (
@@ -666,25 +666,25 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
 
               <div className="rounded-xl border border-line bg-canvas p-4">
                 <h3 className="text-sm font-semibold text-ink">AI-crawler activity in your server logs</h3>
-                <p className="mt-1 text-[13px] text-muted">{fp.crawlerLogs.note}</p>
-                <a href={fp.crawlerLogs.docs} className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-ink">
+                <p className="mt-1 text-[0.8125rem] text-muted">{fp.crawlerLogs.note}</p>
+                <a href={fp.crawlerLogs.docs} className="mt-1 inline-flex items-center gap-1 text-[0.8125rem] font-medium text-ink">
                   Log-shipping guide <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
 
               {fp.brandedMentions?.length > 0 && (
                 <div className="overflow-hidden rounded-xl border border-line bg-white">
-                  <div className="border-b border-line bg-canvas px-4 py-2 text-[13px] font-semibold text-ink">
+                  <div className="border-b border-line bg-canvas px-4 py-2 text-[0.8125rem] font-semibold text-ink">
                     Branded mentions — GDELT + CC-NEWS
                     {fp.brandedMentions.some((s: any) => s.source === "licensed-news") && " + licensed news"}
                   </div>
                   {fp.brandedMentions.map((src: any, i: number) => (
                     <div key={i} className="border-b border-line p-4 last:border-0">
-                      <div className="flex items-center gap-2 text-[13px] font-medium text-ink">
+                      <div className="flex items-center gap-2 text-[0.8125rem] font-medium text-ink">
                         {src.ok ? (
                           <Chip>{src.source}</Chip>
                         ) : (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-failed-tint px-2 py-0.5 text-[10px] font-semibold leading-tight text-failed-text">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-failed-tint px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-failed-text">
                             <span className="size-2 rounded-[2px] bg-failed" aria-hidden />
                             {src.source}
                           </span>
@@ -692,7 +692,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                         {src.ok ? `${src.hits.length} hits` : `failed: ${src.error}`}
                       </div>
                       {src.ok && src.hits.length > 0 && (
-                        <ul className="mt-2 space-y-1 text-[13px]">
+                        <ul className="mt-2 space-y-1 text-[0.8125rem]">
                           {src.hits.slice(0, 10).map((h: any, j: number) => (
                             <li key={j}>
                               <a href={h.url} target="_blank" rel="noreferrer" className="text-ink">
@@ -703,7 +703,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                           ))}
                         </ul>
                       )}
-                      <p className="mt-1 text-[11px] text-subtle">{src.note}</p>
+                      <p className="mt-1 text-[0.6875rem] text-subtle">{src.note}</p>
                     </div>
                   ))}
                 </div>

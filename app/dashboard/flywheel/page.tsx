@@ -12,9 +12,9 @@ import { requireWorkspaceRole } from "@/lib/authz";
 
 // Neutral category chip. Pending approvals awaiting attention use the needs tone.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[11px] font-semibold leading-tight text-muted shadow-control";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.6875rem] font-semibold leading-tight text-muted shadow-control";
 const chipNeeds =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[11px] font-semibold leading-tight text-ink";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[0.6875rem] font-semibold leading-tight text-ink";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +89,7 @@ export default async function FlywheelPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="aos-heading">Flywheel</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Reallocate budget to what works, recycle winning creative, test honestly, and expand
             channels — on rails that keep every dollar human-signed. Autopilot never buys media.
           </p>

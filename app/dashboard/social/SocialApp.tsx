@@ -156,7 +156,7 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {mode === "mock" ? (
-        <p className="rounded-md bg-paper px-3 py-2 text-[13px] text-muted shadow-hairline">
+        <p className="rounded-md bg-paper px-3 py-2 text-[0.8125rem] text-muted shadow-hairline">
           Sample mode: Postiz isn&apos;t connected, so channels are sample channels, publishing is simulated and engagement is sample
           data. Set POSTIZ_URL and POSTIZ_API_KEY to publish for real.
         </p>
@@ -164,8 +164,8 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
       {mode === "none" ? (
         <div className={`${cardCls} flex flex-wrap items-center justify-between gap-3 p-4`}>
           <div>
-            <p className="text-[15px] font-semibold text-ink">Connect Postiz to publish</p>
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.9375rem] font-semibold text-ink">Connect Postiz to publish</p>
+            <p className="text-[0.8125rem] text-muted">
               You can draft posts now. Set POSTIZ_URL and POSTIZ_API_KEY in Settings → Providers, then connect channels inside Postiz.
             </p>
           </div>
@@ -183,13 +183,13 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] font-semibold ${
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.875rem] font-semibold ${
                 tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon className="h-4 w-4" />
               {label}
-              {count ? <span className="rounded-full bg-control px-1.5 text-[12px] font-semibold text-ink">{count}</span> : null}
+              {count ? <span className="rounded-full bg-control px-1.5 text-[0.75rem] font-semibold text-ink">{count}</span> : null}
             </button>
           ))}
         </div>
@@ -222,7 +222,7 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
               <input aria-label="Search posts" className={`${inputCls} !w-64 pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text or campaign" />
             </div>
-            <span className="ml-auto text-[13px] text-muted">{filtered.length} posts</span>
+            <span className="ml-auto text-[0.8125rem] text-muted">{filtered.length} posts</span>
             {filtered.length > 0 ? (
               <OpenInSheetsButton
                 title="Content calendar"
@@ -243,11 +243,11 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
             ) : null}
           </div>
           {loading ? (
-            <p className="p-6 text-[13px] text-muted">Loading posts…</p>
+            <p className="p-6 text-[0.8125rem] text-muted">Loading posts…</p>
           ) : filtered.length === 0 ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-[15px] font-semibold text-ink">{posts.length ? "No posts match these filters" : "No posts yet"}</p>
-              <p className="mt-1 text-[13px] text-muted">
+              <p className="text-[0.9375rem] font-semibold text-ink">{posts.length ? "No posts match these filters" : "No posts yet"}</p>
+              <p className="mt-1 text-[0.8125rem] text-muted">
                 {posts.length ? "Clear the filters to see everything." : "Write one with New post, or send a design from Studio."}
               </p>
             </div>
@@ -276,7 +276,7 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
                           {p.media[0] ? <Thumb media={p.media[0]} /> : null}
                           <div className="min-w-0">
                             <div className="truncate font-medium">{p.content.trim() || (p.media.length ? `Media post (${p.media.length})` : "Untitled post")}</div>
-                            <div className="flex flex-wrap gap-x-2 text-[12px] text-muted">
+                            <div className="flex flex-wrap gap-x-2 text-[0.75rem] text-muted">
                               {p.media.length ? <span>{p.media.length} media</span> : null}
                               {p.utmCampaign ? <span className="font-mono">{p.utmCampaign}</span> : null}
                               {p.source === "studio" ? <span>From Studio</span> : null}
@@ -297,7 +297,7 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
                       <td className={tdNum}>{p.metrics ? fmtInt(p.metrics.likes + p.metrics.comments + p.metrics.shares) : "—"}</td>
                       <td className={tdNum}>
                         {p.metrics ? fmtInt(p.metrics.clicks) : "—"}
-                        {p.metrics?.mock ? <span className="ml-1 text-[11px] text-muted">sample</span> : null}
+                        {p.metrics?.mock ? <span className="ml-1 text-[0.6875rem] text-muted">sample</span> : null}
                       </td>
                       <td className={`${tdCls} text-right`}>
                         <button type="button" className={btnQuiet} onClick={() => setOpen({ post: p })}>
@@ -316,15 +316,15 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
       ) : (
         <section className={cardCls}>
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-[15px] font-semibold text-ink">Connected channels</h2>
-            <p className="text-[13px] text-muted">
+            <h2 className="text-[0.9375rem] font-semibold text-ink">Connected channels</h2>
+            <p className="text-[0.8125rem] text-muted">
               {mode === "zernio"
                 ? "Channels are your Zernio accounts — connect them in Settings → Connectors → Zernio."
                 : "Channels connect inside Postiz (its own OAuth). ShapesOS reads them back to publish."}
             </p>
           </div>
           {channels.length === 0 ? (
-            <p className="px-4 py-8 text-center text-[13px] text-muted">
+            <p className="px-4 py-8 text-center text-[0.8125rem] text-muted">
               {mode === "none"
                 ? "Connect Postiz first."
                 : mode === "zernio"
@@ -348,7 +348,7 @@ export function SocialApp({ canEdit }: { canEdit: boolean }) {
                       <td className={tdCls}>
                         <Tag>{platformLabel(c.identifier)}</Tag>
                       </td>
-                      <td className={`${tdCls} font-mono text-[12px] text-muted`}>{c.id}</td>
+                      <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>{c.id}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -419,7 +419,7 @@ function CalendarView({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) => v
           <button type="button" className={btnQuiet} aria-label="Next month" onClick={() => setCursor(new Date(year, month + 1, 1))}>
             <ChevronRight className="h-4 w-4" />
           </button>
-          <h2 className="ml-1 text-[15px] font-semibold text-ink">{label}</h2>
+          <h2 className="ml-1 text-[0.9375rem] font-semibold text-ink">{label}</h2>
         </div>
         <button type="button" className={btnQuiet} onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}>
           Today
@@ -438,7 +438,7 @@ function CalendarView({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) => v
             return (
               <div key={i} className={`min-h-[112px] border-b border-r border-line p-1.5 ${d ? "" : "bg-canvas"}`}>
                 {d ? (
-                  <div className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? "bg-ink text-paper" : "text-ink"}`}>
+                  <div className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[0.75rem] font-semibold ${isToday ? "bg-ink text-paper" : "text-ink"}`}>
                     {d.getDate()}
                   </div>
                 ) : null}
@@ -452,15 +452,15 @@ function CalendarView({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) => v
                     >
                       {p.media[0] ? <Thumb media={p.media[0]} size={24} /> : null}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-medium text-ink">{p.content.trim() || "Media post"}</span>
-                        <span className="flex items-center gap-1 text-[11px] text-muted">
+                        <span className="block truncate text-[0.75rem] font-medium text-ink">{p.content.trim() || "Media post"}</span>
+                        <span className="flex items-center gap-1 text-[0.6875rem] text-muted">
                           {new Date(postWhen(p)).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                           <StatusDot status={p.status} />
                         </span>
                       </span>
                     </button>
                   ))}
-                  {items.length > 3 ? <span className="px-1 text-[11px] text-muted">+{items.length - 3} more</span> : null}
+                  {items.length > 3 ? <span className="px-1 text-[0.6875rem] text-muted">+{items.length - 3} more</span> : null}
                 </div>
               </div>
             );
@@ -486,6 +486,6 @@ function StatusDot({ status }: { status: PostStatus }) {
       />
     );
   }
-  if (status === "failed") return <span className="text-[10px] font-semibold text-failed-text">Failed</span>;
+  if (status === "failed") return <span className="text-[0.625rem] font-semibold text-failed-text">Failed</span>;
   return <span className="sr-only">{label}</span>;
 }

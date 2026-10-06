@@ -22,12 +22,12 @@ export default async function SocialPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading">Social</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Write once with images or video, get it approved, publish to every connected channel. Links are tagged so results show up in
           Attribution.
         </p>
       </div>
-      <Suspense fallback={<p className="text-[13px] text-muted">Loading…</p>}>
+      <Suspense fallback={<p className="text-[0.8125rem] text-muted">Loading…</p>}>
         <SocialApp canEdit={roleAtLeast(membership.role, "editor")} />
       </Suspense>
     </div>

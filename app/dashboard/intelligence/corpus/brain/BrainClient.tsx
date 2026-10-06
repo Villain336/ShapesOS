@@ -209,8 +209,8 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
                     style={{ backgroundColor: PILLAR_COLORS[n.pillar] }}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium text-ink">{n.title}</span>
-                    <span className="block truncate text-[11px] text-subtle">
+                    <span className="block truncate text-[0.75rem] font-medium text-ink">{n.title}</span>
+                    <span className="block truncate text-[0.6875rem] text-subtle">
                       {PILLAR_LABEL[n.pillar]} · Tier {n.tier}
                     </span>
                   </span>

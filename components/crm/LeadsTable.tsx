@@ -64,7 +64,7 @@ export function LeadsTable({
                     <Avatar name={l.name} size={30} />
                     <div className="min-w-0">
                       <div className="truncate font-semibold text-ink">{l.name}</div>
-                      <div className="truncate text-[12px] text-muted">
+                      <div className="truncate text-[0.75rem] text-muted">
                         {[l.title, l.company].filter(Boolean).join(" · ") || l.email || "—"}
                       </div>
                     </div>
@@ -75,7 +75,7 @@ export function LeadsTable({
                 </td>
                 <td>
                   {l.ownerName ? (
-                    <span className="inline-flex items-center gap-1.5 text-[13px] text-ink">
+                    <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink">
                       <Avatar name={l.ownerName} size={22} /> {l.ownerName}
                     </span>
                   ) : (
@@ -83,13 +83,13 @@ export function LeadsTable({
                   )}
                 </td>
                 <td>
-                  <span className="text-[12.5px] text-muted">{SOURCE_LABELS[l.source] ?? l.source}</span>
+                  <span className="text-[0.78125rem] text-muted">{SOURCE_LABELS[l.source] ?? l.source}</span>
                 </td>
                 <td><ScoreBar score={l.score} /></td>
                 <td className="text-right font-semibold tabular-nums">{formatMoney(l.valueCents)}</td>
                 <td><Sparkline data={trends[l.id] ?? [0, 0, 0, 0, 0, 0, 0, 0]} /></td>
                 <td>
-                  <span className="text-[12.5px] text-muted">{timeAgo(l.lastActivityAt)}</span>
+                  <span className="text-[0.78125rem] text-muted">{timeAgo(l.lastActivityAt)}</span>
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button className="text-subtle hover:text-ink" onClick={() => onOpen(l.id)}>

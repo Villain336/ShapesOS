@@ -40,6 +40,12 @@ import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { planHasFeature } from "@/lib/billing/entitlements";
 // Phase 4d: sidebar "Running now" (lead agent → sub-agents) + usage meter.
 import { safeAgentActivity, safeUsageMeter } from "@/lib/aos/activity.server";
+// Phase 18.1 (WS=find): skip link (layout-level, every dashboard page), the
+// person's translated shell strings, and the one-time device time-zone save.
+import { SkipLink } from "@/components/a11y/SkipLink";
+import { TimeZoneSync } from "@/components/preferences/TimeZoneSync";
+import { getI18n } from "@/lib/i18n/server";
+import { getShellState } from "@/lib/preferences/server";
 
 export default async function DashboardLayout({
   children,
@@ -105,8 +111,13 @@ export default async function DashboardLayout({
     (defaultKit?.colors as Record<string, string> | null)?.primary,
   );
 
+  const [{ t }, shellState] = await Promise.all([getI18n(), getShellState()]);
+
   return (
     <BrandTheme primary={brandPrimary}>
+      {/* Phase 18.1: first focusable element on every dashboard page. */}
+      <SkipLink label={t("a11y.skipToContent")} />
+      <TimeZoneSync needed={shellState.signedIn && shellState.timeZone === null} />
       <ChatProvider>
         <CommandBar workspaceId={workspace.id} />
         <NewTaskDialog />

@@ -52,7 +52,7 @@ function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: 
     blue: "bg-canvas text-muted border-line",
   };
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -68,12 +68,12 @@ function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "r
 }
 
 const inputCls =
-  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[0.8125rem] font-semibold text-white aos-press disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
 
 // ── Creatives tab ────────────────────────────────────────────────────────────
 
@@ -151,9 +151,9 @@ function CreativesTab() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
+            <tr className="border-b border-line bg-canvas text-[0.6875rem] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Channel</th>
               <th className="px-3 py-2 font-medium">Track / size</th>
@@ -179,13 +179,13 @@ function CreativesTab() {
                 </td>
                 <td className="px-3 py-2 text-muted">{c.source}</td>
                 <td className="px-3 py-2"><Chip tone="violet">v{c.version}</Chip></td>
-                <td className="px-3 py-2 font-mono text-[11px] text-subtle">{hashShort(c.creativeHash)}</td>
+                <td className="px-3 py-2 font-mono text-[0.6875rem] text-subtle">{hashShort(c.creativeHash)}</td>
                 <td className="px-3 py-2"><Chip tone={statusTone(c.status)}>{c.status}</Chip></td>
               </tr>
             ))}
             {creatives.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={7} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No creatives yet — create the first one with “New creative”.
                 </td>
               </tr>
@@ -251,14 +251,14 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
         <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
-            <h3 className="text-[15px] font-semibold text-ink">{c.name}</h3>
+            <h3 className="text-[0.9375rem] font-semibold text-ink">{c.name}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <Chip tone={statusTone(c.status)}>{c.status}</Chip>
               <Chip tone="violet">v{c.version}</Chip>
               <Chip tone="blue">{c.channelTemplate}</Chip>
               <Chip>{trackLabel(c.formatTrack)} · {c.size}</Chip>
             </div>
-            <div className="mt-1.5 font-mono text-[11px] text-subtle">
+            <div className="mt-1.5 font-mono text-[0.6875rem] text-subtle">
               hash {c.creativeHash ?? "—"}
             </div>
           </div>
@@ -269,13 +269,13 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {report ? <ValidationView report={report} /> : <p className="text-[13px] text-muted">No PDF attached yet.</p>}
+          {report ? <ValidationView report={report} /> : <p className="text-[0.8125rem] text-muted">No PDF attached yet.</p>}
 
           {c.pdfUrl && (
             <a href={c.pdfUrl} className={btnGhost} download>
@@ -285,7 +285,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
 
           {c.status === "draft" && (
             <div className="space-y-2 border-t border-line pt-3">
-              <div className="text-[12px] font-semibold text-subtle">Actions</div>
+              <div className="text-[0.75rem] font-semibold text-subtle">Actions</div>
               <div className="flex flex-wrap gap-2">
                 <label className={`${btnGhost} cursor-pointer`}>
                   <FileUp size={14} /> Upload PDF
@@ -324,7 +324,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
 
               <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-line bg-canvas px-3 py-2.5">
                 <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-0.5 accent-ink" />
-                <span className="text-[12.5px] leading-snug text-ink">
+                <span className="text-[0.78125rem] leading-snug text-ink">
                   I confirm this creative contains <strong>no USPS/government impersonation markings</strong> (spec §7).
                 </span>
               </label>
@@ -336,7 +336,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
                 }).then((r) => r.creative))}
                 disabled={!!busy || !attested || !report?.ok}
                 title={!report?.ok ? "Validation must pass before marking ready" : undefined}
-                className="flex items-center gap-1.5 rounded-full bg-done px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-full bg-done px-4 py-1.5 text-[0.8125rem] font-semibold text-white aos-press disabled:opacity-40"
               >
                 {busy === "ready" && <Loader2 size={14} className="animate-spin" />}
                 <CheckCircle2 size={14} /> Mark ready
@@ -345,7 +345,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
           )}
 
           {c.status === "ready" && (
-            <div className="flex items-start gap-1.5 rounded-md border border-line bg-paper px-3 py-2 text-[12.5px] text-ink">
+            <div className="flex items-start gap-1.5 rounded-md border border-line bg-paper px-3 py-2 text-[0.78125rem] text-ink">
               Ready for campaigns. The approval gate binds hash <span className="font-mono">{hashShort(c.creativeHash)}</span>.
               To change the PDF, create a new version.
             </div>
@@ -410,7 +410,7 @@ function AssetsTab() {
         <button onClick={() => void load()} className={btnGhost}>
           <RefreshCw size={14} /> Refresh
         </button>
-        <span className="text-[12px] text-subtle">The asset library is per-project; creatives are workspace-wide.</span>
+        <span className="text-[0.75rem] text-subtle">The asset library is per-project; creatives are workspace-wide.</span>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {assets.map((a) => (
@@ -424,7 +424,7 @@ function AssetsTab() {
               )}
             </div>
             <div className="px-2.5 py-2">
-              <div className="truncate text-[12.5px] font-medium text-ink">{a.name}</div>
+              <div className="truncate text-[0.78125rem] font-medium text-ink">{a.name}</div>
               <div className="mt-1 flex items-center justify-between">
                 <Chip>{a.source}</Chip>
                 <button
@@ -446,7 +446,7 @@ function AssetsTab() {
         ))}
       </div>
       {assets.length === 0 && !loading && (
-        <p className="py-8 text-center text-[13px] text-subtle">No assets in this project yet.</p>
+        <p className="py-8 text-center text-[0.8125rem] text-subtle">No assets in this project yet.</p>
       )}
     </div>
   );
@@ -498,7 +498,7 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">New design</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">New design</h2>
           <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
@@ -506,13 +506,13 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <label className="mb-1 block text-[12px] font-medium text-muted">Name</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -521,7 +521,7 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
             maxLength={120}
           />
 
-          <div className="mb-2 text-[12px] font-medium text-muted">Start from</div>
+          <div className="mb-2 text-[0.75rem] font-medium text-muted">Start from</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button
               type="button"
@@ -532,8 +532,8 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
                   : "border-line hover:border-line-strong"
               }`}
             >
-              <div className="text-[13px] font-medium text-ink">Blank canvas</div>
-              <div className="mt-0.5 text-[11px] text-subtle">1080 × 1080</div>
+              <div className="text-[0.8125rem] font-medium text-ink">Blank canvas</div>
+              <div className="mt-0.5 text-[0.6875rem] text-subtle">1080 × 1080</div>
             </button>
             {TEMPLATES.map((t) => (
               <button
@@ -547,9 +547,9 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <div className="truncate text-[13px] font-medium text-ink">{t.name}</div>
+                  <div className="truncate text-[0.8125rem] font-medium text-ink">{t.name}</div>
                 </div>
-                <div className="mt-0.5 text-[11px] text-subtle">{t.width} × {t.height}</div>
+                <div className="mt-0.5 text-[0.6875rem] text-subtle">{t.width} × {t.height}</div>
                 <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
               </button>
             ))}
@@ -623,9 +623,9 @@ function DesignsTab() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
+            <tr className="border-b border-line bg-canvas text-[0.6875rem] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Template</th>
               <th className="px-3 py-2 font-medium">Pages</th>
@@ -669,7 +669,7 @@ function DesignsTab() {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   {q ? "No designs match your search." : "No designs yet — create the first one with “New design”."}
                 </td>
               </tr>
@@ -736,7 +736,7 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">New page</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">New page</h2>
           <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
@@ -744,13 +744,13 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <label className="mb-1 block text-[12px] font-medium text-muted">Name</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -759,7 +759,7 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
             maxLength={120}
           />
 
-          <div className="mb-2 text-[12px] font-medium text-muted">Page type</div>
+          <div className="mb-2 text-[0.75rem] font-medium text-muted">Page type</div>
           <div className="mb-4 flex gap-1 border-b border-line">
             {(
               [
@@ -771,7 +771,7 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
                 key={id}
                 type="button"
                 onClick={() => setKind(id)}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
                   kind === id
                     ? "border-ink text-ink"
                     : "border-transparent text-muted hover:text-ink"
@@ -783,7 +783,7 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          <div className="mb-2 text-[12px] font-medium text-muted">Start from</div>
+          <div className="mb-2 text-[0.75rem] font-medium text-muted">Start from</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button
               type="button"
@@ -794,8 +794,8 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
                   : "border-line hover:border-line-strong"
               }`}
             >
-              <div className="text-[13px] font-medium text-ink">Blank page</div>
-              <div className="mt-0.5 text-[11px] text-subtle">Empty canvas</div>
+              <div className="text-[0.8125rem] font-medium text-ink">Blank page</div>
+              <div className="mt-0.5 text-[0.6875rem] text-subtle">Empty canvas</div>
             </button>
             {templates.map((t) => (
               <button
@@ -808,8 +808,8 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
                     : "border-line hover:border-line-strong"
                 }`}
               >
-                <div className="truncate text-[13px] font-medium text-ink">{t.name}</div>
-                <div className="mt-0.5 line-clamp-2 text-[11px] text-subtle">{t.description}</div>
+                <div className="truncate text-[0.8125rem] font-medium text-ink">{t.name}</div>
+                <div className="mt-0.5 line-clamp-2 text-[0.6875rem] text-subtle">{t.description}</div>
                 <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
               </button>
             ))}
@@ -875,7 +875,7 @@ function PagesTab() {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[12.5px] text-muted">
+      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Canvas vs Pages. </span>
         Designs (Canvas) produce PNG/SVG assets; Pages produce responsive HTML —
         landing pages and email templates. Build the hero in Canvas, drop the asset into a Page.
@@ -896,9 +896,9 @@ function PagesTab() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
+            <tr className="border-b border-line bg-canvas text-[0.6875rem] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Template</th>
@@ -944,7 +944,7 @@ function PagesTab() {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={5} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   {q || fKind ? "No pages match your filters." : "No pages yet — create the first one with “New page”."}
                 </td>
               </tr>
@@ -977,7 +977,7 @@ export function StudioApp() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

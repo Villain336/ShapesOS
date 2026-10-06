@@ -206,7 +206,7 @@ export function UploadsPanel() {
           {busy ? "Uploading…" : "Upload images"}
         </button>
         {error && (
-          <p className="rounded-md border border-line bg-canvas px-2.5 py-2 text-[12px] text-muted">
+          <p className="rounded-md border border-line bg-canvas px-2.5 py-2 text-[0.75rem] text-muted">
             {error}
           </p>
         )}
@@ -222,31 +222,31 @@ export function UploadsPanel() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={u.dataUrl} alt={u.name} className="h-20 w-full object-cover" />
                 {u.origin === "generated" && (
-                  <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-ink px-1 py-0.5 text-[9px] font-semibold text-white">
+                  <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-ink px-1 py-0.5 text-[0.5625rem] font-semibold text-white">
                     <Sparkles className="h-2.5 w-2.5" />
                     AI
                   </span>
                 )}
-                <div className="truncate px-1.5 py-1 text-left text-[11px] text-muted group-hover:text-ink">
+                <div className="truncate px-1.5 py-1 text-left text-[0.6875rem] text-muted group-hover:text-ink">
                   {u.name}
                 </div>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-[12px] leading-snug text-muted">
+          <p className="text-[0.75rem] leading-snug text-muted">
             No uploads yet. Images are placed at page center, capped at {MAX_DIM}px on the long edge.
           </p>
         )}
         {/* BEGIN: integration-7 cloudinary (2026-09-27) — pipeline state note */}
         {useCloudinary ? (
-          <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+          <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
             Uploads go straight to your Cloudinary account with auto format and
             quality (f_auto,q_auto). Quota: 25 credits/month on Cloudinary&apos;s
             free tier — metered by Cloudinary, not by ShapesOS.
           </p>
         ) : (
-          <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+          <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
             Uploads stay in your browser session and are saved into this design
             as data URLs.{" "}
             <a href="/dashboard/settings/providers" className="text-ink underline hover:no-underline">

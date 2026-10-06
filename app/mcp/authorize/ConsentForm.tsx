@@ -79,7 +79,7 @@ export function ConsentForm({
     <div className="mt-6">
       <fieldset>
         <legend className="text-sm font-semibold text-ink">Connect to workspace</legend>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           The app will act within this workspace only. The choice is verified on our servers.
         </p>
         <div className="mt-2 max-h-48 divide-y divide-line overflow-y-auto rounded-md border border-line">
@@ -106,7 +106,7 @@ export function ConsentForm({
           type="button"
           disabled={busy}
           onClick={approve}
-          className="inline-flex h-control items-center rounded-full bg-ink px-[22px] text-[15px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
+          className="inline-flex h-control items-center rounded-full bg-ink px-[22px] text-[0.9375rem] font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40"
         >
           {busy ? "Allowing…" : "Allow access"}
         </button>
@@ -114,7 +114,7 @@ export function ConsentForm({
           type="button"
           disabled={busy}
           onClick={deny}
-          className="inline-flex h-control items-center rounded-full bg-paper px-[22px] text-[15px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40"
+          className="inline-flex h-control items-center rounded-full bg-paper px-[22px] text-[0.9375rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40"
         >
           Deny
         </button>

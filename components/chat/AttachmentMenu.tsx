@@ -164,7 +164,7 @@ export default function AttachmentMenu() {
           {pendingAttachments.map((a) => (
             <span
               key={a.id}
-              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-field py-1 pl-2.5 pr-1 text-[12px] text-ink-2 shadow-hairline"
+              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-field py-1 pl-2.5 pr-1 text-[0.75rem] text-ink-2 shadow-hairline"
               style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
             >
               <FileText className="size-3.5" />
@@ -200,7 +200,7 @@ export default function AttachmentMenu() {
               }}
             >
               Upload file
-              <span className="ml-auto text-[11px] text-ink-3">max 25 MB</span>
+              <span className="ml-auto text-[0.6875rem] text-ink-3">max 25 MB</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => void openDriveDialog()}>
@@ -218,10 +218,10 @@ export default function AttachmentMenu() {
           onChange={(e) => void uploadSelected(e.target.files)}
         />
         {uploading && (
-          <span className="text-[12px] text-ink-3">Uploading…</span>
+          <span className="text-[0.75rem] text-ink-3">Uploading…</span>
         )}
         {error && (
-          <span className="flex items-center gap-1 text-[12px] text-red">
+          <span className="flex items-center gap-1 text-[0.75rem] text-red">
             <TriangleAlert className="size-3.5" />
             {error}
           </span>
@@ -276,7 +276,7 @@ export default function AttachmentMenu() {
               />
             </Field>
             {error && (
-              <p className="flex items-center gap-1.5 text-[12.5px] text-red">
+              <p className="flex items-center gap-1.5 text-[0.78125rem] text-red">
                 <TriangleAlert className="size-3.5" />
                 {error}
               </p>

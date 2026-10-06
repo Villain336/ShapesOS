@@ -42,7 +42,7 @@ const TIER_ICON: Record<ListingTier, typeof CheckCircle2> = {
 
 function tierChip(tier: ListingTier) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${TIER_BADGE[tier]}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${TIER_BADGE[tier]}`}>
       {TIER_LABELS[tier]}
     </span>
   );
@@ -84,7 +84,7 @@ export default async function ListingsPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Listings &amp; citations</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Honestly tiered: API-synced, aggregator-distributed, manual submission, guided claim.
             Every listing edit is approval-bound; every channel label tells the truth.
           </p>
@@ -101,9 +101,9 @@ export default async function ListingsPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold tracking-tight text-ink">Channels</h2>
         <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Channel</th>
                 <th className="px-3 py-2 font-medium">Tier</th>
                 <th className="px-3 py-2 font-medium">Capability</th>
@@ -130,7 +130,7 @@ export default async function ListingsPage() {
                     </td>
                     {/* MANDATORY tier label */}
                     <td className="px-3 py-2">{tierChip(def.tier)}</td>
-                    <td className="max-w-xs px-3 py-2 text-[12px] text-muted">
+                    <td className="max-w-xs px-3 py-2 text-[0.75rem] text-muted">
                       {def.capabilityNote}
                       {def.channel === "apple" && appleClaim && (
                         <span className="block">Claim walkthrough: {appleClaim.progress} ({(appleClaim.completedSteps ?? []).length}/6 steps)</span>
@@ -143,20 +143,20 @@ export default async function ListingsPage() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-[12px]">
+                      <span className="flex items-center gap-1.5 text-[0.75rem]">
                         {connected ? <CheckCircle2 className="h-3.5 w-3.5 text-ink" /> : <CircleDashed className="h-3.5 w-3.5 text-subtle" />}
                         <span className={connected ? "text-ink" : "text-muted"}>
                           {connected ? `Connected (${connected.status})` : "Not connected"}
                         </span>
                       </span>
                       {connected && Array.isArray(connected.syncErrorsJson) && connected.syncErrorsJson.length > 0 && (
-                        <span className="mt-0.5 flex items-center gap-1 text-[12px] text-failed-text">
+                        <span className="mt-0.5 flex items-center gap-1 text-[0.75rem] text-failed-text">
                           <AlertTriangle className="h-3.5 w-3.5" />
                           {connected.syncErrorsJson.length} sync error(s)
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-muted">
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">
                       {connected ? (
                         <span className="flex items-center gap-1.5">
                           <Clock className="h-3.5 w-3.5" />
@@ -179,14 +179,14 @@ export default async function ListingsPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold tracking-tight text-ink">Profiles</h2>
         {profiles.length === 0 ? (
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             No listing profiles yet — connect a channel to add one.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Channel</th>
                   <th className="px-3 py-2 font-medium">Tier</th>
                   <th className="px-3 py-2 font-medium">Location</th>
@@ -223,9 +223,9 @@ export default async function ListingsPage() {
         {canEdit && <BriefBuilder />}
         {briefs.length > 0 && (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Brief</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Scope</th>
@@ -239,11 +239,11 @@ export default async function ListingsPage() {
                   return (
                     <tr key={b.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className="px-3 py-2 font-mono text-xs text-muted">{b.id}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{b.checklistStatus}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{b.checklistStatus}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">
                         {dirs.length} directories · {(gaps.gaps ?? []).filter((g) => g.priority === "high").length} high-priority gaps
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-muted">
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">
                         {fmtDate(b.createdAt)} · manual submission — ShapesOS tracks, a human submits.
                       </td>
                     </tr>

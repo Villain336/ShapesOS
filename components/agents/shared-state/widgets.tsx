@@ -33,10 +33,10 @@ import type {
 const panelCls =
   "rounded-md bg-paper text-ink shadow-hairline";
 const tabBase =
-  "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold";
+  "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[0.75rem] font-semibold";
 const tabActive = "bg-ink text-paper";
 const tabInactive = "text-muted hover:bg-hover-paper hover:text-ink";
-const tableCls = "w-full text-left text-[13px]";
+const tableCls = "w-full text-left text-[0.8125rem]";
 const thCls = "px-3 py-2 text-xs font-semibold text-muted";
 const tdCls = "px-3 py-2 align-top";
 const rowCls = "border-t border-line hover:bg-hover-paper";
@@ -51,7 +51,7 @@ function badgeCls(tone: "brand" | "stone" | "amber" | "green" | "red"): string {
     green: "text-ink",
     red: "text-failed-text",
   };
-  return `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold ${tones[tone]}`;
+  return `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[0.75rem] font-semibold ${tones[tone]}`;
 }
 
 /** Agent-state shapes (DESIGN.md): only where the status is a run or a wait on the user. */
@@ -123,7 +123,7 @@ function EmptyState({ label }: { label: string }) {
   return (
     <div className="px-4 py-8 text-center">
       <CircleDashed size={18} className="mx-auto text-subtle" />
-      <p className="mt-2 text-[12px] text-muted">{label}</p>
+      <p className="mt-2 text-[0.75rem] text-muted">{label}</p>
     </div>
   );
 }
@@ -139,26 +139,26 @@ export function MissionProgressWidget({ mission }: { mission?: MissionSharedStat
     <div className="p-3">
       <div className="flex items-center gap-2">
         <StatusChip status={mission.status} kind="mission" />
-        <span className="text-[11px] text-muted">{mission.template}</span>
-        <span className="ml-auto text-[12px] font-semibold text-ink">{pct}%</span>
+        <span className="text-[0.6875rem] text-muted">{mission.template}</span>
+        <span className="ml-auto text-[0.75rem] font-semibold text-ink">{pct}%</span>
       </div>
-      <p className="mt-2 text-[13px] font-medium text-ink">{mission.goal}</p>
+      <p className="mt-2 text-[0.8125rem] font-medium text-ink">{mission.goal}</p>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
         <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
       </div>
       {mission.checkpoints.length > 0 && (
         <ul className="mt-2 space-y-1">
           {mission.checkpoints.slice(-4).map((c, i) => (
-            <li key={i} className="flex items-center gap-1.5 text-[12px] text-muted">
+            <li key={i} className="flex items-center gap-1.5 text-[0.75rem] text-muted">
               <CheckCircle2 size={12} className="shrink-0 text-ink" />
               <span className="truncate">{c.label}</span>
-              {c.at && <span className="ml-auto shrink-0 text-[11px] text-muted">{fmtDateTime(c.at)}</span>}
+              {c.at && <span className="ml-auto shrink-0 text-[0.6875rem] text-muted">{fmtDateTime(c.at)}</span>}
             </li>
           ))}
         </ul>
       )}
       {mission.lastEvent && (
-        <p className="mt-2 text-[11px] text-muted">
+        <p className="mt-2 text-[0.6875rem] text-muted">
           Last: {mission.lastEvent.tool ?? mission.lastEvent.step ?? "event"} ·{" "}
           {fmtDateTime(mission.lastEvent.at)}
         </p>
@@ -179,10 +179,10 @@ export function ApprovalQueueWidget({ approvals }: { approvals?: ApprovalQueueSt
     <div>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <Inbox size={14} className="text-ink" />
-        <span className="text-[12px] font-semibold text-ink">
+        <span className="text-[0.75rem] font-semibold text-ink">
           {approvals.pendingCount} pending
         </span>
-        <span className="ml-auto text-[11px] text-muted">
+        <span className="ml-auto text-[0.6875rem] text-muted">
           updated {fmtDateTime(approvals.updatedAt)}
         </span>
       </div>
@@ -247,7 +247,7 @@ function CalendarRowEditor({
           setDraft(toDateTimeLocal(scheduledFor));
           setEditing(true);
         }}
-        className="inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-semibold text-ink hover:bg-hover-paper disabled:opacity-40"
+        className="inline-flex h-7 items-center rounded-full px-2.5 text-[0.75rem] font-semibold text-ink hover:bg-hover-paper disabled:opacity-40"
       >
         Edit
       </button>
@@ -259,12 +259,12 @@ function CalendarRowEditor({
         type="datetime-local"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[12px] text-ink focus:border-focus focus:outline-none"
+        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[0.75rem] text-ink focus:border-focus focus:outline-none"
       />
       <select
         value={draftStatus}
         onChange={(e) => setDraftStatus(e.target.value)}
-        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[12px] text-ink focus:border-focus focus:outline-none"
+        className="h-8 rounded-md border-[1.5px] border-control bg-paper px-1.5 text-[0.75rem] text-ink focus:border-focus focus:outline-none"
       >
         {CALENDAR_STATUSES.map((s) => (
           <option key={s} value={s}>
@@ -280,14 +280,14 @@ function CalendarRowEditor({
             updateCalendarRow(rowId, { scheduledFor: iso, status: draftStatus });
             setEditing(false);
           }}
-          className="inline-flex h-7 items-center rounded-full bg-ink px-3 text-[12px] font-semibold text-paper hover:bg-night-hover"
+          className="inline-flex h-7 items-center rounded-full bg-ink px-3 text-[0.75rem] font-semibold text-paper hover:bg-ink-hover"
         >
           Save
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="inline-flex h-7 items-center rounded-full bg-paper px-3 text-[12px] font-semibold text-ink shadow-outline hover:bg-hover-paper"
+          className="inline-flex h-7 items-center rounded-full bg-paper px-3 text-[0.75rem] font-semibold text-ink shadow-outline hover:bg-hover-paper"
         >
           Cancel
         </button>
@@ -322,7 +322,7 @@ export function ContentCalendarWidget({ calendar }: { calendar?: ContentCalendar
                 {row.text || "—"}
               </td>
               <td className={tdCls}>
-                <span className="text-[12px] text-muted">
+                <span className="text-[0.75rem] text-muted">
                   {row.channels.length > 0 ? row.channels.join(", ") : "—"}
                 </span>
               </td>
@@ -371,13 +371,13 @@ export function SharedStatePanel() {
             <Icon size={13} />
             {label}
             {count !== undefined && count > 0 && (
-              <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-paper text-ink" : "bg-ink text-paper"}`}>
+              <span className={`rounded-full px-1.5 text-[0.6875rem] font-semibold ${tab === id ? "bg-paper text-ink" : "bg-ink text-paper"}`}>
                 {count}
               </span>
             )}
           </button>
         ))}
-        <span className="ml-auto flex items-center gap-1 pr-1 text-[11px] text-muted" title="Shared state sync status">
+        <span className="ml-auto flex items-center gap-1 pr-1 text-[0.6875rem] text-muted" title="Shared state sync status">
           <RefreshCw size={10} className={isReady ? "text-ink" : ""} />
           {isReady ? "Synced" : "Connecting"}
         </span>
@@ -411,13 +411,13 @@ export function SharedStateDock() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex h-9 items-center gap-2 rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-raised hover:shadow-outline"
+        className="flex h-9 items-center gap-2 rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-raised hover:shadow-outline"
       >
         <span className={`h-2 w-2 rounded-full ${isReady ? "bg-ink" : "bg-line-strong"}`} />
         Agent state
         {missionPct !== null && <span className="text-muted">{missionPct}%</span>}
         {pending > 0 && (
-          <span className="flex items-center gap-1 rounded-full bg-canvas px-1.5 text-[11px] font-semibold text-ink" title="Approvals waiting on you">
+          <span className="flex items-center gap-1 rounded-full bg-canvas px-1.5 text-[0.6875rem] font-semibold text-ink" title="Approvals waiting on you">
             <Inbox size={11} />
             {pending}
           </span>

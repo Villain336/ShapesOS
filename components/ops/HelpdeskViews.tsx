@@ -314,17 +314,17 @@ function TicketDetail({ ticketId, people, onClose, onChanged }: { ticketId: stri
       <ol className="flex flex-col gap-2.5">
         {messages.map((m) => (
           <li key={m.id} className={`rounded-lg border px-3 py-2.5 ${m.direction === "note" ? "border-line bg-canvas" : m.direction === "outbound" ? "border-line bg-paper" : "border-line-strong bg-paper"}`}>
-            <p className="mb-1 flex items-center gap-2 text-[12px] text-muted">
+            <p className="mb-1 flex items-center gap-2 text-[0.75rem] text-muted">
               {m.direction === "note" ? <StickyNote size={12} /> : m.direction === "outbound" ? <Send size={12} /> : <MessageSquare size={12} />}
               {m.direction === "inbound" ? m.fromEmail ?? "Customer" : m.direction === "outbound" ? `${nameOf(m.authorUserId)} → ${m.toEmail ?? ""}` : `Internal note · ${nameOf(m.authorUserId)}`}
               <span className="ml-auto">{fmtDateTime(m.createdAt)}</span>
               {m.deliveryStatus && m.deliveryStatus !== "sent" && <span className={chipCls}>{sentence(m.deliveryStatus)}</span>}
             </p>
-            <p className="whitespace-pre-wrap text-[13px] text-ink">{m.body}</p>
-            {m.error && <p className="mt-1 text-[12px] text-failed-text">{m.error}</p>}
+            <p className="whitespace-pre-wrap text-[0.8125rem] text-ink">{m.body}</p>
+            {m.error && <p className="mt-1 text-[0.75rem] text-failed-text">{m.error}</p>}
           </li>
         ))}
-        {messages.length === 0 && <li className="text-[13px] text-muted">No messages yet.</li>}
+        {messages.length === 0 && <li className="text-[0.8125rem] text-muted">No messages yet.</li>}
       </ol>
       {!terminal && (
         <div className="mt-4 flex flex-col gap-2">
@@ -335,7 +335,7 @@ function TicketDetail({ ticketId, people, onClose, onChanged }: { ticketId: stri
                 type="button"
                 role="tab"
                 aria-pressed={mode === k}
-                className={`rounded-full px-3 py-1 text-[12px] font-semibold ${mode === k ? "bg-ink text-white" : "bg-paper text-ink shadow-outline"}`}
+                className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${mode === k ? "bg-ink text-white" : "bg-paper text-ink shadow-outline"}`}
                 onClick={() => setMode(k)}
               >
                 {k === "reply" ? "Reply to customer" : "Internal note"}
@@ -343,7 +343,7 @@ function TicketDetail({ ticketId, people, onClose, onChanged }: { ticketId: stri
             ))}
           </div>
           <textarea
-            className="min-h-[110px] rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+            className="min-h-[110px] rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder={mode === "reply" ? (ticket.requesterEmail ? `Email ${ticket.requesterEmail}…` : "This ticket has no requester email") : "Only your team sees notes"}
@@ -541,8 +541,8 @@ export function SupportEmailView() {
         <LoadingLine label="Loading…" />
       ) : s.supportAddress ? (
         <div className={noteBoxCls}>
-          <p className="text-[12px] font-semibold text-muted">Your support inbox</p>
-          <p className="mt-1 select-all font-mono text-[13px] text-ink">{s.supportAddress}</p>
+          <p className="text-[0.75rem] font-semibold text-muted">Your support inbox</p>
+          <p className="mt-1 select-all font-mono text-[0.8125rem] text-ink">{s.supportAddress}</p>
         </div>
       ) : (
         <div className={infoBoxCls}>

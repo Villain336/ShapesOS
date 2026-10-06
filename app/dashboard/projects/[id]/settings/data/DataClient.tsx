@@ -172,12 +172,12 @@ export default function DataClient({
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-[13.5px] font-medium text-ink">
+                    <span className="text-[0.84375rem] font-medium text-ink">
                       {b.displayName}
                     </span>
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                        "rounded-full px-2 py-0.5 text-[0.6875rem] font-medium",
                         b.status === "active"
                           ? "bg-green/10 text-green"
                           : "bg-amber/10 text-amber",
@@ -187,10 +187,10 @@ export default function DataClient({
                     </span>
                   </div>
                   {meta && (
-                    <p className="mt-0.5 truncate text-[12.5px] text-ink-2">{meta}</p>
+                    <p className="mt-0.5 truncate text-[0.78125rem] text-ink-2">{meta}</p>
                   )}
                   {config && (
-                    <p className="mt-0.5 font-mono text-[11.5px] text-ink-3">{config}</p>
+                    <p className="mt-0.5 font-mono text-[0.71875rem] text-ink-3">{config}</p>
                   )}
                 </div>
                 {canEdit && (
@@ -211,9 +211,9 @@ export default function DataClient({
 
       {canEdit && (
         <div className="flex flex-col gap-3 rounded-control bg-inset p-4">
-          <h4 className="text-[13.5px] font-medium text-ink">Bind a data source</h4>
+          <h4 className="text-[0.84375rem] font-medium text-ink">Bind a data source</h4>
           {bindable.length === 0 ? (
-            <p className="text-[12.5px] text-ink-3">
+            <p className="text-[0.78125rem] text-ink-3">
               No active workspace connections available. Connect one from
               workspace settings first.
             </p>
@@ -248,7 +248,7 @@ export default function DataClient({
                   onChange={(e) => setConfigText(e.target.value)}
                   rows={3}
                   placeholder={"property=https://example.com"}
-                  className="font-mono text-[12.5px]"
+                  className="font-mono text-[0.78125rem]"
                 />
               </Field>
               <div>
@@ -267,7 +267,7 @@ export default function DataClient({
       )}
 
       {error && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-red">
+        <p className="flex items-center gap-1.5 text-[0.78125rem] text-red">
           <TriangleAlert className="size-3.5" />
           {error}
         </p>

@@ -114,7 +114,7 @@ export async function setUserPreferences(userId: string, patch: unknown, db: Pre
   if (Object.keys(data).length === 0) return getUserPreferences(userId, db);
   const row = await db.userPreference.upsert({
     where: { userId },
-    create: { userId, ...(data as Prisma.UserPreferenceCreateInput) },
+    create: { ...(data as Omit<Prisma.UserPreferenceCreateInput, "userId">), userId },
     update: data,
   });
   return rowToPreferences(row);

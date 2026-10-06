@@ -17,7 +17,7 @@ export { ToastView, type ToastViewAction } from "./Toast";
 export { LiveActivity, LiveCounts, LiveRunStrip, type LiveRun, type LiveChip } from "./LiveActivity";
 export { RunTimeline, ToolCallBlock, AsksFirstChip, type TimelineStep, type ToolCall } from "./RunTimeline";
 export { ApprovalCard, type ApprovalItem, type ApprovalCardMode } from "./ApprovalCard";
-export { PermissionSegmented, PERMISSION_OPTIONS, Switch, SwitchRow, Field, FieldMessage, type Permission } from "./Controls";
+export { PermissionSegmented, PERMISSION_OPTIONS, Segmented, Switch, SwitchRow, Field, FieldMessage, type Permission } from "./Controls";
 export { MenuSurface, MenuLabel, MenuRow, MenuSeparator } from "./Menu";
 export { FilterPill } from "./FilterPill";
 export { DelegationPlan } from "./DelegationPlan";

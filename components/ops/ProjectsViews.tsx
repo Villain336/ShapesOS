@@ -186,14 +186,14 @@ export function TasksView() {
           renderHeader={(c, col) => (
             <span className="flex items-center gap-2">
               <span className={chipCls}>{c.label}</span>
-              <span className="text-[12px] font-semibold tabular-nums text-muted">{col.length}</span>
+              <span className="text-[0.75rem] font-semibold tabular-nums text-muted">{col.length}</span>
             </span>
           )}
           renderCard={(t) => (
             <>
-              <div className="text-[13px] font-semibold text-ink">{t.title}</div>
-              <div className="mt-0.5 truncate text-[12px] text-muted">{P.get(t.projectId)?.name ?? shortId(t.projectId)}</div>
-              <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
+              <div className="text-[0.8125rem] font-semibold text-ink">{t.title}</div>
+              <div className="mt-0.5 truncate text-[0.75rem] text-muted">{P.get(t.projectId)?.name ?? shortId(t.projectId)}</div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[0.75rem]">
                 <span className="flex items-center gap-1.5 text-muted">
                   {t.assigneeId ? <Avatar name={nameOf(t.assigneeId)} size={18} /> : null}
                   {t.dueAt ? `Due ${fmtDate(t.dueAt)}` : "No due date"}
@@ -312,7 +312,7 @@ function NewTaskModal({
           </label>
         </div>
         {/* Phase 10 (portal) */}
-        <label className="flex items-center gap-2 text-[13px] text-ink">
+        <label className="flex items-center gap-2 text-[0.8125rem] text-ink">
           <input type="checkbox" checked={f.clientVisible} onChange={(e) => setF({ ...f, clientVisible: e.target.checked })} />
           Show this task to the client in the client portal
         </label>
@@ -479,7 +479,7 @@ export function TimesheetsView() {
       </div>
       {selected.size > 0 && (
         <div className="flex items-center gap-2">
-          <span className="text-[13px] text-muted">{selected.size} selected</span>
+          <span className="text-[0.8125rem] text-muted">{selected.size} selected</span>
           <button type="button" className={btnGhostSm} disabled={busy} onClick={() => decide("approved")}>
             <CheckCircle2 size={13} /> Approve
           </button>
@@ -608,7 +608,7 @@ function LogTimeModal({ projects, people, onClose, onLogged }: { projects: Proje
           <span className={labelCls}>Description</span>
           <input className={`${inputCls} w-full`} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
         </label>
-        <label className="flex items-center gap-2 text-[13px] text-ink">
+        <label className="flex items-center gap-2 text-[0.8125rem] text-ink">
           <input type="checkbox" checked={f.billable} onChange={(e) => setF({ ...f, billable: e.target.checked })} /> Billable
         </label>
         {error && <div className={errorBoxCls}>{error}</div>}

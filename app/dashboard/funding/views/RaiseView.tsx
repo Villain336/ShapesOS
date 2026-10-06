@@ -24,9 +24,9 @@ export interface RoundView {
 }
 
 const inputCls =
-  "h-control rounded-md border-[1.5px] border-control bg-paper px-3 text-[15px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+  "h-control rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.9375rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
-const labelCls = "text-[13px] font-semibold text-ink";
+const labelCls = "text-[0.8125rem] font-semibold text-ink";
 
 function toInput(round: RoundView | null) {
   return {
@@ -82,7 +82,7 @@ export function RaiseView({
   return (
     <div className="flex max-w-2xl flex-col gap-5 rounded-lg bg-paper p-4 shadow-hairline md:p-6">
       <div>
-        <h2 className="text-[18px] font-bold text-ink" style={{ fontStretch: "115%" }}>
+        <h2 className="text-[1.125rem] font-bold text-ink" style={{ fontStretch: "115%" }}>
           Your raise
         </h2>
         <p className="mt-1 text-sm text-muted">
@@ -145,7 +145,7 @@ export function RaiseView({
             value={draft.stages}
             onChange={set("stages")}
           />
-          <p className="text-[13px] text-muted">Comma-separated.</p>
+          <p className="text-[0.8125rem] text-muted">Comma-separated.</p>
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="raise-sectors" className={labelCls}>
@@ -158,7 +158,7 @@ export function RaiseView({
             value={draft.sectors}
             onChange={set("sectors")}
           />
-          <p className="text-[13px] text-muted">Comma-separated.</p>
+          <p className="text-[0.8125rem] text-muted">Comma-separated.</p>
         </div>
       </div>
 
@@ -187,7 +187,7 @@ export function RaiseView({
           type="button"
           onClick={save}
           disabled={saving}
-          className="aos-press inline-flex h-control items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="aos-press inline-flex h-control items-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white disabled:opacity-40"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           {saving ? "Saving" : "Save raise profile"}

@@ -29,7 +29,7 @@ function SourceBadge({ source }: { source: string }) {
     rss: "RSS",
   };
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {labels[source] ?? source}
     </span>
   );
@@ -39,7 +39,7 @@ const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
@@ -240,14 +240,14 @@ function QueueTab() {
         </a>
       </div>
 
-      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[0.75rem] text-muted">
         Draft-first, always: scanning drafts replies and queues them in the approvals inbox.
         A human edits and posts natively — ShapesOS never posts, votes, or messages on your
         behalf. Drafts failing the taste check never reach the inbox.
       </div>
 
       <details className="rounded-lg border border-line bg-paper px-3 py-2">
-        <summary className="cursor-pointer text-[13px] font-medium text-muted">
+        <summary className="cursor-pointer text-[0.8125rem] font-medium text-muted">
           RSS feeds for this scan (optional)
         </summary>
         <textarea
@@ -255,12 +255,12 @@ function QueueTab() {
           onChange={(e) => setFeeds(e.target.value)}
           rows={2}
           placeholder={"Niche SEO Forum | https://forum.example/rss\nhttps://blog.example/atom"}
-          className={`${inputCls} mt-2 w-full font-mono text-[12px]`}
+          className={`${inputCls} mt-2 w-full font-mono text-[0.75rem]`}
         />
       </details>
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
           <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
@@ -270,7 +270,7 @@ function QueueTab() {
       )}
 
       {report && (
-        <div className="rounded-lg border border-line bg-canvas px-3 py-2.5 text-[13px]">
+        <div className="rounded-lg border border-line bg-canvas px-3 py-2.5 text-[0.8125rem]">
           <div className="font-medium text-ink">
             Scan {report.dryRun ? "preview" : "complete"} — {report.opportunities.length}{" "}
             opportunit{report.opportunities.length === 1 ? "y" : "ies"} found
@@ -280,7 +280,7 @@ function QueueTab() {
               </>
             )}
           </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-muted">
+          <div className="mt-1 flex flex-wrap gap-2 text-[0.75rem] text-muted">
             {report.sources.map((s) => (
               <span key={s.source}>
                 <SourceBadge source={s.source} /> {s.status}: {s.detail}
@@ -300,7 +300,7 @@ function QueueTab() {
             </ul>
           )}
           {report.tasteRejected.length > 0 && (
-            <div className="mt-2 text-[12px] text-muted">
+            <div className="mt-2 text-[0.75rem] text-muted">
               {report.tasteRejected.length} draft(s) failed the taste check and were logged, not
               queued: {report.tasteRejected.map((t) => t.failures[0]).join(" · ")}
             </div>
@@ -309,22 +309,22 @@ function QueueTab() {
       )}
 
       {items === null ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="aos-spin" />
           Loading opportunity queue…
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-paper px-6 py-12 text-center">
           <MessagesSquare size={28} className="text-subtle" />
-          <div className="text-[14px] font-semibold text-ink">Queue is empty</div>
-          <div className="max-w-[360px] text-[13px] text-muted">
+          <div className="text-[0.875rem] font-semibold text-ink">Queue is empty</div>
+          <div className="max-w-[360px] text-[0.8125rem] text-muted">
             Run “Scan & draft” to find live threads and draft replies. Passing drafts land in the
             approvals inbox for your sign-off.
           </div>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-          <table className="w-full min-w-[860px] text-left text-[13px]">
+          <table className="w-full min-w-[860px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Source</th>
@@ -339,7 +339,7 @@ function QueueTab() {
                 <tr key={i.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2.5 align-top">
                     <SourceBadge source={i.source} />
-                    {i.feedName && <div className="mt-1 text-[11px] text-subtle">{i.feedName}</div>}
+                    {i.feedName && <div className="mt-1 text-[0.6875rem] text-subtle">{i.feedName}</div>}
                   </td>
                   <td className="max-w-[220px] px-3 py-2.5 align-top">
                     <a
@@ -351,31 +351,31 @@ function QueueTab() {
                     >
                       <span className="line-clamp-2">{i.thread}</span>
                     </a>
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-subtle">
+                    <div className="mt-0.5 flex items-center gap-1 text-[0.6875rem] text-subtle">
                       {i.author && <span>by {i.author}</span>}
                       <ArrowUpRight size={11} />
                     </div>
                   </td>
-                  <td className="max-w-[220px] px-3 py-2.5 align-top text-[12px] text-muted">
+                  <td className="max-w-[220px] px-3 py-2.5 align-top text-[0.75rem] text-muted">
                     <span className="line-clamp-3" title={i.reason}>
                       {i.reason}
                     </span>
                     {i.matchedKeywords.length > 0 && (
-                      <div className="mt-1 text-[11px] text-subtle">
+                      <div className="mt-1 text-[0.6875rem] text-subtle">
                         {i.matchedKeywords.slice(0, 3).join(", ")}
                       </div>
                     )}
                   </td>
                   <td className="max-w-[260px] px-3 py-2.5 align-top">
                     <p
-                      className={`text-[12px] text-muted ${expanded === i.id ? "" : "line-clamp-3"}`}
+                      className={`text-[0.75rem] text-muted ${expanded === i.id ? "" : "line-clamp-3"}`}
                       title={i.draft}
                     >
                       {i.draft}
                     </p>
                     <button
                       onClick={() => setExpanded(expanded === i.id ? null : i.id)}
-                      className="mt-1 text-[11px] font-medium text-ink hover:underline"
+                      className="mt-1 text-[0.6875rem] font-medium text-ink hover:underline"
                     >
                       {expanded === i.id ? "Show less" : "Show full draft"}
                     </button>
@@ -390,7 +390,7 @@ function QueueTab() {
         </div>
       )}
 
-      <p className="text-[12px] text-muted">
+      <p className="text-[0.75rem] text-muted">
         Drafts are decided in the{" "}
         <a href="/dashboard/approvals" className="font-medium text-ink hover:underline">
           approvals inbox
@@ -472,11 +472,11 @@ function OutcomesTab() {
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-line bg-paper p-3">
-        <div className="mb-2 text-[13px] font-semibold text-ink">
+        <div className="mb-2 text-[0.8125rem] font-semibold text-ink">
           Record a posted outcome
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-[12px] text-muted">
+          <label className="flex flex-col gap-1 text-[0.75rem] text-muted">
             Queued draft
             <select
               value={form.approvalId}
@@ -496,7 +496,7 @@ function OutcomesTab() {
             ["replies", "Replies"],
             ["traffic", "Visits"],
           ].map(([key, label]) => (
-            <label key={key} className="flex flex-col gap-1 text-[12px] text-muted">
+            <label key={key} className="flex flex-col gap-1 text-[0.75rem] text-muted">
               {label}
               <input
                 value={form[key as "upvotes" | "replies" | "traffic"]}
@@ -507,7 +507,7 @@ function OutcomesTab() {
               />
             </label>
           ))}
-          <label className="flex flex-col gap-1 text-[12px] text-muted">
+          <label className="flex flex-col gap-1 text-[0.75rem] text-muted">
             Note
             <input
               value={form.note}
@@ -521,14 +521,14 @@ function OutcomesTab() {
             Record posted
           </button>
         </div>
-        <p className="mt-2 text-[12px] text-muted">
+        <p className="mt-2 text-[0.75rem] text-muted">
           After you post a draft natively, record what happened. Outcomes feed M3’s
           branded-mention tracking.
         </p>
       </div>
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
           <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
@@ -538,21 +538,21 @@ function OutcomesTab() {
       )}
 
       {outcomes === null ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="aos-spin" />
           Loading outcomes…
         </div>
       ) : outcomes.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-paper px-6 py-12 text-center">
           <BarChart3 size={28} className="text-subtle" />
-          <div className="text-[14px] font-semibold text-ink">No posted outcomes yet</div>
-          <div className="max-w-[360px] text-[13px] text-muted">
+          <div className="text-[0.875rem] font-semibold text-ink">No posted outcomes yet</div>
+          <div className="max-w-[360px] text-[0.8125rem] text-muted">
             Post a queued draft natively, then record the outcome above to close the loop.
           </div>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-          <table className="w-full min-w-[760px] text-left text-[13px]">
+          <table className="w-full min-w-[760px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Source</th>
@@ -596,7 +596,7 @@ function OutcomesTab() {
                   <td className="px-3 py-2.5 align-top font-medium text-ink">
                     {o.traffic ?? "—"}
                   </td>
-                  <td className="max-w-[200px] px-3 py-2.5 align-top text-[12px] text-muted">
+                  <td className="max-w-[200px] px-3 py-2.5 align-top text-[0.75rem] text-muted">
                     <span className="line-clamp-2" title={o.note ?? ""}>
                       {o.note ?? "—"}
                     </span>
@@ -622,12 +622,12 @@ function SourcesTab() {
       <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="hacker_news" />
-          <span className="text-[14px] font-semibold text-ink">Hacker News</span>
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted shadow-control">
+          <span className="text-[0.875rem] font-semibold text-ink">Hacker News</span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold text-muted shadow-control">
             <CheckCircle2 size={11} /> Live — no key needed
           </span>
         </div>
-        <p className="mt-2 text-[13px] text-muted">
+        <p className="mt-2 text-[0.8125rem] text-muted">
           Searched via the free Algolia HN Search API (stories + comments). Queries default to
           your tracked keywords plus competitor domains.
         </p>
@@ -636,12 +636,12 @@ function SourcesTab() {
       <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="reddit" />
-          <span className="text-[14px] font-semibold text-ink">Reddit</span>
-          <span className="ml-auto inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted shadow-control">
+          <span className="text-[0.875rem] font-semibold text-ink">Reddit</span>
+          <span className="ml-auto inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold text-muted shadow-control">
             Official API only — your own OAuth
           </span>
         </div>
-        <div className="mt-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+        <div className="mt-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[0.75rem] text-muted">
           ShapesOS never scrapes Reddit and never proxies it at platform scale. To enable Reddit
           opportunities, create a script app at reddit.com/prefs/apps (your own account), then
           supply the client ID, secret, refresh token, and username when running a scan. Read-only
@@ -654,11 +654,11 @@ function SourcesTab() {
       <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="rss" />
-          <span className="text-[14px] font-semibold text-ink">Niche forums (RSS)</span>
+          <span className="text-[0.875rem] font-semibold text-ink">Niche forums (RSS)</span>
         </div>
-        <p className="mt-2 text-[13px] text-muted">
+        <p className="mt-2 text-[0.8125rem] text-muted">
           Paste forum/community feed URLs below — one per line, optionally as{" "}
-          <code className="rounded-key bg-hover px-1 font-mono text-[12px]">Name | https://…/rss</code>.
+          <code className="rounded-key bg-hover px-1 font-mono text-[0.75rem]">Name | https://…/rss</code>.
           They’re sent with each scan (Discourse, NodeBB, Flarum, Substack feeds all work).
         </p>
         <textarea
@@ -666,7 +666,7 @@ function SourcesTab() {
           onChange={(e) => setFeeds(e.target.value)}
           rows={3}
           placeholder={"Niche SEO Forum | https://forum.example/rss\nhttps://blog.example/atom"}
-          className={`${inputCls} mt-2 w-full font-mono text-[12px]`}
+          className={`${inputCls} mt-2 w-full font-mono text-[0.75rem]`}
         />
         <div className="mt-2 flex gap-2">
           <button
@@ -682,14 +682,14 @@ function SourcesTab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[0.75rem] text-muted">
         <span className="font-medium text-muted">Google Alerts baseline:</span> there is no
         Alerts API — use the free consumer product (google.com/alerts) for competitor mentions,
         then paste promising thread URLs into a scan’s context or post about them directly. M8
         never scrapes Alerts.
       </div>
 
-      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[0.75rem] text-muted">
         <span className="font-medium text-muted">House rules:</span> one account, honest
         identity. No astroturfing, no fake engagement, no automation of votes or posts.
         Over-polished AI replies get punished by communities — every draft passes a taste check
@@ -710,7 +710,7 @@ export default function CommunityClient() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

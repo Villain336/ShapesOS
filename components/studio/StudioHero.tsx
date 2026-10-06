@@ -17,7 +17,7 @@ export function StudioHero() {
         <h1 className="aos-subheading text-ink">
           Creative Studio
         </h1>
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Design, assets, and templates — one canvas.
         </p>
       </div>
@@ -27,7 +27,7 @@ export function StudioHero() {
   return (
     <div>
       <h1 className="aos-heading text-ink">Creative Studio</h1>
-      <p className="mt-0.5 text-[13px] text-muted">
+      <p className="mt-0.5 text-[0.8125rem] text-muted">
         The central home for all creative and design work across ShapesOS.
         v1 ships print/mail creative plus the asset library; email and social templates plug in later.
       </p>

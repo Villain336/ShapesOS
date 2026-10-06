@@ -47,7 +47,7 @@ export default async function SecuritySettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Security</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — authentication, SSO, and secret-storage posture.
           Read-only; changes happen on the host via environment.
         </p>

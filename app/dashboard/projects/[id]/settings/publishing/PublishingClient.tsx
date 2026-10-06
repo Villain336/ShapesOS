@@ -85,28 +85,28 @@ export default function PublishingClient({
             className="mt-0.5"
           />
           <span className="min-w-0">
-            <span className="block text-[13.5px] font-medium text-ink">{c.label}</span>
-            <span className="mt-0.5 block text-[12.5px] text-ink-2">
+            <span className="block text-[0.84375rem] font-medium text-ink">{c.label}</span>
+            <span className="mt-0.5 block text-[0.78125rem] text-ink-2">
               {c.description}
             </span>
           </span>
         </label>
       ))}
 
-      <p className="mt-3 text-[12.5px] text-ink-3">
+      <p className="mt-3 text-[0.78125rem] text-ink-3">
         Approval mode (Automation tab) still governs whether each publish needs
         your sign-off — these controls only set which destinations are allowed
         at all.
       </p>
 
       {state === "saved" && (
-        <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-green">
+        <p className="flex items-center gap-1.5 pt-2 text-[0.78125rem] text-green">
           <CheckCircle className="size-3.5" />
           Saved
         </p>
       )}
       {state === "error" && error && (
-        <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-red">
+        <p className="flex items-center gap-1.5 pt-2 text-[0.78125rem] text-red">
           <TriangleAlert className="size-3.5" />
           {error}
         </p>

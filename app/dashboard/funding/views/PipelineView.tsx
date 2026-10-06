@@ -88,11 +88,11 @@ function InvestorCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[15px] font-semibold text-ink">
+          <div className="truncate text-[0.9375rem] font-semibold text-ink">
             {investor.name}
           </div>
           {(investor.firm || investor.title) && (
-            <div className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-muted">
+            <div className="mt-0.5 flex items-center gap-1 truncate text-[0.8125rem] text-muted">
               <Building2 size={12} className="shrink-0" />
               <span className="truncate">
                 {[investor.firm, investor.title].filter(Boolean).join(" · ")}
@@ -101,13 +101,13 @@ function InvestorCard({
           )}
         </div>
       </div>
-      {band && <div className="mt-1 text-[13px] text-muted">{band}</div>}
+      {band && <div className="mt-1 text-[0.8125rem] text-muted">{band}</div>}
       {investor.sectors.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {investor.sectors.slice(0, 3).map((s) => (
             <span
               key={s}
-              className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-muted"
+              className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-muted"
             >
               {s}
             </span>
@@ -115,7 +115,7 @@ function InvestorCard({
         </div>
       )}
       {investor.openFollowUps.length > 0 && (
-        <div className="mt-2 flex items-center gap-1 text-[12px] font-semibold text-muted">
+        <div className="mt-2 flex items-center gap-1 text-[0.75rem] font-semibold text-muted">
           <CalendarClock size={12} />
           {investor.openFollowUps.length} follow-up
           {investor.openFollowUps.length === 1 ? "" : "s"} open
@@ -190,19 +190,19 @@ export function PipelineView() {
         <div className="flex items-center gap-2">
           <KanbanSquare size={15} className="text-ink" />
           <h2
-            className="text-[18px] font-bold text-ink"
+            className="text-[1.125rem] font-bold text-ink"
             style={{ fontStretch: "115%" }}
           >
             Pipeline
           </h2>
-          <span className="rounded-full bg-paper px-2.5 py-1 text-[12px] font-semibold text-muted shadow-control">
+          <span className="rounded-full bg-paper px-2.5 py-1 text-[0.75rem] font-semibold text-muted shadow-control">
             {investors.length} investor{investors.length === 1 ? "" : "s"}
           </span>
         </div>
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[14px] font-semibold text-white"
+          className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white"
         >
           {adding ? <X size={15} /> : <Plus size={15} />}
           {adding ? "Close" : "Add investor"}
@@ -213,51 +213,51 @@ export function PipelineView() {
         <div className="rounded-lg bg-paper p-4 shadow-hairline">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-semibold text-ink">Name</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Name</span>
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Jane Doe"
-                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[15px] text-ink"
+                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[0.9375rem] text-ink"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-semibold text-ink">Firm</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Firm</span>
               <input
                 value={form.firm}
                 onChange={(e) => setForm((f) => ({ ...f, firm: e.target.value }))}
                 placeholder="Acme Ventures"
-                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[15px] text-ink"
+                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[0.9375rem] text-ink"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-semibold text-ink">Email</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Email</span>
               <input
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="jane@acme.vc"
-                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[15px] text-ink"
+                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[0.9375rem] text-ink"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-semibold text-ink">Source</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Source</span>
               <input
                 value={form.source}
                 onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
                 placeholder="boardy_intro, crunchbase…"
-                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[15px] text-ink"
+                className="h-11 rounded-md border-[1.5px] border-control bg-white px-3 text-[0.9375rem] text-ink"
               />
             </label>
           </div>
           {error && (
-            <p role="alert" className="mt-2 text-[13px] font-semibold text-failed-text">
+            <p role="alert" className="mt-2 text-[0.8125rem] font-semibold text-failed-text">
               {error}
             </p>
           )}
           <button
             type="button"
             onClick={() => void createInvestor()}
-            className="aos-press mt-3 flex h-11 items-center rounded-full bg-black px-5 text-[14px] font-semibold text-white"
+            className="aos-press mt-3 flex h-11 items-center rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white"
           >
             Add to pipeline
           </button>
@@ -274,15 +274,15 @@ export function PipelineView() {
               className="flex w-[260px] shrink-0 flex-col gap-2"
             >
               <div className="flex items-center justify-between rounded-sm bg-canvas px-2 py-1.5">
-                <h3 className="text-[13px] font-bold text-ink">
+                <h3 className="text-[0.8125rem] font-bold text-ink">
                   {STAGE_LABELS[stage]}
                 </h3>
-                <span className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-semibold text-muted shadow-control">
+                <span className="rounded-full bg-paper px-2 py-0.5 text-[0.6875rem] font-semibold text-muted shadow-control">
                   {list.length}
                 </span>
               </div>
               {list.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-control bg-canvas p-4 text-center text-[13px] text-muted">
+                <div className="rounded-lg border border-dashed border-control bg-canvas p-4 text-center text-[0.8125rem] text-muted">
                   No investors
                 </div>
               ) : (

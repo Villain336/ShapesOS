@@ -86,7 +86,7 @@ export function ConsentApp() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Consent</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Prior express consent per lead per channel. Outbound AI calls only to opted-in leads.
         </p>
       </div>

@@ -30,10 +30,14 @@ const tokenCache = new Map<string, string>();
  *  cannot parse var(). Client-only; falls back to the CSS keyword "black". */
 export function resolveToken(name: string): string {
   if (typeof document === "undefined") return "black";
-  let v = tokenCache.get(name);
+  // Phase 18.1: keyed by the <html> classes so a theme / contrast change
+  // (light ↔ dark) re-resolves instead of serving the old colours.
+  const osDark = typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+  const key = `${document.documentElement.className}|${osDark}|${name}`;
+  let v = tokenCache.get(key);
   if (!v) {
     v = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "black";
-    tokenCache.set(name, v);
+    tokenCache.set(key, v);
   }
   return v;
 }
@@ -98,7 +102,7 @@ export const inputCls =
 
 /** Primary action: black pill, 36px, press feedback. */
 export const btnPrimary =
-  "aos-press inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-night-hover disabled:bg-disabled disabled:text-disabled-fg";
+  "aos-press inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink-hover disabled:bg-disabled disabled:text-disabled-fg";
 
 /** Secondary action: white pill with 1.5px black inset ring. */
 export const btnGhost =

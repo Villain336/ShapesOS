@@ -20,7 +20,7 @@ export default async function ClipsPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading">Clips</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Turn long videos into viral shorts — scored, captioned in your brand, approved by you.
         </p>
       </div>

@@ -151,11 +151,11 @@ export function InvoicesTab() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Invoicing</h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Draft → approve → send → paid. Sending an invoice needs your approval — money is a red lane.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-muted">
+        <div className="flex items-center gap-4 text-[0.8125rem] text-muted">
           <span>
             Outstanding <span className="font-bold text-ink tabular-nums">{formatMoney(totals.outstanding)}</span>
           </span>
@@ -204,14 +204,14 @@ export function InvoicesTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading invoices…
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
           <FileText size={28} className="mx-auto text-subtle" />
-          <p className="mt-2 text-[13px] font-semibold text-ink">No invoices yet</p>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-2 text-[0.8125rem] font-semibold text-ink">No invoices yet</p>
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Create a draft invoice — it stays a draft until you approve the send.
           </p>
         </div>

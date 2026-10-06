@@ -105,7 +105,7 @@ export function AudioApp() {
     }
   }
 
-  const inputCls = "mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none";
+  const inputCls = "mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none";
 
   return (
     <div className="flex flex-col gap-4">
@@ -117,7 +117,7 @@ export function AudioApp() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -162,7 +162,7 @@ export function AudioApp() {
             {stations.map((s, i) => (
               <div key={i} className="mt-1 flex gap-1">
                 <input value={s.name} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))} placeholder="Station / show" className={inputCls} />
-                <select value={s.type} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, type: e.target.value } : r)))} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
+                <select value={s.type} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, type: e.target.value } : r)))} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
                   <option value="streaming">streaming</option><option value="podcast">podcast</option>
                 </select>
                 <input value={s.market} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, market: e.target.value } : r)))} placeholder="Market" className={`${inputCls} w-28`} />
@@ -177,7 +177,7 @@ export function AudioApp() {
             {spotMix.map((s, i) => (
               <div key={i} className="mt-1 flex gap-1">
                 <input value={s.label} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))} placeholder="Label" className={inputCls} />
-                <select value={s.lengthSec} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, lengthSec: Number(e.target.value) } : r)))} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
+                <select value={s.lengthSec} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, lengthSec: Number(e.target.value) } : r)))} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
                   <option value={15}>:15</option><option value={30}>:30</option><option value={60}>:60</option>
                 </select>
                 <input type="number" value={s.spotsPerDay} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, spotsPerDay: Number(e.target.value) } : r)))} min={1} placeholder="/day" className={`${inputCls} w-24`} />
@@ -208,9 +208,9 @@ export function AudioApp() {
           <p className="text-sm text-muted">No briefs yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-canvas text-[0.6875rem] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Brief</th>
                   <th className="px-3 py-2 font-medium">Vendor</th>
                   <th className="px-3 py-2 font-medium">Stations</th>
@@ -227,9 +227,9 @@ export function AudioApp() {
                     <td className="px-3 py-2 text-muted">{b.vendor}</td>
                     <td className="px-3 py-2 text-muted">{(b.stationsJson.stations ?? []).length}</td>
                     <td className="px-3 py-2 font-medium text-ink">{money(b.budgetCents, b.currency)}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{b.stationsJson.flightStart} → {b.stationsJson.flightEnd}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{b.stationsJson.flightStart} → {b.stationsJson.flightEnd}</td>
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted">{b.status}</span>
+                      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted">{b.status}</span>
                     </td>
                     <td className="px-3 py-2">
                       {b.briefUrl ? <a href={b.briefUrl} className="flex items-center gap-1 text-xs text-muted underline"><FileDown className="h-3 w-3" /> PDF</a> : <span className="text-subtle">—</span>}

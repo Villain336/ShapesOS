@@ -12,7 +12,7 @@ export function Monogram({
   return (
     <span
       className={`flex size-4 shrink-0 items-center justify-center rounded-key
-        text-[9px] font-semibold leading-none text-white ${className}`}
+        text-[0.5625rem] font-semibold leading-none text-white ${className}`}
       style={{ background: color }}
     >
       {children}
@@ -40,7 +40,7 @@ export function EntityChip({
         py-px pl-[3px] pr-1.5 align-middle shadow-hairline ${className}`}
     >
       <Monogram color={color}>{monogram ?? name.charAt(0)}</Monogram>
-      <span className="text-[12px] font-medium text-ink">{name}</span>
+      <span className="text-[0.75rem] font-medium text-ink">{name}</span>
     </span>
   );
 }

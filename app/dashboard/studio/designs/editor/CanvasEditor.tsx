@@ -42,7 +42,7 @@ import { AiPanel } from "./panels/AiPanel";
 const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.DesignCanvas), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center text-[13px] text-muted">
+    <div className="flex h-full items-center justify-center text-[0.8125rem] text-muted">
       Loading canvas…
     </div>
   ),
@@ -203,7 +203,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas text-[13px] text-muted">
+      <div className="flex h-full items-center justify-center bg-canvas text-[0.8125rem] text-muted">
         Loading design…
       </div>
     );
@@ -212,8 +212,8 @@ export function CanvasEditor({ designId }: { designId: string }) {
   if (loadError || !document) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 bg-canvas px-6 text-center">
-        <p className="text-[14px] font-semibold text-ink">Could not load this design</p>
-        <p className="max-w-md text-[13px] text-muted">
+        <p className="text-[0.875rem] font-semibold text-ink">Could not load this design</p>
+        <p className="max-w-md text-[0.8125rem] text-muted">
           {loadError ?? "The design came back empty."} The designs API may still be landing — try again in a moment.
         </p>
       </div>
@@ -229,7 +229,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
             key={r.key}
             onClick={() => setPanel(r.key)}
             title={r.label}
-            className={`flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-md text-[9px] font-medium ${
+            className={`flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-md text-[0.5625rem] font-medium ${
               panel === r.key
                 ? "bg-ink text-white"
                 : "text-muted hover:bg-hover-paper hover:text-ink"
@@ -283,7 +283,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
             </button>
             <button
               onClick={fitZoom}
-              className="min-w-12 rounded-full px-1 text-center text-[11px] font-medium text-ink hover:bg-hover-paper"
+              className="min-w-12 rounded-full px-1 text-center text-[0.6875rem] font-medium text-ink hover:bg-hover-paper"
               title="Fit to screen"
             >
               {Math.round(zoom * 100)}%
@@ -297,7 +297,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
             </button>
             <button
               onClick={fitZoom}
-              className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-ink hover:bg-hover-paper"
+              className="rounded-full px-1.5 py-0.5 text-[0.6875rem] font-medium text-ink hover:bg-hover-paper"
               title="Fit page to screen"
             >
               Fit

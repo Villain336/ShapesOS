@@ -102,7 +102,7 @@ export default async function ProposalsPage() {
                         </ul>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
-                        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">{Math.round(p.confidence * 100)}% confidence</span>
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">{Math.round(p.confidence * 100)}% confidence</span>
                         <ProposalActions proposalId={p.id} />
                       </div>
                     </div>
@@ -132,8 +132,8 @@ export default async function ProposalsPage() {
                   <span
               className={
                 p.status === "approved"
-                  ? "inline-flex items-center whitespace-nowrap rounded-full bg-done px-1.5 py-0.5 text-[10px] font-medium leading-tight text-white"
-                  : "inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control"
+                  ? "inline-flex items-center whitespace-nowrap rounded-full bg-done px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-white"
+                  : "inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control"
               }
             >
               {p.status}

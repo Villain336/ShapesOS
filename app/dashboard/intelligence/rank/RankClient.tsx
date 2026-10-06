@@ -26,7 +26,7 @@ import {
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
   void tone;
   return (
-    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
@@ -36,7 +36,7 @@ const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
@@ -199,7 +199,7 @@ export function RankClient({ projects }: { projects: Project[] }) {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -218,10 +218,10 @@ export function RankClient({ projects }: { projects: Project[] }) {
             <option key={p.id} value={p.id}>{p.domain}</option>
           ))}
         </select>
-        <span className="text-[12px] text-muted">Pre</span>
+        <span className="text-[0.75rem] text-muted">Pre</span>
         <input type="date" value={preStart} onChange={(e) => setPreStart(e.target.value)} className={inputCls} />
         <input type="date" value={preEnd} onChange={(e) => setPreEnd(e.target.value)} className={inputCls} />
-        <span className="text-[12px] text-muted">Post</span>
+        <span className="text-[0.75rem] text-muted">Post</span>
         <input type="date" value={postStart} onChange={(e) => setPostStart(e.target.value)} className={inputCls} />
         <input type="date" value={postEnd} onChange={(e) => setPostEnd(e.target.value)} className={inputCls} />
         <input
@@ -243,14 +243,14 @@ export function RankClient({ projects }: { projects: Project[] }) {
       </div>
 
       {error && (
-        <div role="alert" className="mb-3 flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="mb-3 flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
         </div>
       )}
 
       {!data?.gsc.connected && !loading && (
-        <div className="mb-3 rounded-md border border-line bg-canvas px-3 py-2.5 text-[13px] text-muted">
+        <div className="mb-3 rounded-md border border-line bg-canvas px-3 py-2.5 text-[0.8125rem] text-muted">
           Search Console isn’t connected for this project yet — bind the{" "}
           <span className="font-medium text-ink">google-search-console</span> connector to the
           project to make GSC the rank truth here. Paid SERP stays available for
@@ -273,7 +273,7 @@ function OverviewTab({ data, loading }: { data: RankData | null; loading: boolea
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Visibility score (GSC-sourced)</th>
@@ -302,7 +302,7 @@ function OverviewTab({ data, loading }: { data: RankData | null; loading: boolea
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Movement summary</th>
@@ -326,7 +326,7 @@ function OverviewTab({ data, loading }: { data: RankData | null; loading: boolea
       </div>
 
       {data?.visibilityError && (
-        <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[13px] text-muted">
+        <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[0.8125rem] text-muted">
           Visibility recompute failed: {data.visibilityError}
         </div>
       )}
@@ -339,7 +339,7 @@ function OverviewTab({ data, loading }: { data: RankData | null; loading: boolea
 function DeltaTable({ rows, emptyHint }: { rows: DeltaRow[]; emptyHint: string }) {
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white">
-      <table className="w-full text-left text-[13px]">
+      <table className="w-full text-left text-[0.8125rem]">
         <thead>
           <tr className="border-b border-line text-xs font-semibold text-muted">
             <th className="px-3 py-2 font-medium">Query</th>
@@ -364,7 +364,7 @@ function DeltaTable({ rows, emptyHint }: { rows: DeltaRow[]; emptyHint: string }
                   <span className="h-1.5 w-16 overflow-hidden rounded-full bg-hover">
                     <span className="block h-full rounded-full bg-ink" style={{ width: `${r.magnitude}%` }} />
                   </span>
-                  <span className="text-[12px] text-muted">{r.magnitude}</span>
+                  <span className="text-[0.75rem] text-muted">{r.magnitude}</span>
                 </span>
               </td>
               <td className="px-3 py-2"><SourceBadge source={r.source} /></td>
@@ -372,7 +372,7 @@ function DeltaTable({ rows, emptyHint }: { rows: DeltaRow[]; emptyHint: string }
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+              <td colSpan={7} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                 {emptyHint}
               </td>
             </tr>
@@ -399,14 +399,14 @@ function MoversTab({ data, loading }: { data: RankData | null; loading: boolean 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <h3 className="mb-2 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
           <TrendingUp size={14} className="text-muted" /> Winners
           {v && <Chip>{v.winners.length}</Chip>}
         </h3>
         <DeltaTable rows={v?.winners ?? []} emptyHint={loading ? "Loading…" : "No winners in this window."} />
       </div>
       <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <h3 className="mb-2 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
           <TrendingDown size={14} className="text-muted" /> Losers
           {v && <Chip>{v.losers.length}</Chip>}
         </h3>
@@ -422,7 +422,7 @@ function SourcesTab({ data, loading }: { data: RankData | null; loading: boolean
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Data source</th>
@@ -463,7 +463,7 @@ function SourcesTab({ data, loading }: { data: RankData | null; loading: boolean
           </tbody>
         </table>
       </div>
-      <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[13px] text-muted">
+      <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[0.8125rem] text-muted">
         <span className="font-medium text-ink"><Database size={13} className="mr-1 inline" />Source badges:</span>{" "}
         rows marked <Chip tone="violet">GSC</Chip> come from Search Analytics (free, owned-site truth);{" "}
         <Chip tone="amber">Paid vendor</Chip> rows come from the licensed SERP API and only ever

@@ -64,7 +64,7 @@ function InviteBody() {
           </p>
           <a
             href="/dashboard"
-            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-night-hover"
+            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-ink-hover"
           >
             Go to dashboard
           </a>
@@ -81,7 +81,7 @@ function InviteBody() {
           </p>
           <a
             href="/login"
-            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-night-hover"
+            className="mt-4 inline-flex h-control items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper aos-press hover:bg-ink-hover"
           >
             Back to sign-in
           </a>

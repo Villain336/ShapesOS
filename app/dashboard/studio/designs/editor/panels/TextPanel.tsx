@@ -90,12 +90,12 @@ function RichTextControls({ el }: { el: TextElement }) {
         placeholder="No text"
       />
       {hasRange && range ? (
-        <p className="mt-1 text-[11px] leading-snug text-muted">
+        <p className="mt-1 text-[0.6875rem] leading-snug text-muted">
           Chars {range.start}–{range.end}:{" "}
           <span className="font-medium text-ink">“{preview}”</span>
         </p>
       ) : (
-        <p className="mt-1 text-[11px] leading-snug text-muted">
+        <p className="mt-1 text-[0.6875rem] leading-snug text-muted">
           Drag across the text above to select a range, then style just that range.
         </p>
       )}
@@ -119,7 +119,7 @@ function RichTextControls({ el }: { el: TextElement }) {
         <button
           onClick={() => clearFragments(el.id)}
           disabled={!hasRichFragments(el)}
-          className={`${iconBtn} !w-auto gap-1.5 px-2.5 text-[12px]`}
+          className={`${iconBtn} !w-auto gap-1.5 px-2.5 text-[0.75rem]`}
           title="Remove all per-range styling"
         >
           <Eraser className="h-3.5 w-3.5" />
@@ -171,7 +171,7 @@ function RangeStyleForm({
       <select
         value={fontFamily}
         onChange={(e) => setFontFamily(e.target.value)}
-        className={`${inputCls} max-w-32 text-[12px]`}
+        className={`${inputCls} max-w-32 text-[0.75rem]`}
         title="Range font"
         aria-label="Range font"
       >
@@ -189,7 +189,7 @@ function RangeStyleForm({
         onChange={(e) =>
           setFontSize(Math.min(400, Math.max(8, parseInt(e.target.value, 10) || 8)))
         }
-        className={`${inputCls} w-16 text-[12px]`}
+        className={`${inputCls} w-16 text-[0.75rem]`}
         title="Range font size"
         aria-label="Range font size"
       />
@@ -228,7 +228,7 @@ function TextPathControls({ el }: { el: TextElement }) {
               setTextPath(el.id, p.data);
               setCustom(p.data);
             }}
-            className={`${btnGhost} !py-1 text-[12px] ${
+            className={`${btnGhost} !py-1 text-[0.75rem] ${
               active === p.data ? "!border-ink !bg-ink !text-white" : ""
             }`}
             title={`Path preset: ${p.label}`}
@@ -244,7 +244,7 @@ function TextPathControls({ el }: { el: TextElement }) {
           onChange={(e) => setCustom(e.target.value)}
           placeholder="Custom SVG path data…"
           aria-label="Custom SVG path data"
-          className={`${inputCls} min-w-0 flex-1 font-mono text-[12px]`}
+          className={`${inputCls} min-w-0 flex-1 font-mono text-[0.75rem]`}
         />
         <button
           onClick={() => {
@@ -262,13 +262,13 @@ function TextPathControls({ el }: { el: TextElement }) {
             setTextPath(el.id);
             setCustom("");
           }}
-          className={`${btnGhost} mt-1.5 !py-1 text-[12px]`}
+          className={`${btnGhost} mt-1.5 !py-1 text-[0.75rem]`}
         >
           <X className="h-3.5 w-3.5" />
           Remove path
         </button>
       )}
-      <p className="mt-1 text-[11px] leading-snug text-muted">
+      <p className="mt-1 text-[0.6875rem] leading-snug text-muted">
         While a path is set, per-range styling is ignored and the text follows
         the path from the element's position.
       </p>
@@ -359,7 +359,7 @@ export function TextPanel() {
             >
               {p.label}
             </span>
-            <span className="text-[11px] text-muted">
+            <span className="text-[0.6875rem] text-muted">
               {p.label} · {p.fontSize}px{p.fontStyle === "bold" ? " · bold" : ""}
             </span>
           </button>
@@ -367,11 +367,11 @@ export function TextPanel() {
         <div className={`${panelSectionLabel} pt-2`}>Call to action</div>
         <button
           onClick={addCta}
-          className="flex h-control w-full items-center justify-center rounded-full bg-ink px-3 text-[14px] font-semibold text-white aos-press"
+          className="flex h-control w-full items-center justify-center rounded-full bg-ink px-3 text-[0.875rem] font-semibold text-white aos-press"
         >
           CTA button
         </button>
-        <p className="pt-1 text-[11px] leading-snug text-muted">
+        <p className="pt-1 text-[0.6875rem] leading-snug text-muted">
           Adds a black pill with a centered label as two elements. Select the label to edit its text in the toolbar.
         </p>
       </div>

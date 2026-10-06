@@ -55,7 +55,7 @@ export function LineChart({ points, label, height = 160 }: { points: Point[]; la
   const ticks = [0, max / 2, max];
   const hp = hover != null ? points[hover] : null;
 
-  if (n === 0) return <p className="py-8 text-center text-[13px] text-muted">No data in this range.</p>;
+  if (n === 0) return <p className="py-8 text-center text-[0.8125rem] text-muted">No data in this range.</p>;
 
   return (
     <div className="relative">
@@ -96,7 +96,7 @@ export function LineChart({ points, label, height = 160 }: { points: Point[]; la
       </svg>
       {hp && hover != null ? (
         <div
-          className="pointer-events-none absolute top-0 rounded-md bg-ink px-2 py-1 text-[12px] font-semibold text-paper shadow-raised"
+          className="pointer-events-none absolute top-0 rounded-md bg-ink px-2 py-1 text-[0.75rem] font-semibold text-paper shadow-raised"
           style={{ left: `${(x(hover) / W) * 100}%`, transform: "translateX(-50%)" }}
         >
           {hp.x} · {hp.y.toLocaleString("en-US")}
@@ -117,19 +117,19 @@ export function BarList({
   label: string;
 }) {
   const max = Math.max(0, ...rows.map((r) => r.value));
-  if (rows.length === 0) return <p className="py-8 text-center text-[13px] text-muted">No data in this range.</p>;
+  if (rows.length === 0) return <p className="py-8 text-center text-[0.8125rem] text-muted">No data in this range.</p>;
   return (
     <ul className="flex flex-col gap-2" aria-label={label}>
       {rows.map((r) => (
         <li key={r.key} className="grid grid-cols-[120px_minmax(0,1fr)_auto] items-center gap-3" title={`${r.label}: ${format(r.value)}`}>
-          <span className="truncate text-[13px] text-ink">{r.label}</span>
+          <span className="truncate text-[0.8125rem] text-ink">{r.label}</span>
           <span className="h-2.5 rounded-full bg-control">
             <span
               className="block h-2.5 rounded-full bg-ink"
               style={{ width: `${max > 0 ? Math.max(2, (r.value / max) * 100) : 0}%` }}
             />
           </span>
-          <span className="text-right text-[13px] font-semibold tabular-nums text-ink">{format(r.value)}</span>
+          <span className="text-right text-[0.8125rem] font-semibold tabular-nums text-ink">{format(r.value)}</span>
         </li>
       ))}
     </ul>

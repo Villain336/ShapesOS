@@ -28,7 +28,7 @@ const cardCls = "rounded-lg bg-paper p-5 shadow-hairline";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-40";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnDeny =
@@ -242,7 +242,7 @@ export default function WhiteLabelSettings({
           <ImagePlus size={16} className="text-muted" />
           <h2 className="text-sm font-semibold text-ink">Workspace logo</h2>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           Shown on public review pages instead of the default star badge.
         </p>
         <div className="mt-3 flex items-center gap-4">
@@ -300,7 +300,7 @@ export default function WhiteLabelSettings({
           <Globe size={16} className="text-muted" />
           <h2 className="text-sm font-semibold text-ink">Custom domain</h2>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           Your client-facing domain for white-labeled public pages.
         </p>
         <div className="mt-3 flex max-w-md items-center gap-2">
@@ -342,7 +342,7 @@ export default function WhiteLabelSettings({
           <Palette size={16} className="text-muted" />
           <h2 className="text-sm font-semibold text-ink">Company color</h2>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           The primary accent for public pages — and the dashboard, live, as you pick.
         </p>
         <div className="mt-3 flex max-w-md items-center gap-3">
@@ -393,7 +393,7 @@ export default function WhiteLabelSettings({
         <div className="mt-4 rounded-md bg-canvas p-3">
           <p className="text-xs font-semibold text-muted">Live preview</p>
           <div className="mt-2 flex items-center gap-3">
-            <span className="inline-flex h-control-sm items-center rounded-full bg-brand-600 px-4 text-[13px] font-semibold text-paper">
+            <span className="inline-flex h-control-sm items-center rounded-full bg-brand-600 px-4 text-[0.8125rem] font-semibold text-paper">
               Primary button
             </span>
             <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">

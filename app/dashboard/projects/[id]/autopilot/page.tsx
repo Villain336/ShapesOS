@@ -72,7 +72,7 @@ export default async function AutopilotPage({ params }: { params: Promise<{ id: 
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="inline-flex items-center gap-1 text-[13px] text-ink-3 hover:text-ink-2"
+          className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-3 hover:text-ink-2"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           {project.domain}
@@ -85,7 +85,7 @@ export default async function AutopilotPage({ params }: { params: Promise<{ id: 
             <h1 className="text-xl font-bold tracking-tight text-ink">
               Content autopilot
             </h1>
-            <p className="mt-0.5 text-[13.5px] text-ink-2">
+            <p className="mt-0.5 text-[0.84375rem] text-ink-2">
               Scheduled pipeline: source → AI draft → <ValuePill tone="orange">your approval</ValuePill> → publish.
               Nothing publishes without passing the approval gate unless a rule explicitly opts in to auto-approve
               low-risk refreshes. The kill switch stops everything immediately.

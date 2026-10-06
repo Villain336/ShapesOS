@@ -117,7 +117,7 @@ export function PromotionsView() {
                     <td className={`${tdCls} font-mono font-semibold`}>{p.code}</td>
                     <td className={`${tdCls} text-muted`}>
                       {describeRules(p.rules)}
-                      {describeWindow(p) && <span className="block text-[12px]">{describeWindow(p)}</span>}
+                      {describeWindow(p) && <span className="block text-[0.75rem]">{describeWindow(p)}</span>}
                     </td>
                     <td className={tdCls}>
                       <span className={chipCls}>{p.active ? "Active" : "Paused"}</span>

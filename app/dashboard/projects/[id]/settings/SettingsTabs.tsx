@@ -42,7 +42,7 @@ export default function SettingsTabs({ projectId }: { projectId: string }) {
             href={`${base}/${tab.slug}`}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
+              "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors",
               active
                 ? "border-accent text-accent-ink"
                 : "border-transparent text-ink-2 hover:text-ink",

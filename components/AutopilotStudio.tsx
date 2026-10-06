@@ -302,7 +302,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                 role="tab"
                 aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium capitalize transition-colors ${
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium capitalize transition-colors ${
                   tab === t.id
                     ? "border-accent text-accent-ink"
                     : "border-transparent text-ink-2 hover:text-ink"
@@ -315,7 +315,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           </div>
           <a
             href="#kill-switch"
-            className={`mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium ${killed ? "text-red" : "text-ink-3 hover:text-ink-2"}`}
+            className={`mb-2 inline-flex items-center gap-1.5 text-[0.8125rem] font-medium ${killed ? "text-red" : "text-ink-3 hover:text-ink-2"}`}
           >
             <OctagonAlert className="h-4 w-4" />
             {killed ? "Kill switch ENGAGED" : "Kill switch"}
@@ -373,11 +373,11 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                        <span className="text-[15px] font-medium leading-snug text-ink">{item.title}</span>
+                        <span className="text-[0.9375rem] font-medium leading-snug text-ink">{item.title}</span>
                         <ValuePill tone={QUEUE_TONES[item.status] ?? "neutral"}>{item.status}</ValuePill>
                         {item.autoApproved && <ValuePill tone="orange">auto-approved</ValuePill>}
                       </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem] text-ink-3">
                         <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
                         <span aria-hidden="true">·</span>
                         <span>{item.rule.name}</span>
@@ -385,13 +385,13 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                         <span>{new Date(item.createdAt).toLocaleString()}</span>
                       </div>
                       {item.draftMarkdown && (
-                        <p className="mt-2 line-clamp-2 max-w-[72ch] text-[13px] leading-relaxed text-ink-2">
+                        <p className="mt-2 line-clamp-2 max-w-[72ch] text-[0.8125rem] leading-relaxed text-ink-2">
                           {item.draftMarkdown.slice(0, 180)}
                           {item.draftMarkdown.length > 180 ? "…" : ""}
                         </p>
                       )}
                       {item.publishedUrl && (
-                        <p className="mt-1.5 text-[12px] text-ink-2">→ {item.publishedUrl}</p>
+                        <p className="mt-1.5 text-[0.75rem] text-ink-2">→ {item.publishedUrl}</p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -605,7 +605,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           }
         />
         <CardBody className="flex flex-col gap-4">
-          <p className="text-[13px] text-ink-2">
+          <p className="text-[0.8125rem] text-ink-2">
             Engaging the kill switch immediately stops all scheduled autopilot activity: running runs are marked
             killed and pending/approved items are frozen. Nothing resumes silently — release it explicitly to restart.
             The kill is audit-logged and fires an alert.
@@ -614,8 +614,8 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             {canEdit && (
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[13px] font-medium text-ink">Project kill switch</div>
-                  <div className="text-[12px] text-ink-3">Stops all autopilot activity for this project</div>
+                  <div className="text-[0.8125rem] font-medium text-ink">Project kill switch</div>
+                  <div className="text-[0.75rem] text-ink-3">Stops all autopilot activity for this project</div>
                 </div>
                 <Switch
                   checked={projectKilled}
@@ -630,8 +630,8 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             {isAdmin && (
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[13px] font-medium text-ink">Workspace kill switch</div>
-                  <div className="text-[12px] text-ink-3">Stops autopilot across the entire workspace</div>
+                  <div className="text-[0.8125rem] font-medium text-ink">Workspace kill switch</div>
+                  <div className="text-[0.75rem] text-ink-3">Stops autopilot across the entire workspace</div>
                 </div>
                 <Switch
                   checked={workspaceKilled}
@@ -821,13 +821,13 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
           <div className="flex items-start gap-2.5">
             <Switch checked={autoApprove} onCheckedChange={setAutoApprove} className="mt-0.5" />
             <div>
-              <div className="text-[13px] font-medium text-ink">Auto-approve without human review</div>
-              <div className="text-[12px] text-ink-3">Low-risk decay refreshes only; every auto-approval is audit-logged</div>
+              <div className="text-[0.8125rem] font-medium text-ink">Auto-approve without human review</div>
+              <div className="text-[0.75rem] text-ink-3">Low-risk decay refreshes only; every auto-approval is audit-logged</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
             <Switch checked={enabled} onCheckedChange={setEnabled} />
-            <span className="text-[13px] font-medium text-ink">Enabled</span>
+            <span className="text-[0.8125rem] font-medium text-ink">Enabled</span>
           </div>
         </div>
         <DialogFooter>

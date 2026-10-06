@@ -86,7 +86,7 @@ export function BookingWidget({ token }: { token: string }) {
     setSubmitting(false);
   }
 
-  const inputCls = "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[14px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+  const inputCls = "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.875rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
   return (
     <div className="min-h-screen bg-canvas px-4 py-10">
@@ -95,38 +95,38 @@ export function BookingWidget({ token }: { token: string }) {
           {notFound ? (
             <div className="py-8 text-center">
               <Calendar size={28} className="mx-auto text-subtle" />
-              <p className="mt-3 text-[15px] font-semibold text-ink">This booking page is no longer available.</p>
-              <p className="mt-1 text-[13px] text-muted">The link may be expired or the page was disabled.</p>
+              <p className="mt-3 text-[0.9375rem] font-semibold text-ink">This booking page is no longer available.</p>
+              <p className="mt-1 text-[0.8125rem] text-muted">The link may be expired or the page was disabled.</p>
             </div>
           ) : done ? (
             <div className="py-8 text-center">
               <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-canvas">
                 <Check size={24} className="text-ink" />
               </span>
-              <p className="mt-3 text-[16px] font-semibold text-ink">You're booked, {name}.</p>
-              <p className="mt-1 text-[13px] text-muted">
+              <p className="mt-3 text-[1rem] font-semibold text-ink">You're booked, {name}.</p>
+              <p className="mt-1 text-[0.8125rem] text-muted">
                 A confirmation email is on its way, and you'll get reminders 24 hours and 1 hour before.
               </p>
             </div>
           ) : (
             <>
-              <p className="text-[12px] font-semibold text-muted">ShapesOS booking</p>
+              <p className="text-[0.75rem] font-semibold text-muted">ShapesOS booking</p>
               <h1 className="mt-1 text-xl font-heading tracking-heading stretch-heading text-ink">{title}</h1>
-              {description && <p className="mt-1 text-[13px] text-muted">{description}</p>}
-              <p className="mt-1 text-[12.5px] text-muted">{durationMin} minutes</p>
+              {description && <p className="mt-1 text-[0.8125rem] text-muted">{description}</p>}
+              <p className="mt-1 text-[0.78125rem] text-muted">{durationMin} minutes</p>
 
               {loading ? (
                 <p className="py-10 text-center text-sm text-muted">Loading availability…</p>
               ) : (
                 <>
                   <div className="mt-5">
-                    <p className="mb-2 text-[12px] font-semibold text-muted">Pick a day</p>
+                    <p className="mb-2 text-[0.75rem] font-semibold text-muted">Pick a day</p>
                     <div className="flex flex-wrap gap-2">
                       {days.map((d) => (
                         <button
                           key={d.key}
                           onClick={() => { setDay(d.key); setSelected(null); }}
-                          className={`h-chip rounded-full px-3.5 text-[13px] font-semibold transition-colors ${
+                          className={`h-chip rounded-full px-3.5 text-[0.8125rem] font-semibold transition-colors ${
                             activeDay === d.key
                               ? "bg-ink text-white"
                               : "bg-paper text-ink shadow-control hover:shadow-outline"
@@ -135,19 +135,19 @@ export function BookingWidget({ token }: { token: string }) {
                           {d.label}
                         </button>
                       ))}
-                      {days.length === 0 && <p className="text-[13px] text-muted">No availability in the next 14 days.</p>}
+                      {days.length === 0 && <p className="text-[0.8125rem] text-muted">No availability in the next 14 days.</p>}
                     </div>
                   </div>
 
                   {daySlots.length > 0 && (
                     <div className="mt-4">
-                      <p className="mb-2 text-[12px] font-semibold text-muted">Pick a time</p>
+                      <p className="mb-2 text-[0.75rem] font-semibold text-muted">Pick a time</p>
                       <div className="grid grid-cols-3 gap-2">
                         {daySlots.map((s) => (
                           <button
                             key={s.startAt}
                             onClick={() => setSelected(s)}
-                            className={`h-chip rounded-full px-2 text-[13px] font-semibold tabular-nums transition-colors ${
+                            className={`h-chip rounded-full px-2 text-[0.8125rem] font-semibold tabular-nums transition-colors ${
                               selected?.startAt === s.startAt
                                 ? "bg-ink text-white"
                                 : "bg-paper text-ink shadow-control hover:shadow-outline"
@@ -169,21 +169,21 @@ export function BookingWidget({ token }: { token: string }) {
                     <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know? (optional)" rows={2} className={inputCls} />
                     <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-line bg-canvas p-3">
                       <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-ink" />
-                      <span className="text-[12.5px] leading-snug text-muted">
+                      <span className="text-[0.78125rem] leading-snug text-muted">
                         I agree to receive a booking confirmation and appointment reminders by email (and text if I provided a phone number). I can opt out of reminders at any time.
                       </span>
                     </label>
                   </div>
 
-                  {error && <p className="mt-3 text-[13px] text-failed-text">{error}</p>}
+                  {error && <p className="mt-3 text-[0.8125rem] text-failed-text">{error}</p>}
                   <button
                     onClick={submit}
                     disabled={submitting || !selected || !name.trim() || (!email.trim() && !phone.trim())}
-                    className="mt-4 h-control w-full rounded-full bg-ink px-4 text-[15px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
+                    className="mt-4 h-control w-full rounded-full bg-ink px-4 text-[0.9375rem] font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-50"
                   >
                     {submitting ? "Booking…" : "Confirm booking"}
                   </button>
-                  <p className="mt-2 text-[11.5px] text-muted">Email or phone is required so we can send your confirmation.</p>
+                  <p className="mt-2 text-[0.71875rem] text-muted">Email or phone is required so we can send your confirmation.</p>
                 </>
               )}
             </>

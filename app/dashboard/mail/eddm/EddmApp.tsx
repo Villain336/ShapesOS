@@ -116,7 +116,7 @@ function Chip({ tone, children, title }: { tone?: Tone; children: React.ReactNod
   return (
     <span
       title={title}
-      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[11px] font-medium leading-4 text-muted shadow-control"
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[0.6875rem] font-medium leading-4 text-muted shadow-control"
     >
       {children}
     </span>
@@ -126,7 +126,7 @@ function Chip({ tone, children, title }: { tone?: Tone; children: React.ReactNod
 const inputCls =
   "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSecondary =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnDanger =
@@ -137,7 +137,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
     <label className="block">
       <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
       {children}
-      {hint ? <span className="mt-0.5 block text-[11px] text-subtle">{hint}</span> : null}
+      {hint ? <span className="mt-0.5 block text-[0.6875rem] text-subtle">{hint}</span> : null}
     </label>
   );
 }
@@ -146,7 +146,7 @@ function Card({ title, icon, children, action }: { title: string; icon?: React.R
   return (
     <div className="rounded-lg bg-paper shadow-hairline">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <h3 className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
           {icon}
           {title}
         </h3>
@@ -160,7 +160,7 @@ function Card({ title, icon, children, action }: { title: string; icon?: React.R
 function Err({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+    <div className="mb-3 flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[0.75rem] text-failed-text">
       <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
       <span>{message}</span>
     </div>
@@ -169,7 +169,7 @@ function Err({ message }: { message: string | null }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-md bg-canvas px-2.5 py-2 text-[12px] text-muted">
+    <div className="mb-3 flex items-start gap-2 rounded-md bg-canvas px-2.5 py-2 text-[0.75rem] text-muted">
       <Info size={14} className="mt-0.5 shrink-0 text-ink" />
       <span>{children}</span>
     </div>
@@ -253,7 +253,7 @@ export function EddmApp() {
     if (selectedId) await loadDetail(selectedId);
   }, [loadOrders, loadDetail, selectedId]);
 
-  if (loading) return <p className="text-[13px] text-muted">Loading EDDM orders…</p>;
+  if (loading) return <p className="text-[0.8125rem] text-muted">Loading EDDM orders…</p>;
 
   if (!selectedId || !detail) {
     return (
@@ -266,15 +266,15 @@ export function EddmApp() {
         </div>
         {orders.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line bg-paper px-4 py-10 text-center">
-            <p className="text-[13px] font-medium text-ink">No EDDM orders yet</p>
-            <p className="mt-1 text-[12px] text-subtle">
+            <p className="text-[0.8125rem] font-medium text-ink">No EDDM orders yet</p>
+            <p className="mt-1 text-[0.75rem] text-subtle">
               Plan a saturation drop: pick carrier routes, bind an EDDM flat creative, estimate
               costs, and generate the mailhouse handoff brief.
             </p>
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                   <th className="px-3 py-2">Order</th>
@@ -342,7 +342,7 @@ export function EddmApp() {
           <button
             key={s.key}
             onClick={() => setStep(s.key)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[13px] font-medium ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[0.8125rem] font-medium ${
               step === s.key
                 ? "border-ink bg-ink text-white"
                 : "border-line bg-paper text-muted hover:bg-hover-paper"
@@ -444,7 +444,7 @@ function OrderHeader({
         </div>
       ) : (
         <>
-          <h2 className="text-[15px] font-semibold text-ink">{order.name}</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">{order.name}</h2>
           <Chip>{order.status.replace(/_/g, " ")}</Chip>
           {order.mailhouse ? <Chip>{order.mailhouse}</Chip> : null}
           {editable ? (
@@ -462,7 +462,7 @@ function OrderHeader({
           ) : null}
         </>
       )}
-      <div className="ml-auto flex items-center gap-3 text-[12px] text-muted">
+      <div className="ml-auto flex items-center gap-3 text-[0.75rem] text-muted">
         <span>
           <strong className="text-ink">{order.pieceCount.toLocaleString()}</strong> pieces
         </span>
@@ -497,10 +497,10 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-night/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-ink">New EDDM order</h3>
+          <h3 className="text-[0.875rem] font-semibold text-ink">New EDDM order</h3>
           <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
@@ -593,14 +593,14 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
       <div className="mb-3 flex items-center gap-3">
         <span className="text-xs font-semibold text-muted">Postage entry:</span>
         {(["retail", "bmeu"] as const).map((t) => (
-          <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
+          <label key={t} className="flex items-center gap-1.5 text-[0.8125rem] text-ink">
             <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!editable} />
             {t === "retail" ? "Retail — 26.0¢/pc" : "BMEU — 25.9¢/pc"}
           </label>
         ))}
       </div>
       <div className="overflow-hidden rounded-md border border-line">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-left text-xs font-semibold text-muted">
               <th className="px-2 py-1.5">ZIP</th>
@@ -674,7 +674,7 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
         ) : (
           <span />
         )}
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           <strong className="text-ink">{selectedPieces.toLocaleString()}</strong> pieces across{" "}
           <strong className="text-ink">{rows.filter((r) => r.selected).length}</strong> selected routes
         </p>
@@ -735,11 +735,11 @@ function CreativeStep({ order, onSaved, onError }: { order: Order; onSaved: () =
         Studio, then bind it below.
       </Note>
       {loading ? (
-        <p className="text-[13px] text-muted">Loading EDDM-track creative…</p>
+        <p className="text-[0.8125rem] text-muted">Loading EDDM-track creative…</p>
       ) : creatives.length === 0 ? (
         <div className="rounded-md border border-dashed border-line px-4 py-8 text-center">
-          <p className="text-[13px] font-medium text-ink">No EDDM-track creative yet</p>
-          <p className="mt-1 text-[12px] text-subtle">
+          <p className="text-[0.8125rem] font-medium text-ink">No EDDM-track creative yet</p>
+          <p className="mt-1 text-[0.75rem] text-subtle">
             Create one in the Studio on the EDDM flat format track, then return to bind it.
           </p>
         </div>
@@ -755,8 +755,8 @@ function CreativeStep({ order, onSaved, onError }: { order: Order; onSaved: () =
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-ink">{c.name}</p>
-                  <p className="text-[11px] text-muted">
+                  <p className="truncate text-[0.8125rem] font-medium text-ink">{c.name}</p>
+                  <p className="text-[0.6875rem] text-muted">
                     {c.size} · v{c.version} · {c.status}
                     {c.creativeHash ? ` · ${c.creativeHash.slice(0, 10)}…` : ""}
                   </p>
@@ -845,7 +845,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
         <Field label="Postage entry">
           <div className="flex gap-3 pt-1.5">
             {(["retail", "bmeu"] as const).map((t) => (
-              <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
+              <label key={t} className="flex items-center gap-1.5 text-[0.8125rem] text-ink">
                 <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!editable} />
                 {t === "retail" ? "Retail — 26.0¢/pc (2026)" : "BMEU — 25.9¢/pc (2026)"}
               </label>
@@ -866,7 +866,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
       </div>
       {est && est.pieceCount > 0 ? (
         <div className="overflow-hidden rounded-md border border-line">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Line</th>
@@ -896,10 +896,10 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
           </table>
         </div>
       ) : (
-        <p className="text-[13px] text-muted">Add carrier routes first — the estimate is piece count × postage + print.</p>
+        <p className="text-[0.8125rem] text-muted">Add carrier routes first — the estimate is piece count × postage + print.</p>
       )}
       {est?.usedDefaults ? (
-        <p className="mt-2 text-[11px] text-muted">Using the default print assumption until you enter a quote.</p>
+        <p className="mt-2 text-[0.6875rem] text-muted">Using the default print assumption until you enter a quote.</p>
       ) : null}
     </Card>
   );
@@ -966,12 +966,12 @@ function ScheduleStep({ order, onSaved, onError }: { order: Order; onSaved: () =
           <input type="date" className={inputCls} value={dropDate} disabled={!editable} onChange={(e) => setDropDate(e.target.value)} />
         </Field>
         <Field label="In-home target window">
-          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[13px] font-medium text-ink">
+          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[0.8125rem] font-medium text-ink">
             {dropDate ? inHomePreview(dropDate) : order.inHomeStart ? `${fmtDate(order.inHomeStart)} – ${fmtDate(order.inHomeEnd)}` : "—"}
           </div>
         </Field>
         <Field label="Pieces">
-          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[13px] font-medium text-ink">
+          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[0.8125rem] font-medium text-ink">
             {order.pieceCount.toLocaleString()}
           </div>
         </Field>
@@ -1034,7 +1034,7 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
         summary. Generating it advances the order to <strong>briefed</strong>.
       </Note>
       {!ready ? (
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Bind an EDDM creative and add carrier routes first — the brief needs both.
         </p>
       ) : (
@@ -1043,7 +1043,7 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
             <Field label="Postage entry (for the brief's cost summary)">
               <div className="flex gap-3 pt-1.5">
                 {(["retail", "bmeu"] as const).map((t) => (
-                  <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
+                  <label key={t} className="flex items-center gap-1.5 text-[0.8125rem] text-ink">
                     <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!canGenerate} />
                     {t === "retail" ? "Retail — 26.0¢/pc" : "BMEU — 25.9¢/pc"}
                   </label>
@@ -1072,19 +1072,19 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
         </>
       )}
       {order.briefPdfUrl ? (
-        <div className="mt-4 rounded-md border border-line bg-canvas p-3 text-[12px] text-muted">
+        <div className="mt-4 rounded-md border border-line bg-canvas p-3 text-[0.75rem] text-muted">
           <p className="font-medium text-ink">Brief ready</p>
           <p className="mt-1 flex items-center gap-1.5">
             <QrCode size={13} className="text-ink" /> Drop QR slug:{" "}
-            <code className="rounded bg-paper px-1 py-px aos-mono text-[11px]">{order.qrSlug ?? "—"}</code>
+            <code className="rounded bg-paper px-1 py-px aos-mono text-[0.6875rem]">{order.qrSlug ?? "—"}</code>
           </p>
           {dropUrl ? (
             <p className="mt-1 flex items-center gap-1.5">
               <Link2 size={13} className="text-ink" /> pURL:{" "}
-              <code className="break-all rounded bg-paper px-1 py-px aos-mono text-[11px]">{dropUrl}</code>
+              <code className="break-all rounded bg-paper px-1 py-px aos-mono text-[0.6875rem]">{dropUrl}</code>
             </p>
           ) : null}
-          <p className="mt-1 text-[11px] text-subtle">
+          <p className="mt-1 text-[0.6875rem] text-subtle">
             Confirm the scan target resolves before print — the drop pURL is reserved for this drop&apos;s attribution.
           </p>
         </div>
@@ -1129,7 +1129,7 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
     <Card title="Status tracking" icon={<Truck size={14} className="text-ink" />}>
       <Err message={localError} />
       {order.status === "cancelled" ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Chip>cancelled</Chip> This order was cancelled. No spend occurred — estimates only.
         </div>
       ) : (
@@ -1142,7 +1142,7 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
                 <li key={s} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] text-[11px] font-semibold ${
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] text-[0.6875rem] font-semibold ${
                         done
                           ? "border-ink bg-ink text-white"
                           : current
@@ -1155,11 +1155,11 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
                     {i < TIMELINE.length - 1 ? <span className="h-5 w-px bg-line" /> : null}
                   </div>
                   <div className="pb-4">
-                    <p className={`text-[13px] font-medium ${current ? "text-ink" : done ? "text-muted" : "text-subtle"}`}>
+                    <p className={`text-[0.8125rem] font-medium ${current ? "text-ink" : done ? "text-muted" : "text-subtle"}`}>
                       {s.replace(/_/g, " ")}
                       {current ? <Chip>current</Chip> : null}
                     </p>
-                    <p className="text-[11px] text-subtle">
+                    <p className="text-[0.6875rem] text-subtle">
                       {s === "dropped" && order.inHomeStart
                         ? `In-home target ${fmtDate(order.inHomeStart)} – ${fmtDate(order.inHomeEnd)}`
                         : s === "dropped" && order.dropDate
@@ -1173,12 +1173,12 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
           </ol>
           {next.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] font-semibold text-muted">Advance:</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Advance:</span>
               {next.map((to) =>
                 to === "cancelled" ? (
                   confirmCancel ? (
                     <span key={to} className="inline-flex items-center gap-2">
-                      <span className="text-[12px] text-muted">Cancel this order? No spend occurred.</span>
+                      <span className="text-[0.75rem] text-muted">Cancel this order? No spend occurred.</span>
                       <button className={btnDanger} disabled={busy != null} onClick={() => transition("cancelled")}>
                         Confirm cancel
                       </button>
@@ -1199,10 +1199,10 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
               )}
             </div>
           ) : (
-            <p className="text-[12px] text-muted">Terminal state — nothing left to do.</p>
+            <p className="text-[0.75rem] text-muted">Terminal state — nothing left to do.</p>
           )}
           {next.includes("dropped") && !order.dropDate ? (
-            <p className="mt-2 flex items-center gap-1.5 rounded-md bg-needs-tint p-2 text-[12px] text-ink">
+            <p className="mt-2 flex items-center gap-1.5 rounded-md bg-needs-tint p-2 text-[0.75rem] text-ink">
               <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Warning" /> Set a drop date (Schedule step) before marking the order dropped.
             </p>
           ) : null}

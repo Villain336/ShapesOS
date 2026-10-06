@@ -166,26 +166,26 @@ export function BuildView() {
     <div className="flex flex-col gap-4">
       {/* Health panel */}
       <div className="rounded-lg bg-paper p-4 shadow-hairline md:p-6">
-        <h2 className="text-[15px] font-semibold">Dataset health</h2>
+        <h2 className="text-[0.9375rem] font-semibold">Dataset health</h2>
         <div className="mt-3 flex flex-wrap items-center gap-6">
           <div>
-            <p className="font-mono text-[24px] font-semibold">{coverage.pct}%</p>
-            <p className="text-[13px] text-muted">coverage</p>
-            <p className="text-[12px] text-subtle">
+            <p className="font-mono text-[1.5rem] font-semibold">{coverage.pct}%</p>
+            <p className="text-[0.8125rem] text-muted">coverage</p>
+            <p className="text-[0.75rem] text-subtle">
               {formatCount(coverage.classified)} of {formatCount(coverage.total)} chunks
               classified into datasets
             </p>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold">Freshness</p>
+            <p className="text-[0.8125rem] font-semibold">Freshness</p>
             <div className="mt-1 flex flex-col gap-1">
               {health.map((h) => (
                 <div
                   key={h.type}
-                  className="flex items-center justify-between gap-3 text-[13px]"
+                  className="flex items-center justify-between gap-3 text-[0.8125rem]"
                 >
                   <span className="text-muted">{h.label}</span>
-                  <span className="font-mono text-[12px] text-subtle">
+                  <span className="font-mono text-[0.75rem] text-subtle">
                     newest data {formatAge(h.newestDataAgeDays)}
                     {h.latestVersion !== null && ` · v${h.latestVersion}`}
                   </span>
@@ -200,7 +200,7 @@ export function BuildView() {
               <div
                 key={`${a.severity}-${a.datasetType ?? "all"}-${i}`}
                 role="alert"
-                className="flex items-start gap-2 rounded-md bg-needs px-3 py-2 text-[13px]"
+                className="flex items-start gap-2 rounded-md bg-needs px-3 py-2 text-[0.8125rem]"
               >
                 <TriangleAlert size={15} className="mt-0.5 shrink-0 text-needs-text" />
                 <span>{a.message}</span>
@@ -211,7 +211,7 @@ export function BuildView() {
       </div>
 
       {error && (
-        <p role="alert" className="flex items-start gap-2 text-[14px] text-failed-text">
+        <p role="alert" className="flex items-start gap-2 text-[0.875rem] text-failed-text">
           <TriangleAlert size={15} className="mt-0.5 shrink-0" />
           {error}
         </p>
@@ -226,16 +226,16 @@ export function BuildView() {
             <div key={d.type} className="rounded-lg bg-paper p-4 shadow-hairline">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="flex items-center gap-2 text-[15px] font-semibold">
+                  <p className="flex items-center gap-2 text-[0.9375rem] font-semibold">
                     <Database size={15} className="text-muted" />
                     {d.label}
                   </p>
-                  <p className="mt-1 text-[13px] text-muted">
+                  <p className="mt-1 text-[0.8125rem] text-muted">
                     {formatCount(d.appliedChunks)}{" "}
                     {d.appliedChunks === 1 ? "chunk" : "chunks"} classified
                     {h && ` · ${h.coveragePct}% of all chunks`}
                   </p>
-                  <p className="font-mono text-[12px] text-subtle">
+                  <p className="font-mono text-[0.75rem] text-subtle">
                     {d.latestVersion !== null
                       ? `v${d.latestVersion} · ${formatCount(d.latestChunkCount ?? 0)} chunks · compiled ${formatDate(d.latestCompiledAt)}`
                       : "Not compiled yet"}
@@ -248,7 +248,7 @@ export function BuildView() {
                   type="button"
                   disabled={compiling === d.type || d.appliedChunks === 0}
                   onClick={() => void compile(d.type)}
-                  className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                  className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                 >
                   {compiling === d.type ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -261,14 +261,14 @@ export function BuildView() {
                   <>
                     <a
                       href={`/api/datasets/${d.id}/export?format=jsonl`}
-                      className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline"
+                      className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline"
                     >
                       <Download size={15} />
                       JSONL
                     </a>
                     <a
                       href={`/api/datasets/${d.id}/export?format=parquet`}
-                      className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline"
+                      className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline"
                     >
                       <Download size={15} />
                       Parquet
@@ -276,7 +276,7 @@ export function BuildView() {
                     <button
                       type="button"
                       onClick={() => void toggleVersions(d.id as string)}
-                      className="aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold text-muted"
+                      className="aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold text-muted"
                       aria-expanded={isOpen}
                     >
                       <History size={15} />
@@ -298,26 +298,26 @@ export function BuildView() {
                       Loading versions
                     </div>
                   ) : (versions[d.id] ?? []).length === 0 ? (
-                    <p className="text-[13px] text-muted">No versions yet</p>
+                    <p className="text-[0.8125rem] text-muted">No versions yet</p>
                   ) : (
                     <div className="flex flex-col gap-2">
                       {(versions[d.id] ?? []).map((v) => (
                         <div key={v.id} className="rounded-md bg-canvas px-3 py-2">
-                          <p className="text-[13px] font-semibold">
+                          <p className="text-[0.8125rem] font-semibold">
                             v{v.version} · {formatCount(v.chunkCount)}{" "}
                             {v.chunkCount === 1 ? "chunk" : "chunks"} ·{" "}
                             <span className="font-normal text-muted">
                               {formatDate(v.compiledAt)}
                             </span>
                           </p>
-                          <p className="mt-1 font-mono text-[12px] text-subtle">
+                          <p className="mt-1 font-mono text-[0.75rem] text-subtle">
                             {v.sources.length}{" "}
                             {v.sources.length === 1 ? "source" : "sources"} ·{" "}
                             {v.engines
                               .map((e) => `${e.name} ${e.version}`)
                               .join(", ")}
                           </p>
-                          <p className="mt-1 text-[12px] text-subtle">
+                          <p className="mt-1 text-[0.75rem] text-subtle">
                             {v.sources
                               .slice(0, 3)
                               .map((s) => s.name)

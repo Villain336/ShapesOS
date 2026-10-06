@@ -27,7 +27,7 @@ import { closeOnEscape } from "@/lib/ui/keyboard";
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -47,7 +47,7 @@ import {
 // ready = needs (awaits human review).
 function statusChip(s: BriefView["status"]) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   const shape = (extra: string) => (
     <span
       className={`aos-shape ${extra} [--aos-shape-size:9px]`}
@@ -218,7 +218,7 @@ export function RecyclingApp() {
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[0.8125rem] text-failed-text">
           <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setError(null)} aria-label="Dismiss">
@@ -234,7 +234,7 @@ export function RecyclingApp() {
           count={signals.length}
           right={
             <div className="flex items-center gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-muted">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[0.75rem] text-muted">
                 <input
                   type="checkbox"
                   checked={useFixtures}
@@ -252,19 +252,19 @@ export function RecyclingApp() {
         />
 
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-[13px] text-muted">
+          <div className="flex items-center gap-2 py-8 text-[0.8125rem] text-muted">
             <Loader2 className="h-4 w-4 aos-spin" /> Loading signals…
           </div>
         ) : signals.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-white p-6 text-center">
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               No winning creative flagged by the current readers. Signals appear when attribution revenue,
               QR scan rates, AEO lift, or mail response rates cross their thresholds.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Signal</th>
@@ -278,16 +278,16 @@ export function RecyclingApp() {
                 {signals.map((s) => (
                   <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">{SIGNAL_LABELS[s.kind] ?? s.kind}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">{s.sourceAssetId}</td>
+                    <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">{s.sourceAssetId}</td>
                     <td className="px-3 py-2">
                       <span className="font-bold text-ink">{formatMetric(s.kind, s.metricValue, s.metricUnit)}</span>
-                      <span className="ml-1.5 text-[11px] text-muted">{s.sourceChannel} → recycle</span>
+                      <span className="ml-1.5 text-[0.6875rem] text-muted">{s.sourceChannel} → recycle</span>
                     </td>
                     <td className="px-3 py-2">{chip(s.source === "fake" ? "fixture" : "live", "border-line bg-canvas text-muted")}</td>
                     <td className="px-3 py-2">
                       <Button
                         size="sm"
-                        className="bg-ink text-white hover:bg-night-hover"
+                        className="bg-ink text-white hover:bg-ink-hover"
                         onClick={() => {
                           setComposerSignal(s);
                           setComposerTargets(SUPPORTED_TARGET_SUGGESTIONS[s.sourceChannel] ?? []);
@@ -326,14 +326,14 @@ export function RecyclingApp() {
             </Button>
           </div>
           <div className="flex flex-col gap-3">
-            <div className="font-mono text-[11px] text-muted">
+            <div className="font-mono text-[0.6875rem] text-muted">
               {composerSignal.sourceAssetId} · {composerSignal.sourceChannel} ·{" "}
               {formatMetric(composerSignal.kind, composerSignal.metricValue, composerSignal.metricUnit)}
             </div>
             <div>
-              <div className="mb-1.5 text-[12px] font-medium text-muted">Target channels</div>
+              <div className="mb-1.5 text-[0.75rem] font-medium text-muted">Target channels</div>
               {suggestedTargets.length === 0 ? (
-                <p className="text-[12px] text-muted">
+                <p className="text-[0.75rem] text-muted">
                   No deterministic adaptation rules exist from “{composerSignal.sourceChannel}” yet — pick
                   another winner, or add the pair to the rule table (lib/flywheel/recycling/adaptation.ts).
                 </p>
@@ -354,11 +354,11 @@ export function RecyclingApp() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={createBrief} disabled={creating || composerTargets.length === 0} className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40">
+              <Button onClick={createBrief} disabled={creating || composerTargets.length === 0} className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40">
                 {creating ? <Loader2 className="mr-1.5 h-4 w-4 aos-spin" /> : <Recycle className="mr-1.5 h-4 w-4" />}
                 Create draft brief
               </Button>
-              <span className="text-[11px] text-muted">
+              <span className="text-[0.6875rem] text-muted">
                 Deterministic variant specs only — headlines/CTAs get supervised rewrite after you approve.
               </span>
             </div>
@@ -371,13 +371,13 @@ export function RecyclingApp() {
         <SectionHead title="Recycling briefs" count={briefs.length} />
         {briefs.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-white p-6 text-center">
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               No briefs yet. Generate one from a trigger signal above.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Source</th>
@@ -392,12 +392,12 @@ export function RecyclingApp() {
                 {briefs.map((b) => (
                   <tr key={b.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">
-                      <div className="font-mono text-[11px] text-muted">{b.sourceAssetId}</div>
-                      <div className="text-[11px] text-muted">{b.sourceChannel}</div>
+                      <div className="font-mono text-[0.6875rem] text-muted">{b.sourceAssetId}</div>
+                      <div className="text-[0.6875rem] text-muted">{b.sourceChannel}</div>
                     </td>
                     <td className="px-3 py-2">
                       <div className="text-ink">{SIGNAL_LABELS[b.triggerSignal.kind] ?? b.triggerSignal.kind}</div>
-                      <div className="text-[11px] text-muted">
+                      <div className="text-[0.6875rem] text-muted">
                         {formatMetric(b.triggerSignal.kind, b.triggerSignal.metricValue, b.triggerSignal.metricUnit)}
                       </div>
                     </td>
@@ -409,7 +409,7 @@ export function RecyclingApp() {
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted">
+                      <span className="inline-flex items-center gap-1 font-mono text-[0.6875rem] text-muted">
                         <Hash className="h-3 w-3" />
                         {hashShort(b.creativeHashLineage[0]?.hash ?? "")} × {b.creativeHashLineage.length}
                       </span>
@@ -432,7 +432,7 @@ export function RecyclingApp() {
 
       {/* ── Detail drawer ── */}
       {selectedId && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-ink/30" role="presentation" onClick={closeDetail} onKeyDown={closeOnEscape(closeDetail)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-night/30" role="presentation" onClick={closeDetail} onKeyDown={closeOnEscape(closeDetail)}>
           <div
             className="flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-white p-5 shadow-overlay"
             onClick={(e) => e.stopPropagation()}
@@ -444,7 +444,7 @@ export function RecyclingApp() {
               </Button>
             </div>
             {detailLoading || !selectedBrief ? (
-              <div className="flex items-center gap-2 py-10 text-[13px] text-muted">
+              <div className="flex items-center gap-2 py-10 text-[0.8125rem] text-muted">
                 <Loader2 className="h-4 w-4 aos-spin" /> Loading brief…
               </div>
             ) : (
@@ -486,14 +486,14 @@ function BriefDetail({
       <div className="flex flex-wrap items-center gap-2">
         {statusChip(brief.status)}
         {chip(`${brief.triggerSignal.source} signal`, "border-line bg-canvas text-muted")}
-        <span className="font-mono text-[11px] text-muted">{brief.sourceAssetId}</span>
+        <span className="font-mono text-[0.6875rem] text-muted">{brief.sourceAssetId}</span>
       </div>
 
       {/* Variant specs */}
       <section>
-        <h4 className="mb-2 text-[13px] font-semibold text-ink">Variant specs (deterministic rules)</h4>
+        <h4 className="mb-2 text-[0.8125rem] font-semibold text-ink">Variant specs (deterministic rules)</h4>
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Variant</th>
@@ -512,19 +512,19 @@ function BriefDetail({
                       </span>
                     </td>
                     <td className="px-3 py-2">{chip(spec.aspectRatio, "border-line bg-canvas text-muted")}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">
                       ≤{spec.copyDensityCeiling.maxWords} words, ≤{spec.copyDensityCeiling.maxLines} lines
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{spec.ctaFormats.join(", ")}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{spec.ctaFormats.join(", ")}</td>
                   </tr>
                   <tr key={`${spec.targetChannel}-notes`} className="border-b border-line bg-hover-paper">
                     <td colSpan={4} className="px-3 py-2">
-                      <ul className="list-disc space-y-0.5 pl-4 text-[12px] text-muted">
+                      <ul className="list-disc space-y-0.5 pl-4 text-[0.75rem] text-muted">
                         {spec.notes.map((n, i) => (
                           <li key={i}>{n}</li>
                         ))}
                       </ul>
-                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                      <div className="mt-1 flex items-center gap-1.5 text-[0.6875rem] text-muted">
                         <Sparkles className="h-3.5 w-3.5" />
                         Supervised rewrite (human-approved only): headline + CTA · rules {spec.rulesVersion}
                       </div>
@@ -539,14 +539,14 @@ function BriefDetail({
 
       {/* Lineage */}
       <section>
-        <h4 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <h4 className="mb-2 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
           <GitBranch className="h-4 w-4" /> Creative-hash lineage
           {detail && (
             <span className="ml-1">
               {detail.lineage.ok ? (
-                <span><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink"><ShieldCheck className="mr-1 h-3 w-3" /> intact</span></span>
+                <span><span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-ink"><ShieldCheck className="mr-1 h-3 w-3" /> intact</span></span>
               ) : (
-                <span><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-failed-text"><XCircle className="mr-1 h-3 w-3" /> broken</span></span>
+                <span><span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-failed-text"><XCircle className="mr-1 h-3 w-3" /> broken</span></span>
               )}
             </span>
           )}
@@ -555,17 +555,17 @@ function BriefDetail({
           {brief.creativeHashLineage.map((e, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2">
               <span>{chip(e.stage, "border-line bg-canvas text-muted")}</span>
-              <span className="text-[12px] font-medium text-muted">{e.channel}</span>
-              <span className="font-mono text-[11px] text-muted" title={e.hash}>
+              <span className="text-[0.75rem] font-medium text-muted">{e.channel}</span>
+              <span className="font-mono text-[0.6875rem] text-muted" title={e.hash}>
                 {hashShort(e.hash)}
               </span>
-              <span className="ml-auto text-[11px] text-subtle">
+              <span className="ml-auto text-[0.6875rem] text-subtle">
                 {new Date(e.at).toLocaleString()}
               </span>
             </div>
           ))}
         </div>
-        <p className="mt-1.5 text-[11px] text-muted">
+        <p className="mt-1.5 text-[0.6875rem] text-muted">
           Every regenerated asset re-enters the studio approval flows and is bound to buys by its own
           per-buy creative-hash approval object.
         </p>
@@ -574,14 +574,14 @@ function BriefDetail({
       {/* Studio routing */}
       {brief.studioRouting.length > 0 && (
         <section>
-          <h4 className="mb-2 text-[13px] font-semibold text-ink">Studio routing</h4>
+          <h4 className="mb-2 text-[0.8125rem] font-semibold text-ink">Studio routing</h4>
           <div className="flex flex-col gap-1.5">
             {brief.studioRouting.map((r) => (
-              <div key={r.receipt} className="rounded-lg border border-line bg-white px-3 py-2 text-[12px]">
+              <div key={r.receipt} className="rounded-lg border border-line bg-white px-3 py-2 text-[0.75rem]">
                 <span className="font-medium text-ink">{r.variantChannel}</span>
-                <span className="ml-2 font-mono text-[11px] text-muted">{r.studioRef}</span>
+                <span className="ml-2 font-mono text-[0.6875rem] text-muted">{r.studioRef}</span>
                 <span className="ml-2">{chip(r.provider, "border-line bg-canvas text-muted")}</span>
-                <div className="mt-0.5 text-[11px] text-muted">
+                <div className="mt-0.5 text-[0.6875rem] text-muted">
                   Routed {new Date(r.routedAt).toLocaleString()} — review-queue entry, not a publish.
                 </div>
               </div>
@@ -593,9 +593,9 @@ function BriefDetail({
       {/* Approval */}
       {brief.status === "draft" && (
         <section>
-          <h4 className="mb-2 text-[13px] font-semibold text-ink">Human approval</h4>
+          <h4 className="mb-2 text-[0.8125rem] font-semibold text-ink">Human approval</h4>
           <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-[12px] text-muted">
+            <p className="text-[0.75rem] text-muted">
               Approving routes every variant into the studio approval flows for human review and
               regeneration. Nothing publishes. Nothing enters a buy without its own approval object.
             </p>
@@ -604,7 +604,7 @@ function BriefDetail({
               onChange={(e) => setApproveNote(e.target.value)}
               placeholder="Approval note (optional)"
               rows={2}
-              className="mt-2 border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]"
+              className="mt-2 border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]"
             />
             <Button onClick={onApprove} disabled={approving} className="mt-2 bg-done text-white hover:brightness-110">
               {approving ? <Loader2 className="mr-1.5 h-4 w-4 aos-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
@@ -617,18 +617,18 @@ function BriefDetail({
       {/* Audit trail */}
       {detail && detail.audit.events.length > 0 && (
         <section>
-          <h4 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+          <h4 className="mb-2 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
             <Clock className="h-4 w-4" /> Audit trail
             {detail.audit.chain.ok ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink"><ShieldCheck className="mr-1 h-3 w-3" /> chain intact</span>
+              <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-ink"><ShieldCheck className="mr-1 h-3 w-3" /> chain intact</span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-failed-text"><XCircle className="mr-1 h-3 w-3" /> chain broken</span>
+              <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-failed-text"><XCircle className="mr-1 h-3 w-3" /> chain broken</span>
             )}
           </h4>
           <div className="flex flex-col gap-1">
             {detail.audit.events.map((e) => (
-              <div key={e.id} className="flex items-center gap-2 text-[12px] text-muted">
-                <span className="font-mono text-[11px] text-subtle">
+              <div key={e.id} className="flex items-center gap-2 text-[0.75rem] text-muted">
+                <span className="font-mono text-[0.6875rem] text-subtle">
                   {new Date(e.ts).toLocaleString()}
                 </span>
                 <span>{chip(e.action, "border-line bg-canvas text-muted")}</span>

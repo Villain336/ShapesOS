@@ -65,16 +65,16 @@ export function ViewHeader({
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-ink">{title}</h2>
-        <p className="mt-0.5 text-[13px] text-muted">{hint}</p>
+        <p className="mt-0.5 text-[0.8125rem] text-muted">{hint}</p>
       </div>
-      {children && <div className="flex flex-wrap items-center gap-4 text-[13px] text-muted">{children}</div>}
+      {children && <div className="flex flex-wrap items-center gap-4 text-[0.8125rem] text-muted">{children}</div>}
     </div>
   );
 }
 
 export function LoadingLine({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 text-[13px] text-muted">
+    <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
       <Loader2 size={16} className="animate-spin" /> {label}
     </div>
   );
@@ -84,8 +84,8 @@ export function EmptyBlock({ icon: Icon, title, hint }: { icon: LucideIcon; titl
   return (
     <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
       <Icon size={28} className="mx-auto text-subtle" />
-      <p className="mt-2 text-[13px] font-semibold text-ink">{title}</p>
-      <p className="mt-0.5 text-[13px] text-muted">{hint}</p>
+      <p className="mt-2 text-[0.8125rem] font-semibold text-ink">{title}</p>
+      <p className="mt-0.5 text-[0.8125rem] text-muted">{hint}</p>
     </div>
   );
 }
@@ -256,7 +256,7 @@ export function OpsModal({
       >
         <div className={modalCardCls} style={wide ? { width: 640 } : undefined} role="dialog" aria-modal="true" aria-label={title}>
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <h3 className="text-[15px] font-bold text-ink">{title}</h3>
+            <h3 className="text-[0.9375rem] font-bold text-ink">{title}</h3>
             <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink">
               <X size={16} />
             </button>
@@ -288,7 +288,7 @@ export function OpsSlideOver({
           <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-lg font-bold tracking-tight text-ink">{title}</div>
-              {meta && <p className="mt-0.5 text-[13px] text-muted">{meta}</p>}
+              {meta && <p className="mt-0.5 text-[0.8125rem] text-muted">{meta}</p>}
             </div>
             <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />

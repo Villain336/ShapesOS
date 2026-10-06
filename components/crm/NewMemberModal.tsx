@@ -66,7 +66,7 @@ export function NewMemberModal({
             </div>
           )}
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Name *</span>
+            <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Name *</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -75,7 +75,7 @@ export function NewMemberModal({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Title</span>
+            <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Title</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -85,7 +85,7 @@ export function NewMemberModal({
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Email</span>
+              <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Email</span>
               <input
                 type="email"
                 value={email}
@@ -95,7 +95,7 @@ export function NewMemberModal({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Start date</span>
+              <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Start date</span>
               <input
                 type="date"
                 value={startDate}

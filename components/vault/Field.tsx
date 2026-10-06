@@ -23,15 +23,15 @@ export function Field({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label ? (
-        <Label htmlFor={htmlFor} className="text-[12.5px] font-medium text-ink-2">
+        <Label htmlFor={htmlFor} className="text-[0.78125rem] font-medium text-ink-2">
           {label}
         </Label>
       ) : null}
       {children}
       {error ? (
-        <span className="text-[12px] text-red">{error}</span>
+        <span className="text-[0.75rem] text-red">{error}</span>
       ) : hint ? (
-        <span className="text-[12px] text-ink-3">{hint}</span>
+        <span className="text-[0.75rem] text-ink-3">{hint}</span>
       ) : null}
     </div>
   );

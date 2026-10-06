@@ -116,7 +116,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
           ) : (
             <TriangleAlert size={14} className="text-failed-text" />
           )}
-          <span className="text-[13px] font-semibold">
+          <span className="text-[0.8125rem] font-semibold">
             {integrityOk === null
               ? "Checking integrity"
               : integrityOk
@@ -124,7 +124,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
                 : "Integrity issue found"}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <span>
             {formatCount(totals.sources)} sources · {formatCount(totals.documents)}{" "}
             documents · {formatCount(totals.chunks)} chunks
@@ -135,7 +135,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
             <button
               type="button"
               onClick={() => setShowAdd((v) => !v)}
-              className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+              className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white"
             >
               <Plus size={16} />
               Add source
@@ -169,7 +169,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold ${
                 active ? "bg-black text-white" : "bg-paper text-muted shadow-hairline"
               }`}
             >
@@ -177,7 +177,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
               {t.label}
               {t.badge !== null && (
                 <span
-                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[11px] ${
+                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[0.6875rem] ${
                     active ? "bg-white text-black" : "bg-black text-white"
                   }`}
                 >
@@ -208,7 +208,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
             </div>
           ) : sources.length === 0 ? (
             <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-              <p className="text-[15px] font-semibold">No sources yet</p>
+              <p className="text-[0.9375rem] font-semibold">No sources yet</p>
               <p className="mt-1 text-sm text-muted">
                 Add your first source — a file, a Drive document, a website, or
                 pasted text — and it becomes chunked, traceable knowledge.
@@ -216,7 +216,7 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
               <button
                 type="button"
                 onClick={() => setShowAdd(true)}
-                className="aos-press mt-4 h-11 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+                className="aos-press mt-4 h-11 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white"
               >
                 Add source
               </button>
@@ -241,10 +241,10 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
                     <Icon size={16} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">
+                    <span className="block truncate text-[0.9375rem] font-semibold">
                       {source.name}
                     </span>
-                    <span className="block text-[13px] text-muted">
+                    <span className="block text-[0.8125rem] text-muted">
                       {meta.label} · {source.documentCount} document
                       {source.documentCount === 1 ? "" : "s"} ·{" "}
                       {formatCount(source.chunkCount)} chunks
@@ -266,17 +266,17 @@ export function DatasetsApp({ initialTab }: { initialTab?: string | null } = {})
                           <span className="block truncate text-sm font-medium">
                             {doc.name}
                           </span>
-                          <span className="block font-mono text-[12px] text-subtle">
+                          <span className="block font-mono text-[0.75rem] text-subtle">
                             {doc.mimeType ?? "unknown type"} ·{" "}
                             {formatCount(doc.charCount)} chars
                           </span>
                           {doc.status === "failed" && doc.error && (
-                            <span className="mt-1 block text-[13px] text-failed-text">
+                            <span className="mt-1 block text-[0.8125rem] text-failed-text">
                               {doc.error}
                             </span>
                           )}
                         </span>
-                        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                           {doc.status === "ready" ? (
                             <CheckCircle2 size={13} />
                           ) : doc.status === "failed" ? (
@@ -373,7 +373,7 @@ function ByTypeView({ onClassified }: { onClassified: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Chunks auto-classified into dataset types. Low-confidence chunks go
           to the review queue instead of being force-fit.
         </p>
@@ -382,39 +382,39 @@ function ByTypeView({ onClassified }: { onClassified: () => void }) {
             type="button"
             onClick={() => void runClassification()}
             disabled={running}
-            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-60"
+            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white disabled:opacity-60"
           >
             {running ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
             {running ? "Classifying" : "Run classification"}
           </button>
         </div>
       </div>
-      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {types.map((t) => (
           <div key={t.type} className="rounded-lg bg-paper p-4 shadow-hairline">
-            <p className="text-[15px] font-semibold">{t.label}</p>
-            <p className="mt-1 font-mono text-[24px] font-semibold">
+            <p className="text-[0.9375rem] font-semibold">{t.label}</p>
+            <p className="mt-1 font-mono text-[1.5rem] font-semibold">
               {formatCount(t.count)}
             </p>
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               {t.count === 1 ? "chunk" : "chunks"} classified
             </p>
           </div>
         ))}
         <div className="rounded-lg bg-paper p-4 shadow-hairline">
-          <p className="text-[15px] font-semibold">Unclassified</p>
-          <p className="mt-1 font-mono text-[24px] font-semibold">
+          <p className="text-[0.9375rem] font-semibold">Unclassified</p>
+          <p className="mt-1 font-mono text-[1.5rem] font-semibold">
             {formatCount(unclassified)}
           </p>
-          <p className="text-[13px] text-muted">chunks awaiting classification</p>
+          <p className="text-[0.8125rem] text-muted">chunks awaiting classification</p>
         </div>
         <div className="rounded-lg bg-paper p-4 shadow-hairline">
-          <p className="text-[15px] font-semibold">In review</p>
-          <p className="mt-1 font-mono text-[24px] font-semibold">
+          <p className="text-[0.9375rem] font-semibold">In review</p>
+          <p className="mt-1 font-mono text-[1.5rem] font-semibold">
             {formatCount(pendingReview)}
           </p>
-          <p className="text-[13px] text-muted">chunks awaiting your decision</p>
+          <p className="text-[0.8125rem] text-muted">chunks awaiting your decision</p>
         </div>
       </div>
     </div>
@@ -498,7 +498,7 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
   if (items.length === 0) {
     return (
       <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-        <p className="text-[15px] font-semibold">Review queue is clear</p>
+        <p className="text-[0.9375rem] font-semibold">Review queue is clear</p>
         <p className="mt-1 text-sm text-muted">
           Low-confidence classifications will land here for your decision —
           approve, reassign to the right type, or reject.
@@ -512,17 +512,17 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
       {items.map((item) => (
         <div key={item.reviewId} className="rounded-lg bg-paper p-4 shadow-hairline">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+            <span className="rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
               {item.suggestedTypeLabel}
             </span>
-            <span className="font-mono text-[12px] text-subtle">
+            <span className="font-mono text-[0.75rem] text-subtle">
               {Math.round(item.confidence * 100)}% confidence · {item.engine}
             </span>
-            <span className="text-[13px] text-muted">
+            <span className="text-[0.8125rem] text-muted">
               {item.documentName} · {item.sourceName}
             </span>
           </div>
-          <p className="mt-2 line-clamp-3 text-[14px] text-muted">
+          <p className="mt-2 line-clamp-3 text-[0.875rem] text-muted">
             {item.chunkText}
           </p>
           {reassignFor === item.reviewId ? (
@@ -530,7 +530,7 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
               <select
                 value={reassignType}
                 onChange={(e) => setReassignType(e.target.value)}
-                className="h-10 rounded-full border border-line bg-paper px-4 text-[14px]"
+                className="h-10 rounded-full border border-line bg-paper px-4 text-[0.875rem]"
                 aria-label="Reassign to type"
               >
                 {REASSIGN_TYPES.map((t) => (
@@ -543,14 +543,14 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
                 type="button"
                 disabled={busy === item.reviewId}
                 onClick={() => void decide(item.reviewId, "reassign", reassignType)}
-                className="aos-press h-10 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-60"
+                className="aos-press h-10 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-60"
               >
                 Confirm reassign
               </button>
               <button
                 type="button"
                 onClick={() => setReassignFor(null)}
-                className="aos-press h-10 rounded-full px-4 text-[14px] font-semibold text-muted"
+                className="aos-press h-10 rounded-full px-4 text-[0.875rem] font-semibold text-muted"
               >
                 Cancel
               </button>
@@ -561,7 +561,7 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
                 type="button"
                 disabled={busy === item.reviewId}
                 onClick={() => void decide(item.reviewId, "approve")}
-                className="aos-press h-10 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-60"
+                className="aos-press h-10 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-60"
               >
                 Approve
               </button>
@@ -571,7 +571,7 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
                   setReassignFor(item.reviewId);
                   setReassignType(item.suggestedType);
                 }}
-                className="aos-press h-10 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline"
+                className="aos-press h-10 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline"
               >
                 Reassign
               </button>
@@ -579,7 +579,7 @@ function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
                 type="button"
                 disabled={busy === item.reviewId}
                 onClick={() => void decide(item.reviewId, "reject")}
-                className="aos-press h-10 rounded-full px-4 text-[14px] font-semibold text-failed-text"
+                className="aos-press h-10 rounded-full px-4 text-[0.875rem] font-semibold text-failed-text"
               >
                 Reject
               </button>
@@ -700,8 +700,8 @@ function AddSourcePanel({
   }
 
   const inputCls =
-    "h-11 w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-[15px] placeholder:text-subtle focus:border-focus focus:outline-none";
-  const labelCls = "mb-1 block text-[13px] font-semibold";
+    "h-11 w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.9375rem] placeholder:text-subtle focus:border-focus focus:outline-none";
+  const labelCls = "mb-1 block text-[0.8125rem] font-semibold";
 
   return (
     <form
@@ -709,13 +709,13 @@ function AddSourcePanel({
       className="flex flex-col gap-4 rounded-lg bg-paper p-4 shadow-hairline md:p-6"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-[18px] font-bold" style={{ fontStretch: "115%" }}>
+        <h2 className="text-[1.125rem] font-bold" style={{ fontStretch: "115%" }}>
           Add source
         </h2>
         <button
           type="button"
           onClick={onCancel}
-          className="aos-press h-9 rounded-full px-4 text-[14px] font-semibold text-muted shadow-outline"
+          className="aos-press h-9 rounded-full px-4 text-[0.875rem] font-semibold text-muted shadow-outline"
         >
           Cancel
         </button>
@@ -736,7 +736,7 @@ function AddSourcePanel({
                 setKind(k);
                 setError(null);
               }}
-              className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+              className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold ${
                 active ? "bg-black text-white" : "bg-canvas text-ink"
               }`}
             >
@@ -758,9 +758,9 @@ function AddSourcePanel({
               type="file"
               accept=".pdf,.docx,.csv,.md,.markdown"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="text-[14px]"
+              className="text-[0.875rem]"
             />
-            <p className="mt-1 text-[13px] text-muted">PDF, DOCX, CSV, or MD — up to 10 MB.</p>
+            <p className="mt-1 text-[0.8125rem] text-muted">PDF, DOCX, CSV, or MD — up to 10 MB.</p>
           </div>
           <div>
             <label className={labelCls} htmlFor="ds-upload-label">
@@ -795,12 +795,12 @@ function AddSourcePanel({
                 type="button"
                 onClick={loadDriveFiles}
                 disabled={busy}
-                className="aos-press h-11 shrink-0 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                className="aos-press h-11 shrink-0 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
               >
                 List files
               </button>
             </div>
-            <p className="mt-1 text-[13px] text-muted">
+            <p className="mt-1 text-[0.8125rem] text-muted">
               Connect Google Drive through Nango Cloud, then list and pick a file.
             </p>
           </div>
@@ -869,7 +869,7 @@ function AddSourcePanel({
               placeholder="Founder notes 2026-10-01"
               className={inputCls}
             />
-            <p className="mt-1 text-[13px] text-muted">
+            <p className="mt-1 text-[0.8125rem] text-muted">
               The label you give is how every chunk from this text stays traced.
             </p>
           </div>
@@ -883,14 +883,14 @@ function AddSourcePanel({
               onChange={(e) => setPasteText(e.target.value)}
               rows={6}
               placeholder="Paste the text to ingest…"
-              className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[15px] placeholder:text-subtle focus:border-focus focus:outline-none"
+              className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.9375rem] placeholder:text-subtle focus:border-focus focus:outline-none"
             />
           </div>
         </div>
       )}
 
       {error && (
-        <p role="alert" className="flex items-start gap-2 text-[14px] text-failed-text">
+        <p role="alert" className="flex items-start gap-2 text-[0.875rem] text-failed-text">
           <TriangleAlert size={15} className="mt-0.5 shrink-0" />
           {error}
         </p>
@@ -900,7 +900,7 @@ function AddSourcePanel({
         <button
           type="submit"
           disabled={busy}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? "Adding" : `Add ${KIND_META[kind].label.toLowerCase()} source`}

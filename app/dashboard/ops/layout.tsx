@@ -11,7 +11,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full flex-col bg-canvas">
       <div className="border-b border-line bg-paper px-5 pt-4">
-        <p className="text-[12px] font-medium text-subtle">ShapesOS · Operations</p>
+        <p className="text-[0.75rem] font-medium text-subtle">ShapesOS · Operations</p>
         <h1 className="aos-heading mt-0.5">Operations</h1>
         <div className="mt-3">
           <SectionNav items={NAV} ariaLabel="Operations sections" />

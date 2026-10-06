@@ -80,7 +80,7 @@ export default function SerpAnalyzer({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={loading || !keyword.trim()}
-          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-50"
         >
           {loading ? "Analyzing…" : "Analyze SERP"}
         </button>

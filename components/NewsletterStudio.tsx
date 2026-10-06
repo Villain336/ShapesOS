@@ -1101,7 +1101,7 @@ export default function NewsletterStudio(props: Props) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors ${
               tab === t.id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

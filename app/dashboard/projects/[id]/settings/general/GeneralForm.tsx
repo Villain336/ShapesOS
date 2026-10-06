@@ -105,11 +105,11 @@ export default function GeneralForm({
         description="Brand context is injected into ShapesOS's prompt for this project"
         actions={
           !brandInherited ? (
-            <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[11.5px] font-medium text-accent-ink">
+            <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[0.71875rem] font-medium text-accent-ink">
               Overridden
             </span>
           ) : (
-            <span className="rounded-full bg-inset px-2 py-0.5 text-[11.5px] text-ink-3">
+            <span className="rounded-full bg-inset px-2 py-0.5 text-[0.71875rem] text-ink-3">
               Inherited default
             </span>
           )
@@ -135,7 +135,7 @@ export default function GeneralForm({
           <button
             type="button"
             onClick={() => void resetBrandContext()}
-            className="self-start text-[12.5px] text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink"
+            className="self-start text-[0.78125rem] text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink"
           >
             Reset to inherited default
           </button>
@@ -152,7 +152,7 @@ export default function GeneralForm({
                 {domains.map((d) => (
                   <span
                     key={d}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-inset py-1 pl-3 pr-1.5 text-[12.5px] text-ink"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-inset py-1 pl-3 pr-1.5 text-[0.78125rem] text-ink"
                   >
                     {d}
                     {canEdit && (
@@ -198,13 +198,13 @@ export default function GeneralForm({
         </Field>
 
         {state === "error" && error && (
-          <p className="flex items-center gap-1.5 text-[12.5px] text-red">
+          <p className="flex items-center gap-1.5 text-[0.78125rem] text-red">
             <TriangleAlert className="size-3.5" />
             {error}
           </p>
         )}
         {state === "saved" && (
-          <p className="flex items-center gap-1.5 text-[12.5px] text-green">
+          <p className="flex items-center gap-1.5 text-[0.78125rem] text-green">
             <CheckCircle className="size-3.5" />
             Saved
           </p>

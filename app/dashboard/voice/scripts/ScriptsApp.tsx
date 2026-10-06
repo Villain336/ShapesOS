@@ -83,7 +83,7 @@ export function ScriptsApp() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Call Scripts</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Draft-first: only human-approved scripts can attach to a live session. This is the legal-review surface.
         </p>
       </div>
@@ -146,18 +146,18 @@ export function ScriptsApp() {
                   {s.hasDisclosure ? (
                     <span className="inline-flex items-center gap-1 text-ink">
                       <ShieldCheck className="h-4 w-4" />
-                      <span className="text-[12px] font-medium">Present</span>
+                      <span className="text-[0.75rem] font-medium">Present</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-failed-text">
                       <ShieldAlert className="h-4 w-4" />
-                      <span className="text-[12px] font-medium">Missing — will be refused</span>
+                      <span className="text-[0.75rem] font-medium">Missing — will be refused</span>
                     </span>
                   )}
                 </td>
                 <td className={tdCls}>
                   {s.approvedBy ? (
-                    <span className="text-[12px]">
+                    <span className="text-[0.75rem]">
                       {s.approvedBy.slice(0, 24)}
                       {s.approvedAt ? ` · ${new Date(s.approvedAt).toLocaleDateString()}` : ""}
                     </span>

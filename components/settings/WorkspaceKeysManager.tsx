@@ -144,20 +144,20 @@ function CredentialCard({ cred, onChanged }: { cred: CredentialView; onChanged: 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {cred.kind === "model" ? <KeyRound size={16} className="text-subtle" aria-hidden="true" /> : <Plug size={16} className="text-subtle" aria-hidden="true" />}
-          <span className="text-[13px] font-semibold text-ink">{cred.label}</span>
+          <span className="text-[0.8125rem] font-semibold text-ink">{cred.label}</span>
         </div>
         <Chip
           on={cred.connected}
           label={cred.connected ? (cred.kind === "model" ? "Your key — no AI credits used" : "Your own") : "Not connected"}
         />
       </div>
-      <p className="text-[12px] text-muted">{cred.help}</p>
+      <p className="text-[0.75rem] text-muted">{cred.help}</p>
       {cred.connected && !editing ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-muted">
+          <span className="text-[0.75rem] text-muted">
             Saved {cred.connectedAt ? new Date(cred.connectedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""}
             {cred.fields.filter((f) => !f.secret && f.value).map((f) => (
-              <span key={f.name} className="ml-2 font-mono text-[11px] text-ink">
+              <span key={f.name} className="ml-2 font-mono text-[0.6875rem] text-ink">
                 {f.value}
               </span>
             ))}
@@ -237,7 +237,7 @@ export default function WorkspaceKeysManager({ kinds }: { kinds: Array<Credentia
   if (error) return <Notice notice={{ kind: "error", message: error }} />;
   if (!data) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-muted">
+      <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
         <Loader2 size={16} className="aos-spin" />
         Loading keys…
       </div>
@@ -252,10 +252,10 @@ export default function WorkspaceKeysManager({ kinds }: { kinds: Array<Credentia
         return (
           <section key={kind} className="flex flex-col gap-3" aria-labelledby={`keys-${kind}`}>
             <div>
-              <h3 id={`keys-${kind}`} className="text-[13px] font-semibold text-ink">
+              <h3 id={`keys-${kind}`} className="text-[0.8125rem] font-semibold text-ink">
                 {SECTION[kind].title}
               </h3>
-              <p className="text-[12px] text-muted">{SECTION[kind].body(hosted)}</p>
+              <p className="text-[0.75rem] text-muted">{SECTION[kind].body(hosted)}</p>
             </div>
             <div className="grid gap-3 lg:grid-cols-2">
               {creds.map((c) => (

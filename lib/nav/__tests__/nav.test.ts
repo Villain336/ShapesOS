@@ -118,7 +118,24 @@ describe("⌘K Go section", () => {
 
   it("CommandBar builds its Go list from the nav config", () => {
     const src = readFileSync(path.join(ROOT, "components/command-bar/CommandBar.tsx"), "utf8");
-    assert.match(src, /const GO_ITEMS: UICommand\[\] = navCommands\(\);/);
+    // Phase 18.1: the same nav config, in the person's language (lib/nav/i18n.ts).
+    assert.match(src, /navCommands\(localizeNavGroups\(NAV_GROUPS, messages\)\)/);
+  });
+
+  it("the localized nav keeps every destination and English search words (Phase 18.1)", async () => {
+    const { localizeNavGroups } = await import("../i18n");
+    const { en } = await import("@/lib/i18n/messages/en");
+    const { es } = await import("@/lib/i18n/messages/es");
+    const { mergeCatalogues } = await import("@/lib/i18n");
+    const localized = localizeNavGroups(NAV_GROUPS, mergeCatalogues(en, es));
+    const before = navCommands();
+    const after = navCommands(localized);
+    assert.deepEqual(after.map((c) => c.href), before.map((c) => c.href), "same destinations, same order");
+    const files = after.find((c) => c.href === "/dashboard/files")!;
+    assert.equal(files.title, "Archivos");
+    assert.match(files.keywords, /Files/, "English label stays searchable");
+    assert.match(files.subtitle, /^Operar · /);
+    assert.deepEqual(navCommands(localizeNavGroups(NAV_GROUPS, en)).map((c) => c.title), before.map((c) => c.title), "English unchanged");
   });
 
   it("keeps the original ⌥1–⌥6 hotkeys on real destinations", () => {

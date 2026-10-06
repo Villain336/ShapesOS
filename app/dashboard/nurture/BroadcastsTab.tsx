@@ -165,23 +165,23 @@ export function BroadcastsTab() {
             placeholder="Search campaigns…"
           />
         </div>
-        <span className="ml-auto text-[12px] text-muted">{rows.length} broadcasts</span>
+        <span className="ml-auto text-[0.75rem] text-muted">{rows.length} broadcasts</span>
         <button className={btnPrimary} onClick={() => setCreateOpen(true)}>
           <Plus size={14} /> New broadcast
         </button>
       </div>
 
       {error ? (
-        <p className="border-b border-line bg-failed-tint px-3 py-2 text-[12px] text-failed-text">{error}</p>
+        <p className="border-b border-line bg-failed-tint px-3 py-2 text-[0.75rem] text-failed-text">{error}</p>
       ) : null}
 
       {loading ? (
-        <div className="p-6 text-[13px] text-muted">Loading broadcasts…</div>
+        <div className="p-6 text-[0.8125rem] text-muted">Loading broadcasts…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No broadcasts yet" hint="Create one to send a newsletter via the Listmonk sidecar." /></div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left text-[13px]">
+          <table className="w-full min-w-[820px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Campaign</th>
@@ -198,7 +198,7 @@ export function BroadcastsTab() {
                   <td className="px-3 py-2">
                     <button className="text-left hover:text-ink" onClick={() => openDetail(b)}>
                       <div className="font-medium text-ink">{b.name}</div>
-                      <div className="max-w-[320px] truncate text-[12px] text-muted">{b.subject}</div>
+                      <div className="max-w-[320px] truncate text-[0.75rem] text-muted">{b.subject}</div>
                     </button>
                   </td>
                   <td className="px-3 py-2">
@@ -206,12 +206,12 @@ export function BroadcastsTab() {
                       {b.lists.map((l) => (
                         <Chip key={l.id}>{l.name}</Chip>
                       ))}
-                      {b.lists.length === 0 ? <span className="text-[12px] text-subtle">—</span> : null}
+                      {b.lists.length === 0 ? <span className="text-[0.75rem] text-subtle">—</span> : null}
                     </div>
                   </td>
                   <td className="px-3 py-2"><Chip>{b.status}</Chip></td>
                   <td className="px-3 py-2 text-muted">{b.sentCount ?? "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-muted">{timeAgo(b.updatedAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-[0.75rem] text-muted">{timeAgo(b.updatedAt)}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1.5">
                       {b.status === "draft" ? (
@@ -265,21 +265,21 @@ export function BroadcastsTab() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Chip>{detail.campaign.status}</Chip>
-              <span className="text-[13px] text-muted">{detail.campaign.subject}</span>
+              <span className="text-[0.8125rem] text-muted">{detail.campaign.subject}</span>
             </div>
             {detail.stats ? (
               <div className="grid grid-cols-4 gap-2">
                 {([["sent", detail.stats.sent], ["viewed", detail.stats.viewed], ["clicked", detail.stats.clicked], ["bounced", detail.stats.bounced]] as const).map(([k, v]) => (
                   <div key={k} className="rounded-lg bg-canvas p-2 text-center">
-                    <div className="text-[16px] font-bold text-ink">{v}</div>
+                    <div className="text-[1rem] font-bold text-ink">{v}</div>
                     <div className="text-xs font-semibold text-muted">{k}</div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[12px] text-muted">No send stats yet — stats appear after the first send.</p>
+              <p className="text-[0.75rem] text-muted">No send stats yet — stats appear after the first send.</p>
             )}
-            <p className="text-[12px] text-muted">
+            <p className="text-[0.75rem] text-muted">
               New drafts send through the Listmonk sidecar only. Sends are irreversible — confirm in the row actions.
             </p>
           </div>
@@ -335,12 +335,12 @@ function CreateBroadcastModal({
           <p className="mb-1 text-xs font-semibold text-muted">Lists ({picked.size} selected)</p>
           <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-line p-2">
             {lists.length === 0 ? (
-              <p className="text-[12px] text-subtle">No lists yet — create one in the Listmonk admin UI first.</p>
+              <p className="text-[0.75rem] text-subtle">No lists yet — create one in the Listmonk admin UI first.</p>
             ) : lists.map((l) => (
               <label key={l.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 hover:bg-hover-paper">
                 <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-ink" />
-                <span className="text-[13px] text-ink">{l.name}</span>
-                <span className="ml-auto text-[11px] text-subtle">{l.subscriberCount ?? "—"} subscribers</span>
+                <span className="text-[0.8125rem] text-ink">{l.name}</span>
+                <span className="ml-auto text-[0.6875rem] text-subtle">{l.subscriberCount ?? "—"} subscribers</span>
               </label>
             ))}
           </div>
@@ -351,9 +351,9 @@ function CreateBroadcastModal({
           onChange={(e) => setBody(e.target.value)}
           placeholder="<h1>Hello</h1><p>Your newsletter HTML…</p>"
         />
-        {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+        {error ? <p className="text-[0.8125rem] text-failed-text">{error}</p> : null}
         <div className="flex items-center justify-between border-t border-line pt-3">
-          <p className="text-[12px] text-muted">Saved as a draft in Listmonk. Sends happen from the row actions.</p>
+          <p className="text-[0.75rem] text-muted">Saved as a draft in Listmonk. Sends happen from the row actions.</p>
           <div className="flex gap-2">
             <button className={btnSecondary} onClick={onClose}>Cancel</button>
             <button

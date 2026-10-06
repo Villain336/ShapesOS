@@ -1089,13 +1089,13 @@ export function BrainScene3D(props: BrainScene3DProps) {
         <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
           <span className="inline-block h-2 w-2 rounded-full bg-ink" /> Galaxy model
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-ink" /> Core = source · size ∝ chunks
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted" /> Sparkle = chunk
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-subtle" /> Dotted ring = hero orbit
         </div>
       </div>
@@ -1105,7 +1105,7 @@ export function BrainScene3D(props: BrainScene3DProps) {
         <button
           type="button"
           onClick={() => (touring ? tourCtl.current?.cancel() : tourCtl.current?.start())}
-          className="aos-press inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-night-hover"
+          className="aos-press inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink-hover"
         >
           {touring ? <X className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
           {touring ? "Skip tour" : "Cinematic tour"}
@@ -1124,13 +1124,13 @@ export function BrainScene3D(props: BrainScene3DProps) {
       {/* Hover card */}
       {hoverNode && (
         <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md bg-paper px-2.5 py-2 shadow-raised">
-          <div className="text-[12px] font-semibold text-ink">{hoverNode.title}</div>
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{hoverNode.teaches}</div>
+          <div className="text-[0.75rem] font-semibold text-ink">{hoverNode.title}</div>
+          <div className="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug text-muted">{hoverNode.teaches}</div>
         </div>
       )}
 
       {/* Controls hint */}
-      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-paper px-2 py-1 text-[10px] tracking-wide text-subtle shadow-raised">
+      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-paper px-2 py-1 text-[0.625rem] tracking-wide text-subtle shadow-raised">
         {!introDone ? "opening flight — click anywhere to take over" : "drag to rotate · scroll to zoom · click a core"}
       </div>
     </div>

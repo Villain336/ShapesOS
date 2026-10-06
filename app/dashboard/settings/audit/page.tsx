@@ -21,7 +21,7 @@ export default async function AuditSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Audit log</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — every skill install, connector change, file
           attachment, and settings update, with who and when.
         </p>

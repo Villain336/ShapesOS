@@ -95,7 +95,7 @@ function TierPill({ tier }: { tier: EscalationTier | null }) {
   const meta = TIER_META[key];
   const Icon = meta.icon;
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
       <Icon size={13} />
       {meta.label}
     </span>
@@ -118,7 +118,7 @@ function DateForm({
   const [recurrence, setRecurrence] = useState<DeadlineRecurrence>(initial.recurrence);
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-canvas p-3">
-      <label className="flex items-center gap-2 text-[14px]">
+      <label className="flex items-center gap-2 text-[0.875rem]">
         <input
           type="checkbox"
           checked={useDate}
@@ -132,13 +132,13 @@ function DateForm({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+          className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
         />
       )}
       <select
         value={recurrence}
         onChange={(e) => setRecurrence(e.target.value as DeadlineRecurrence)}
-        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
         aria-label="Recurrence"
       >
         {RECURRENCES.map((r) => (
@@ -151,7 +151,7 @@ function DateForm({
         type="button"
         disabled={busy}
         onClick={() => onSave({ dueDate: useDate && date ? new Date(`${date}T12:00:00Z`).toISOString() : null, recurrence })}
-        className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+        className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
       >
         {busy && <Loader2 size={14} className="animate-spin" />}
         Save date
@@ -159,13 +159,13 @@ function DateForm({
       <button
         type="button"
         onClick={onCancel}
-        className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted"
+        className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[0.875rem] font-semibold text-muted"
       >
         <X size={14} />
         Cancel
       </button>
       {!useDate && (
-        <p className="w-full text-[13px] text-muted">
+        <p className="w-full text-[0.8125rem] text-muted">
           Leaving this unchecked keeps it as "date needed" — dates are never guessed.
         </p>
       )}
@@ -277,10 +277,10 @@ export function DeadlinesView({
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <Info size={16} className="mt-0.5 shrink-0" />
-        <p className="text-[14px]">{disclaimer}</p>
+        <p className="text-[0.875rem]">{disclaimer}</p>
       </div>
 
-      <p className="text-[13px] text-muted">
+      <p className="text-[0.8125rem] text-muted">
         {open.length} on the calendar
         {attentionCount > 0 && ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention`}
         {needsDate.length > 0 && ` · ${needsDate.length} waiting for a date`}
@@ -288,7 +288,7 @@ export function DeadlinesView({
 
       {open.length === 0 && needsDate.length === 0 ? (
         <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-          <p className="text-[15px] font-semibold">No deadlines yet</p>
+          <p className="text-[0.9375rem] font-semibold">No deadlines yet</p>
           <p className="mt-1 text-sm text-muted">
             Put an obligation on the calendar below and reminders will escalate
             as the date approaches.
@@ -302,10 +302,10 @@ export function DeadlinesView({
             return (
               <article key={d.id} className="rounded-lg bg-paper p-4 shadow-hairline">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="min-w-0 flex-1 text-[15px] font-semibold">{d.title}</h3>
+                  <h3 className="min-w-0 flex-1 text-[0.9375rem] font-semibold">{d.title}</h3>
                   <TierPill tier={d.tier} />
                 </div>
-                <p className="mt-1.5 text-[14px] text-muted">
+                <p className="mt-1.5 text-[0.875rem] text-muted">
                   {d.dueDate ? (
                     <>
                       {formatDate(d.dueDate)}
@@ -320,10 +320,10 @@ export function DeadlinesView({
                   )}
                 </p>
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                  <span className="rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                     {RECURRENCE_LABELS[d.recurrence]}
                   </span>
-                  <span className="text-[13px] text-muted">{SOURCE_LABELS[d.source]}</span>
+                  <span className="text-[0.8125rem] text-muted">{SOURCE_LABELS[d.source]}</span>
                 </div>
                 {editing ? (
                   <DateForm
@@ -338,7 +338,7 @@ export function DeadlinesView({
                       type="button"
                       disabled={busy}
                       onClick={() => void patchDeadline(d.id, { status: "done" })}
-                      className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                      className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                     >
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                       Mark done
@@ -347,7 +347,7 @@ export function DeadlinesView({
                       type="button"
                       disabled={busy}
                       onClick={() => setEditingId(d.id)}
-                      className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline disabled:opacity-50"
+                      className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline disabled:opacity-50"
                     >
                       <Pencil size={14} />
                       {d.dueDate ? "Change date" : "Set date"}
@@ -356,7 +356,7 @@ export function DeadlinesView({
                       type="button"
                       disabled={busy}
                       onClick={() => void dismissDeadline(d.id)}
-                      className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted disabled:opacity-50"
+                      className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[0.875rem] font-semibold text-muted disabled:opacity-50"
                     >
                       <EyeOff size={14} />
                       Dismiss
@@ -372,7 +372,7 @@ export function DeadlinesView({
       {needsDate.length > 0 && (
         <section aria-label="Waiting for a date">
           <h2 className="aos-subheading mb-2">Waiting for a date</h2>
-          <p className="mb-3 text-[13px] text-muted">
+          <p className="mb-3 text-[0.8125rem] text-muted">
             These obligations have no deadline on the calendar. Add a date you
             confirm — nothing is scheduled until you do.
           </p>
@@ -383,11 +383,11 @@ export function DeadlinesView({
               return (
                 <article key={n.templateKey} className="rounded-lg bg-paper p-4 shadow-hairline">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="min-w-0 flex-1 text-[15px] font-semibold">{n.title}</h3>
+                    <h3 className="min-w-0 flex-1 text-[0.9375rem] font-semibold">{n.title}</h3>
                     <TierPill tier="date_needed" />
                   </div>
                   {n.renewalCadence && (
-                    <p className="mt-1.5 text-[14px] text-muted">
+                    <p className="mt-1.5 text-[0.875rem] text-muted">
                       Renewal pattern: {n.renewalCadence}. The reminder recurs
                       only after you anchor it to a real date.
                     </p>
@@ -404,7 +404,7 @@ export function DeadlinesView({
                       <button
                         type="button"
                         onClick={() => setAddingKey(n.templateKey)}
-                        className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white"
+                        className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white"
                       >
                         <Plus size={14} />
                         Add to calendar
@@ -429,19 +429,19 @@ export function DeadlinesView({
                   key={d.id}
                   className="flex flex-wrap items-center gap-2 rounded-lg bg-paper p-3 shadow-hairline"
                 >
-                  <p className="min-w-0 flex-1 text-[14px] font-semibold">{d.title}</p>
-                  <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                  <p className="min-w-0 flex-1 text-[0.875rem] font-semibold">{d.title}</p>
+                  <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                     {d.status === "done" ? <CheckCircle2 size={13} /> : <EyeOff size={13} />}
                     {d.status === "done" ? "Done" : "Dismissed"}
                   </span>
                   {d.dueDate && (
-                    <span className="text-[13px] text-muted">{formatDate(d.dueDate)}</span>
+                    <span className="text-[0.8125rem] text-muted">{formatDate(d.dueDate)}</span>
                   )}
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => void patchDeadline(d.id, { status: "open" })}
-                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-muted disabled:opacity-50"
+                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[0.8125rem] font-semibold text-muted disabled:opacity-50"
                   >
                     <RotateCcw size={13} />
                     Reopen
@@ -450,7 +450,7 @@ export function DeadlinesView({
                     type="button"
                     disabled={busy}
                     onClick={() => void deleteDeadline(d.id)}
-                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-failed-text disabled:opacity-50"
+                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[0.8125rem] font-semibold text-failed-text disabled:opacity-50"
                   >
                     <Trash2 size={13} />
                     Delete

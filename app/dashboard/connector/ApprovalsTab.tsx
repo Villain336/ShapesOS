@@ -56,7 +56,7 @@ function ApprovalCard({
   return (
     <div className="flex flex-col gap-4 rounded-lg bg-paper p-5 shadow-hairline">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[16px] font-semibold text-ink">
+        <div className="text-[1rem] font-semibold text-ink">
           {intro.personA.name} <span className="font-normal text-muted">→</span>{" "}
           {intro.personB.name}
         </div>
@@ -70,32 +70,32 @@ function ApprovalCard({
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-md border border-line bg-canvas p-3">
-          <p className="mb-1 text-[12px] font-semibold text-muted">
+          <p className="mb-1 text-[0.75rem] font-semibold text-muted">
             Draft ask — to {intro.personA.name} (side A)
           </p>
-          <p className="text-[14px] leading-relaxed text-ink">{intro.draftAskMessage}</p>
+          <p className="text-[0.875rem] leading-relaxed text-ink">{intro.draftAskMessage}</p>
         </div>
         <div className="rounded-md border border-line bg-canvas p-3">
-          <p className="mb-1 text-[12px] font-semibold text-muted">
+          <p className="mb-1 text-[0.75rem] font-semibold text-muted">
             Draft offer — to {intro.personB.name} (side B, after side A accepts)
           </p>
-          <p className="text-[14px] leading-relaxed text-ink">{intro.draftOfferMessage}</p>
+          <p className="text-[0.875rem] leading-relaxed text-ink">{intro.draftOfferMessage}</p>
         </div>
       </div>
 
       {intro.rateLimitOverrideMaxAsks != null && (
-        <p className="text-[12px] text-muted">
+        <p className="text-[0.75rem] text-muted">
           Rate-limit override on this proposal: {intro.rateLimitOverrideMaxAsks} ask
           {intro.rateLimitOverrideMaxAsks === 1 ? "" : "s"} per{" "}
           {intro.rateLimitOverrideWindowDays} days.
         </p>
       )}
 
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
 
       {!declining ? (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-[13px] text-muted">
+          <label className="flex items-center gap-2 text-[0.8125rem] text-muted">
             Send the ask via
             <input
               value={sentVia}
@@ -127,7 +127,7 @@ function ApprovalCard({
       ) : (
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">
+            <span className="text-[0.75rem] font-semibold text-muted">
               Reason (optional — recorded on the intro)
             </span>
             <input
@@ -197,7 +197,7 @@ export function ApprovalsTab({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
       {inbox.length > 0 && (
         <div role="status" className="flex items-center gap-2.5 rounded-lg bg-needs px-4 py-3 text-ink">
           <span
@@ -212,7 +212,7 @@ export function ApprovalsTab({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
       {inbox.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="flex items-center gap-2 rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           <Inbox size={16} />
           Nothing awaiting approval. Proposed intros land here with the full path and draft copy.
         </div>

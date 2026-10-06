@@ -70,7 +70,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
 
   if (error && !order) {
     return (
-      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[13px] text-muted">
+      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[0.8125rem] text-muted">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4" />
           <span>{error}</span>
@@ -81,7 +81,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
 
   if (!order) {
     return (
-      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[13px] text-muted">
+      <div className="rounded-lg bg-paper shadow-hairline p-4 text-[0.8125rem] text-muted">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading order…</span>
@@ -98,14 +98,14 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
           <span className="text-sm font-semibold text-ink">Order {order.id.slice(0, 8)}…</span>
         </div>
         <span
-          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+          className={`rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold ${
             STATUS_BADGE[order.status] ?? STATUS_BADGE.new
           }`}
         >
           {order.status}
         </span>
       </div>
-      <table className="w-full text-[13px]">
+      <table className="w-full text-[0.8125rem]">
         <thead>
           <tr className="text-left text-muted">
             <th className="px-4 py-2 font-medium">Item</th>
@@ -118,7 +118,7 @@ export function OpsOrderCard({ orderId }: OpsOrderCardProps) {
             <tr key={i} className="border-t border-line hover:bg-hover-paper">
               <td className="px-4 py-2 text-ink">
                 {it.name ?? it.description ?? "Item"}
-                {it.sku && <span className="ml-2 text-[12px] text-muted">{it.sku}</span>}
+                {it.sku && <span className="ml-2 text-[0.75rem] text-muted">{it.sku}</span>}
               </td>
               <td className="px-2 py-2 text-right tabular-nums text-muted">{it.qty}</td>
               <td className="px-4 py-2 text-right tabular-nums text-ink">

@@ -68,7 +68,7 @@ export function OpenInSheetsButton({
       disabled={busy}
       className={
         className ??
-        "inline-flex h-control-sm items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
+        "inline-flex h-control-sm items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
       }
     >
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}

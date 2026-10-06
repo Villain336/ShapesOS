@@ -13,13 +13,17 @@ import { Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NeedsYouPill, useNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+// Phase 18.1 (WS=find): i18n + the top bar is the page's banner landmark.
+// (Edits here are limited to these; WS=desk adds the Control Center.)
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export function AppTopBar() {
   const pathname = usePathname();
   const { actionable } = useNeedsYouCount();
+  const { t } = useI18n(); // p18-find i18n
   const onApprovals = pathname.startsWith("/dashboard/approvals");
   return (
-    <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-1.5 border-b border-line bg-paper px-6 md:flex">
+    <header aria-label={t("a11y.banner")} className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-1.5 border-b border-line bg-paper px-6 md:flex">
       <Link
         href="/dashboard/approvals"
         aria-current={onApprovals ? "page" : undefined}
@@ -29,7 +33,7 @@ export function AppTopBar() {
         )}
       >
         <Inbox className="size-4" aria-hidden />
-        Needs you
+        {t("topbar.needsYou")}
         <NeedsYouPill count={actionable} />
       </Link>
       <NotificationBell />

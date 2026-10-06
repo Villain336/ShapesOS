@@ -164,7 +164,7 @@ export default function ThinkingState({
         <span role="status" className="contents">
           {working ? (
             <span
-              className="bg-clip-text text-[13px] font-medium whitespace-nowrap text-transparent"
+              className="bg-clip-text text-[0.8125rem] font-medium whitespace-nowrap text-transparent"
               style={{
                 backgroundImage:
                   "linear-gradient(90deg, var(--ink-3) 35%, var(--ink) 50%, var(--ink-3) 65%)",
@@ -176,7 +176,7 @@ export default function ThinkingState({
             </span>
           ) : (
             <span
-              className="text-[13px] font-medium whitespace-nowrap text-ink-2"
+              className="text-[0.8125rem] font-medium whitespace-nowrap text-ink-2"
               style={{ animation: "fade-in 350ms ease-out both" }}
             >
               {v.done}
@@ -215,7 +215,7 @@ export default function ThinkingState({
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
-                <span className="text-[12.5px] text-ink-2">{v.query}</span>
+                <span className="text-[0.78125rem] text-ink-2">{v.query}</span>
               </div>
             )}
             {v.rows.slice(0, visible).map((row, i) => {
@@ -231,16 +231,16 @@ export default function ThinkingState({
                     <span className="size-3 shrink-0 rounded-full border-[1.5px] border-line-strong border-t-ink-2" style={{ animation: "spin 700ms linear infinite" }} />
                   )
                 )}
-                <span className={`min-w-0 truncate text-[12.5px] ${variant === "Reasoning" ? "whitespace-normal leading-relaxed text-ink-2" : "font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}>
+                <span className={`min-w-0 truncate text-[0.78125rem] ${variant === "Reasoning" ? "whitespace-normal leading-relaxed text-ink-2" : "font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}>
                   {row.primary}
                 </span>
                 {row.secondary && (
-                  <span className={`shrink-0 text-[11.5px] text-ink-3 ${row.mono ? "font-mono" : ""}`}>
+                  <span className={`shrink-0 text-[0.71875rem] text-ink-3 ${row.mono ? "font-mono" : ""}`}>
                     {row.secondary}
                   </span>
                 )}
                 {row.add !== undefined && (
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums">
+                  <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums">
                     <span className="text-green">+{row.add}</span>{" "}
                     <span className="text-red">−{row.del}</span>
                   </span>
@@ -288,7 +288,7 @@ export default function ThinkingState({
               );
             })}
             {variant === "Search" && stage >= 3 && (
-              <span className="text-[12px] text-ink-3" style={{ animation: "fade-in 300ms ease-out both" }}>
+              <span className="text-[0.75rem] text-ink-3" style={{ animation: "fade-in 300ms ease-out both" }}>
                 +7 more
               </span>
             )}

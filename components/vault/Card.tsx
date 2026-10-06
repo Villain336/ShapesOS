@@ -34,9 +34,9 @@ export function CardHeader({
   return (
     <div className={cn("primitive-card-bar flex items-center justify-between gap-3 border-b border-line", className)}>
       <div className="min-w-0">
-        <h3 className="truncate text-[14px] font-medium text-ink">{title}</h3>
+        <h3 className="truncate text-[0.875rem] font-medium text-ink">{title}</h3>
         {description ? (
-          <p className="mt-0.5 truncate text-[12.5px] text-ink-2">{description}</p>
+          <p className="mt-0.5 truncate text-[0.78125rem] text-ink-2">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}

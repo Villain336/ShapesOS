@@ -36,7 +36,7 @@ export default function SeedRulesButton({
       size="sm"
       onClick={seed}
       disabled={busy}
-      className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-muted hover:bg-hover-paper disabled:opacity-40"
+      className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-muted hover:bg-hover-paper disabled:opacity-40"
     >
       {busy ? "Seeding…" : hasRules ? "Re-seed default pack" : "Seed default v1 pack"}
     </Button>

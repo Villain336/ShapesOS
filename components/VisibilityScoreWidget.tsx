@@ -66,10 +66,10 @@ export default async function VisibilityScoreWidget({ projectId }: { projectId: 
         {latest ? (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-[36px] font-semibold tracking-tight text-ink tabular-nums">
+              <span className="text-[2.25rem] font-semibold tracking-tight text-ink tabular-nums">
                 {latest.score}
               </span>
-              <span className="text-[13px] text-ink-2">/ 100</span>
+              <span className="text-[0.8125rem] text-ink-2">/ 100</span>
               {delta !== null && delta !== 0 && (
                 <ValuePill tone={delta > 0 ? "green" : "red"}>
                   <span className="inline-flex items-center gap-1">
@@ -102,8 +102,8 @@ export default async function VisibilityScoreWidget({ projectId }: { projectId: 
                 const v = typeof components[key] === "number" ? (components[key] as number) : null;
                 return (
                   <div key={key} className="rounded-control bg-field p-2.5">
-                    <div className="text-[12px] text-ink-2">{label}</div>
-                    <div className="mt-0.5 text-[18px] font-semibold text-ink tabular-nums">
+                    <div className="text-[0.75rem] text-ink-2">{label}</div>
+                    <div className="mt-0.5 text-[1.125rem] font-semibold text-ink tabular-nums">
                       {v ?? "–"}
                     </div>
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">

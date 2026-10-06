@@ -230,7 +230,7 @@ export function TaskComposer({
           disabled={sending}
           aria-label={sending ? "Sending" : `Send to ${current?.name ?? "the agent"}`}
           title="Send (⌘↵)"
-          className="aos-press flex size-10 shrink-0 items-center justify-center rounded-full bg-ink text-paper hover:bg-night-hover disabled:bg-disabled disabled:text-disabled-fg"
+          className="aos-press flex size-10 shrink-0 items-center justify-center rounded-full bg-ink text-paper hover:bg-ink-hover disabled:bg-disabled disabled:text-disabled-fg"
         >
           {sending ? <Loader2 className="size-5 aos-spin" aria-hidden /> : <ArrowUp className="size-5" aria-hidden />}
         </button>

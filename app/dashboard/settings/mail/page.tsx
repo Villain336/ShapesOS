@@ -22,7 +22,7 @@ export default async function DirectMailSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Direct Mail</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — connect Lob or PostGrid to send addressed mail.
           Test keys first; live keys are fenced and can only spend behind an
           approved campaign. Key material is never displayed here.

@@ -139,7 +139,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         description="The 12 master-plan stages. Attaching a fragment flips its stage to in-progress; status is otherwise human-driven."
       >
         <div className={tableShell}>
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className={theadCls}>
                 <th className={thCls}>Stage</th>
@@ -188,7 +188,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         description="Each link is a first-class row with provenance. Unlinking is surgical — fragment rows are never touched."
       >
         {report.fragments.length === 0 ? (
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             No fragments linked yet. Attach one below, or run the backfill proposer on the Link proposals tab.
           </p>
         ) : (
@@ -197,7 +197,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               <li key={f.linkId} className="border-b border-line py-3 first:pt-0 last:border-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium text-ink">{f.displayName}</div>
+                    <div className="text-[0.8125rem] font-medium text-ink">{f.displayName}</div>
                     <p className="mt-0.5 text-xs text-muted">
                       {LINKED_TYPE_LABELS[f.linkedType]} · role {f.role} · source {f.linkSource.replace("_", " ")}
                       {f.stageKeys.length > 0 ? ` · stages: ${f.stageKeys.map((k) => CAMPAIGN_STAGE_LABELS[k as CampaignStageKey] ?? k).join(", ")}` : ""}
@@ -230,9 +230,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </ul>
         )}
         <div className="mt-4 border-t border-line pt-4">
-          <h3 className="mb-2 text-[13px] font-medium text-ink">Attach a fragment</h3>
+          <h3 className="mb-2 text-[0.8125rem] font-medium text-ink">Attach a fragment</h3>
           {attachOptions.length === 0 ? (
-            <p className="text-[13px] text-muted">Every fragment in this workspace is already linked.</p>
+            <p className="text-[0.8125rem] text-muted">Every fragment in this workspace is already linked.</p>
           ) : (
             <AttachLinkForm campaignId={campaign.id} fragments={attachOptions} />
           )}
@@ -245,7 +245,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         description="Per-fragment metrics with provenance labels. Totals carry explicit semantics notes — semantically-different metrics are never silently summed."
       >
         {report.warnings.length > 0 ? (
-          <div className="mb-3 flex items-start gap-2 rounded-md border border-needs bg-needs-tint px-3 py-2 text-[13px] text-ink">
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-needs bg-needs-tint px-3 py-2 text-[0.8125rem] text-ink">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             <ul className="space-y-1">
               {report.warnings.map((w, i) => (
@@ -255,10 +255,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </div>
         ) : null}
         {report.totals.length === 0 ? (
-          <p className="text-[13px] text-muted">No summable metrics on the linked fragments yet.</p>
+          <p className="text-[0.8125rem] text-muted">No summable metrics on the linked fragments yet.</p>
         ) : (
           <div className={tableShell}>
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className={theadCls}>
                   <th className={thCls}>Metric</th>
@@ -308,7 +308,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           <ul>
             {children.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-0">
-                <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-[13px] font-medium text-ink hover:underline">
+                <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-[0.8125rem] font-medium text-ink hover:underline">
                   {c.name}
                 </Link>
                 <Chip tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Chip>
@@ -316,11 +316,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-muted">No sub-campaigns.</p>
+          <p className="text-[0.8125rem] text-muted">No sub-campaigns.</p>
         )}
         {canNest ? (
           <div className="mt-4 border-t border-line pt-4">
-            <h3 className="mb-2 text-[13px] font-medium text-ink">Create sub-campaign</h3>
+            <h3 className="mb-2 text-[0.8125rem] font-medium text-ink">Create sub-campaign</h3>
             <NewCampaignForm parentId={campaign.id} />
           </div>
         ) : null}

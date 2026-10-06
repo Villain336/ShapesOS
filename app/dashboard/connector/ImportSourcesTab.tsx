@@ -89,7 +89,7 @@ function StatusBadge({
   };
   return (
     <span
-      className={`inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${styles[kind]}`}
+      className={`inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-[0.8125rem] font-semibold ${styles[kind]}`}
     >
       <StatusShape kind={kind} live={live} />
       {label}
@@ -345,7 +345,7 @@ export function ImportSourcesTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-lg border border-line bg-paper p-4 text-[14px] text-muted shadow-hairline">
+      <div className="rounded-lg border border-line bg-paper p-4 text-[0.875rem] text-muted shadow-hairline">
         Connect a source, record your consent, set exclusions, then run the
         import. No import runs without recorded consent, and excluded contacts
         never enter your graph. Re-imports only fetch what changed since the
@@ -355,7 +355,7 @@ export function ImportSourcesTab() {
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-4 text-[14px] text-failed-text"
+          className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-4 text-[0.875rem] text-failed-text"
         >
           <span className="mt-0.5">
             <StatusShape kind="failed" />
@@ -391,10 +391,10 @@ export function ImportSourcesTab() {
 
             {/* Step 1 — connect */}
             <div className="flex flex-col gap-2 border-t border-line pt-4">
-              <h3 className="text-[13px] font-semibold text-ink">
+              <h3 className="text-[0.8125rem] font-semibold text-ink">
                 1. Connect {source.displayName}
               </h3>
-              <p className="text-[13px] text-muted">
+              <p className="text-[0.8125rem] text-muted">
                 {source.source === "email"
                   ? "Message metadata only — who you email, how often, how recently. Message bodies are never read."
                   : "Event attendees only — who you meet with. Event titles and details are never read."}{" "}
@@ -406,7 +406,7 @@ export function ImportSourcesTab() {
                     type="button"
                     onClick={() => void connect(source)}
                     disabled={connecting[source.source]}
-                    className="aos-press inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                    className="aos-press inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                   >
                     {connecting[source.source] ? (
                       <Loader2 size={15} className="animate-spin" />
@@ -424,10 +424,10 @@ export function ImportSourcesTab() {
 
             {/* Step 2 — consent */}
             <div className="flex flex-col gap-2 border-t border-line pt-4">
-              <h3 className="text-[13px] font-semibold text-ink">2. Consent</h3>
+              <h3 className="text-[0.8125rem] font-semibold text-ink">2. Consent</h3>
               {source.consent ? (
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 text-[14px] text-ink">
+                  <span className="inline-flex items-center gap-2 text-[0.875rem] text-ink">
                     <ShieldCheck size={15} className="text-done" />
                     Recorded by {source.consent.consentedBy} on{" "}
                     {formatDate(source.consent.consentedAt)}
@@ -436,14 +436,14 @@ export function ImportSourcesTab() {
                     type="button"
                     onClick={() => void revokeConsent(source)}
                     disabled={revoking[source.source]}
-                    className="aos-press inline-flex h-9 items-center rounded-full bg-paper px-4 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-50"
+                    className="aos-press inline-flex h-9 items-center rounded-full bg-paper px-4 text-[0.8125rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-50"
                   >
                     {revoking[source.source] ? "Revoking" : "Revoke consent"}
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <label className="flex cursor-pointer items-start gap-2 text-[14px] text-ink">
+                  <label className="flex cursor-pointer items-start gap-2 text-[0.875rem] text-ink">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -465,7 +465,7 @@ export function ImportSourcesTab() {
                       type="button"
                       onClick={() => void recordConsent(source)}
                       disabled={!checked || consenting[source.source]}
-                      className="aos-press inline-flex h-10 items-center gap-2 rounded-full bg-needs px-5 text-[14px] font-semibold text-black disabled:opacity-50"
+                      className="aos-press inline-flex h-10 items-center gap-2 rounded-full bg-needs px-5 text-[0.875rem] font-semibold text-black disabled:opacity-50"
                     >
                       {consenting[source.source] ? (
                         <Loader2 size={15} className="animate-spin" />
@@ -481,7 +481,7 @@ export function ImportSourcesTab() {
 
             {/* Step 3 — exclusions */}
             <div className="flex flex-col gap-2 border-t border-line pt-4">
-              <h3 className="text-[13px] font-semibold text-ink">
+              <h3 className="text-[0.8125rem] font-semibold text-ink">
                 3. Exclusions{" "}
                 <span className="font-normal text-muted">
                   — these never enter your graph
@@ -492,12 +492,12 @@ export function ImportSourcesTab() {
                   {exclusions.map((ex) => (
                     <li
                       key={ex.id}
-                      className="flex items-center gap-2 text-[14px]"
+                      className="flex items-center gap-2 text-[0.875rem]"
                     >
-                      <span className="inline-flex h-8 items-center rounded-full bg-canvas px-3 text-[13px] font-semibold text-ink">
+                      <span className="inline-flex h-8 items-center rounded-full bg-canvas px-3 text-[0.8125rem] font-semibold text-ink">
                         {EXCLUSION_TYPE_LABELS[ex.type]}
                       </span>
-                      <code className="font-mono text-[13px] text-ink">
+                      <code className="font-mono text-[0.8125rem] text-ink">
                         {ex.value}
                       </code>
                       <button
@@ -519,7 +519,7 @@ export function ImportSourcesTab() {
                     setExType(e.target.value as ConnectorExclusionType)
                   }
                   aria-label="Exclusion type"
-                  className="h-10 rounded-md border border-control bg-paper px-3 text-[14px] text-ink"
+                  className="h-10 rounded-md border border-control bg-paper px-3 text-[0.875rem] text-ink"
                 >
                   <option value="domain">Domain</option>
                   <option value="email">Email</option>
@@ -539,13 +539,13 @@ export function ImportSourcesTab() {
                         : "Person name"
                   }
                   aria-label="Exclusion value"
-                  className="h-10 min-w-52 flex-1 rounded-md border border-control bg-paper px-3 text-[14px] text-ink placeholder:text-subtle"
+                  className="h-10 min-w-52 flex-1 rounded-md border border-control bg-paper px-3 text-[0.875rem] text-ink placeholder:text-subtle"
                 />
                 <button
                   type="button"
                   onClick={() => void addExclusion()}
                   disabled={exSaving || !exValue.trim()}
-                  className="aos-press inline-flex h-10 items-center gap-1.5 rounded-full bg-paper px-4 text-[14px] font-semibold text-ink shadow-outline disabled:opacity-50"
+                  className="aos-press inline-flex h-10 items-center gap-1.5 rounded-full bg-paper px-4 text-[0.875rem] font-semibold text-ink shadow-outline disabled:opacity-50"
                 >
                   {exSaving ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -559,13 +559,13 @@ export function ImportSourcesTab() {
 
             {/* Step 4 — run */}
             <div className="flex flex-col gap-2 border-t border-line pt-4">
-              <h3 className="text-[13px] font-semibold text-ink">4. Import</h3>
+              <h3 className="text-[0.8125rem] font-semibold text-ink">4. Import</h3>
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => void runImport(source)}
                   disabled={!canRun}
-                  className="aos-press inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[15px] font-semibold text-white disabled:bg-disabled disabled:text-disabled-fg"
+                  className="aos-press inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[0.9375rem] font-semibold text-white disabled:bg-disabled disabled:text-disabled-fg"
                 >
                   {running[source.source] ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -579,7 +579,7 @@ export function ImportSourcesTab() {
                       : "Run import"}
                 </button>
                 {!canRun && !running[source.source] && (
-                  <span className="text-[13px] text-muted">
+                  <span className="text-[0.8125rem] text-muted">
                     {!source.connectionStatus || source.connectionStatus !== "active"
                       ? `Connect ${source.displayName} first.`
                       : !source.consent
@@ -591,7 +591,7 @@ export function ImportSourcesTab() {
 
               {sourceBatches.length > 0 && (
                 <div className="mt-2 overflow-x-auto">
-                  <table className="w-full text-left text-[13px]">
+                  <table className="w-full text-left text-[0.8125rem]">
                     <thead>
                       <tr className="border-b border-line text-muted">
                         <th className="py-2 pr-3 font-semibold">Run</th>
@@ -624,7 +624,7 @@ export function ImportSourcesTab() {
                               {b.stats ? skipped : "—"}
                             </td>
                             <td className="py-2 pr-3">
-                              <code className="font-mono text-[12px] text-muted">
+                              <code className="font-mono text-[0.75rem] text-muted">
                                 {b.cursor ? b.cursor.slice(0, 10) : "—"}
                               </code>
                             </td>
@@ -637,7 +637,7 @@ export function ImportSourcesTab() {
                     </tbody>
                   </table>
                   {sourceBatches.some((b) => b.status === "failed" && b.error) && (
-                    <p className="mt-2 text-[13px] text-failed-text">
+                    <p className="mt-2 text-[0.8125rem] text-failed-text">
                       {
                         sourceBatches.find(
                           (b) => b.status === "failed" && b.error,

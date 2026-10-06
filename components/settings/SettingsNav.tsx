@@ -10,15 +10,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SETTINGS_GROUPS, settingsLocation } from "./settingsSections";
+// Phase 18.1 (WS=find): labels in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export default function SettingsNav() {
   const pathname = usePathname();
   const onIndex = pathname === "/dashboard/settings";
   const { group: current, page: currentPage } = settingsLocation(pathname);
+  const { t, messages, settingsPage } = useI18n();
+  const groupLabel = (id: string, fallback: string) => (messages.settings.groups as Record<string, string>)[id] ?? fallback;
 
   return (
     <div className="mb-4 flex flex-col gap-3">
-      <nav aria-label="Settings sections" className="flex flex-wrap gap-2">
+      <nav aria-label={t("settings.sections")} className="flex flex-wrap gap-2">
         {SETTINGS_GROUPS.map((g) => {
           const active = !onIndex && g.id === current.id;
           const Icon = g.icon;
@@ -32,13 +36,13 @@ export default function SettingsNav() {
               }`}
             >
               <Icon size={14} aria-hidden />
-              {g.label}
+              {groupLabel(g.id, g.label)}
             </Link>
           );
         })}
       </nav>
       {!onIndex && (
-        <nav aria-label={`${current.label} settings`} className="flex flex-wrap gap-1 border-b border-line">
+        <nav aria-label={t("settings.groupSettings", { group: groupLabel(current.id, current.label) })} className="flex flex-wrap gap-1 border-b border-line">
           {current.pages.map((p) => {
             const active = currentPage?.href === p.href;
             const Icon = p.icon;
@@ -52,7 +56,7 @@ export default function SettingsNav() {
                 }`}
               >
                 <Icon size={15} aria-hidden />
-                {p.label}
+                {settingsPage(p.href, p).label}
               </Link>
             );
           })}

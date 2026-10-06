@@ -54,7 +54,7 @@ export function AddToCart({ storeSlug, productId, variants }: { storeSlug: strin
     <div className="flex flex-col gap-4">
       {variants.length > 1 && (
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-muted">Option</span>
+          <span className="text-[0.8125rem] font-semibold text-muted">Option</span>
           <select className={shopSelect} value={idx} onChange={(e) => { setIdx(Number(e.target.value)); setQty(1); setAdded(false); }}>
             {variants.map((x, i) => (
               <option key={x.id ?? "default"} value={i}>
@@ -66,7 +66,7 @@ export function AddToCart({ storeSlug, productId, variants }: { storeSlug: strin
       )}
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-muted">Quantity</span>
+          <span className="text-[0.8125rem] font-semibold text-muted">Quantity</span>
           <select className={`${shopSelect} w-24`} value={qty} onChange={(e) => setQty(Number(e.target.value))} disabled={soldOut}>
             {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
@@ -80,9 +80,9 @@ export function AddToCart({ storeSlug, productId, variants }: { storeSlug: strin
           {soldOut ? "Out of stock" : busy ? "Adding" : "Add to cart"}
         </button>
       </div>
-      <p className="text-[13px] text-muted">{stockLabel(v.available)}</p>
+      <p className="text-[0.8125rem] text-muted">{stockLabel(v.available)}</p>
       {added && (
-        <p className="flex items-center gap-2 text-[14px] font-medium" role="status">
+        <p className="flex items-center gap-2 text-[0.875rem] font-medium" role="status">
           <Check size={16} aria-hidden /> Added to your cart.
           <Link href={`/shop/${storeSlug}/cart`} className="underline hover:text-muted">
             View cart

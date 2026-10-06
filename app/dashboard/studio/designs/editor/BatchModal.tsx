@@ -160,7 +160,7 @@ function BatchModalBody({
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div>
           <h2 className="aos-heading">Batch generate variants</h2>
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             From “{page.name}” — one variant page per value row, for your review.
           </p>
         </div>
@@ -174,7 +174,7 @@ function BatchModalBody({
         <section>
           <div className={panelSectionLabel}>1 · Variables on this page</div>
           {variables.length === 0 ? (
-            <p className="flex items-start gap-1.5 rounded-md border border-line bg-needs-tint px-3 py-2 text-[13px] leading-snug text-ink">
+            <p className="flex items-start gap-1.5 rounded-md border border-line bg-needs-tint px-3 py-2 text-[0.8125rem] leading-snug text-ink">
               <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" />
               <span>No {"{{variables}}"} found on this page. Add a {"{{name}}"} placeholder to any text
               element first, then come back.</span>
@@ -184,7 +184,7 @@ function BatchModalBody({
               {variables.map((v) => (
                 <span
                   key={v}
-                  className="rounded-md border border-line bg-paper px-2 py-1 font-mono text-[12px] text-ink"
+                  className="rounded-md border border-line bg-paper px-2 py-1 font-mono text-[0.75rem] text-ink"
                 >
                   {`{{${v}}}`}
                 </span>
@@ -202,7 +202,7 @@ function BatchModalBody({
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium ${
+                  className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[0.8125rem] font-medium ${
                     tab === t.key
                       ? "border-ink bg-ink text-white"
                       : "border-line bg-paper text-muted hover:bg-hover-paper hover:text-ink"
@@ -216,14 +216,14 @@ function BatchModalBody({
 
             {tab === "table" && (
               <div className="overflow-x-auto rounded-md border border-line bg-paper">
-                <table className="w-full text-[13px]">
+                <table className="w-full text-[0.8125rem]">
                   <thead>
                     <tr className="border-b border-line bg-canvas">
-                      <th className="w-10 px-2 py-1.5 text-left font-mono text-[11px] text-subtle">#</th>
+                      <th className="w-10 px-2 py-1.5 text-left font-mono text-[0.6875rem] text-subtle">#</th>
                       {variables.map((v) => (
                         <th
                           key={v}
-                          className="px-2 py-1.5 text-left font-mono text-[11px] font-semibold text-ink"
+                          className="px-2 py-1.5 text-left font-mono text-[0.6875rem] font-semibold text-ink"
                         >
                           {`{{${v}}}`}
                         </th>
@@ -234,14 +234,14 @@ function BatchModalBody({
                   <tbody>
                     {rows.map((row, ri) => (
                       <tr key={ri} className="border-b border-line hover:bg-hover-paper">
-                        <td className="px-2 py-1 font-mono text-[11px] text-subtle">{ri + 1}</td>
+                        <td className="px-2 py-1 font-mono text-[0.6875rem] text-subtle">{ri + 1}</td>
                         {variables.map((v) => (
                           <td key={v} className="px-1 py-1">
                             <input
                               value={row[v] ?? ""}
                               onChange={(e) => setCell(ri, v, e.target.value)}
                               placeholder={v}
-                              className={`${inputCls} w-full py-1 text-[12px]`}
+                              className={`${inputCls} w-full py-1 text-[0.75rem]`}
                             />
                           </td>
                         ))}
@@ -276,14 +276,14 @@ function BatchModalBody({
                   onChange={(e) => setCsvText(e.target.value)}
                   rows={6}
                   placeholder={`product,date\nWidget,Friday\nGadget,Monday\n\nFirst row = headers matching ${variables.map((v) => `{{${v}}}`).join(", ")}`}
-                  className={`${inputCls} w-full resize-y font-mono text-[12px]`}
+                  className={`${inputCls} w-full resize-y font-mono text-[0.75rem]`}
                 />
                 <button onClick={parseCsvInput} className={`${btnPrimary} mt-2`}>
                   <FileText className="h-4 w-4" />
                   Parse CSV into table
                 </button>
                 {csvNote && (
-                  <p className="mt-1.5 text-[12px] leading-snug text-muted">{csvNote}</p>
+                  <p className="mt-1.5 text-[0.75rem] leading-snug text-muted">{csvNote}</p>
                 )}
               </div>
             )}
@@ -298,7 +298,7 @@ function BatchModalBody({
                   className={`${inputCls} w-full resize-none`}
                 />
                 <div className="mt-2 flex items-center gap-2">
-                  <label className="text-[12px] text-muted">Rows</label>
+                  <label className="text-[0.75rem] text-muted">Rows</label>
                   <input
                     type="number"
                     min={1}
@@ -312,7 +312,7 @@ function BatchModalBody({
                         ),
                       )
                     }
-                    className={`${inputCls} w-20 py-1 text-[12px]`}
+                    className={`${inputCls} w-20 py-1 text-[0.75rem]`}
                   />
                   <button
                     onClick={() => void fillFromBrief()}
@@ -328,11 +328,11 @@ function BatchModalBody({
                   </button>
                 </div>
                 {aiError && (
-                  <p className="mt-2 rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
+                  <p className="mt-2 rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] leading-snug text-failed-text">
                     {aiError}
                   </p>
                 )}
-                <p className="mt-1.5 text-[11px] leading-snug text-subtle">
+                <p className="mt-1.5 text-[0.6875rem] leading-snug text-subtle">
                   Uses your LLM key (same as Generate design). Rows land in the table — you edit
                   before generating.
                 </p>
@@ -345,7 +345,7 @@ function BatchModalBody({
         {variables.length > 0 && (
           <section>
             <div className={panelSectionLabel}>3 · Review & generate</div>
-            <p className="text-[13px] leading-snug text-muted">
+            <p className="text-[0.8125rem] leading-snug text-muted">
               <span className="font-semibold text-ink">{usableRows.length}</span> variant
               {usableRows.length === 1 ? "" : "s"} will be appended as new pages (
               {usableRows.length > 0
@@ -355,7 +355,7 @@ function BatchModalBody({
               drafts for your review — nothing is exported or published.
             </p>
             {genError && (
-              <p className="mt-2 rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
+              <p className="mt-2 rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] leading-snug text-failed-text">
                 {genError}
               </p>
             )}
@@ -410,7 +410,7 @@ export function BatchModal({
             onGenerated={onGenerated}
           />
         ) : (
-          <div className="rounded-lg border border-line bg-paper p-6 text-[13px] text-muted">
+          <div className="rounded-lg border border-line bg-paper p-6 text-[0.8125rem] text-muted">
             No page to batch from.
           </div>
         )}

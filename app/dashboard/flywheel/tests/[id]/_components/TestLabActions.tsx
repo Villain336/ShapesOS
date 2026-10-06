@@ -73,7 +73,7 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
           </Button>
         )}
         {experiment.status === "qa" && (
-          <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
+          <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
             {busy ? "Launching…" : "Launch"}
           </Button>
         )}
@@ -95,11 +95,11 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
 
       {(experiment.status === "running" || experiment.status === "paused") && (
         <div className="mt-4 grid max-w-2xl grid-cols-2 gap-3 md:grid-cols-5">
-          <div><Label htmlFor="aConv" className="text-[13px] font-medium text-muted">Control conv.</Label><Input id="aConv" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
-          <div><Label htmlFor="aN" className="text-[13px] font-medium text-muted">Control n</Label><Input id="aN" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
-          <div><Label htmlFor="bConv" className="text-[13px] font-medium text-muted">Treatment conv.</Label><Input id="bConv" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
-          <div><Label htmlFor="bN" className="text-[13px] font-medium text-muted">Treatment n</Label><Input id="bN" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
-          <div><Label htmlFor="days" className="text-[13px] font-medium text-muted">Days running</Label><Input id="days" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={days} onChange={(e) => setDays(e.target.value)} /></div>
+          <div><Label htmlFor="aConv" className="text-[0.8125rem] font-medium text-muted">Control conv.</Label><Input id="aConv" className="border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
+          <div><Label htmlFor="aN" className="text-[0.8125rem] font-medium text-muted">Control n</Label><Input id="aN" className="border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
+          <div><Label htmlFor="bConv" className="text-[0.8125rem] font-medium text-muted">Treatment conv.</Label><Input id="bConv" className="border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
+          <div><Label htmlFor="bN" className="text-[0.8125rem] font-medium text-muted">Treatment n</Label><Input id="bN" className="border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
+          <div><Label htmlFor="days" className="text-[0.8125rem] font-medium text-muted">Days running</Label><Input id="days" className="border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={days} onChange={(e) => setDays(e.target.value)} /></div>
         </div>
       )}
 

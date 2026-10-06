@@ -41,9 +41,9 @@ export function PagesStrip() {
                   height: aspect >= 1 ? Math.max(10, 32 / aspect) : 32,
                 }}
               >
-                <span className="text-[9px] font-medium text-muted">{page.elements.length}</span>
+                <span className="text-[0.5625rem] font-medium text-muted">{page.elements.length}</span>
               </span>
-              <span className="mt-1 max-w-full truncate px-1 text-[10px] text-muted">
+              <span className="mt-1 max-w-full truncate px-1 text-[0.625rem] text-muted">
                 {i + 1}. {page.name}
               </span>
             </button>

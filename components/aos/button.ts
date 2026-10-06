@@ -24,7 +24,7 @@ export type AosButtonVariant =
 export type AosButtonSize = "xs" | "sm" | "md" | "lg";
 
 const VARIANTS: Record<AosButtonVariant, string> = {
-  primary: "bg-ink text-paper hover:bg-night-hover",
+  primary: "bg-ink text-paper hover:bg-ink-hover",
   secondary: "bg-paper text-ink shadow-outline hover:bg-hover-paper",
   quiet: "bg-transparent text-ink hover:bg-hover",
   run: "bg-running text-paper hover:bg-running-pressed",

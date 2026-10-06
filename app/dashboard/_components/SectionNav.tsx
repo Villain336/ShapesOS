@@ -108,7 +108,7 @@ export function SectionNav({ items, ariaLabel }: { items: SectionNavItem[]; aria
             key={n.href}
             href={n.href}
             aria-current={active ? "page" : undefined}
-            className={`flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition-colors ${
+            className={`flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-semibold transition-colors ${
               active
                 ? "bg-ink text-paper"
                 : "text-muted hover:bg-hover hover:text-ink"

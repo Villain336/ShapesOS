@@ -33,18 +33,18 @@ import { activateOnKey, closeOnEscape } from "@/lib/ui/keyboard";
 const inputCls =
   "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSmallGhost =
-  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-1 text-[12px] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper focus-visible:outline-none disabled:opacity-40";
+  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-1 text-[0.75rem] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper focus-visible:outline-none disabled:opacity-40";
 const iconBtn =
   "cursor-pointer rounded-full p-1.5 text-muted aos-press hover:bg-hover-paper hover:text-ink focus-visible:outline-none disabled:opacity-40";
 
 const cardCls = "rounded-lg bg-paper p-4 shadow-hairline";
 const thCls = "px-3 py-2 text-left text-xs font-semibold text-muted";
-const tdCls = "px-3 py-2.5 text-[13px] text-muted tabular-nums";
-const tdNum = "px-3 py-2.5 text-[13px] text-muted tabular-nums text-right";
+const tdCls = "px-3 py-2.5 text-[0.8125rem] text-muted tabular-nums";
+const tdNum = "px-3 py-2.5 text-[0.8125rem] text-muted tabular-nums text-right";
 const thNum = "px-3 py-2 text-right text-xs font-semibold text-muted";
 
 type Tab = "numbers" | "calls" | "pages" | "bookings";
@@ -91,7 +91,7 @@ function fmtDateTime(iso: string): string {
 }
 function statusChip(status: string): string {
   void status;
-  return "inline-flex items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-muted shadow-control";
+  return "inline-flex items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.6875rem] font-medium text-muted shadow-control";
 }
 
 export function CallsApp() {
@@ -109,7 +109,7 @@ export function CallsApp() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-[0.8125rem] font-medium transition-colors ${
                 tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
@@ -195,7 +195,7 @@ function NumbersPanel() {
     <div className="flex flex-col gap-5">
       <section className={cardCls}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+          <h2 className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
             <Phone size={16} className="text-ink" /> Tracking numbers
           </h2>
           <button onClick={() => setShowPurchase(true)} className={btnPrimary}>
@@ -234,21 +234,21 @@ function NumbersPanel() {
             </table>
           </div>
         )}
-        {error && <p className="mt-3 text-[13px] text-failed-text">{error}</p>}
+        {error && <p className="mt-3 text-[0.8125rem] text-failed-text">{error}</p>}
       </section>
 
       <section className={cardCls}>
-        <h2 className="mb-2 flex items-center gap-2 text-[14px] font-semibold text-ink">
+        <h2 className="mb-2 flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
           <Code size={16} className="text-ink" /> Dynamic number insertion
         </h2>
-        <p className="mb-3 max-w-[640px] text-[13px] text-muted">
+        <p className="mb-3 max-w-[640px] text-[0.8125rem] text-muted">
           Paste this snippet on your site. It reads <code className="rounded bg-canvas px-1">?utm_source=</code> from
           the URL and swaps every <code className="rounded bg-canvas px-1">tel:</code> link and
           <code className="rounded bg-canvas px-1">[data-mk-number]</code> element to the tracking number
           whose campaign matches — falling back to your first active number.
         </p>
         <div className="flex items-start gap-2">
-          <code className="flex-1 break-all rounded-lg bg-night px-3 py-2.5 aos-mono text-[12px] text-night-text">{snippet}</code>
+          <code className="flex-1 break-all rounded-lg bg-night px-3 py-2.5 aos-mono text-[0.75rem] text-night-text">{snippet}</code>
           <button
             onClick={() => { navigator.clipboard.writeText(snippet); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
             className={btnGhost}
@@ -259,10 +259,10 @@ function NumbersPanel() {
       </section>
 
       {showPurchase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={() => setShowPurchase(false)} onKeyDown={closeOnEscape(() => setShowPurchase(false))}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={() => setShowPurchase(false)} onKeyDown={closeOnEscape(() => setShowPurchase(false))}>
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold text-ink">Buy tracking number</h3>
+              <h3 className="text-[0.9375rem] font-semibold text-ink">Buy tracking number</h3>
               <button onClick={() => setShowPurchase(false)} className={iconBtn}><X size={16} /></button>
             </div>
             <label className="mb-3 block">
@@ -277,11 +277,11 @@ function NumbersPanel() {
               <span className="mb-1 block text-xs font-semibold text-muted">Campaign label (for DNI + attribution)</span>
               <input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder="summer-sale" className={inputCls} />
             </label>
-            {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
+            {error && <p className="mb-3 text-[0.8125rem] text-failed-text">{error}</p>}
             <button onClick={purchase} disabled={purchasing} className={`${btnPrimary} w-full`}>
               {purchasing ? "Purchasing…" : "Buy number"}
             </button>
-            <p className="mt-3 text-[11.5px] text-subtle">Runs on the fake telephony provider until Twilio credentials are configured.</p>
+            <p className="mt-3 text-[0.71875rem] text-subtle">Runs on the fake telephony provider until Twilio credentials are configured.</p>
           </div>
         </div>
       )}
@@ -313,7 +313,7 @@ function CallsPanel() {
   return (
     <section className={cardCls}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
           <PhoneCall size={16} className="text-ink" /> Call log
         </h2>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} w-auto`} aria-label="Status filter">
@@ -355,9 +355,9 @@ function CallsPanel() {
                   {expanded === c.id && (
                     <tr key={`${c.id}-x`} className="border-b border-line bg-canvas">
                       <td colSpan={6} className="px-4 py-3">
-                        <p className="mb-2 text-[13px] text-muted"><span className="font-semibold text-ink">Summary: </span>{c.summary ?? "—"}</p>
+                        <p className="mb-2 text-[0.8125rem] text-muted"><span className="font-semibold text-ink">Summary: </span>{c.summary ?? "—"}</p>
                         {c.transcription && (
-                          <pre className="max-h-[160px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-paper p-3 aos-mono text-[12px] text-muted">{c.transcription}</pre>
+                          <pre className="max-h-[160px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-paper p-3 aos-mono text-[0.75rem] text-muted">{c.transcription}</pre>
                         )}
                       </td>
                     </tr>
@@ -439,20 +439,20 @@ function PagesPanel() {
     <div className="flex flex-col gap-5">
       {newToken && (
         <div className="rounded-lg bg-canvas px-4 py-3">
-          <p className="mb-1 text-[13px] font-semibold text-ink">Booking page created — save this token now, it won't be shown again:</p>
+          <p className="mb-1 text-[0.8125rem] font-semibold text-ink">Booking page created — save this token now, it won't be shown again:</p>
           <div className="flex items-start gap-2">
-            <code className="flex-1 break-all rounded-lg bg-night px-3 py-2 aos-mono text-[12px] text-night-text">{newToken}</code>
+            <code className="flex-1 break-all rounded-lg bg-night px-3 py-2 aos-mono text-[0.75rem] text-night-text">{newToken}</code>
             <button onClick={() => { navigator.clipboard.writeText(newToken); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className={btnGhost}>
               {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy"}
             </button>
             <button onClick={() => setNewToken(null)} className={iconBtn}><X size={14} /></button>
           </div>
-          <p className="mt-2 text-[12px] text-muted">Public page: <code className="rounded bg-paper px-1">{origin}/book/{newToken}</code></p>
+          <p className="mt-2 text-[0.75rem] text-muted">Public page: <code className="rounded bg-paper px-1">{origin}/book/{newToken}</code></p>
         </div>
       )}
       <section className={cardCls}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+          <h2 className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
             <CalendarPlus size={16} className="text-ink" /> Booking pages
           </h2>
           <button onClick={() => setShowCreate(true)} className={btnPrimary}>
@@ -477,7 +477,7 @@ function PagesPanel() {
                     <td className={tdCls}>
                       <span className="flex items-center gap-1.5 text-ink">
                         <LinkIcon size={13} />
-                        <span className="aos-mono text-[12px]">{origin}/book/…</span>
+                        <span className="aos-mono text-[0.75rem]">{origin}/book/…</span>
                       </span>
                     </td>
                     <td className={tdNum}>{p._count.bookings}</td>
@@ -495,10 +495,10 @@ function PagesPanel() {
       </section>
 
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={() => setShowCreate(false)} onKeyDown={closeOnEscape(() => setShowCreate(false))}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={() => setShowCreate(false)} onKeyDown={closeOnEscape(() => setShowCreate(false))}>
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold text-ink">New booking page</h3>
+              <h3 className="text-[0.9375rem] font-semibold text-ink">New booking page</h3>
               <button onClick={() => setShowCreate(false)} className={iconBtn}><X size={16} /></button>
             </div>
             <label className="mb-3 block">
@@ -519,7 +519,7 @@ function PagesPanel() {
                 <input value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inputCls} />
               </label>
             </div>
-            {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
+            {error && <p className="mb-3 text-[0.8125rem] text-failed-text">{error}</p>}
             <button onClick={create} disabled={creating || !title || !slug} className={`${btnPrimary} w-full`}>
               {creating ? "Creating…" : "Create page"}
             </button>
@@ -562,7 +562,7 @@ function BookingsPanel() {
   return (
     <section className={cardCls}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
           <Calendar size={16} className="text-ink" /> Bookings
         </h2>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} w-auto`} aria-label="Status filter">

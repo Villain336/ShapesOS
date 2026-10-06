@@ -160,10 +160,10 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
     >
       <div className="flex items-center gap-2">
         <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs you" />
-        <span className="text-[13px] font-semibold text-ink">Approval needed</span>
+        <span className="text-[0.8125rem] font-semibold text-ink">Approval needed</span>
         {risk && (
           <span
-            className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${TIER_BADGE[risk.tier]}`}
+            className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.75rem] font-semibold ${TIER_BADGE[risk.tier]}`}
           >
             {risk.tier === "high" ? (
               <ShieldAlert className="h-3 w-3" aria-hidden />
@@ -176,21 +176,21 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
       </div>
 
       {phase.kind === "loading" && (
-        <div className="flex items-center gap-2 py-6 text-[13px] text-muted">
+        <div className="flex items-center gap-2 py-6 text-[0.8125rem] text-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading approval item…
         </div>
       )}
 
       {phase.kind === "error" && (
         <div className="py-4">
-          <p role="alert" className="flex items-start gap-2 text-[13px] text-failed-text">
+          <p role="alert" className="flex items-start gap-2 text-[0.8125rem] text-failed-text">
             <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
             {phase.message}
           </p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-2 inline-flex h-8 items-center rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+            className="mt-2 inline-flex h-8 items-center rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
           >
             Retry
           </button>
@@ -198,13 +198,13 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
       )}
 
       {phase.kind === "working" && (
-        <div className="flex items-center gap-2 py-6 text-[13px] text-muted">
+        <div className="flex items-center gap-2 py-6 text-[0.8125rem] text-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {phase.label}…
         </div>
       )}
 
       {phase.kind === "done" && (
-        <p className="py-4 text-[13px] font-medium text-ink">{phase.message}</p>
+        <p className="py-4 text-[0.8125rem] font-medium text-ink">{phase.message}</p>
       )}
 
       {item && (phase.kind === "ready" || phase.kind === "editing") && (
@@ -215,65 +215,65 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
           {phase.kind === "editing" ? (
             <div className="mt-2 space-y-2">
               <label className="block">
-                <span className="text-[12px] font-medium text-muted">Title</span>
+                <span className="text-[0.75rem] font-medium text-muted">Title</span>
                 <input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+                  className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
                 />
               </label>
               <label className="block">
-                <span className="text-[12px] font-medium text-muted">Draft</span>
+                <span className="text-[0.75rem] font-medium text-muted">Draft</span>
                 <textarea
                   value={editDraft}
                   onChange={(e) => setEditDraft(e.target.value)}
                   rows={5}
-                  className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+                  className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
                 />
               </label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="inline-flex h-8 items-center rounded-full bg-ink px-3 text-[13px] font-semibold text-paper aos-press hover:bg-night-hover"
+                  className="inline-flex h-8 items-center rounded-full bg-ink px-3 text-[0.8125rem] font-semibold text-paper aos-press hover:bg-ink-hover"
                 >
                   Save edit
                 </button>
                 <button
                   type="button"
                   onClick={() => setPhase({ kind: "ready" })}
-                  className="inline-flex h-8 items-center rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+                  className="inline-flex h-8 items-center rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
                 >
                   Cancel
                 </button>
               </div>
-              <p className="text-[12px] text-muted">
+              <p className="text-[0.75rem] text-muted">
                 Edit keeps the item pending — it still needs approval before it can publish.
               </p>
             </div>
           ) : (
             <>
-              <h4 className="mt-1 text-[14px] font-semibold text-ink">{item.title}</h4>
-              {summary && <p className="mt-1 line-clamp-3 text-[13px] text-muted">{summary}</p>}
+              <h4 className="mt-1 text-[0.875rem] font-semibold text-ink">{item.title}</h4>
+              {summary && <p className="mt-1 line-clamp-3 text-[0.8125rem] text-muted">{summary}</p>}
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
                   onClick={approve}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-done px-3 text-[13px] font-semibold text-paper aos-press"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-done px-3 text-[0.8125rem] font-semibold text-paper aos-press"
                 >
                   <Check className="h-3.5 w-3.5" aria-hidden /> Approve
                 </button>
                 <button
                   type="button"
                   onClick={deny}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint"
                 >
                   <X className="h-3.5 w-3.5" aria-hidden /> Deny
                 </button>
                 <button
                   type="button"
                   onClick={() => setPhase({ kind: "editing" })}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden /> Edit
                 </button>
@@ -289,11 +289,11 @@ export function ApprovalCard({ itemId, projectId, onResolved }: ApprovalCardProp
                     data-testid="approval-card-auto"
                     className="size-[18px] shrink-0 cursor-pointer appearance-none rounded-key bg-paper shadow-[inset_0_0_0_1.5px_var(--aos-control)] checked:bg-ink checked:shadow-none"
                   />
-                  <label htmlFor={autoId} className="text-[13px] text-ink">
+                  <label htmlFor={autoId} className="text-[0.8125rem] text-ink">
                     Do this without asking: approve new {KIND_LABEL[item.kind].toLowerCase()} items automatically
                   </label>
                 </div>
-                <p className="mt-1 text-[12px] text-muted">
+                <p className="mt-1 text-[0.75rem] text-muted">
                   {autoError ??
                     (autoOn
                       ? "Saved. New items of this kind are approved as they're made — approve this one above."

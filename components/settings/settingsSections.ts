@@ -1,5 +1,9 @@
 // ShapesOS — settings information architecture (Phase 3, workstream I).
-// The settings pages grouped into six sections. One source for the grouped
+// Phase 18.1 (WS=find): a "You" group first — the person's own preferences
+// (General, Appearance, Language and region, Accessibility, Notifications)
+// plus "Your security" and "Your account", regrouped here from Members and
+// access. The other six groups are the workspace's settings, unchanged.
+// The settings pages grouped into sections. One source for the grouped
 // tab strip (SettingsNav) and the /dashboard/settings index, so the two can't
 // drift. Billing lives at /dashboard/billing but is part of "Billing and
 // usage" here, so it's reachable from every settings page.
@@ -36,6 +40,10 @@ import {
   Wrench,
   type LucideIcon,
   Shapes,
+  Accessibility,
+  Languages,
+  SunMoon,
+  BellRing,
 } from "lucide-react";
 
 export interface SettingsPage {
@@ -53,6 +61,20 @@ export interface SettingsGroup {
 }
 
 export const SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    id: "you",
+    label: "You",
+    icon: UserRound,
+    pages: [
+      { href: "/dashboard/settings/you", label: "General", description: "Your name, time zone and how ShapesOS starts.", icon: UserRound },
+      { href: "/dashboard/settings/you/appearance", label: "Appearance", description: "Light or dark, contrast, text size and density.", icon: SunMoon },
+      { href: "/dashboard/settings/you/language", label: "Language and region", description: "Language, time zone and clock.", icon: Languages },
+      { href: "/dashboard/settings/you/accessibility", label: "Accessibility", description: "Motion, contrast, text size and focus.", icon: Accessibility },
+      { href: "/dashboard/settings/you/notifications", label: "Notifications", description: "Which notifications reach you, and where.", icon: BellRing },
+      { href: "/dashboard/settings/account-security", label: "Your security", description: "Two-factor sign-in and passkeys for your own account.", icon: Fingerprint },
+      { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
+    ],
+  },
   {
     id: "workspace",
     label: "Workspace",
@@ -74,9 +96,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: "/dashboard/settings/members", label: "Members", description: "Invite teammates and control what they can do.", icon: Users },
       { href: "/dashboard/settings/clients", label: "Clients", description: "Agency clients: who sees their reports, and how often.", icon: Briefcase },
       { href: "/dashboard/settings/security", label: "Security", description: "Workspace sign-in policy, SCIM provisioning, SSO, and secret storage.", icon: Lock },
-      { href: "/dashboard/settings/account-security", label: "Your security", description: "Two-factor sign-in and passkeys for your own account.", icon: Fingerprint },
       { href: "/dashboard/settings/audit", label: "Audit log", description: "Every consequential action, who did it, and when.", icon: ScrollText },
-      { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
     ],
   },
   {

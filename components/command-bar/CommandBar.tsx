@@ -61,7 +61,6 @@ import { AgentAvatar, KeyCap, KeyCaps } from "@/components/aos/AgentAvatar";
 import { StatusShape } from "@/components/aos/StatusShape";
 import { toolIcon } from "@/components/aos/ToolChip";
 import { useNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
-import { STATUS_META } from "@/lib/aos/status";
 import { visibleBranches } from "@/lib/aos/agents";
 import { isComposerAgentKey } from "@/lib/aos/composer";
 import { openNewTask } from "./NewTaskDialog";
@@ -97,6 +96,12 @@ import {
   type CommandItem,
   type FrecencyMap,
 } from "./lib";
+// Phase 18.1 (WS=find): the palette in the person's language; nav titles come
+// from the localized overlay (English kept as search keywords).
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { localizeNavGroups } from "@/lib/nav/i18n";
+import { NAV_GROUPS } from "@/lib/nav/config";
+import type { Translator } from "@/lib/i18n";
 
 // Budgets from docs/specs/SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
 const SUGGESTION_BUDGET_MS = 800;
@@ -131,9 +136,10 @@ type Page =
   | { name: "ask"; query: string; status: "loading" | "slow" | "done" | "error"; answer?: string; citations?: AskCitation[]; error?: string };
 
 // Go = every nav destination (lib/nav/config.ts), so ⌘K and the sidebar
-// can't drift. ⌥1–⌥6 keep their original targets (NAV_HOTKEYS).
-const GO_ITEMS: UICommand[] = navCommands();
-const GO_BY_HOTKEY = new Map(GO_ITEMS.filter((g) => g.hotkey).map((g) => [g.hotkey!, g]));
+// can't drift. ⌥1–⌥6 keep their original targets (NAV_HOTKEYS). Built per
+// language (useMemo in the component) from the localized nav overlay.
+const GO_ITEMS_EN: UICommand[] = navCommands();
+const GO_BY_HOTKEY = new Map(GO_ITEMS_EN.filter((g) => g.hotkey).map((g) => [g.hotkey!, g]));
 
 // Phase 4a: icons for the Records section (by record kind).
 const RECORD_ICONS: Record<string, LucideIcon> = {
@@ -152,28 +158,30 @@ const RECORD_ICONS: Record<string, LucideIcon> = {
   dataset: Database,
 };
 
-const DO_ITEMS: UICommand[] = [
-  { id: "do:missions", section: "actions", title: "Start a mission", subtitle: "From a Growth Mission template", keywords: "mission goal launch template growth", hotkey: "⌥M", action: "missions-page", icon: Rocket },
-  { id: "do:playbooks", section: "actions", title: "Run a playbook step", subtitle: "Agent playbooks", keywords: "playbook run step procedure", hotkey: "⌥P", action: "playbooks-page", icon: BookOpen },
-];
+function doItems(t: Translator): UICommand[] {
+  return [
+    { id: "do:missions", section: "actions", title: t("commandBar.startMission"), subtitle: t("commandBar.actions.startMissionSub"), keywords: "mission goal launch template growth", hotkey: "⌥M", action: "missions-page", icon: Rocket },
+    { id: "do:playbooks", section: "actions", title: t("commandBar.runPlaybookStep"), subtitle: t("commandBar.actions.playbookSub"), keywords: "playbook run step procedure", hotkey: "⌥P", action: "playbooks-page", icon: BookOpen },
+  ];
+}
 
 /** Kit Actions: New task ⌘N, Schedule a run ⌘J, Open approvals G I. */
-function actionItems(needsYou: number): UICommand[] {
+function actionItems(needsYou: number, t: Translator): UICommand[] {
   return [
-    { id: "action:new-task", section: "actions", title: "New task", subtitle: "Hand a goal to the lead agent", keywords: "task goal agent strategist composer hand off", hotkey: "⌘N", action: "new-task", agentKey: "lead", icon: Plus },
-    { id: "action:schedule", section: "actions", title: "Schedule a run", subtitle: "Repeat daily or weekly", keywords: "schedule cron recurring automation run", hotkey: "⌘J", action: "go", href: SCHEDULE_HREF, icon: Clock },
+    { id: "action:new-task", section: "actions", title: t("commandBar.actions.newTask"), subtitle: t("commandBar.actions.newTaskSub"), keywords: "new task goal agent strategist composer hand off", hotkey: "⌘N", action: "new-task", agentKey: "lead", icon: Plus },
+    { id: "action:schedule", section: "actions", title: t("commandBar.actions.schedule"), subtitle: t("commandBar.actions.scheduleSub"), keywords: "schedule a run cron recurring automation", hotkey: "⌘J", action: "go", href: SCHEDULE_HREF, icon: Clock },
     {
       id: "action:approvals",
       section: "actions",
-      title: "Open approvals",
-      subtitle: needsYou > 0 ? `${needsYou} ${needsYou === 1 ? "approval" : "approvals"} waiting` : "Nothing waiting on you",
-      keywords: "inbox approvals needs you review approve",
+      title: t("commandBar.actions.approvals"),
+      subtitle: needsYou > 0 ? t("commandBar.actions.approvalsWaiting", { count: needsYou }) : t("commandBar.actions.approvalsNone"),
+      keywords: "open approvals inbox needs you review approve",
       hotkey: "G I",
       action: "go",
       href: APPROVALS_HREF,
       icon: Inbox,
     },
-    ...DO_ITEMS,
+    ...doItems(t),
   ];
 }
 
@@ -215,6 +223,8 @@ async function postAudit(payload: AuditPayload): Promise<void> {
 
 export function CommandBar({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
+  const { t, messages } = useI18n();
+  const goItems = useMemo<UICommand[]>(() => navCommands(localizeNavGroups(NAV_GROUPS, messages)), [messages]);
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page>({ name: "root" });
   const [query, setQuery] = useState("");
@@ -259,10 +269,10 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
     setActive(0);
     setNotice(null);
     setOpen(true);
-    setAnnouncement("Command bar opened.");
+    setAnnouncement(t("commandBar.opened"));
     // Focus the input on the next frame — 0ms open, no animation.
     requestAnimationFrame(() => inputRef.current?.focus());
-  }, [close]);
+  }, [close, t]);
 
   // Global shortcuts: ⌘K / Ctrl+K toggles; ⌘J / Ctrl+J schedules a run; G
   // then I opens approvals (only outside text fields); ⌘N belongs to the
@@ -406,7 +416,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         AGENTS_IDLE_LIMIT,
       );
       // Idle Actions are the kit's three; missions/playbooks show when typing (and keep ⌥M / ⌥P).
-      const actions = capIdleSection(rankCommands(actionItems(needsYou), q, {}, now), q, "actions", ACTIONS_IDLE_LIMIT);
+      const actions = capIdleSection(rankCommands(actionItems(needsYou, t), q, {}, now), q, "actions", ACTIONS_IDLE_LIMIT);
       const tools = connectors
         ? fixed(
             toolCommandItems(connectors).map((i) => ({ ...i, icon: i.id === "tool:connect" ? Plug : connectorIcon(i.id.slice("tool:".length), i.title) })),
@@ -414,7 +424,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
             TOOLS_IDLE_LIMIT,
           )
         : [];
-      const go = capIdleSection(rankCommands(GO_ITEMS, q, frec, now), q, "go", GO_IDLE_LIMIT);
+      const go = capIdleSection(rankCommands(goItems, q, frec, now), q, "go", GO_IDLE_LIMIT);
       let ranked: UICommand[] = [...agents, ...actions, ...tools, ...go];
       // Records only for the query they were fetched for (no stale flashes).
       if (q && records.query === q && records.items.length > 0) {
@@ -425,8 +435,8 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
           {
             id: `ask:${q}`,
             section: "ask",
-            title: `Ask: “${q}”`,
-            subtitle: "Ask the Strategist, answered with citations",
+            title: t("commandBar.actions.ask", { query: q }),
+            subtitle: t("commandBar.actions.askSub"),
             keywords: "ask question ai strategist",
             action: "ask",
             icon: Sparkles,
@@ -434,8 +444,8 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
           {
             id: `task:${q}`,
             section: "ask",
-            title: `New task: “${q}”`,
-            subtitle: "Hand it to the Strategist",
+            title: t("commandBar.actions.task", { query: q }),
+            subtitle: t("commandBar.actions.taskSub"),
             keywords: "task hand off",
             action: "new-task",
             agentKey: "lead",
@@ -467,7 +477,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       base = []; // ask result page shows the answer panel, not a list
     }
     return rankCommands(base, q, frec, now);
-  }, [page, query, frec, records, tree, connectors, needsYou]);
+  }, [page, query, frec, records, tree, connectors, needsYou, t, goItems]);
 
   const groups = useMemo(() => groupBySection(items), [items]);
 
@@ -477,15 +487,13 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
   }, [items.length]);
   useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       setAnnouncement(
-        page.name === "ask"
-          ? "Answer from the strategist."
-          : `${items.length} result${items.length === 1 ? "" : "s"}.`,
+        page.name === "ask" ? t("commandBar.answerFromStrategist") : t("commandBar.resultsAnnounce", { count: items.length }),
       );
     }, 150);
-    return () => clearTimeout(t);
-  }, [open, items.length, page.name, query]);
+    return () => clearTimeout(timer);
+  }, [open, items.length, page.name, query, t]);
 
   // ---- actions ----------------------------------------------------------
 
@@ -637,14 +645,14 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
           setQuery("");
           setActive(0);
           setNotice(null);
-          setAnnouncement("Mission templates.");
+          setAnnouncement(t("commandBar.missionTemplates"));
           break;
         case "playbooks-page":
           setPage({ name: "playbooks", status: "loading", items: [] });
           setQuery("");
           setActive(0);
           setNotice(null);
-          setAnnouncement("Loading playbooks.");
+          setAnnouncement(t("commandBar.loadingPlaybooks"));
           break;
         case "template":
           void runTemplate(item);
@@ -664,7 +672,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         }
       }
     },
-    [runGo, runTemplate, runPlaybook, runAsk, query, bumpFrecency, close],
+    [runGo, runTemplate, runPlaybook, runAsk, query, bumpFrecency, close, t],
   );
 
   // Load playbooks defensively when the playbooks page opens (M5 implements).
@@ -677,34 +685,34 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         if (cancelled) return;
         if (res.status === 404) {
           setPage({ name: "playbooks", status: "unavailable", items: [] });
-          setAnnouncement("Playbooks are not yet available.");
+          setAnnouncement(t("commandBar.playbooksUnavailable"));
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { playbooks?: PlaybookSummary[] };
         if (cancelled) return;
         setPage({ name: "playbooks", status: "ready", items: data.playbooks ?? [] });
-        setAnnouncement(`${data.playbooks?.length ?? 0} playbooks.`);
+        setAnnouncement(t("commandBar.playbooksCount", { count: data.playbooks?.length ?? 0 }));
       } catch {
         if (!cancelled) {
           setPage({ name: "playbooks", status: "error", items: [] });
-          setAnnouncement("Could not load playbooks.");
+          setAnnouncement(t("commandBar.playbooksError"));
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, page]);
+  }, [open, page, t]);
 
   const popPage = useCallback(() => {
     setPage({ name: "root" });
     setQuery("");
     setActive(0);
     setNotice(null);
-    setAnnouncement("Back to command bar.");
+    setAnnouncement(t("commandBar.backToBar"));
     inputRef.current?.focus();
-  }, []);
+  }, [t]);
 
   // ---- palette key handling ---------------------------------------------
 
@@ -736,13 +744,14 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       popPage();
     } else if (e.altKey && e.key.toLowerCase() === "m") {
       e.preventDefault();
-      runItem(DO_ITEMS[0]);
+      runItem(doItems(t)[0]!);
     } else if (e.altKey && e.key.toLowerCase() === "p") {
       e.preventDefault();
-      runItem(DO_ITEMS[1]);
+      runItem(doItems(t)[1]!);
     } else if (e.altKey && /^[1-9]$/.test(e.key) && GO_BY_HOTKEY.has(`⌥${e.key}`)) {
       e.preventDefault();
-      runGo(GO_BY_HOTKEY.get(`⌥${e.key}`)!);
+      const target = GO_BY_HOTKEY.get(`⌥${e.key}`)!;
+      runGo(goItems.find((g) => g.href === target.href) ?? target);
     }
   };
 
@@ -752,12 +761,12 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
   const activeDescendant = activeItem ? `cmdk-option-${activeItem.id}` : undefined;
   const pageTitle =
     page.name === "missions"
-      ? "Start a mission"
+      ? t("commandBar.startMission")
       : page.name === "playbooks"
-        ? "Run a playbook step"
+        ? t("commandBar.runPlaybookStep")
         : page.name === "ask"
-          ? "Ask the strategist"
-          : "Command bar";
+          ? t("commandBar.askStrategist")
+          : t("commandBar.title");
 
   return (
     <>
@@ -766,8 +775,8 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       <button
         type="button"
         onClick={toggle}
-        aria-label="Open command bar"
-        title="Command bar (Ctrl/⌘K)"
+        aria-label={t("shell.commandBarOpen")}
+        title={t("shell.commandBarTitle")}
         className="fixed bottom-4 right-4 z-40 rounded-full bg-ink p-3.5 text-paper shadow-raised aos-press md:hidden"
       >
         <Command className="h-5 w-5" aria-hidden />
@@ -776,7 +785,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={pageTitle}>
           <div
-            className="absolute inset-0 bg-ink/30"
+            className="absolute inset-0 bg-night/30"
             onClick={close}
             aria-hidden="true"
           />
@@ -790,7 +799,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 <button
                   type="button"
                   onClick={popPage}
-                  aria-label="Back to command bar"
+                  aria-label={t("commandBar.backToBar")}
                   className="-ml-1.5 flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover-paper"
                 >
                   <ArrowLeft className="size-4" aria-hidden />
@@ -807,10 +816,10 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 }}
                 placeholder={
                   page.name === "missions"
-                    ? "Filter mission templates…"
+                    ? t("commandBar.placeholderMissions")
                     : page.name === "playbooks"
-                      ? "Filter playbooks…"
-                      : "Search or type a task…"
+                      ? t("commandBar.placeholderPlaybooks")
+                      : t("commandBar.placeholder")
                 }
                 role="combobox"
                 aria-expanded="true"
@@ -824,10 +833,10 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
               />
               {isNested && page.name !== "ask" && (
                 <span className="shrink-0 text-xs font-semibold text-muted">
-                  {page.name === "missions" ? "Missions" : "Playbooks"}
+                  {page.name === "missions" ? t("commandBar.missions") : t("commandBar.playbooks")}
                 </span>
               )}
-              <button type="button" onClick={close} aria-label="Close command bar" className="shrink-0 rounded-key">
+              <button type="button" onClick={close} aria-label={t("commandBar.close")} className="shrink-0 rounded-key">
                 <KeyCap>esc</KeyCap>
               </button>
             </div>
@@ -835,22 +844,22 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
             {/* Ask result panel */}
             {page.name === "ask" ? (
               <div className="max-h-[50vh] overflow-y-auto p-4">
-                <p className="text-[13px] font-medium text-muted">“{page.query}”</p>
+                <p className="text-[0.8125rem] font-medium text-muted">“{page.query}”</p>
                 {(page.status === "loading" || page.status === "slow") && (
-                  <div className="mt-3 flex items-center gap-2 text-[13px] text-muted">
+                  <div className="mt-3 flex items-center gap-2 text-[0.8125rem] text-muted">
                     <Loader2 className="h-4 w-4 aos-spin text-muted" aria-hidden />
-                    {page.status === "slow" ? "Still thinking — the strategist is taking a while…" : "Asking the strategist…"}
+                    {page.status === "slow" ? t("commandBar.stillThinking") : t("commandBar.asking")}
                   </div>
                 )}
                 {page.status === "error" && (
-                  <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+                  <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-3 text-[0.8125rem] text-failed-text">
                     <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
                     <span>{page.error}</span>
                   </div>
                 )}
                 {page.status === "done" && (
                   <div className="mt-3">
-                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{page.answer}</p>
+                    <p className="whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink">{page.answer}</p>
                     {/* Phase 13B: explicit feedback affordance on the strategist answer */}
                     <div className="mt-2 flex justify-end">
                       <FeedbackButtons agentId="business-strategist" workspaceId={workspaceId} />
@@ -863,7 +872,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                             href={c.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex max-w-full items-center gap-1 rounded-full border-line bg-paper px-2.5 py-1 text-[12px] font-medium text-muted hover:text-ink"
+                            className="inline-flex max-w-full items-center gap-1 rounded-full border-line bg-paper px-2.5 py-1 text-[0.75rem] font-medium text-muted hover:text-ink"
                           >
                             <span className="truncate">{c.title || c.url}</span>
                           </a>
@@ -873,8 +882,8 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                   </div>
                 )}
                 <p className="mt-4 flex items-center gap-1.5 text-xs text-muted">
-                  <KeyCap>esc</KeyCap> Close
-                  <KeyCap className="ml-2">⌫</KeyCap> Back
+                  <KeyCap>esc</KeyCap> {t("commandBar.closeKey")}
+                  <KeyCap className="ml-2">⌫</KeyCap> {t("commandBar.back")}
                 </p>
               </div>
             ) : (
@@ -896,15 +905,15 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
 
                 {/* Playbooks page states */}
                 {page.name === "playbooks" && page.status !== "ready" && (
-                  <div className="px-3 py-6 text-center text-[13px] text-muted">
+                  <div className="px-3 py-6 text-center text-[0.8125rem] text-muted">
                     {page.status === "loading" && (
                       <span className="inline-flex items-center gap-2">
                         <Loader2 className="h-4 w-4 aos-spin text-muted" aria-hidden />
-                        Loading playbooks…
+                        {t("commandBar.loadingPlaybooksEllipsis")}
                       </span>
                     )}
-                    {page.status === "unavailable" && "Playbooks are not yet available (Phase 9 M5)."}
-                    {page.status === "error" && "Could not load playbooks. Try again later."}
+                    {page.status === "unavailable" && t("commandBar.playbooksUnavailable")}
+                    {page.status === "error" && t("commandBar.playbooksError")}
                   </div>
                 )}
 
@@ -912,13 +921,13 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 <div
                   id="cmdk-listbox"
                   role="listbox"
-                  aria-label="Command results"
+                  aria-label={t("commandBar.commandResults")}
                   className="max-h-[min(62vh,580px)] overflow-y-auto p-2"
                 >
                   {groups.map((group) => (
                     <div key={group.section} role="group" aria-labelledby={`cmdk-h-${group.section}`}>
                       <h3 id={`cmdk-h-${group.section}`} className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">
-                        {group.label}
+                        {t(`commandBar.sections.${group.section}`)}
                       </h3>
                       {group.items.map((item) => {
                         const flatIndex = items.indexOf(item);
@@ -937,12 +946,12 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                     </div>
                   ))}
                   {items.length === 0 && page.name !== "playbooks" && (
-                    <p className="px-3 py-6 text-center text-sm text-subtle">No matching commands.</p>
+                    <p className="px-3 py-6 text-center text-sm text-subtle">{t("commandBar.noMatches")}</p>
                   )}
                   {page.name === "root" && records.loading && query.trim().length >= 2 && (
                     <p className="flex items-center gap-1.5 px-3 py-2 text-xs text-subtle" role="status">
                       <Loader2 className="size-3.5 aos-spin" aria-hidden />
-                      Searching records…
+                      {t("commandBar.searchingRecords")}
                     </p>
                   )}
                 </div>
@@ -952,24 +961,24 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                   <span className="flex items-center gap-1.5">
                     <KeyCap>↑</KeyCap>
                     <KeyCap>↓</KeyCap>
-                    Move
+                    {t("commandBar.move")}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <KeyCap>↵</KeyCap>
-                    Open
+                    {t("commandBar.open")}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <KeyCap>esc</KeyCap>
-                    {query ? "Clear" : "Close"}
+                    {query ? t("commandBar.clear") : t("commandBar.closeKey")}
                   </span>
                   {isNested && (
                     <span className="hidden items-center gap-1.5 sm:flex">
                       <KeyCap>⌫</KeyCap>
-                      Back
+                      {t("commandBar.back")}
                     </span>
                   )}
                   <span className="ml-auto tabular-nums">
-                    {items.length} {items.length === 1 ? "result" : "results"}
+                    {t("commandBar.results", { count: items.length })}
                   </span>
                 </div>
               </>
@@ -1004,6 +1013,7 @@ function PaletteRow({
   onHover: () => void;
 }) {
   const Icon = item.icon;
+  const { t } = useI18n();
   const isAgent = item.section === "agents";
   const keys = hotkeyParts(item.hotkey);
   return (
@@ -1037,14 +1047,14 @@ function PaletteRow({
       {item.status ? (
         <span className={cn("inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold", active ? "text-paper" : "text-ink")}>
           <StatusShape status={item.status} size={9} tone={active ? "night" : "paper"} live={false} />
-          {STATUS_META[item.status].label}
+          {t(`status.${item.status}`)}
         </span>
       ) : item.toolState === "connected" ? (
-        <span className={cn("shrink-0 text-sm font-semibold", active ? "text-night-soft" : "text-muted")}>Connected</span>
+        <span className={cn("shrink-0 text-sm font-semibold", active ? "text-night-soft" : "text-muted")}>{t("commandBar.connected")}</span>
       ) : item.toolState === "reconnect" ? (
         <span className={cn("inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold", active ? "text-paper" : "text-failed-text")}>
           <StatusShape status="failed" size={9} tone={active ? "night" : "paper"} />
-          Reconnect
+          {t("commandBar.reconnect")}
         </span>
       ) : keys.length ? (
         <KeyCaps keys={keys} className="hidden sm:inline-flex" />
