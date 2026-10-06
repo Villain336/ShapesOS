@@ -79,6 +79,11 @@ const nextConfig: NextConfig = {
   // its companion libonnxruntime.so, so any route touching @xenova/transformers
   // (embeddings — e.g. /dashboard/intelligence/repurpose) 500s at runtime with
   // "cannot open shared object file". Force-include the native lib.
+  // Phase 19A: apps/desktop (the Electron app, its own package and
+  // node_modules) is never part of the web build or its standalone trace.
+  outputFileTracingExcludes: {
+    "/*": ["./apps/**"],
+  },
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/onnxruntime-node/bin/napi-v3/linux/x64/libonnxruntime.so.1.14.0",

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Phase 19A: apps/desktop (the Electron app) has its own package,
+    // tsconfig and tests; the web app's lint never sees it.
+    "apps/**",
   ]),
 ]);
 
