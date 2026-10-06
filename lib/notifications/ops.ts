@@ -36,11 +36,21 @@ export function opsNotices(slug: string, before: Row | null, after: Row | null, 
   return out;
 }
 
+/** Notices in flight (tests await them; each removes itself when done). */
+const inFlight = new Set<Promise<void>>();
+
+/** Wait for every queued ops notice to be produced (tests, graceful shutdown). */
+export async function settleOpsNotices(): Promise<void> {
+  // A notice queued by setImmediate may not have started yet.
+  await new Promise((r) => setImmediate(r));
+  await Promise.allSettled([...inFlight]);
+}
+
 /** Produce the notices after the current transaction (never throws, never blocks). */
 export function queueOpsNotices(workspaceId: string, notices: readonly OpsNotice[], actorUserId: string | null = null): void {
   if (!notices.length) return;
   setImmediate(() => {
-    void (async () => {
+    const p: Promise<void> = (async () => {
       const producers = await import("./producers");
       for (const n of notices) {
         if (n.kind === "invoice_paid") {
@@ -49,6 +59,9 @@ export function queueOpsNotices(workspaceId: string, notices: readonly OpsNotice
           await producers.notifyTicketAssigned({ workspaceId, ticketId: n.ticketId, number: n.number, subject: n.subject, assigneeId: n.assigneeId, assignedBy: actorUserId, at: n.at });
         }
       }
-    })().catch((e: unknown) => console.warn("[notifications] ops notices skipped:", e instanceof Error ? e.message : e));
+    })()
+      .catch((e: unknown) => console.warn("[notifications] ops notices skipped:", e instanceof Error ? e.message : e))
+      .finally(() => inFlight.delete(p));
+    inFlight.add(p);
   });
 }

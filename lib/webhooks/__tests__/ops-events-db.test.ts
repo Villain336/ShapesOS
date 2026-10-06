@@ -23,6 +23,8 @@ import { createEndpoint } from "../endpoints";
 import { emitInvoicePaid } from "../emit";
 import { opsCreate, opsEntityDef, opsPatch } from "@/lib/ops/doctype";
 import { applyInvoicePayment } from "@/lib/ops/finance/invoicing";
+// Phase 18.3 (WS=trust): ops writes also notify, right after their transaction.
+import { settleOpsNotices } from "@/lib/notifications/ops";
 
 const RUN = `p11w-${Date.now().toString(36)}`;
 const WS = `${RUN}-ws`;
@@ -93,6 +95,9 @@ describe("Phase 9/10 events → outbound webhooks (transactional outbox)", () =>
   });
 
   it("outbox atomicity: a rolled-back write leaves no event", async () => {
+    // Phase 18.3 (WS=trust): the invoice paid above also notifies its admins
+    // right after its transaction (notification.created events); let those land first.
+    await settleOpsNotices();
     const before = (await deliveries(allEp)).length;
     await assert.rejects(
       withWorkspaceScope(WS, async (tx) => {
