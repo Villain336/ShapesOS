@@ -76,7 +76,12 @@ export const TOOL_GROUP_LABELS: Readonly<Record<ToolGroup, string>> = {
  */
 export interface GroupAvailability {
   code?: { ok: true } | { ok: false; reason: string } | null;
+  /** Phase 18.3 (WS=trust): apps this workspace blocks for agents (Agent app access). */
+  blocked?: readonly string[] | null;
 }
+
+/** Phase 18.3: why a blocked app's chip is off in the composer and agent picker. */
+export const BLOCKED_FOR_AGENTS_REASON = "Blocked for agents in this workspace (Settings → Privacy and security → Agent app access).";
 
 export const CODE_UNAVAILABLE_DEFAULT = "No code sandbox is available on this server.";
 
@@ -86,6 +91,7 @@ export function unavailableGroups(availability?: GroupAvailability | null): Read
   const code = availability?.code;
   if (!code) out.set("code", CODE_UNAVAILABLE_DEFAULT);
   else if (!code.ok) out.set("code", code.reason || CODE_UNAVAILABLE_DEFAULT);
+  for (const g of blockableGroups(availability?.blocked)) out.set(g, BLOCKED_FOR_AGENTS_REASON);
   return out;
 }
 
@@ -124,6 +130,14 @@ export interface GrantInput {
   requested?: readonly string[] | null;
   /** The grant of the run that handed this work off (delegation). */
   parentGrant?: readonly string[] | null;
+  /**
+   * Phase 18.3 (WS=trust): agent app permissions — the workspace's blocked
+   * tool groups (WorkspaceSettings.agentBlockedGroups, lib/agents/
+   * app-permissions.ts). Removed from every grant, whatever was requested or
+   * inherited. Never-blockable groups (ALWAYS_GRANTED) stay. Empty / omitted =
+   * today's behaviour.
+   */
+  blockedGroups?: readonly string[] | null;
 }
 
 export interface Grant {
@@ -167,7 +181,32 @@ export function computeGrant(input: GrantInput): Grant {
       }
     }
   }
+  // Phase 18.3: the workspace's app permissions narrow every grant last, so
+  // nothing above (a request, the agent's defaults, a parent) can re-add a
+  // blocked app. A grant only ever narrows here.
+  for (const g of blockableGroups(input.blockedGroups)) {
+    if (groups.delete(g) && requested.includes(g)) dropped.push(g);
+  }
   return { groups: ordered(groups), dropped: [...new Set(dropped)] };
+}
+
+/**
+ * Phase 18.3 (WS=trust): groups an admin may block for agents ("Allow … to
+ * access Mail?"). Everything except ALWAYS_GRANTED — an agent that can't read
+ * its own workspace can't do anything.
+ */
+export const BLOCKABLE_GROUPS: readonly ToolGroup[] = TOOL_GROUPS.filter((g) => !ALWAYS_GRANTED.includes(g));
+
+/** The valid, blockable groups in a stored block list (unknown names ignored). PURE. */
+export function blockableGroups(blocked: readonly string[] | null | undefined): ToolGroup[] {
+  if (!blocked?.length) return [];
+  const set = new Set(blocked);
+  return BLOCKABLE_GROUPS.filter((g) => set.has(g));
+}
+
+/** Is this group blocked for agents by the workspace's app permissions? PURE. */
+export function isGroupBlocked(blocked: readonly string[] | null | undefined, group: ToolGroup): boolean {
+  return blockableGroups(blocked).includes(group);
 }
 
 /** A null grant means "no task grant" (legacy callers): everything the role allows. */

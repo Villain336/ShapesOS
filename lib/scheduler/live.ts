@@ -38,7 +38,7 @@ export async function schedulerLoopIsLive(workspaceId?: string): Promise<boolean
 }
 
 /** Tool groups a skill's declared tools fall in ("connector.<key>.<tool>" or "<key>.<tool>"). */
-export function skillGrantGroups(declaredTools: readonly string[]): ToolGroup[] {
+export function skillGrantGroups(declaredTools: readonly string[], blockedGroups?: readonly string[] | null): ToolGroup[] {
   const groups = new Set<ToolGroup>(["workspace"]);
   for (const d of declaredTools) {
     if (getTool(d)) groups.add(toolGroup(d));
@@ -49,7 +49,8 @@ export function skillGrantGroups(declaredTools: readonly string[]): ToolGroup[] 
     }
   }
   // parentGrant = the declared groups: the lead's hand-off ability is not added.
-  return computeGrant({ agentKey: SKILL_AGENT, requested: [...groups], parentGrant: [...groups] }).groups;
+  // Phase 18.3 (WS=trust): minus the apps blocked for agents in the workspace.
+  return computeGrant({ agentKey: SKILL_AGENT, requested: [...groups], parentGrant: [...groups], blockedGroups }).groups;
 }
 
 /** Only the skill's declared tools (exact, or as connector.<declared>). */
@@ -84,7 +85,8 @@ export interface LiveSubtaskResult {
 export type LiveSubtaskRunner = (input: LiveSubtaskInput) => Promise<LiveSubtaskResult>;
 
 export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
-  const groups = skillGrantGroups(input.skill.declaredTools);
+  const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");
+  const groups = skillGrantGroups(input.skill.declaredTools, await getAgentBlockedGroups(input.workspaceId));
   const projectId =
     input.projectId ??
     (await prisma.project.findFirst({ where: { workspaceId: input.workspaceId }, orderBy: { createdAt: "asc" }, select: { id: true } }))?.id ??

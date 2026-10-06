@@ -383,6 +383,14 @@ enum FileChangeAction {
   // Phase 18.2 (WS=content): a run / job / sandbox / terminal stopped from the
   // Activity Monitor.
   process_stopped
+  // Phase 18.3 (WS=trust): the Privacy & Security center — agent app access
+  // changed, a sign-in session revoked, a memory forgotten, a phone removed,
+  // the audit timeline exported.
+  agent_app_access_changed
+  session_revoked
+  memory_forgotten
+  push_device_removed
+  audit_timeline_exported
 }
 
 // ---------------------------------------------------------------------------
