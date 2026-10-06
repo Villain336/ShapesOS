@@ -262,6 +262,8 @@ export function initialLoopState(input: {
 
 export type LoopEvent =
   | { type: "text_delta"; step: number; text: string }
+  /** Phase 17: the model reasons before writing (its text is never carried). */
+  | { type: "thinking"; step: number; state: "started" | "ended" }
   | { type: "tool_start"; toolUseId: string; tool: string; args: Record<string, unknown> }
   | { type: "tool_result"; toolUseId: string; tool: string; status: ChatToolCall["status"]; summary: string }
   | { type: "step"; step: number; stopReason: ChatStopReason; model: string; costMicroUsd: number | null };
@@ -409,15 +411,25 @@ export function testsFailed(result: ToolResult | null): boolean {
 
 /**
  * Streamed text → run events, in order, in chunks (not one row per token).
- * A chunk is written when ~200 characters have gathered or 250 ms passed,
- * and at every step boundary. A stream guard that trips withholds the rest
- * of the step's text (the final text is enforced again before delivery).
+ * The FIRST delta of a step is written at once (Phase 17: it is the first
+ * token the person sees — the in-process bus forwards the row the moment it
+ * is durable); after it a chunk is written when ~200 characters have
+ * gathered or 250 ms passed, and at every step boundary. A stream guard
+ * that trips withholds the rest of the step's text (the final text is
+ * enforced again before delivery).
+ *
+ * Phase 17: thinking deltas are not stored — only the STATE is, as one
+ * `text` event { kind: "thinking", state: "started" } on the first one and
+ * { state: "ended" } when the first text delta follows, so the chat can show
+ * "Thinking" while the model reasons.
  */
 class TextEventWriter {
   private buf = "";
   private acc = "";
   private timer: ReturnType<typeof setTimeout> | null = null;
   private chain: Promise<unknown> = Promise.resolve();
+  private firstFlushed = false;
+  private thinkingState: "none" | "started" | "ended" = "none";
   withheld = false;
 
   constructor(
@@ -430,6 +442,7 @@ class TextEventWriter {
 
   push(delta: string): void {
     if (this.withheld || !delta) return;
+    if (this.thinkingState === "started") this.thinking("ended");
     this.acc += delta;
     if (this.guard && this.guard(this.acc)) {
       this.withheld = true;
@@ -441,8 +454,26 @@ class TextEventWriter {
     this.onEvent?.({ type: "text_delta", step: this.step, text: delta });
     if (!this.persist) return;
     this.buf += delta;
-    if (this.buf.length >= 200) this.flush();
+    if (!this.firstFlushed || this.buf.length >= 200) this.flush();
     else if (!this.timer) this.timer = setTimeout(() => this.flush(), 250);
+  }
+
+  /** The model's thinking state changed (first thinking delta / first text after it). */
+  thinking(state: "started" | "ended"): void {
+    if (state === "started" && this.thinkingState !== "none") return;
+    if (state === "ended" && this.thinkingState !== "started") return;
+    this.thinkingState = state;
+    this.onEvent?.({ type: "thinking", step: this.step, state });
+    if (!this.persist || !this.ctx.runId) return;
+    const { workspaceId, runId } = this.ctx;
+    const step = this.step;
+    this.chain = this.chain.then(() =>
+      appendAgentRunEvent(workspaceId, runId!, {
+        type: "text",
+        summary: state === "started" ? "Thinking" : "Writing",
+        payload: { kind: "thinking", step, state },
+      }).catch(() => undefined),
+    );
   }
 
   flush(): void {
@@ -451,6 +482,7 @@ class TextEventWriter {
     const text = this.buf;
     this.buf = "";
     if (!text || !this.ctx.runId) return;
+    this.firstFlushed = true;
     const { workspaceId, runId } = this.ctx;
     const step = this.step;
     this.chain = this.chain.then(() =>
@@ -473,6 +505,7 @@ async function callModel(provider: LlmProvider, req: ChatRequest, writer: TextEv
   let final: ChatResponse | null = null;
   for await (const ev of provider.chatStream(req)) {
     if (ev.type === "text_delta") writer.push(ev.text);
+    else if (ev.type === "thinking_delta") writer.thinking("started");
     else if (ev.type === "final") final = ev.response;
   }
   if (!final) throw new Error("The model stream ended without a final response.");
@@ -771,7 +804,54 @@ interface ToolStepResult {
   waiting: boolean;
 }
 
-/** Run one step's tool calls; append their results as one user message. */
+/** Phase 17: `safe` (read-only) tools of one step run side by side, this many at a time. */
+export const PARALLEL_SAFE_TOOLS = 4;
+
+interface StepItem {
+  i: number;
+  block: ChatToolUseBlock;
+  canonical: string;
+  call: ChatToolCall;
+  /** safe = read-only, may run beside other safe tools; serial = everything else (one at a time, in order). */
+  lane: "safe" | "serial";
+  /** Already answered (a saved result, invalid input, a refused or interrupted call): nothing to run. */
+  done: boolean;
+}
+
+/**
+ * Phase 17: split a step's calls into batches that keep the step's order —
+ * consecutive `safe` tools form one parallel batch; every other call is a
+ * batch of its own. PURE.
+ */
+export function stepBatches<T extends { lane: "safe" | "serial"; done: boolean }>(items: readonly T[]): Array<{ parallel: boolean; items: T[] }> {
+  const out: Array<{ parallel: boolean; items: T[] }> = [];
+  for (const it of items) {
+    if (it.done) continue;
+    const last = out[out.length - 1];
+    if (it.lane === "safe" && last?.parallel) last.items.push(it);
+    else out.push({ parallel: it.lane === "safe", items: [it] });
+  }
+  return out;
+}
+
+async function mapLimit<T>(items: readonly T[], limit: number, fn: (t: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]!);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+/**
+ * Run one step's tool calls; append their results as one user message.
+ *
+ * Phase 17 (latency): `safe` tools of the step run in parallel (at most
+ * PARALLEL_SAFE_TOOLS at once) and the results are appended in the model's
+ * order whatever finished first; a non-safe tool never runs beside another
+ * call. The transcript is saved ONCE at the end of the step (plus, as
+ * before, right before a non-safe tool starts — the at-most-once rule on
+ * resume needs that one), not after every tool.
+ */
 async function runToolStep(
   s: LoopState,
   toolUses: ChatToolUseBlock[],
@@ -784,105 +864,134 @@ async function runToolStep(
   const store = input.deps?.store ?? prismaTranscriptStore;
   const save = () =>
     ctx.runId ? store.save(ctx.workspaceId, ctx.runId, s, s.steps).catch(() => undefined) : Promise.resolve();
-  const results: ChatToolResultBlock[] = [];
-  const stepCalls: ChatToolCall[] = [];
+  const results: Array<ChatToolResultBlock | null> = toolUses.map(() => null);
   const proposals: ChatToolCall[] = [];
   let waiting = false;
   let failedTests = false;
+  let cancelled = false;
 
-  for (const block of toolUses) {
+  // Classify every call first (saved / invalid / refused / interrupted need
+  // no run); the rest get a lane.
+  const items: StepItem[] = [];
+  for (const [i, block] of toolUses.entries()) {
     const saved = s.toolResults[block.id];
     if (saved) {
       // Resumed after a crash: this call already ran — never again.
-      results.push(saved);
+      results[i] = saved;
       continue;
     }
     const canonical = tools.toCanonical(block.name);
     const call: ChatToolCall = { tool: canonical, args: block.input ?? {}, status: "executed", toolUseId: block.id };
     if (ctx.runId) call.runId = ctx.runId;
-
-    let result: ToolResult | null = null;
+    const def = getTool(canonical);
+    const sideEffects = !def || def.kind !== "safe";
+    const item: StepItem = { i, block, canonical, call, lane: sideEffects || isDelegationTool(canonical) ? "serial" : "safe", done: false };
     if (block.invalid && !isUnknownToolOnly(block.invalid)) {
       // Unparseable / schema-invalid input: never run; tell the model why.
       call.status = "error";
       call.resultSummary = `Invalid input for ${canonical}: ${block.invalid}`;
       const r = invalidToolResult(block);
       s.toolResults[block.id] = r;
-      results.push(r);
-      s.calls.push(call);
-      stepCalls.push(call);
-      await save();
-      continue;
-    }
-    const def = getTool(canonical);
-    const sideEffects = !def || def.kind !== "safe";
-    if (input.toolFilter && !input.toolFilter(canonical)) {
+      results[i] = r;
+      item.done = true;
+    } else if (input.toolFilter && !input.toolFilter(canonical)) {
       // Outside the run's narrower allow-list: refused like an ungranted tool.
       call.status = "denied";
       call.resultSummary = `This run may not use ${canonical} (not in its declared tools).`;
       await runEvent(ctx, `Refused ${canonical}: not in this run's declared tools`, { kind: "tool_result", tool: canonical, status: "denied", toolUseId: block.id }, "gate");
+      item.done = true;
     } else if (sideEffects && s.toolStarted.includes(block.id)) {
       // Started before a crash, result never saved: may or may not have run.
       call.status = "error";
       call.resultSummary = `${canonical} was interrupted (the worker restarted) and was not run again; it may or may not have completed. Check before retrying.`;
-    } else {
-      if (await stopRequested(ctx)) {
-        call.status = "cancelled";
-        call.resultSummary = "Not run — the task was stopped.";
-        s.calls.push(call);
-        await save();
-        return { cancelled: true, proposal: null, proposals: [], waiting: false };
-      }
-      if (sideEffects) {
-        s.toolStarted.push(block.id);
-        await save();
-      }
-      input.onEvent?.({ type: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
-      if (persistEvents) {
-        await runEvent(ctx, `Calling ${canonical}`, { kind: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
-      }
-      // The run's remaining budget rides along (a delegated child stays inside it).
-      const toolCtx: LoopContext = {
-        ...ctx,
-        toolUseId: block.id,
-        deadlineAt: Math.min(ctx.deadlineAt ?? Infinity, s.startedAt + limits.maxMs),
-        costLeftMicroUsd: Math.max(0, Math.min(ctx.costLeftMicroUsd ?? Infinity, limits.maxCostMicroUsd) - s.costMicroUsd),
-        // Phase 16: what a delegation may split (model calls left in this run).
-        stepsLeft: Math.max(0, limits.maxSteps - s.steps),
-      };
-      result = await executeTool(toolCtx, canonical, call.args, call);
-      if (call.status === "cancelled") {
-        s.calls.push(call);
-        await save();
-        return { cancelled: true, proposal: null, proposals: [], waiting: false };
-      }
-      // Phase 16: a delegation tool started a plan — the run waits after this step.
-      if (call.status === "executed" && isDelegationTool(canonical) && (result?.details as { delegationWait?: unknown } | undefined)?.delegationWait === true) {
-        waiting = true;
-      }
-      // A delegated sub-agent's spend counts against this run's budget.
-      const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
-      if (typeof childCost === "number" && Number.isFinite(childCost)) s.costMicroUsd += childCost;
-      if (testsFailed(result)) failedTests = true;
+      item.done = true;
     }
-    const r = toolResultFor(block.id, call, result, limits.toolResultMaxChars);
-    s.toolResults[block.id] = r;
-    results.push(r);
-    s.calls.push(call);
-    stepCalls.push(call);
-    input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
-    if (call.status === "pending_confirmation") proposals.push(call);
-    await save();
+    if (item.done) {
+      const r = toolResultFor(block.id, call, null, limits.toolResultMaxChars);
+      s.toolResults[block.id] = r;
+      results[i] = r;
+      input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
+    }
+    items.push(item);
   }
 
+  const runOne = async (it: StepItem): Promise<void> => {
+    const { block, canonical, call } = it;
+    if (cancelled) {
+      call.status = "cancelled";
+      call.resultSummary = "Not run — the task was stopped.";
+      return;
+    }
+    if (it.lane === "serial") {
+      s.toolStarted.push(block.id);
+      await save();
+    }
+    input.onEvent?.({ type: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
+    if (persistEvents) {
+      await runEvent(ctx, `Calling ${canonical}`, { kind: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
+    }
+    // The run's remaining budget rides along (a delegated child stays inside it).
+    const toolCtx: LoopContext = {
+      ...ctx,
+      toolUseId: block.id,
+      deadlineAt: Math.min(ctx.deadlineAt ?? Infinity, s.startedAt + limits.maxMs),
+      costLeftMicroUsd: Math.max(0, Math.min(ctx.costLeftMicroUsd ?? Infinity, limits.maxCostMicroUsd) - s.costMicroUsd),
+      // Phase 16: what a delegation may split (model calls left in this run).
+      stepsLeft: Math.max(0, limits.maxSteps - s.steps),
+    };
+    const result = await executeTool(toolCtx, canonical, call.args, call);
+    if (call.status === "cancelled") {
+      cancelled = true;
+      return;
+    }
+    // Phase 16: a delegation tool started a plan — the run waits after this step.
+    if (call.status === "executed" && isDelegationTool(canonical) && (result?.details as { delegationWait?: unknown } | undefined)?.delegationWait === true) {
+      waiting = true;
+    }
+    // A delegated sub-agent's spend counts against this run's budget.
+    const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
+    if (typeof childCost === "number" && Number.isFinite(childCost)) s.costMicroUsd += childCost;
+    if (testsFailed(result)) failedTests = true;
+    const r = toolResultFor(block.id, call, result, limits.toolResultMaxChars);
+    s.toolResults[block.id] = r;
+    results[it.i] = r;
+    input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
+    if (call.status === "pending_confirmation") proposals.push(call);
+  };
+
+  for (const batch of stepBatches(items)) {
+    // Stop is checked before every batch (before every tool, for the
+    // serial ones — a parallel batch holds only read-only tools).
+    if (await stopRequested(ctx)) {
+      cancelled = true;
+      const first = batch.items[0]!;
+      first.call.status = "cancelled";
+      first.call.resultSummary = "Not run — the task was stopped.";
+      s.calls.push(first.call);
+      await save();
+      return { cancelled: true, proposal: null, proposals: [], waiting: false };
+    }
+    if (batch.parallel) await mapLimit(batch.items, PARALLEL_SAFE_TOOLS, runOne);
+    else await runOne(batch.items[0]!);
+    if (cancelled) {
+      for (const it of batch.items) if (it.call.status === "cancelled") s.calls.push(it.call);
+      await save();
+      return { cancelled: true, proposal: null, proposals: [], waiting: false };
+    }
+  }
+
+  // The step's calls and results, in the model's order.
+  for (const it of items) s.calls.push(it.call);
   if (failedTests) s.testFailCycles++;
-  s.messages.push({ role: "user", content: results });
+  s.messages.push({ role: "user", content: results.filter((r): r is ChatToolResultBlock => r !== null) });
 
   // Phase 16: every pending action of the step stays pending and is listed
   // to the user (none is turned into an error); "yes" confirms the listed
   // ones, each re-checked against the grant it was proposed under.
   await save();
-  return { cancelled: false, proposal: proposals[0] ?? null, proposals, waiting };
+  // Proposals in the model's order (a parallel batch may finish out of order).
+  const ordered = items.map((it) => it.call).filter((c) => proposals.includes(c));
+  return { cancelled: false, proposal: ordered[0] ?? null, proposals: ordered, waiting };
 }
 
 /**

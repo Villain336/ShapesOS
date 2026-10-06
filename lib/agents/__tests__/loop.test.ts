@@ -18,6 +18,7 @@ import {
   loopLimitsFromEnv,
   initialLoopState,
   runAgentLoop,
+  stepBatches,
   type AgentLoopInput,
   type LoopContext,
   type LoopState,
@@ -465,5 +466,167 @@ describe("agent loop: native tool protocol", () => {
       },
     }).p;
     assert.ok(!guarded.join("").includes("cheap"), "the banned word never streams");
+  });
+});
+
+// ── Phase 17 (latency): parallel safe tools, one save per step, thinking ────
+
+const timeline: Array<{ tool: string; at: "start" | "end"; t: number }> = [];
+const slowSafe = (name: string, ms: number): ToolDef => ({
+  name,
+  description: `Read slowly (${ms} ms).`,
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: { type: "object", properties: {} },
+  async execute() {
+    timeline.push({ tool: name, at: "start", t: Date.now() });
+    await new Promise((r) => setTimeout(r, ms));
+    timeline.push({ tool: name, at: "end", t: Date.now() });
+    return { summary: `${name} done` };
+  },
+});
+const t_write_slow: ToolDef = {
+  name: "t_write_slow",
+  description: "Write slowly (needs the user's OK unless confirmed).",
+  kind: "publish",
+  minRole: "viewer",
+  argsSchema: { type: "object", properties: {} },
+  async execute() {
+    timeline.push({ tool: "t_write_slow", at: "start", t: Date.now() });
+    await new Promise((r) => setTimeout(r, 60));
+    timeline.push({ tool: "t_write_slow", at: "end", t: Date.now() });
+    return { summary: "written" };
+  },
+};
+
+before(() => {
+  for (const t of [slowSafe("t_slow_a", 120), slowSafe("t_slow_b", 40), slowSafe("t_slow_c", 10), t_write_slow]) registerExtraTool(t);
+});
+
+const overlap = (a: string, b: string) => {
+  const s = (n: string, at: "start" | "end") => timeline.find((e) => e.tool === n && e.at === at)!.t;
+  return s(a, "start") < s(b, "end") && s(b, "start") < s(a, "end");
+};
+
+describe("Phase 17: safe tools of a step run in parallel, results stay in the model's order", () => {
+  it("stepBatches keeps order: consecutive safe tools form one batch, anything else is its own", () => {
+    const items = [
+      { lane: "safe" as const, done: false, n: 1 },
+      { lane: "safe" as const, done: true, n: 2 },
+      { lane: "safe" as const, done: false, n: 3 },
+      { lane: "serial" as const, done: false, n: 4 },
+      { lane: "safe" as const, done: false, n: 5 },
+      { lane: "serial" as const, done: false, n: 6 },
+      { lane: "serial" as const, done: false, n: 7 },
+    ];
+    assert.deepEqual(
+      stepBatches(items).map((b) => [b.parallel, b.items.map((i) => i.n)]),
+      [
+        [true, [1, 3]],
+        [false, [4]],
+        [true, [5]],
+        [false, [6]],
+        [false, [7]],
+      ],
+    );
+  });
+
+  it("three safe tools overlap, the slowest first in the model's order still answers first; one transcript save for the step", async () => {
+    timeline.length = 0;
+    const provider = new MockLlmProvider({
+      chatScript: [
+        { content: [toolUse("t_slow_a", {}, "tu_a"), toolUse("t_slow_b", {}, "tu_b"), toolUse("t_slow_c", {}, "tu_c")] },
+        (req) => {
+          const blocks = lastUser(req) as ChatToolResultBlock[];
+          assert.deepEqual(blocks.map((b) => b.toolUseId), ["tu_a", "tu_b", "tu_c"], "results in the model's order");
+          return { content: [text("done")] };
+        },
+      ],
+    });
+    const store = memoryTranscriptStore();
+    let saves = 0;
+    const counting = { ...store, save: async (...a: Parameters<typeof store.save>) => (saves++, store.save(...a)) };
+    const t0 = Date.now();
+    const res = await runAgentLoop({
+      ctx: ctx({ runId: "run-par" }),
+      system: "s",
+      messages: [{ role: "user", content: "read three things" }],
+      deps: { provider, store: counting, persistEvents: false },
+    });
+    const took = Date.now() - t0;
+    assert.equal(res.status, "done");
+    assert.ok(overlap("t_slow_a", "t_slow_b") && overlap("t_slow_a", "t_slow_c"), `safe tools ran side by side: ${JSON.stringify(timeline)}`);
+    assert.ok(took < 120 + 40 + 10 + 60, `the step took ${took} ms, less than the serial sum (170 ms)`);
+    assert.deepEqual(res.calls.map((c) => c.tool), ["t_slow_a", "t_slow_b", "t_slow_c"], "calls recorded in the model's order");
+    // Saves: after step 1's model call, once after its tools, after step 2's model call, and the finish.
+    assert.equal(saves, 4, `one save per tool step (saw ${saves})`);
+  });
+
+  it("a non-safe tool never runs beside another call (confirmed, it runs alone between the safe batches)", async () => {
+    timeline.length = 0;
+    const provider = new MockLlmProvider({
+      chatScript: [
+        { content: [toolUse("t_slow_b", {}, "tu_b"), toolUse("t_write_slow", {}, "tu_w"), toolUse("t_slow_c", {}, "tu_c")] },
+        (req) => {
+          const blocks = lastUser(req) as ChatToolResultBlock[];
+          assert.deepEqual(blocks.map((b) => b.toolUseId), ["tu_b", "tu_w", "tu_c"]);
+          return { content: [text("done")] };
+        },
+      ],
+    });
+    const res = await runAgentLoop({
+      ctx: ctx({ runId: "run-serial", confirmed: true }),
+      system: "s",
+      messages: [{ role: "user", content: "read, write, read" }],
+      deps: { provider, store: memoryTranscriptStore(), persistEvents: false },
+    });
+    assert.equal(res.status, "done");
+    assert.ok(!overlap("t_slow_b", "t_write_slow") && !overlap("t_write_slow", "t_slow_c"), `the write ran alone: ${JSON.stringify(timeline)}`);
+    const order = timeline.filter((e) => e.at === "start").map((e) => e.tool);
+    assert.deepEqual(order, ["t_slow_b", "t_write_slow", "t_slow_c"], "batches run in the model's order");
+    assert.ok(res.state.toolStarted.includes("tu_w") && !res.state.toolStarted.includes("tu_b"), "only the non-safe tool is marked started (at-most-once on resume)");
+  });
+
+  it("an unconfirmed non-safe tool in a mixed step is proposed; the safe reads still ran", async () => {
+    timeline.length = 0;
+    const provider = new MockLlmProvider({ chatScript: [{ content: [toolUse("t_slow_c", {}, "tu_c"), toolUse("t_write_slow", {}, "tu_w")] }] });
+    const res = await runAgentLoop({
+      ctx: ctx({ runId: "run-mixed" }),
+      system: "s",
+      messages: [{ role: "user", content: "read then write" }],
+      deps: { provider, store: memoryTranscriptStore(), persistEvents: false },
+    });
+    assert.equal(res.status, "awaiting_confirmation");
+    assert.equal(res.proposal?.tool, "t_write_slow");
+    assert.deepEqual(res.calls.map((c) => [c.tool, c.status]), [["t_slow_c", "executed"], ["t_write_slow", "pending_confirmation"]]);
+  });
+});
+
+describe("Phase 17: thinking state", () => {
+  it("the first thinking delta starts the state, the first text delta ends it (once each, never the text)", async () => {
+    const inner = new MockLlmProvider({ chatScript: [{ content: [text("the answer")] }] });
+    const provider = {
+      ...inner,
+      name: inner.name,
+      isLive: inner.isLive,
+      isConfigured: () => inner.isConfigured(),
+      generate: (p: string) => inner.generate(p),
+      chat: (r: ChatRequest) => inner.chat(r),
+      async *chatStream(req: ChatRequest) {
+        yield { type: "thinking_delta" as const, index: 0, text: "let me think" };
+        yield { type: "thinking_delta" as const, index: 0, text: " harder" };
+        yield* inner.chatStream(req);
+      },
+    };
+    const events: string[] = [];
+    await runAgentLoop({
+      ctx: ctx(),
+      system: "s",
+      messages: [{ role: "user", content: "q" }],
+      onEvent: (e) => events.push(e.type === "thinking" ? `thinking:${e.state}` : e.type === "text_delta" ? "text" : e.type),
+      deps: { provider, store: memoryTranscriptStore(), persistEvents: false },
+    });
+    assert.deepEqual(events.slice(0, 3), ["thinking:started", "thinking:ended", "text"]);
+    assert.equal(events.filter((e) => e.startsWith("thinking")).length, 2);
   });
 });
