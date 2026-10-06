@@ -16,6 +16,8 @@ import { useId, useState, type ReactNode } from "react";
 import { ArrowUpRight, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { aosButton } from "./button";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget, cursorSlug } from "@/lib/cursor/registry";
 import { StatusShape } from "./StatusShape";
 
 export interface ApprovalItem {
@@ -91,6 +93,8 @@ export function ApprovalCard({
   const [localAuto, setLocalAuto] = useState(false);
   const auto = autoApprove ?? localAuto;
   const total = totalItems ?? items.length;
+  // Phase 19A: the card's actions are addressable as approval:<id>:approve|deny|review.
+  const cursorKey = id ?? cursorSlug(title);
   const edit = editHref ? (
     <Link href={editHref} className={aosButton({ variant: "quiet", size: "sm" })}>
       {editLabel}
@@ -143,7 +147,7 @@ export function ApprovalCard({
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
           {mode === "decide" ? (
             <>
-              <button type="button" onClick={onDeny} disabled={!!busy} className={aosButton({ variant: "deny", size: "sm" })}>
+              <button type="button" onClick={onDeny} disabled={!!busy} className={aosButton({ variant: "deny", size: "sm" })} {...cursorTarget(`approval:${cursorKey}:deny`, `${denyLabel}: ${title}`)}>
                 {busy === "deny" ? "Denying" : denyLabel}
               </button>
               {edit}
@@ -152,6 +156,7 @@ export function ApprovalCard({
                 onClick={onApprove}
                 disabled={!!busy}
                 className={aosButton({ variant: "approve", size: "md", className: "ml-auto" })}
+                {...cursorTarget(`approval:${cursorKey}:approve`, `${approveLabel}: ${title}`)}
               >
                 <Check className="size-4" aria-hidden />
                 {busy === "approve" ? "Approving" : approveLabel}
@@ -161,7 +166,7 @@ export function ApprovalCard({
             <>
               {edit}
               {reviewHref ? (
-                <Link href={reviewHref} className={aosButton({ variant: "review", size: "md", className: "ml-auto" })}>
+                <Link href={reviewHref} className={aosButton({ variant: "review", size: "md", className: "ml-auto" })} {...cursorTarget(`approval:${cursorKey}:review`, `${reviewLabel}: ${title}`, "link")}>
                   {reviewLabel}
                   <ArrowUpRight className="size-4" aria-hidden />
                 </Link>

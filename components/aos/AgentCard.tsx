@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import type { AosStatus } from "@/lib/aos/status";
 import { cn } from "@/lib/utils";
 import { aosButton } from "./button";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget, cursorSlug } from "@/lib/cursor/registry";
 import { CroppedShape, statusSurface } from "./CroppedShape";
 import { StatusBadge } from "./StatusBadge";
 import { ToolChip } from "./ToolChip";
@@ -22,13 +24,13 @@ export function CardActionButton({ action, status }: { action: CardAction; statu
   const cls = aosButton({ variant: status === "needs" ? "review" : "primary", size: "sm" });
   if (action.href) {
     return (
-      <Link href={action.href} className={cls}>
+      <Link href={action.href} className={cls} {...cursorTarget(`kit:agent-card:${cursorSlug(action.label)}`, action.label, "link")}>
         {action.label}
       </Link>
     );
   }
   return (
-    <button type="button" onClick={action.onClick} className={cls}>
+    <button type="button" onClick={action.onClick} className={cls} {...cursorTarget(`kit:agent-card:${cursorSlug(action.label)}`, action.label)}>
       {action.label}
     </button>
   );

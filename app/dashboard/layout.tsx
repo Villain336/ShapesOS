@@ -59,6 +59,8 @@ import { getI18n } from "@/lib/i18n/server";
 import { getShellState } from "@/lib/preferences/server";
 // Phase 18.2 (WS=content): Notes quick capture (⌥⇧N from anywhere).
 import { QuickCapture } from "@/components/notes/QuickCapture";
+// Phase 19A (WS=server): window.__shapesUiMap() for ShapesOS Desktop's cursor.
+import { CursorUiMap } from "@/components/cursor/CursorUiMap";
 
 export default async function DashboardLayout({
   children,
@@ -176,6 +178,8 @@ export default async function DashboardLayout({
         <NewTaskDialog />
         <QuickCapture />
         <FeedbackHost />
+        {/* Phase 19A (WS=server): the cursor's element map (renders nothing). */}
+        <CursorUiMap />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
