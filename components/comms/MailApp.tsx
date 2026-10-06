@@ -67,7 +67,7 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
-export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: boolean; initialThread?: string | null; initialCompose?: { to?: string | null } | null }) {
+export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: boolean; initialThread?: string | null; initialCompose?: { to?: string | null; subject?: string | null; body?: string | null } | null }) {
   const { t, format } = useI18n();
   const [folder, setFolder] = useState<MailFolder>("inbox");
   const [source, setSource] = useState<MailSource | null>(null);
@@ -340,6 +340,8 @@ export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: b
         onClose={() => setComposeOpen(false)}
         mailboxes={mailboxes}
         initialTo={initialCompose?.to ?? ""}
+        initialSubject={initialCompose?.subject ?? ""}
+        initialBody={initialCompose?.body ?? ""}
         onSent={(msg) => {
           setComposeOpen(false);
           setNotice(msg);
@@ -623,14 +625,31 @@ function ThreadPane({ threadKey, canEdit, onBack, onChanged }: { threadKey: stri
   );
 }
 
-function ComposeDialog({ open, onClose, mailboxes, initialTo, onSent }: { open: boolean; onClose: () => void; mailboxes: SourceStatus[]; initialTo: string; onSent: (notice: string) => void }) {
+function ComposeDialog({
+  open,
+  onClose,
+  mailboxes,
+  initialTo,
+  initialSubject = "",
+  initialBody = "",
+  onSent,
+}: {
+  open: boolean;
+  onClose: () => void;
+  mailboxes: SourceStatus[];
+  initialTo: string;
+  /** Phase 18.3 (WS=flow): prefilled by the share sheet. */
+  initialSubject?: string;
+  initialBody?: string;
+  onSent: (notice: string) => void;
+}) {
   const { t } = useI18n();
   const accounts = mailboxes.flatMap((m) => m.accounts.filter((a) => a.connectionId).map((a) => ({ ...a, source: m.source })));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(initialTo);
   const [cc, setCc] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState(initialBody);
   const [busy, setBusy] = useState<"send" | "draft" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
