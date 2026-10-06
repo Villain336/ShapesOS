@@ -130,3 +130,24 @@ back to the queue at once without charging the attempt
 Downloads streamed by other routes (exports, CAD packages) are ordinary HTTP
 responses: Next's own SIGTERM handler waits for them to finish while the
 server closes, bounded by the same grace period.
+
+## Two-instance smoke (scripts/smoke/multi-instance.mts)
+
+Runs the BUILT app as two replicas (A, B) plus the worker, each with its own
+scratch `TMPDIR` / `MARKETR_BLOB_DIR`, against one Postgres and one
+S3-compatible bucket (the in-process signature-checking fake,
+`lib/filesystem/fake-s3.ts`, unless `SMOKE_REAL_S3=1`). Checks: B accepts A's
+session; a file uploaded on A downloads on B byte for byte; a site working copy
+written on A is read on B and lives under `blobs/sites/`; a chat stream on A
+gets `event: reconnect` on SIGTERM and resumes on B with `Last-Event-ID`, every
+delta exactly once; A and the worker exit within `SHUTDOWN_GRACE_MS`.
+
+```
+npm run build   # once; the smoke never runs next dev
+DATABASE_URL=<schema owner> SMOKE_APP_DATABASE_URL=<app role> \
+  npx tsx scripts/smoke/multi-instance.mts      # exit 0 pass, 1 fail, 2 prerequisites
+```
+
+Its checks are unit-tested against stub replicas
+(`scripts/smoke/__tests__/multi-instance-lib.test.ts`), including the failure
+modes they must catch (replay from the start, no `reconnect`, an unshared bucket).
