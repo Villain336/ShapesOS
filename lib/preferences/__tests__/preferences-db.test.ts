@@ -125,7 +125,9 @@ describe("user preferences (DB)", () => {
       ["ana:approval_needed", "nobody:alert_fired", "nobody:approval_needed"],
     );
     const push = await prefs.filterByNotificationPrefs(bell, "push");
-    assert.deepEqual(push.map((n) => n.userId).sort(), [nobody, nobody], "Ana switched push off");
+    // Phase 18.3 (WS=trust): the channel matrix now also says which kinds reach
+    // the phone — alerts never did (PUSH_KINDS), and now the prefs filter says so too.
+    assert.deepEqual(push.map((n) => `${n.userId === nobody ? "nobody" : n.userId}:${n.kind}`), ["nobody:approval_needed"], "Ana switched push off; alerts never reach the phone");
     // A broken lookup fails open (an approval request is never swallowed).
     const broken = { userPreference: { findMany: async () => { throw new Error("db down"); } } } as never;
     assert.equal((await prefs.filterByNotificationPrefs(inputs, "inApp", broken)).length, inputs.length);
