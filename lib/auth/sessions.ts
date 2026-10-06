@@ -93,12 +93,10 @@ export async function checkUserSession(
   const sub = typeof token.sub === "string" ? token.sub : null;
   if (!sub) return "allow";
   const sid = typeof token.sid === "string" && token.sid ? token.sid : null;
-  const cacheKey = sid ?? legacyRowId(sub);
+  // A legacy token's answer depends on its own sign-in time: key it by both.
+  const cacheKey = sid ?? `${legacyRowId(sub)}@${typeof token.authAt === "number" ? token.authAt : 0}`;
   const hit = checks.get(cacheKey);
-  if (hit && (hit.decision === "reject" || now.getTime() - hit.at < SESSION_CHECK_TTL_MS)) {
-    // A cached legacy "allow" still depends on this token's own authAt.
-    if (sid || hit.decision === "reject") return hit.decision;
-  }
+  if (hit && (hit.decision === "reject" || now.getTime() - hit.at < SESSION_CHECK_TTL_MS)) return hit.decision;
   try {
     const decision = await withSessionOwner(sub, async (tx) => {
       let state: SessionRowState;
@@ -117,9 +115,7 @@ export async function checkUserSession(
       }
       return sessionClaimDecision(token, state, now);
     });
-    // Legacy answers depend on the token's authAt: only a reject for a
-    // sid-bearing token, or any sid answer, is safe to cache by key.
-    if (sid) checks.set(cacheKey, { decision, at: now.getTime() });
+    checks.set(cacheKey, { decision, at: now.getTime() });
     return decision;
   } catch (err) {
     console.warn("[sessions] registry check failed; allowing this request:", err instanceof Error ? err.message : err);
@@ -190,6 +186,8 @@ export async function revokeOtherSessions(userId: string, currentSid: string | n
     });
     return res.count;
   });
+  // Forget this process's "allow" answers (other sessions, and the legacy
+  // tokens keyed "legacy:<user>@<authAt>"), so the next read asks the database.
   for (const [key, v] of checks) if (key !== currentSid && v.decision === "allow") checks.delete(key);
   return count;
 }

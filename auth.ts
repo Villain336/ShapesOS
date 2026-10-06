@@ -171,7 +171,7 @@ if (oidc) extraProviders.push(oidc);
 const saml = samlProvider();
 if (saml) extraProviders.push(saml);
 
-/** Phase 18.3: the JWT lifetime, shared with the session registry rows. */
+/** Phase 18.3: the registry rows expire with the JWT (keep equal to session.maxAge below). */
 const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -179,7 +179,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
     strategy: "jwt",
     // Absolute session lifetime: 12h. Re-auth required after that.
-    maxAge: SESSION_MAX_AGE_SECONDS,
+    maxAge: 12 * 60 * 60,
   },
   providers: [
     Google,
