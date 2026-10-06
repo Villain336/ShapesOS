@@ -14,7 +14,9 @@ import { agentWorkerMode, type EnvLike } from "@/lib/agents/queue/config";
 // Phase 17 (latency): llm_usage too — the metering outbox rows a process
 // wrote but could not finish (lib/llm/usage.ts) need a sweeper when no agent
 // worker runs.
-export const DELEGATION_JOB_KINDS = ["subagent_run", "delegation_tick", "delegation_join", "llm_usage"] as const;
+// Phase 18.2 (WS=comms): channel_agent too — an agent mentioned in Messages
+// (and the inline Approve of its proposal) is a short delegated job.
+export const DELEGATION_JOB_KINDS = ["subagent_run", "delegation_tick", "delegation_join", "llm_usage", "channel_agent"] as const;
 
 export function localDelegationWorkerDecision(env: EnvLike = process.env): { start: boolean; reason?: string } {
   if (agentWorkerMode(env) !== "off") return { start: false, reason: "a worker runs agent jobs" };

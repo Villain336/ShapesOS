@@ -12,6 +12,9 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+// Phase 18.2 (WS=comms): posting goes through Messages' one path.
+import { errorResponse } from "@/lib/api/errors";
+import { postMessage } from "@/lib/comms/messages/store.server";
 
 export const dynamic = "force-dynamic";
 
@@ -102,19 +105,26 @@ export async function POST(req: Request) {
   // Author-name snapshot: member name, then session identity, then email prefix.
   const membership = await getMembership(user.id, project.workspaceId);
   if (!membership) return forbidden();
-  const authorName =
-    membership.name ??
-    (user as { name?: string | null }).name ??
-    user.email?.split("@")[0] ??
-    "Member";
-
-  const message = await withWorkspaceScope(project.workspaceId, async (tx) => {
-    const row = await tx.teamChatMessage.create({
-      data: { workspaceId: project.workspaceId, channelId: channel.id, userId: user.id, authorName, body: text },
-    });
-    await tx.chatChannel.update({ where: { id: channel.id }, data: { lastMessageAt: row.createdAt } });
-    return row;
-  });
+  // Phase 18.2 (WS=comms): the one posting path of Messages — mentions
+  // notify the people named, "@Researcher" starts an agent (editor+), the
+  // channel's read state moves. Same row shape as before for this panel.
+  let posted: Awaited<ReturnType<typeof postMessage>>;
+  try {
+    posted = await postMessage(
+      {
+        workspaceId: project.workspaceId,
+        userId: user.id,
+        role: membership.role,
+        name: membership.name ?? (user as { name?: string | null }).name ?? null,
+        email: user.email ?? null,
+      },
+      channel.id,
+      { body: text },
+    );
+  } catch (err) {
+    return errorResponse(err, "POST /api/team/chat");
+  }
+  const message = { ...posted.message, createdAt: new Date(posted.message.createdAt) };
   return Response.json(
     {
       message: {

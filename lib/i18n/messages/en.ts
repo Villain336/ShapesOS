@@ -89,6 +89,7 @@ export const en = {
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
       "/dashboard/mail": { label: "Mail", description: "One inbox: mail, lead conversations, social DMs" },
+      "/dashboard/messages": { label: "Messages", description: "Team channels, direct messages and your agents" },
       "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
       "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },

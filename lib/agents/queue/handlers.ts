@@ -100,4 +100,12 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     if (payload.workspaceId !== job.workspaceId) throw new Error("slack_mention payload belongs to another workspace");
     return runSlackMention(payload);
   },
+  // Phase 18.2 (WS=comms): an agent mentioned in Messages (or a person's
+  // inline Approve of its proposal) — lib/comms/messages/agent.server.ts.
+  async channel_agent(job) {
+    const { runChannelAgent } = await import("@/lib/comms/messages/agent.server");
+    const payload = job.payload as import("@/lib/comms/messages/agent.server").ChannelAgentJobPayload;
+    if (payload.workspaceId !== job.workspaceId) throw new Error("channel_agent payload belongs to another workspace");
+    return runChannelAgent(payload);
+  },
 };
