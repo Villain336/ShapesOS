@@ -187,7 +187,8 @@ export const MAX_AGENTS_PER_MESSAGE = 2;
  */
 export const STREAM_OVERLAP_MS = 5_000;
 
-export function messageVersion(m: { id: string; createdAt: Date | string; editedAt?: Date | string | null }): string {
+/** A message's version for the stream's de-duplication: edits AND new replies move it. */
+export function messageVersion(m: { id: string; createdAt: Date | string; editedAt?: Date | string | null; replyCount?: number }): string {
   const t = (d: Date | string | null | undefined) => (d ? new Date(d).getTime() : 0);
-  return `${m.id}@${Math.max(t(m.createdAt), t(m.editedAt))}`;
+  return `${m.id}@${Math.max(t(m.createdAt), t(m.editedAt))}#${m.replyCount ?? 0}`;
 }

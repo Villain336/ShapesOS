@@ -97,11 +97,12 @@ describe("DMs, presence, names, versions", () => {
     assert.equal(channelName("x".repeat(80))!.length, 60);
   });
 
-  it("a message's version moves when it is edited", () => {
+  it("a message's version moves when it is edited or gets a reply", () => {
     const a = messageVersion({ id: "m1", createdAt: "2026-10-06T12:00:00Z" });
     const b = messageVersion({ id: "m1", createdAt: "2026-10-06T12:00:00Z", editedAt: "2026-10-06T12:05:00Z" });
     assert.notEqual(a, b);
     assert.equal(a, messageVersion({ id: "m1", createdAt: new Date("2026-10-06T12:00:00Z"), editedAt: null }));
+    assert.notEqual(a, messageVersion({ id: "m1", createdAt: "2026-10-06T12:00:00Z", replyCount: 1 }), "a new reply re-sends its root (reply count)");
   });
 });
 
