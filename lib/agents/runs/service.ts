@@ -21,6 +21,7 @@ import type {
 import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
 import { notifyAgentRunFailed } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
+import { publishRunEvent } from "./live-events";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -80,7 +81,7 @@ export async function appendAgentRunEvent(
   event: AgentRunEventInput,
 ) {
   if (!event.summary?.trim()) throw new Error("appendAgentRunEvent: summary is required");
-  return withWorkspaceScope(workspaceId, async (tx) => {
+  const row = await withWorkspaceScope(workspaceId, async (tx) => {
     // Same outer transaction (withWorkspaceScope's) — no nested
     // $transaction: the seq increment and the event insert are atomic.
     const run = await tx.agentRun.update({
@@ -99,6 +100,10 @@ export async function appendAgentRunEvent(
       },
     });
   });
+  // Phase 17 (latency): the row is durable — hand it to the tails in this
+  // process at once (the AG-UI chat stream), instead of their next poll.
+  publishRunEvent(runId, { seq: row.seq, type: row.type, summary: row.summary, payload: row.payload });
+  return row;
 }
 
 /**
