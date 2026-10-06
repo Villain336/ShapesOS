@@ -213,7 +213,10 @@ export function buildSecurityHeaders(opts: { hsts: boolean }): Array<{ key: stri
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {
       key: "Permissions-Policy",
-      value: "camera=(), microphone=(), geolocation=(), payment=()",
+      // Phase 18.2 (WS=content): voice notes record in the browser, so the
+      // microphone is allowed for this origin only (self) — never for
+      // embedded third-party frames. Camera, location and payment stay off.
+      value: "camera=(), microphone=(self), geolocation=(), payment=()",
     },
     ...(opts.hsts
       ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]

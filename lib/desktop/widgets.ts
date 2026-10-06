@@ -23,6 +23,7 @@ import {
   MessagesSquare,
   Network,
   Newspaper,
+  NotebookPen, // Phase 18.2 (WS=content): Notes
   Target,
   Wallet,
   Warehouse,
@@ -53,6 +54,8 @@ export const WIDGET_IDS = [
   "key-numbers",
   "projects",
   "suggestions",
+  // Phase 18.2 (WS=content)
+  "notes",
 ] as const;
 
 export type WidgetId = (typeof WIDGET_IDS)[number];
@@ -260,6 +263,19 @@ export const WIDGETS: Readonly<Record<WidgetId, WidgetDef>> = Object.freeze({
     minRole: "viewer",
     href: "/dashboard/projects",
     source: "the Overview's suggestions",
+  },
+  // Phase 18.2 (WS=content): pinned and recent notes + a quick note.
+  notes: {
+    id: "notes",
+    title: "Notes",
+    description: "Pinned and recent notes, and a quick note",
+    icon: NotebookPen,
+    defaultSize: { w: 4, h: 3 },
+    minSize: { w: 3, h: 3 },
+    maxSize: { w: 6, h: 8 },
+    minRole: "viewer",
+    href: "/dashboard/notes",
+    source: "univer_docs kind note (lib/notes/service.ts listNotes)",
   },
 });
 

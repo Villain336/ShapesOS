@@ -40,6 +40,7 @@ import {
   MessagesSquare,
   Mic,
   Network,
+  NotebookPen, // Phase 18.2 (WS=content): Notes
   Paintbrush,
   PenLine,
   Phone,
@@ -143,6 +144,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/ops", label: "Operations", icon: Building2, description: "Orders, invoices, inventory, projects, helpdesk, team", keywords: "ops erp orders payments promotions invoices inventory warehouses purchasing projects tasks timesheets helpdesk tickets team hr leave recruiting workflows" },
       { href: "/dashboard/office", label: "Office", icon: Briefcase, description: "Docs, sheets and decks", keywords: "documents spreadsheets slides" },
       { href: "/dashboard/files", label: "Files", icon: Folder, description: "Workspace files", keywords: "uploads storage" },
+      // Phase 18.2 (WS=content): Notes (UniverDoc kind "note"; lib/notes).
+      { href: "/dashboard/notes", label: "Notes", icon: NotebookPen, description: "Quick notes, voice notes, notes on any record", keywords: "notes notebook memo jot capture voice meeting notes" },
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine, description: "Signature envelopes", keywords: "signature contracts documenso" },
       { href: "/dashboard/legal", label: "Legal", icon: Scale, description: "Licenses, filings, compliance", keywords: "compliance obligations permits tax" },
       { href: "/dashboard/insurance", label: "Insurance", icon: ShieldCheck, description: "Policies and renewals", keywords: "policies coverage renewals" },

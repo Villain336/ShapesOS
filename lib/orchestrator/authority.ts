@@ -66,6 +66,10 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   // no external audience; reversible (cancel the booking, free the forklift).
   "book_dock",
   "assign_equipment",
+  // Phase 18.2 (WS=content): an agent writing a note in the Notes app — an
+  // internal note owned by the person it works for (private by default),
+  // no money, no outside audience; reversible (the person deletes it).
+  "write_internal_note",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

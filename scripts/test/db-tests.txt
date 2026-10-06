@@ -210,3 +210,5 @@ lib/preferences/__tests__/preferences-db.test.ts
 lib/search/__tests__/spotlight-db.test.ts
 # Phase 18.1 (integration): notification producers apply find's channel filter first (a muted kind is never written, even in focus), then desk's focus hold (written held, not pushed), then push only rows not held; release on focus end (switch-off and cron sweep) delivers to the bell and pushes through the same push filter (push MOCK).
 lib/notifications/__tests__/focus-channels-db.test.ts
+# Phase 18.2 (content): Notes — createNote writes univer_docs kind "note" + record links (private = maker only, shared = members; viewer read-only; delete = maker/admin), a record's notes, another workspace never, FORCE RLS fail-closed on note_links / univer_doc_versions / univer_doc_collab_states, stale expectedVersion refused, version history (idle snapshot, named, restore keeps the current state and drops the collab state), Spotlight kind "note" (words inside, private only for its maker, never via Office/file contents), agents' create_note / read_note / search_workspace.
+lib/notes/__tests__/notes-db.test.ts

@@ -7,7 +7,8 @@
 //            only when semantic search runs — the query was embedded)
 // The best chunk per record wins; one hit per file / doc, with a snippet
 // from the best text chunk (or the closest chunk for a meaning-only match).
-// Viewer reads (Files and Office pages); trashed files never show.
+// Viewer reads (Files and Office pages); trashed files never show. Phase 18.2:
+// notes (univer_docs kind "note") are the "note" source's, never matched here.
 
 import { Prisma } from "@prisma/client";
 import { HEADLINE_OPTS, tsQuery } from "../sql";
@@ -73,7 +74,7 @@ export const fileContent: SearchSource = {
           JOIN search_texts st ON st.id = b.search_text_id AND st.workspace_id = ${ws}
           LEFT JOIN workspace_files f ON f.id = st.file_id AND f.workspace_id = st.workspace_id AND f.trashed_at IS NULL
           LEFT JOIN univer_docs d ON d.id = st.univer_doc_id AND d.workspace_id = st.workspace_id
-         WHERE ((st.source = 'file' AND f.id IS NOT NULL) OR (st.source = 'doc' AND d.id IS NOT NULL)) ${excluded}
+         WHERE ((st.source = 'file' AND f.id IS NOT NULL) OR (st.source = 'doc' AND d.id IS NOT NULL AND d.kind <> 'note')) ${excluded}
          ORDER BY (${RANK_WEIGHTS.text} * (coalesce(b.fts_rank, 0) / (coalesce(b.fts_rank, 0) + 0.1))
                  + ${RANK_WEIGHTS.meaning} * greatest(coalesce(b.vsim, 0) - 0.25, 0) / 0.75) DESC,
                   updated_at DESC, id
@@ -91,6 +92,6 @@ export const fileContent: SearchSource = {
   hit: (r) =>
     r.extra === "doc"
       ? { id: r.id, title: r.title ?? "Untitled", subtitle: r.sub, href: `/dashboard/office?open=${encodeURIComponent(r.id)}`, ref: { docId: r.id } }
-      : { id: r.id, title: r.title ?? "File", subtitle: r.sub, href: "/dashboard/files", ref: { fileId: r.id } },
+      : { id: r.id, title: r.title ?? "File", subtitle: r.sub, href: `/dashboard/files?file=${encodeURIComponent(r.id)}`, ref: { fileId: r.id } },
   actions: [{ id: "summarize", tool: "create_content_draft", instruction: "Read this and summarize it in five bullet points." }],
 };

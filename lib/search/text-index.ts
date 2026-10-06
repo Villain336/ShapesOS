@@ -107,7 +107,11 @@ export async function extractUniverText(kind: string, snapshot: unknown): Promis
   try {
     const { docSnapshotToParagraphs, sheetSnapshotToSheets } = await import("@/lib/univer/export");
     let text = "";
-    if (kind === "doc") {
+    if (kind === "note") {
+      // Phase 18.2 (WS=content): notes are Tiptap JSON (lib/notes/content.ts).
+      const { noteText } = await import("@/lib/notes/content");
+      text = noteText(snapshot);
+    } else if (kind === "doc") {
       text = docSnapshotToParagraphs(snapshot as Parameters<typeof docSnapshotToParagraphs>[0]).map((p) => p.text).join("\n");
     } else if (kind === "sheet") {
       text = sheetSnapshotToSheets(snapshot as Parameters<typeof sheetSnapshotToSheets>[0])

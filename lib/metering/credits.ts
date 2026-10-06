@@ -182,6 +182,10 @@ export const CREDIT_COSTS = {
   /** One started minute of call transcription (Twilio <Record> transcribe,
    * $0.05/min; cost-plus ~4× → 20 credits). */
   call_transcription_minute: { credits: 20, basis: "cost-plus", description: "Call transcription: 1 started minute (Twilio)", category: "messaging" },
+  /** Phase 18.2 (WS=content): one started minute of a browser voice note
+   * transcribed by the Whisper-class API on the platform key ($0.006/min;
+   * cost-plus ~4× → 3 credits). A new action, no existing price changed. */
+  voice_note_minute: { credits: 3, basis: "cost-plus", description: "Voice note transcription: 1 started minute (Whisper)", category: "ai" },
   /** One tracking number for one month (Twilio US local number $1.15/mo;
    * cost-plus ~4× → 460 credits). Charged at purchase and on each monthly
    * metering run while the number is active. */

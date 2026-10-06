@@ -34,6 +34,10 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "update_listing", label: "Update listing", description: "Small edits to business listings (hours, photos)." },
   { action: "send_internal_note", label: "Send internal note", description: "Notes to your own team, never external." },
   { action: "refresh_owned_page", label: "Refresh owned page", description: "Re-crawl / refresh a page you own." },
+  // Phase 18.2 (WS=content): Notes — an agent's internal note (Tier 1).
+  { action: "write_internal_note", label: "Write a note", description: "Save a note in the Notes app for the person the agent works for (private unless they share it)." },
+  // Phase 18.2 (WS=content): Files — a share link for people outside the workspace (Tier 2).
+  { action: "share_file_externally", label: "Share a file by link", description: "Create a share link to a workspace file (view-only or download, expiring)." },
   // Tier 2: significant — external audience or above the threshold. Asks
   // unless a rule says Auto-run (Phase 14).
   { action: "publish_external", label: "Publish externally", description: "Publish to audiences you don't own." },

@@ -4,6 +4,8 @@
 // de frase. Nombres de producto (ShapesOS, CRM, CAD, MCP) sin traducir.
 
 import type { Catalogue } from "./en";
+// Phase 18.2 (WS=content): las apps de este flujo, en su propio archivo.
+import { contentEs } from "./content.es";
 
 export const es: Catalogue = {
   common: {
@@ -103,6 +105,8 @@ export const es: Catalogue = {
       "/dashboard/ops": { label: "Operaciones", description: "Pedidos, facturas, inventario, proyectos, soporte, equipo" },
       "/dashboard/office": { label: "Oficina", description: "Documentos, hojas y presentaciones" },
       "/dashboard/files": { label: "Archivos", description: "Archivos del espacio de trabajo" },
+      // Phase 18.2 (WS=content)
+      "/dashboard/notes": { label: "Notas", description: "Notas rápidas, notas de voz, notas en cualquier registro" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
@@ -344,6 +348,8 @@ export const es: Catalogue = {
       ticket: "Ticket",
       deal: "Oportunidad",
       app: "App",
+      // Phase 18.2 (WS=content)
+      note: "Nota",
     },
   },
 
@@ -555,6 +561,8 @@ export const es: Catalogue = {
       attention: { title: "Requiere tu atención", description: "Borradores por revisar, páginas que pierden tráfico, movimientos de la competencia, alertas" },
       calendar: { title: "Calendario de hoy", description: "Reservas y eventos de los calendarios conectados para hoy" },
       inbox: { title: "Bandeja de entrada", description: "Conversaciones con leads sin leer (mensajes y correo)" },
+      // Phase 18.2 (WS=content)
+      notes: { title: "Notas", description: "Notas fijadas y recientes, y una nota rápida" },
       pipeline: { title: "Embudo", description: "Leads abiertos y su valor por etapa" },
       cash: { title: "Caja", description: "Pagos de los últimos 30 días y facturas aún abiertas" },
       twin: { title: "Gemelo", description: "Cifras en vivo del gemelo de tu almacén, fábrica o tienda" },
@@ -901,7 +909,12 @@ export const es: Catalogue = {
         "desktop.move": { label: "Mover el widget enfocado", hint: "Flechas, mientras editas" },
         "desktop.resize": { label: "Cambiar el tamaño del widget enfocado", hint: "Mayús + flechas, mientras editas" },
         "desktop.remove": { label: "Quitar el widget enfocado", hint: "Mientras editas" },
+        // Phase 18.2 (WS=content)
+        "notes.capture": { label: "Nota rápida", hint: "Desde cualquier parte" },
       },
     },
   },
+
+  // Phase 18.2 (WS=content): Notas, Archivos, colaboración, Monitor de actividad, Terminal, Tienda.
+  ...contentEs,
 };

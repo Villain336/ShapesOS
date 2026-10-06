@@ -12,6 +12,13 @@ export interface TranscribeOptions {
   language?: string;
   /** Whisper-class model name. Env TRANSCRIPTION_MODEL, default "whisper-1". */
   model?: string;
+  /**
+   * Phase 18.2 (WS=content): the audio's container, for recordings that are
+   * not MP3 (a browser voice note is WebM/Ogg). The API picks the decoder
+   * from the file name's extension. Default "audio.mp3" / "audio/mpeg".
+   */
+  filename?: string;
+  mimeType?: string;
 }
 
 export interface TranscriptionProvider {
@@ -72,7 +79,7 @@ export class WhisperTranscriptionProvider implements TranscriptionProvider {
 
     const form = new FormData();
     // Node's global FormData accepts a Blob; wrap the Buffer to stay typed.
-    form.append("file", new Blob([Uint8Array.from(audio)], { type: "audio/mpeg" }), "audio.mp3");
+    form.append("file", new Blob([Uint8Array.from(audio)], { type: opts.mimeType ?? "audio/mpeg" }), opts.filename ?? "audio.mp3");
     form.append("model", model);
     form.append("response_format", "verbose_json");
     form.append("timestamp_granularities[]", "word");
