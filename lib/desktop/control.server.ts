@@ -11,7 +11,7 @@
 //   - Focus / do not disturb → lib/desktop/focus.server.ts.
 //   - Auto-approve → a read-only summary of lib/automation/policy.ts.
 //   - Voice → the person's "voice" preference (lib/preferences via lib/desktop/prefs.ts, for 19A).
-//   - Spend today → the metering ledger (getUsageSummary from midnight UTC).
+//   - Spend today → the metering ledger (getUsageSummary from the person's local midnight; UTC until set).
 
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
@@ -20,6 +20,7 @@ import { LIVE_RUN_STATUSES } from "@/lib/agents/runs/types";
 import { focusView, type FocusView } from "./focus.server";
 import { getUserPreferences } from "./prefs";
 import { deskRoleAtLeast } from "./widgets";
+import { DEFAULT_TIME_ZONE, resolveTimeZone, startOfZonedDay } from "@/lib/time/zoned";
 
 export const PAUSE_REASON = "Paused from Control Center";
 
@@ -143,25 +144,32 @@ export async function autoApproveSummary(workspaceId: string): Promise<AutoAppro
   return out;
 }
 
-function startOfUtcDay(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-/** Credits metered today (UTC), from the ledger. 1 credit = $0.01. */
-export async function spendToday(workspaceId: string, now: Date = new Date()): Promise<{ credits: number; usd: number }> {
+/**
+ * Credits metered today — since midnight in the person's time zone (their
+ * "timeZone" preference; UTC until set), from the ledger. 1 credit = $0.01.
+ */
+export async function spendToday(
+  workspaceId: string,
+  now: Date = new Date(),
+  timeZone: string | null = null,
+): Promise<{ credits: number; usd: number }> {
   const { getUsageSummary } = await import("@/lib/metering/service");
-  const summary = await getUsageSummary({ workspaceId, periodStart: startOfUtcDay(now) });
+  const summary = await getUsageSummary({ workspaceId, periodStart: startOfZonedDay(now, resolveTimeZone(timeZone ?? DEFAULT_TIME_ZONE)) });
   return { credits: summary.used, usd: Math.round(summary.used) / 100 };
 }
 
 export async function controlState(workspaceId: string, userId: string, role: string | null | undefined, now: Date = new Date()): Promise<ControlState> {
+  const prefsP = getUserPreferences(userId);
   const [ws, liveRuns, focus, autoApprove, prefs, spend] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { frozenAt: true } }),
     withWorkspaceScope(workspaceId, (tx) => tx.agentRun.count({ where: { workspaceId, status: { in: [...LIVE_RUN_STATUSES] } } })).catch(() => 0),
     focusView(userId, now),
     autoApproveSummary(workspaceId),
-    getUserPreferences(userId),
-    spendToday(workspaceId, now).catch(() => ({ credits: 0, usd: 0 })),
+    prefsP,
+    prefsP
+      .catch(() => null)
+      .then((p) => spendToday(workspaceId, now, p?.timeZone ?? null))
+      .catch(() => ({ credits: 0, usd: 0 })),
   ]);
   return {
     paused: ws?.frozenAt ? { at: ws.frozenAt.toISOString() } : null,

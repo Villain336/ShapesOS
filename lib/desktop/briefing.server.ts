@@ -322,7 +322,14 @@ export async function runBriefingSweep(
     ? [{ id: opts.workspaceId }]
     : await prisma.workspace.findMany({ where: { frozenAt: null }, select: { id: true }, orderBy: { createdAt: "asc" }, take: opts.maxWorkspaces ?? 200 });
   let budget = opts.maxMembers ?? 500;
-  const tzOf = opts.timeZoneOf ?? (async () => null);
+  // Phase 18.1 (integration): the member's "timeZone" preference
+  // (lib/preferences via the desk adapter); UTC until they set one.
+  const tzOf =
+    opts.timeZoneOf ??
+    (async (userId: string) => {
+      const { getUserPreferences } = await import("./prefs");
+      return (await getUserPreferences(userId).catch(() => null))?.timeZone ?? null;
+    });
   for (const ws of workspaces) {
     report.workspaces++;
     const members = await prisma.workspaceMember.findMany({ where: { workspaceId: ws.id, userId: { not: null } }, select: { userId: true }, take: 500 });

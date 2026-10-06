@@ -239,6 +239,33 @@ describe("the Today briefing", () => {
     assert.equal(calls, afterOptIn + 1);
     assert.equal(localDay(new Date("2026-10-10T06:30:00Z"), "UTC"), "2026-10-10");
   });
+
+  it("the sweep's morning and day follow the member's timeZone preference (UTC until set)", async () => {
+    const prefs = await import("@/lib/preferences");
+    let calls = 0;
+    const deps = { batch: false, gather: async () => fakeInput, generate: async () => (calls++, { text: "Buenos días.", model: "m", live: true }) };
+    await prefs.setUserPreference(EDITOR, "timeZone", "America/Mexico_City"); // UTC-6, no DST
+    try {
+      // 06:30 UTC = 00:30 in Mexico City: not morning there yet.
+      const night = await runBriefingSweep({ workspaceId: WS, now: new Date("2026-10-11T06:30:00Z"), deps });
+      assert.equal(night.written, 0);
+      // 12:30 UTC = 06:30 local: written, for the LOCAL day.
+      const morning = await runBriefingSweep({ workspaceId: WS, now: new Date("2026-10-11T12:30:00Z"), deps });
+      assert.equal(morning.written, 1);
+      const row = await withUserScope(WS, EDITOR, (tx) =>
+        tx.desktopBriefing.findFirst({ where: { workspaceId: WS, userId: EDITOR, body: "Buenos días." }, select: { day: true } }),
+      );
+      assert.equal(row?.day, "2026-10-11");
+      // 03:00 UTC next day = 21:00 on the 11th locally: still the same day, nothing new.
+      const evening = await runBriefingSweep({ workspaceId: WS, now: new Date("2026-10-12T03:00:00Z"), deps });
+      assert.equal(evening.written, 0);
+      assert.equal(calls, 1);
+      // The page reads the same local day.
+      assert.equal((await readTodayBriefing(WS, EDITOR, "America/Mexico_City", new Date("2026-10-12T03:00:00Z"))).status, "ready");
+    } finally {
+      await prisma.userPreference.deleteMany({ where: { userId: EDITOR } });
+    }
+  });
 });
 
 describe("Control Center: pause all agents", () => {
