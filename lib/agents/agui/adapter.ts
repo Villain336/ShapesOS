@@ -426,10 +426,16 @@ function createRunTail(
   request: { workspaceId: string },
   deps: AguiAdapterDeps,
   meta: AguiRunMeta,
-  emit: (event: AguiEvent) => Generator<AguiEvent>,
+  emitOut: (event: AguiEvent) => Generator<AguiEvent>,
   afterSeq = -1,
 ) {
   const listEvents = deps.listRunEvents ?? defaultListRunEvents;
+  // While priming a resumed stream (prime() below) the state is rebuilt from
+  // events the client already has, so nothing is emitted.
+  let silent = false;
+  const emit = function* (event: AguiEvent): Generator<AguiEvent> {
+    if (!silent) yield* emitOut(event);
+  };
   const runIdAgui = meta.runId;
   const st = {
     agentRunId: null as string | null,
@@ -505,6 +511,33 @@ function createRunTail(
       if (batch.length < 500) return;
     }
   };
+  /**
+   * Deploy PR: a stream resumed on another replica must continue where the
+   * client is, not where this process is. Replay the run's events up to
+   * `upToSeq` silently, so the open message (same id, no second
+   * TEXT_MESSAGE_START), the text already shown in it, and the tool calls
+   * already announced are known. Without this the final reconcile saw only
+   * the post-resume text and sent the whole answer again as a new message.
+   */
+  const prime = async (upToSeq: number): Promise<void> => {
+    if (!st.agentRunId || upToSeq < 0) return;
+    silent = true;
+    try {
+      let after = -1;
+      for (;;) {
+        const batch = await listEvents(request.workspaceId, st.agentRunId, after).catch(() => [] as TailedRunEvent[]);
+        for (const ev of batch) {
+          if (ev.seq > upToSeq) return;
+          after = Math.max(after, ev.seq);
+          for (const _ of mapEvent(ev)) void _;
+        }
+        if (batch.length < 500) return;
+      }
+    } finally {
+      silent = false;
+      st.lastSeq = Math.max(st.lastSeq, upToSeq);
+    }
+  };
   /** Draining: end at this clean boundary and tell the client where to resume. */
   const reconnect = function* (): Generator<AguiEvent> {
     yield* emit(
@@ -559,7 +592,7 @@ function createRunTail(
     yield* drain();
     return "ended";
   };
-  return { st, closeMsg, drain, reconnect, finish, tailUntilEnd };
+  return { st, closeMsg, drain, prime, reconnect, finish, tailUntilEnd };
 }
 
 /**
@@ -671,6 +704,7 @@ export async function* resumeChatTurnAgui(request: AguiResumeRequest, deps: Agui
   const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
   const tail = createRunTail(request, deps, meta, emit, request.afterSeq);
   tail.st.agentRunId = request.agentRunId;
+  await tail.prime(request.afterSeq);
   const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
   if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
     yield* tail.reconnect();

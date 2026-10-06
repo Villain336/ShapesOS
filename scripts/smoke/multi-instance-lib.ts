@@ -275,13 +275,13 @@ export async function sseDrainResume(
   } catch {
     // B cut the connection — the finish check below reports it.
   }
-  // The final reconcile may append the delivered text as its own message:
-  // compare only the streamed deltas.
-  const streamed = received.slice(0, sent.length);
+  // Exactly the streamed deltas: the final reconcile on B must find the full
+  // text in the open message (the resumed stream is primed with what A
+  // delivered) and add nothing — a second copy of the answer is a failure.
   checks.push({ name: "the turn finishes on B (RUN_FINISHED)", ok: finished });
   checks.push({
     name: "every delta exactly once, in order, across the restart",
-    ok: JSON.stringify(streamed) === JSON.stringify(sent),
+    ok: JSON.stringify(received) === JSON.stringify(sent),
     detail: `sent ${JSON.stringify(sent)} got ${JSON.stringify(received)}`,
   });
   const code = await Promise.race([a.exited, new Promise<"timeout">((r) => setTimeout(() => r("timeout"), opts.graceMs + 5_000))]);

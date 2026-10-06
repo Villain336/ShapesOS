@@ -42,6 +42,8 @@ interface StubOptions {
   noReconnect?: boolean;
   /** Use a private bucket instead of the shared one (a local-disk replica). */
   privateBucket?: boolean;
+  /** At the end, send the whole answer again as its own message (the unprimed-resume bug). */
+  resendFinalText?: boolean;
 }
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -153,8 +155,13 @@ async function stubReplica(name: string, shared: Shared, opts: StubOptions = {})
           return end();
         }
         if (shared.finalText !== null) {
-          // Like the real tail: the delivered text as its own message, then RUN_FINISHED.
-          res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", messageId: "m2", delta: shared.finalText })}\n\n`);
+          // Like the real (primed) tail: the final text matches what the
+          // open message already holds, so only the message end and
+          // RUN_FINISHED follow — no second copy of the answer.
+          res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_END", messageId: "m1" })}\n\n`);
+          if (opts.resendFinalText) {
+            res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", messageId: "m2", delta: shared.finalText })}\n\n`);
+          }
           res.write(`data: ${JSON.stringify({ type: "RUN_FINISHED" })}\n\n`);
           return end();
         }
@@ -289,6 +296,17 @@ describe("multi-instance smoke checks (stub replicas)", () => {
     const exactlyOnce = checks.find((c) => c.name.startsWith("every delta exactly once"))!;
     assert.equal(exactlyOnce.ok, false);
     assert.match(exactlyOnce.detail!, /"a0 ".*"a0 "/);
+  });
+
+  it("fails when the resuming replica sends the whole answer again at the end", async () => {
+    const shared = newShared();
+    const a = await stubReplica("A", shared);
+    const b = await stubReplica("B", shared, { resendFinalText: true });
+    const jar = await signedIn(a);
+    const checks = await sseDrainResume(a, b, jar, { runId: RUN, aguiRunId: "agui-1" }, timelineOf(shared), { graceMs: 200 });
+    const exactlyOnce = checks.find((c) => c.name.startsWith("every delta exactly once"))!;
+    assert.equal(exactlyOnce.ok, false);
+    assert.match(exactlyOnce.detail!, /"a0 a1 a2 b0 b1 b2 "/);
   });
 
   it("fails when SIGTERM drops the stream without `event: reconnect`", async () => {
