@@ -17,6 +17,8 @@ import { emitWebhookEvent } from "@/lib/webhooks/emit";
 // Phase 4b: mobile push for the push kinds (fire-and-forget, no-op unless
 // PUSH_PROVIDER=expo — see lib/push/notify.ts).
 import { queuePushForNotifications } from "@/lib/push/notify";
+// Phase 18.1 (WS=find): per-person notification channels.
+import { filterByNotificationPrefs } from "@/lib/preferences";
 
 export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
 
@@ -49,10 +51,16 @@ export function actorUserId(actor: string | null | undefined): string | null {
  * recipient row (Phase 4a). The webhook dedupe key follows the
  * notification's own, so a duplicate notification never re-fires.
  */
-async function createAndEmit(db: ProducerDb, inputs: NotificationInput[]): Promise<number> {
+async function createAndEmit(db: ProducerDb, all: NotificationInput[]): Promise<number> {
+  // Phase 18.1 (WS=find): each person's notification channels
+  // (lib/preferences — Settings → You → Notifications). A kind muted or the
+  // bell switched off → no row; push follows the bell (only new rows push,
+  // which is also what keeps a re-fired event from pushing twice).
+  const inputs = await filterByNotificationPrefs(all, "inApp");
   const created = await createNotifications(db, inputs);
   if (created > 0) {
-    queuePushForNotifications(inputs);
+    const pushable = await filterByNotificationPrefs(inputs, "push");
+    if (pushable.length) queuePushForNotifications(pushable);
     for (const n of inputs) {
       await emitWebhookEvent({
         workspaceId: n.workspaceId,

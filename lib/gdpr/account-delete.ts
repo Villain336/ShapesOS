@@ -134,6 +134,8 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   // Phase 6: the email + password account (its single-use links are keyed by
   // address and deleted just before; see EMAIL_TOKEN_TABLE).
   { table: "email_accounts", column: "user_id" },
+  // Phase 18.1 (WS=find): theme, language, time zone, shortcuts… (lib/preferences).
+  { table: "user_preferences", column: "user_id" },
   { table: "user_security", column: "user_id" },
 ];
 

@@ -202,3 +202,5 @@ lib/llm/__tests__/batch-db.test.ts
 lib/metering/__tests__/ai-health-db.test.ts
 # Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
 scripts/eval/__tests__/eval-dry-run-db.test.ts
+# Phase 18.1 (find): per-user preferences — defaults, one-key upserts, ownership (one person's write never touches another; the route reads the subject from the session only), all-or-nothing validation, CHECK constraints against raw SQL, PATCH /api/preferences + shell cookie + 401, notification channel filter (bell/push/muted, fail-open), account deletion lists the table.
+lib/preferences/__tests__/preferences-db.test.ts

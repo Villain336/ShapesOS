@@ -17047,3 +17047,41 @@ model CorpusRetrievalUsage {
 
   @@map("corpus_retrieval_usage")
 }
+
+// ============================================================================
+// Phase 18.1 (WS=find): per-user preferences (lib/preferences). One row per
+// person (the Auth.js subject), global across workspaces: theme, contrast,
+// language, time zone, density, motion and font size are about the human at
+// the keyboard, so there are no per-workspace overrides. Like user_security
+// and notifications this is keyed by the subject id with no workspace_id and
+// no tenant RLS; every read and write is keyed to the SESSION's own subject
+// (lib/preferences/index.ts, app/api/preferences — requireSelfService), and
+// account deletion removes the row (lib/gdpr/account-delete.ts). Enum-like
+// text columns carry CHECK constraints in the migration; the JSON columns
+// are validated by lib/preferences/schema.ts on every write.
+// ============================================================================
+
+model UserPreference {
+  userId        String   @id @map("user_id")
+  theme         String   @default("system")
+  contrast      String   @default("standard")
+  // NULL = match the browser (Accept-Language), negotiated per request.
+  language      String?
+  // NULL = not set yet; the shell saves the device zone on first visit.
+  timeZone      String?  @map("time_zone")
+  hourCycle     String   @default("auto") @map("hour_cycle")
+  density       String   @default("comfortable")
+  motion        String   @default("system")
+  fontScale     Int      @default(100) @map("font_scale")
+  // { inApp, push, mutedKinds[] }
+  notifications Json     @default("{}")
+  // { "<action.id>": "mod+k" | "g i" } — WS=desk's rebinding UI writes it.
+  shortcuts     Json     @default("{}")
+  // Placeholders for WS=desk (Home desktop/dock) and 19A (voice).
+  desktop       Json     @default("{}")
+  voice         Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("user_preferences")
+}
