@@ -5,7 +5,7 @@
 //
 // Tiers (per spec):
 //   auth  — /api/auth/* (except read-only session/csrf/providers): 10 req/min, keyed by IP
-//   read  — GET/HEAD/OPTIONS: 120 req/min, keyed by user (IP fallback)
+//   read  — GET/HEAD/OPTIONS: 120 req/min (RATE_LIMIT_READ_PER_MIN), keyed by user (IP fallback)
 //   write — POST/PUT/PATCH/DELETE: 60 req/min, keyed by user (IP fallback)
 //   ai    — LLM / skill-execution routes (see AI_ROUTE_PATTERNS): 20 req/min, keyed by user
 //
@@ -38,9 +38,25 @@ import { maybeCleanup, sharedCounterStore, storeWarn, withStoreTimeout } from ".
 
 export type RateLimitTier = "auth" | "read" | "write" | "ai";
 
+export const DEFAULT_READ_LIMIT = 120;
+
+/**
+ * RATE_LIMIT_READ_PER_MIN (optional) raises or lowers the READ tier only —
+ * e.g. many people behind one office IP before they sign in, or the e2e suite
+ * (one user, machine speed). Clamped to 30–6000; anything else keeps the
+ * default. The auth, write and ai tiers are never configurable here: they
+ * guard credentials, side effects and spend.
+ */
+export function readLimitFromEnv(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.RATE_LIMIT_READ_PER_MIN;
+  if (!raw) return DEFAULT_READ_LIMIT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 30 && n <= 6000 ? n : DEFAULT_READ_LIMIT;
+}
+
 export const TIER_LIMITS: Record<RateLimitTier, { limit: number; windowMs: number }> = {
   auth: { limit: 10, windowMs: 60_000 },
-  read: { limit: 120, windowMs: 60_000 },
+  read: { limit: readLimitFromEnv(), windowMs: 60_000 },
   write: { limit: 60, windowMs: 60_000 },
   ai: { limit: 20, windowMs: 60_000 },
 };

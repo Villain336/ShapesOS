@@ -291,7 +291,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (253 keys)</summary>
+<details><summary>Not set on Render, on purpose (254 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -306,6 +306,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | hosted deployment | `MARKETR_SELF_HOSTED` |
 | default http://127.0.0.1:$PORT is right | `CRON_RUNNER_ORIGIN` |
 | set per service in render.yaml (heap sized to the plan) | `NODE_OPTIONS` |
+| default 120 reads/min per person per web instance; set it in shapesos-web only if many people share one IP | `RATE_LIMIT_READ_PER_MIN` |
 | local disk path; hosted files live in R2 (MARKETR_STORAGE=s3) | `MARKETR_STORAGE_DIR` |
 | legacy fallback for AUTH_SECRET; leave unset so there is one session secret | `NEXTAUTH_SECRET` |
 | OpenAI-compatible override; OPENAI_API_KEY is used on hosted | `LLM_API_KEY` |

@@ -103,6 +103,7 @@ export const TABLE = [
   ["KEEP_ALIVE_TIMEOUT", { cls: "value", group: W, value: "310000", why: "above every load balancer idle timeout in front of the app" }],
   ["NODE_OPTIONS", { cls: "exclude", notInEnvExample: "Node runtime flag, set per service in render.yaml", why: "set per service in render.yaml (heap sized to the plan)" }],
   ["RATE_LIMIT_STORE", { cls: "value", group: S, value: "postgres" }],
+  ["RATE_LIMIT_READ_PER_MIN", { cls: "exclude", why: "default 120 reads/min per person per web instance; set it in shapesos-web only if many people share one IP" }],
   ["MARKETR_STORAGE", { cls: "value", group: S, value: "s3" }],
   ["MARKETR_S3_REGION", { cls: "value", group: S, value: "auto", why: "R2's region (https://developers.cloudflare.com/r2/api/s3/api/)" }],
   ["MARKETR_S3_BUCKET", { cls: "value", group: S, value: "shapesos-files" }],
