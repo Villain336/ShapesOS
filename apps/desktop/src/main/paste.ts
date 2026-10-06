@@ -5,35 +5,44 @@
 // (keyTap V with Meta/Ctrl). On macOS that needs Accessibility; without it
 // (or without uiohook) canPaste() is false and the text is only copied.
 
-import { clipboard, nativeImage, systemPreferences } from "electron";
-import type { ClipboardPort, ClipboardSnapshot, PastePort } from "../shared/dictation";
+import { clipboard, ClipboardItem, systemPreferences } from "electron";
+import type { ClipboardPort, PastePort } from "../shared/dictation";
 import { loadUiohook } from "./hold-key";
 
-export const electronClipboard: ClipboardPort = {
-  snapshot(): ClipboardSnapshot {
-    const img = clipboard.readImage();
-    return {
-      text: clipboard.readText(),
-      html: clipboard.readHTML(),
-      rtf: clipboard.readRTF(),
-      image: img.isEmpty() ? null : new Uint8Array(img.toPNG()),
-    };
+type Snapshot = Record<string, Blob | string>[];
+
+/**
+ * Electron 44's async clipboard. The snapshot copies every MIME type of
+ * every item (text, HTML, RTF, images, files) so restore() puts back exactly
+ * what the person had.
+ */
+export const electronClipboard: ClipboardPort<Snapshot> = {
+  async snapshot(): Promise<Snapshot> {
+    const items = await clipboard.read().catch(() => []);
+    const out: Snapshot = [];
+    for (const item of items) {
+      const rec: Record<string, Blob | string> = {};
+      for (const type of item.types) {
+        try {
+          const v = await item.getType(type);
+          if (v instanceof Blob) rec[type] = v;
+        } catch {
+          /* a type the platform can't hand back */
+        }
+      }
+      if (Object.keys(rec).length) out.push(rec);
+    }
+    return out;
   },
-  restore(s: ClipboardSnapshot): void {
-    clipboard.write({
-      text: s.text || undefined,
-      html: s.html || undefined,
-      rtf: s.rtf || undefined,
-      image: s.image ? nativeImage.createFromBuffer(Buffer.from(s.image)) : undefined,
-    });
-    if (!s.text && !s.html && !s.rtf && !s.image) clipboard.clear();
+  async restore(s: Snapshot): Promise<void> {
+    if (!s.length) {
+      await clipboard.clear();
+      return;
+    }
+    await clipboard.write(s.map((rec) => new ClipboardItem(rec)));
   },
-  writeText(text: string): void {
-    clipboard.writeText(text);
-  },
-  readText(): string {
-    return clipboard.readText();
-  },
+  writeText: (text) => clipboard.writeText(text),
+  readText: () => clipboard.readText(),
 };
 
 export function pastePort(platform = process.platform): PastePort {

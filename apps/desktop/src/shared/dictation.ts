@@ -7,19 +7,17 @@
 // permission (macOS) or a key injector, the text stays on the clipboard and
 // the card says "Copied. Press ⌘V to paste." instead of pretending.
 
-export interface ClipboardSnapshot {
-  text: string;
-  html: string;
-  rtf: string;
-  /** PNG bytes of an image on the clipboard, if any. */
-  image: Uint8Array | null;
-}
-
-export interface ClipboardPort {
-  snapshot(): ClipboardSnapshot;
-  restore(s: ClipboardSnapshot): void;
-  writeText(text: string): void;
-  readText(): string;
+/**
+ * The clipboard, async (Electron 44's clipboard is the W3C-style async API:
+ * read() → ClipboardItem[], write(items), readText(), writeText()).
+ * A snapshot is opaque to this module: whatever restore() needs to put
+ * every format back (text, HTML, RTF, images, files).
+ */
+export interface ClipboardPort<S = unknown> {
+  snapshot(): Promise<S>;
+  restore(s: S): Promise<void>;
+  writeText(text: string): Promise<void>;
+  readText(): Promise<string>;
 }
 
 export interface PastePort {
@@ -43,11 +41,11 @@ export async function confirmDictation(
   const sleep = ports.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const combo = ports.platform === "darwin" ? "⌘V" : "Ctrl+V";
   if (!ports.paste.canPaste()) {
-    ports.clipboard.writeText(text);
+    await ports.clipboard.writeText(text);
     return { status: "copied", say: `Copied. Press ${combo} to paste.` };
   }
-  const saved = ports.clipboard.snapshot();
-  ports.clipboard.writeText(text);
+  const saved = await ports.clipboard.snapshot();
+  await ports.clipboard.writeText(text);
   try {
     await ports.paste.paste();
     await sleep(PASTE_SETTLE_MS);
@@ -56,7 +54,7 @@ export async function confirmDictation(
     return { status: "failed", say: `Couldn't paste. The text is on your clipboard; press ${combo}.` };
   }
   // Only restore if nobody else changed the clipboard while we pasted.
-  if (ports.clipboard.readText() === text) ports.clipboard.restore(saved);
+  if ((await ports.clipboard.readText()) === text) await ports.clipboard.restore(saved);
   return { status: "pasted", say: "Pasted." };
 }
 

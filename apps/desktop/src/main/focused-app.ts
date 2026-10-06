@@ -9,7 +9,7 @@
 
 import type { FocusedApp } from "../shared/exclusions";
 
-type ActiveWindow = (opts?: { accessibilityPermission?: boolean; screenRecordingPermission?: boolean }) => Promise<
+type ActiveWindow = (opts?: { accessibilityPermission: boolean; screenRecordingPermission: boolean }) => Promise<
   | {
       title: string;
       owner: { name: string; path: string; bundleId?: string };

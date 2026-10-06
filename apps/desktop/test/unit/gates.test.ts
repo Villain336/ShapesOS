@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { gateClick, gateVoice, parseVoiceAnswer, proposalHint, voiceCanApprove } from "../../src/shared/approval";
 import type { ProposalEvent } from "../../src/shared/contract";
-import { confirmDictation, type ClipboardSnapshot } from "../../src/shared/dictation";
+import { confirmDictation } from "../../src/shared/dictation";
 import { DEFAULT_EXCLUSIONS, exclusionMessage, matchExclusion, normaliseExclusions, parseExclusion } from "../../src/shared/exclusions";
 import { decideCap, parseAgentIntent } from "../../src/shared/intents";
 
@@ -90,10 +90,10 @@ describe("exclusion list", () => {
 
 describe("dictation: preview → paste → clipboard restore (mocked)", () => {
   function ports(canPaste = true) {
-    const saved: ClipboardSnapshot = { text: "original", html: "<b>original</b>", rtf: "", image: null };
+    const saved = { formats: { "text/plain": "original", "text/html": "<b>original</b>" } };
     let clip = "original";
-    const restore = vi.fn((s: ClipboardSnapshot) => {
-      clip = s.text;
+    const restore = vi.fn(async (s: typeof saved) => {
+      clip = s.formats["text/plain"];
     });
     const paste = vi.fn(async () => undefined);
     return {
@@ -103,7 +103,12 @@ describe("dictation: preview → paste → clipboard restore (mocked)", () => {
         return clip;
       },
       p: {
-        clipboard: { snapshot: () => saved, restore, writeText: (t: string) => void (clip = t), readText: () => clip },
+        clipboard: {
+          snapshot: async () => saved,
+          restore,
+          writeText: async (t: string) => void (clip = t),
+          readText: async () => clip,
+        },
         paste: { canPaste: () => canPaste, paste },
         sleep: async () => undefined,
         platform: "darwin",
@@ -132,7 +137,7 @@ describe("dictation: preview → paste → clipboard restore (mocked)", () => {
 
   it("does not clobber a clipboard someone changed mid-paste", async () => {
     const t = ports();
-    t.p.paste.paste = vi.fn(async () => void t.p.clipboard.writeText("user copied something"));
+    t.p.paste.paste = vi.fn(async () => void (await t.p.clipboard.writeText("user copied something")));
     await confirmDictation("Hello", t.p);
     expect(t.restore).not.toHaveBeenCalled();
   });
