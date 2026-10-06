@@ -556,8 +556,14 @@ function createRunTail(
     const final = finalText.trim();
     if (final) {
       if (st.openMsg && final.startsWith(st.openText.trim()) && st.openText.trim()) {
-        const rest = finalText.slice(finalText.indexOf(st.openText.trim()) + st.openText.trim().length);
-        if (rest) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: st.openMsg, delta: rest } as TextMessageContentEvent, meta));
+        // What the client lacks after the text the open message already
+        // holds. Compare exactly when possible: the trimmed comparison used
+        // to re-send whitespace the stream had already delivered (the smoke
+        // saw a lone " " after a resume). A whitespace-only tail adds nothing.
+        const rest = finalText.startsWith(st.openText)
+          ? finalText.slice(st.openText.length)
+          : finalText.slice(finalText.indexOf(st.openText.trim()) + st.openText.trim().length);
+        if (rest.trim()) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: st.openMsg, delta: rest } as TextMessageContentEvent, meta));
         yield* closeMsg();
       } else if (!st.openMsg || final !== st.openText.trim()) {
         yield* closeMsg();

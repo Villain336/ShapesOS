@@ -160,6 +160,20 @@ describe("AG-UI stream across a server restart (deploy PR)", () => {
     assert.equal(out[out.length - 1]!.type, EventType.RUN_FINISHED);
   });
 
+  it("the final reconcile adds nothing when the stream already delivered the text, trailing whitespace included", async () => {
+    const tl = timeline();
+    tl.push("text", { kind: "text_delta", step: 1, text: "a0 " }); // seq 0 (delivered)
+    tl.push("text", { kind: "text_delta", step: 1, text: "b0 " }); // seq 1 (new)
+    const out: AguiEvent[] = [];
+    for await (const e of resumeChatTurnAgui(
+      { workspaceId: "ws", threadId: "th", agentRunId: "run7", aguiRunId: "agui1", afterSeq: 0 },
+      { listRunEvents: tl.list, getRunStatus: async () => "succeeded", latestAssistantText: async () => "a0 b0 ", logSink: () => undefined, pollMs: 5 },
+    ))
+      out.push(e);
+    const texts = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CONTENT).map((e) => (e as { delta: string }).delta);
+    assert.deepEqual(texts, ["b0 "], "no lone whitespace delta after the streamed text");
+  });
+
   it("a resumed stream does not re-announce a tool call the client already saw", async () => {
     const tl = timeline();
     tl.push("tool", { kind: "tool_start", toolUseId: "t1", tool: "search", args: { q: "x" } }); // seq 0 (delivered)
