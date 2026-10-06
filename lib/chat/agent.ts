@@ -876,7 +876,17 @@ async function freshTurnPrompt(
     nudge: autoDelegation && grantCanDelegate(grant) ? delegationNudge(trimmed) : null,
     factsSummary,
   });
+  // Phase 17 evaluation knob: CHAT_CACHE_LAYOUT=legacy rebuilds the
+  // pre-Phase-17 shape (the dynamic context inside the system prompt, so the
+  // prefix changes every turn) — only so scripts/eval can measure the layout
+  // against the old one. Default "v2" (above).
+  if (chatCacheLayout() === "legacy") return { system: `${system}\n\n${context}`, messages: [...history, { role: "user", content: trimmed }] };
   return { system, messages: withContextBlock([...history, { role: "user", content: trimmed }], context) };
+}
+
+/** Phase 17: "v2" (default: static prefix + context in the first user turn) or "legacy" (evaluation only). */
+export function chatCacheLayout(env: Record<string, string | undefined> = process.env): "v2" | "legacy" {
+  return (env.CHAT_CACHE_LAYOUT ?? "").trim().toLowerCase() === "legacy" ? "legacy" : "v2";
 }
 
 /**

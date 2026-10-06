@@ -197,7 +197,9 @@ export const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
  * take the 1-hour TTL; sub-agents and background runs are bursts of calls
  * seconds apart, where the default 5-minute entry stays warm on its own.
  */
-export function cacheTtlForWorkload(workload: LlmWorkload): ChatCacheTtl {
+export function cacheTtlForWorkload(workload: LlmWorkload, env: Record<string, string | undefined> = process.env): ChatCacheTtl {
+  // CHAT_CACHE_LAYOUT=legacy (evaluation only): the pre-Phase-17 5-minute TTL everywhere.
+  if ((env.CHAT_CACHE_LAYOUT ?? "").trim().toLowerCase() === "legacy") return "5m";
   return workload === "lead" || workload === "code" || workload === "code_max" ? "1h" : "5m";
 }
 

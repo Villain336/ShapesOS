@@ -190,3 +190,5 @@ lib/chat/__tests__/p17-model-db.test.ts
 lib/llm/__tests__/batch-db.test.ts
 # Phase 17 (model): AI cost & speed from the llm_tokens ledger (cost per day, cache hits, p50/p95 first token, by model, top runs) and the cache-health alert (admins notified once per day when the 24 h cache-read share is under 60%).
 lib/metering/__tests__/ai-health-db.test.ts
+# Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
+scripts/eval/__tests__/eval-dry-run-db.test.ts
