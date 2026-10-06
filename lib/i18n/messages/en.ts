@@ -112,6 +112,7 @@ export const en = {
       // Phase 18.2 (WS=content)
       "/dashboard/notes": { label: "Notes", description: "Quick notes, voice notes, notes on any record" },
       "/dashboard/activity": { label: "Activity monitor", description: "Every run, job and sandbox: cost, time, Stop" },
+      "/dashboard/terminal": { label: "Terminal", description: "A shell on a workspace sandbox" },
       // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
       "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
       "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },

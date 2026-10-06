@@ -129,7 +129,7 @@ export async function startTerminalSession(actor: TerminalActor): Promise<{ sess
   );
   if (existing) {
     if (await attach(existing)) return { session: out(existing), resumed: true };
-    await markEnded(actor.workspaceId, existing.id, "the sandbox idled out");
+    await finishSession(actor.workspaceId, existing.id, "the sandbox idled out", null);
   }
   const avail = await terminalAvailability();
   if (!avail.ok) throw new ServiceUnavailableError(avail.reason);
@@ -209,7 +209,7 @@ export async function runTerminalCommand(
   if (row.status !== "active") throw new ConflictError("This terminal session has ended. Open a new one.");
   const sb = await attach(row);
   if (!sb) {
-    await markEnded(actor.workspaceId, row.id, "the sandbox idled out");
+    await finishSession(actor.workspaceId, row.id, "the sandbox idled out", null);
     throw new ConflictError("The sandbox behind this terminal has stopped (idle timeout). Open a new one.");
   }
   const cwd = checkCwd(input.cwd, sb.workdir);
@@ -218,25 +218,41 @@ export async function runTerminalCommand(
   );
   // Hold back the cwd marker: it may arrive split across chunks.
   let pendingOut = "";
-  const res = await sb.exec(wrapCommand(command, cwd), {
+  let streamed = false;
+  const started = Date.now();
+  const res = await sb
+    .exec(wrapCommand(command, cwd), {
     timeoutMs: TERMINAL_EXEC_TIMEOUT_MS,
     maxOutputBytes: TERMINAL_OUTPUT_MAX_BYTES,
     signal,
     onOutput: (chunk) => {
+      streamed = true;
       if (chunk.stream === "stderr") {
         onOutput(chunk);
         return;
       }
       pendingOut += chunk.data;
+      // Keep the last character back too: the newline right before the
+      // marker belongs to the marker line.
       const i = pendingOut.indexOf("\u001e");
-      const safe = i >= 0 ? i : Math.max(0, pendingOut.length - 1);
+      const safe = i >= 0 ? Math.max(0, i - 1) : Math.max(0, pendingOut.length - 1);
       if (safe > 0) {
         onOutput({ stream: "stdout", data: pendingOut.slice(0, safe) });
         pendingOut = pendingOut.slice(safe);
       }
     },
-  });
-  const split = splitCwd(pendingOut || res.stdout.slice(res.stdout.lastIndexOf("\u001e") >= 0 ? res.stdout.lastIndexOf("\u001e") : res.stdout.length));
+    })
+    .catch(async (err: unknown) => {
+      // Stopped (Ctrl+C / the request closed) or the sandbox failed: the
+      // record still gets its duration; 130 = interrupted, like a shell.
+      await withWorkspaceScope(actor.workspaceId, (tx) =>
+        tx.terminalCommand.update({ where: { id: cmdRow.id, workspaceId: actor.workspaceId }, data: { exitCode: 130, durationMs: Date.now() - started } }),
+      ).catch(() => undefined);
+      throw err;
+    });
+  // A provider that doesn't stream: everything arrives in the result.
+  const split = splitCwd(streamed ? pendingOut : res.stdout);
+  if (!streamed && res.stderr) onOutput({ stream: "stderr", data: res.stderr });
   if (split.text) onOutput({ stream: "stdout", data: split.text });
   const newCwd = split.cwd ?? splitCwd(res.stdout).cwd ?? cwd;
   await withWorkspaceScope(actor.workspaceId, async (tx) => {
@@ -254,6 +270,37 @@ async function markEnded(workspaceId: string, id: string, reason: string): Promi
   });
 }
 
+/**
+ * Close the row (once), meter paid sandbox minutes (sandbox_minute, like an
+ * agent run's sandbox) and audit the end. Idempotent: false when it had
+ * already ended.
+ */
+async function finishSession(workspaceId: string, id: string, reason: string, byUserId: string | null): Promise<boolean> {
+  const ended = await markEnded(workspaceId, id, reason);
+  if (!ended) return false;
+  const { meterSandboxLifetime } = await import("@/lib/sandbox/metering");
+  const { sandboxConfig } = await import("@/lib/sandbox/config");
+  await meterSandboxLifetime({
+    id,
+    workspaceId,
+    runId: `terminal-${id}`,
+    provider: ended.provider,
+    createdAt: ended.startedAt,
+    lastUsedAt: ended.lastActiveAt,
+    endedAt: new Date(),
+    idleSeconds: sandboxConfig().idleSeconds,
+  });
+  await auditEvent({
+    workspaceId,
+    projectId: null,
+    action: "terminal_session_ended",
+    summary: `Terminal closed (${reason})`,
+    // null = closed by the idle timeout (no person did it).
+    actorUserId: byUserId ?? undefined,
+  }).catch(() => undefined);
+  return true;
+}
+
 /** End a session: destroy its sandbox, record it, meter paid minutes. Idempotent. */
 export async function endTerminalSession(workspaceId: string, id: string, byUserId: string, reason = "closed"): Promise<boolean> {
   const row = await withWorkspaceScope(workspaceId, (tx) => tx.terminalSession.findFirst({ where: { id, workspaceId } }));
@@ -261,22 +308,28 @@ export async function endTerminalSession(workspaceId: string, id: string, byUser
   if (row.status !== "active") return false;
   const sb = await attach(row);
   if (sb) await sb.destroy().catch(() => undefined);
-  const ended = await markEnded(workspaceId, id, reason);
-  if (!ended) return false;
-  const { meterSandboxLifetime } = await import("@/lib/sandbox/metering");
+  return finishSession(workspaceId, id, reason, byUserId);
+}
+
+/**
+ * Close this workspace's sessions whose sandbox idled out (the provider's
+ * idle watchdog removed it). Cheap: only rows quiet for longer than the idle
+ * timeout are checked. Called when the Terminal or the Activity monitor
+ * loads. Returns how many were closed.
+ */
+export async function sweepIdleTerminals(workspaceId: string, now = new Date()): Promise<number> {
   const { sandboxConfig } = await import("@/lib/sandbox/config");
-  await meterSandboxLifetime({
-    id: row.id,
-    workspaceId,
-    runId: `terminal-${row.id}`,
-    provider: ended.provider,
-    createdAt: ended.startedAt,
-    lastUsedAt: ended.lastActiveAt,
-    endedAt: new Date(),
-    idleSeconds: sandboxConfig().idleSeconds,
-  });
-  await auditEvent({ workspaceId, projectId: null, action: "terminal_session_ended", summary: `Terminal closed (${reason})`, actorUserId: byUserId }).catch(() => undefined);
-  return true;
+  const quietSince = new Date(now.getTime() - (sandboxConfig().idleSeconds + 60) * 1000);
+  const rows = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.terminalSession.findMany({ where: { workspaceId, status: "active", lastActiveAt: { lt: quietSince } }, take: 20 }),
+  );
+  let closed = 0;
+  for (const row of rows) {
+    const sb = await attach(row);
+    if (sb) continue;
+    if (await finishSession(workspaceId, row.id, "the sandbox idled out", null)) closed += 1;
+  }
+  return closed;
 }
 
 /** The person's own end (only their session). */
@@ -293,4 +346,13 @@ export async function terminalHistory(actor: TerminalActor, sessionId: string, l
     tx.terminalCommand.findMany({ where: { workspaceId: actor.workspaceId, sessionId, userId: actor.userId }, orderBy: { createdAt: "desc" }, take: Math.min(Math.max(limit, 1), 200), select: { command: true, exitCode: true, createdAt: true } }),
   );
   return rows.reverse().map((r) => ({ command: r.command, exitCode: r.exitCode, createdAt: r.createdAt.toISOString() }));
+}
+
+/** The person's open session in this workspace (after closing idled-out ones), or null. */
+export async function myTerminalSession(actor: TerminalActor): Promise<TerminalSessionOut | null> {
+  await sweepIdleTerminals(actor.workspaceId).catch(() => 0);
+  const row = await withWorkspaceScope(actor.workspaceId, (tx) =>
+    tx.terminalSession.findFirst({ where: { workspaceId: actor.workspaceId, userId: actor.userId, status: "active" }, orderBy: { startedAt: "desc" } }),
+  );
+  return row ? out(row) : null;
 }

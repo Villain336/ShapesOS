@@ -210,6 +210,11 @@ describe("Phase 18.1: system actions and role gating", () => {
     assert.match(src, /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/);
     const viewerHrefs = visibleNavGroups("viewer").flatMap((g) => g.items.map((i) => i.href));
     assert.ok(!viewerHrefs.includes("/dashboard/billing"));
-    assert.equal(viewerHrefs.length, allNavItems().length - 1);
+    // Phase 18.2 (WS=content): the Terminal is editor+ like its routes (a shell on a workspace sandbox).
+    const terminal = allNavItems().find((i) => i.href === "/dashboard/terminal")!;
+    assert.equal(terminal.minRole, "editor");
+    assert.ok(!viewerHrefs.includes("/dashboard/terminal"));
+    assert.ok(visibleNavGroups("editor").some((g) => g.items.some((i) => i.href === "/dashboard/terminal")));
+    assert.equal(viewerHrefs.length, allNavItems().length - 2);
   });
 });

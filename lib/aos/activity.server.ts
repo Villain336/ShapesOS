@@ -500,6 +500,13 @@ export async function loadSystemHealth(workspaceId: string, viewer: ProcessViewe
 }
 
 export async function loadProcessSnapshot(workspaceId: string, viewer: ProcessViewer, now = new Date()): Promise<ProcessSnapshot> {
+  // Terminals whose sandbox idled out are closed (and metered) first, so they don't show as open.
+  try {
+    const { sweepIdleTerminals } = await import("@/lib/terminal/service");
+    await sweepIdleTerminals(workspaceId, now);
+  } catch {
+    // best effort
+  }
   const [processes, health] = await Promise.all([loadProcesses(workspaceId, viewer, now), loadSystemHealth(workspaceId, viewer, now)]);
   return { processes, health };
 }

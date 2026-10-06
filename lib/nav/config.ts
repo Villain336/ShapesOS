@@ -42,6 +42,7 @@ import {
   Network,
   NotebookPen, // Phase 18.2 (WS=content): Notes
   Gauge, // Phase 18.2 (WS=content): Activity Monitor
+  SquareTerminal, // Phase 18.2 (WS=content): Terminal
   Paintbrush,
   PenLine,
   Phone,
@@ -147,6 +148,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/files", label: "Files", icon: Folder, description: "Workspace files", keywords: "uploads storage" },
       // Phase 18.2 (WS=content): Notes (UniverDoc kind "note"; lib/notes).
       { href: "/dashboard/notes", label: "Notes", icon: NotebookPen, description: "Quick notes, voice notes, notes on any record", keywords: "notes notebook memo jot capture voice meeting notes" },
+      // Phase 18.2 (WS=content): a shell on a workspace sandbox (lib/terminal); editor+ like the route.
+      { href: "/dashboard/terminal", label: "Terminal", icon: SquareTerminal, description: "A shell on a workspace sandbox", keywords: "terminal shell console bash sandbox command line", minRole: "editor" },
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine, description: "Signature envelopes", keywords: "signature contracts documenso" },
       { href: "/dashboard/legal", label: "Legal", icon: Scale, description: "Licenses, filings, compliance", keywords: "compliance obligations permits tax" },
       { href: "/dashboard/insurance", label: "Insurance", icon: ShieldCheck, description: "Policies and renewals", keywords: "policies coverage renewals" },
