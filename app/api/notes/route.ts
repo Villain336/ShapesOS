@@ -11,7 +11,8 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/guard";
-import { createNote, listNotes, noteFacets } from "@/lib/notes/service";
+import { createNote, findOwnNoteBySourceRef, listNotes, noteFacets } from "@/lib/notes/service";
+import { isClientId } from "@/lib/offline/queue";
 import { noteActor } from "@/lib/notes/http";
 import { roleAtLeast } from "@/lib/authz";
 import { ForbiddenError } from "@/lib/api/errors";
@@ -29,6 +30,9 @@ const CreateSchema = z.object({
   folder: z.string().max(120).nullish(),
   tags: z.array(z.string().max(60)).max(20).optional(),
   pinned: z.boolean().optional(),
+  // Phase 18.3 (WS=flow): an offline-queued create carries its client id; a
+  // replay of the same id returns the note it already made (200, replayed).
+  clientId: z.string().max(64).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -65,7 +69,14 @@ export async function POST(req: Request) {
     if (body.shareState === "workspace" && !roleAtLeast(actor.role, "editor")) {
       throw new ForbiddenError("Sharing a note with the workspace needs the editor role.");
     }
+    const sourceRef = body.clientId && isClientId(body.clientId) ? `offline:${body.clientId}` : null;
+    if (body.clientId && !sourceRef) return Response.json({ error: "Invalid clientId." }, { status: 400 });
+    if (sourceRef) {
+      const prior = await findOwnNoteBySourceRef(actor, sourceRef);
+      if (prior) return Response.json({ note: prior, replayed: true }, { status: 200 });
+    }
     const note = await createNote({
+      sourceRef,
       workspaceId: workspace.id,
       createdBy: user.id,
       title: body.title ?? null,

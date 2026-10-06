@@ -185,6 +185,19 @@ export async function getReminder(db: Db, opts: { workspaceId: string; userId: s
   return toReminderView(await ownReminder(db, opts.workspaceId, opts.userId, opts.id), opts.now);
 }
 
+/**
+ * Phase 18.3 (WS=flow): the reminder this person already made from one
+ * offline write (sourceRef "offline:<clientId>"), so a replayed create
+ * returns it instead of adding a second one (lib/offline/queue.ts).
+ */
+export async function findOwnReminderBySourceRef(db: Db, opts: { workspaceId: string; userId: string; sourceRef: string; now?: Date }): Promise<ReminderView | null> {
+  const row = await db.opsTask.findFirst({
+    where: { workspaceId: opts.workspaceId, projectId: null, assigneeId: opts.userId, sourceRef: opts.sourceRef },
+    select: SELECT,
+  });
+  return row ? toReminderView(row, opts.now) : null;
+}
+
 export async function createReminder(
   db: Db,
   opts: { workspaceId: string; userId: string; now?: Date } & ReminderInput,

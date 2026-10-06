@@ -9,7 +9,8 @@ import type { NextRequest } from "next/server";
 import { errorResponse } from "@/lib/api/errors";
 import { validateBody, z } from "@/lib/api/validate";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { createReminder, listReminders, REMINDER_NOTES_MAX, REMINDER_TITLE_MAX, REPEAT_RULES } from "@/lib/comms/reminders";
+import { isClientId } from "@/lib/offline/queue";
+import { createReminder, findOwnReminderBySourceRef, listReminders, REMINDER_NOTES_MAX, REMINDER_TITLE_MAX, REPEAT_RULES } from "@/lib/comms/reminders";
 import { commsGuard } from "../_lib";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ const CreateSchema = z.object({
   notes: z.string().max(REMINDER_NOTES_MAX).nullable().optional(),
   dueAt: z.string().datetime({ offset: true }).nullable().optional(),
   repeat: z.enum(REPEAT_RULES).nullable().optional(),
+  // Phase 18.3 (WS=flow): an offline-queued create carries its client id; a
+  // replay of the same id returns the reminder it already made (200, replayed).
+  clientId: z.string().max(64).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -40,8 +44,15 @@ export async function POST(req: NextRequest) {
     const parsed = validateBody(CreateSchema, await req.json());
     if (!parsed.ok) return parsed.error;
     const b = parsed.data;
+    const sourceRef = b.clientId && isClientId(b.clientId) ? `offline:${b.clientId}` : null;
+    if (b.clientId && !sourceRef) return Response.json({ error: "Invalid clientId." }, { status: 400 });
+    if (sourceRef) {
+      const prior = await withWorkspaceScope(ctx.workspaceId, (tx) => findOwnReminderBySourceRef(tx, { workspaceId: ctx.workspaceId, userId: ctx.userId, sourceRef }));
+      if (prior) return Response.json({ reminder: prior, replayed: true }, { status: 200 });
+    }
     const reminder = await withWorkspaceScope(ctx.workspaceId, (tx) =>
       createReminder(tx, {
+        sourceRef,
         workspaceId: ctx.workspaceId,
         userId: ctx.userId,
         title: b.title,
