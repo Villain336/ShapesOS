@@ -412,12 +412,13 @@ export async function runDelegatedChild(p: SubagentRunJobPayload, opts: ChildRun
       if (own?.state) applyJoinToState(saved, own.state.plans, { now: Date.now(), maxMs: limits.maxMs });
       loop = await runAgentLoop({ ...common, state: saved });
     } else {
-      const system = await agentMod.delegatedChildSystemPrompt(p.projectId, ws, agent, task.grant as ToolGroup[]);
+      const { system, context } = await agentMod.delegatedChildSystemPrompt(p.projectId, ws, agent, task.grant as ToolGroup[]);
       const prerequisites = plan.tasks.filter((x) => task.dependsOn.includes(x.id));
       loop = await runAgentLoop({
         ...common,
         system,
-        messages: [{ role: "user", content: childBriefMessage({ goal: plan.goal, task, prerequisites }) }],
+        // Phase 17 (A1): the project context rides in the first user turn, after the cached static prefix.
+        messages: agentMod.withContextBlock([{ role: "user", content: childBriefMessage({ goal: plan.goal, task, prerequisites }) }], context),
       });
     }
     return await settleChildLoop(p, by.parentRunId, loop, settle);

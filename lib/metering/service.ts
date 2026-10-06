@@ -105,6 +105,14 @@ export interface LlmUsageFields {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   costMicroUsd: number | null;
+  // Phase 17 (A1, WS=model): per-call observability — time to first token,
+  // wall-clock, the effort sent, whether the prompt cache was read, and the
+  // provider's service tier. Optional: every older caller keeps working.
+  ttftMs?: number | null;
+  durationMs?: number | null;
+  effort?: string | null;
+  cacheHit?: boolean | null;
+  serviceTier?: string | null;
 }
 
 function nonNegInt(n: number, field: string): number {
@@ -331,6 +339,13 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         llmCacheReadTokens: nonNegInt(llm.cacheReadTokens, "cacheReadTokens"),
         llmCacheWriteTokens: nonNegInt(llm.cacheWriteTokens, "cacheWriteTokens"),
         llmCostMicroUsd: llm.costMicroUsd === null ? null : BigInt(nonNegInt(llm.costMicroUsd, "costMicroUsd")),
+        // Phase 17 (A1): observability columns (nullable; rounded to whole ms).
+        llmTtftMs: typeof llm.ttftMs === "number" && Number.isFinite(llm.ttftMs) ? Math.max(0, Math.round(llm.ttftMs)) : null,
+        llmDurationMs:
+          typeof llm.durationMs === "number" && Number.isFinite(llm.durationMs) ? Math.max(0, Math.round(llm.durationMs)) : null,
+        llmEffort: llm.effort ?? null,
+        llmCacheHit: typeof llm.cacheHit === "boolean" ? llm.cacheHit : null,
+        llmServiceTier: llm.serviceTier ?? null,
       }
     : {};
 
@@ -388,6 +403,32 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // Phase 15.2: an agency client workspace charges the agency's ONE
         // pool — its balance, cap and alert. The event stays on workspaceId.
         const poolId = await resolvePoolWorkspaceId(tx, workspaceId);
+
+        // Phase 17 (latency): a 0-credit event (a BYOK or self-hosted model
+        // call, a value-priced call's tokens) changes no balance and passes
+        // every cap check by definition — it is appended WITHOUT the balance
+        // and cap row locks, so it never queues behind charged calls.
+        if (charge === 0) {
+          const event = await tx.usageEvent.create({
+            data: {
+              workspaceId,
+              projectId,
+              actorId,
+              keyId,
+              action,
+              credits: 0,
+              overageCredits: 0,
+              idempotencyKey,
+              evidenceRef,
+              keySource,
+              waivedCredits,
+              chargedToWorkspaceId: poolId !== workspaceId ? poolId : null,
+              ...llmData,
+            },
+            select: { id: true },
+          });
+          return { result: { ok: true, charged: 0, eventId: event.id }, alert: null };
+        }
 
         // T2: lock balance + cap — concurrent meter() calls serialize here
         // (for a pool: every workspace in the pool serializes on the owner).

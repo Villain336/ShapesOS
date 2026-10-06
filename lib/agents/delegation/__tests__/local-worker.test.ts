@@ -23,7 +23,8 @@ describe("localDelegationWorkerDecision", () => {
     assert.equal(localDelegationWorkerDecision({ ...base, NEXT_RUNTIME: "edge" }).start, false);
   });
 
-  it("claims only the delegation job kinds (never a chat turn or a mission)", () => {
-    assert.deepEqual([...DELEGATION_JOB_KINDS], ["subagent_run", "delegation_tick", "delegation_join"]);
+  it("claims only the delegation job kinds and the usage outbox (never a chat turn or a mission)", () => {
+    // Phase 17: llm_usage — metering rows a process wrote but could not finish.
+    assert.deepEqual([...DELEGATION_JOB_KINDS], ["subagent_run", "delegation_tick", "delegation_join", "llm_usage"]);
   });
 });

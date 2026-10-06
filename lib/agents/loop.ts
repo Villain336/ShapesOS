@@ -56,6 +56,7 @@ import { invalidToolResult } from "@/lib/llm/tool-input";
 import { LlmProviderError } from "@/lib/llm/errors";
 import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import type {
+  ChatCacheTtl,
   ChatContentBlock,
   ChatMessage,
   ChatRequest,
@@ -77,6 +78,18 @@ import {
 } from "@/lib/chat/tool-exec";
 import { waitingPlaceholder } from "./delegation/plan";
 import { buildLoopTools, type ConnectorChatTool, type LoopToolSet } from "./loop-tools";
+import {
+  capResult,
+  DEFAULT_TOOL_RESULT_CAP,
+  deferralFor,
+  FETCH_MORE_DEF,
+  FETCH_MORE_TOOL,
+  pruneStored,
+  SEARCH_TOOLS_DEF,
+  SEARCH_TOOLS_TOOL,
+  searchTools,
+  sliceResult,
+} from "./tool-loading";
 import { appendAgentRunEvent } from "./runs/service";
 import { isLeaseLost, isRunStopped } from "./runs/abort";
 import { isDraining } from "@/lib/runtime/shutdown";
@@ -98,10 +111,19 @@ export interface AgentLoopLimits {
   maxCostMicroUsd: number;
   /** Input tokens of one call above which the loop compacts client-side. */
   compactAtTokens: number;
-  /** Characters of one tool result sent back to the model. */
+  /**
+   * Characters of one tool result sent back to the model. Phase 17 (A3):
+   * 8,000 (was 20,000); the rest stays readable through fetch_more.
+   */
   toolResultMaxChars: number;
   /** Phase 9: failed test/check cycles before code mode escalates (and again before it hands back). */
   fixCycles: number;
+  /**
+   * Phase 17 (A3): input tokens of one call above which the provider clears
+   * old tool results server-side (Anthropic context editing). Below the
+   * client compaction threshold, so clearing comes first.
+   */
+  contextEditAtTokens: number;
 }
 
 export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
@@ -109,9 +131,14 @@ export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
   maxMs: 30 * 60_000,
   maxCostMicroUsd: 10_000_000,
   compactAtTokens: 150_000,
-  toolResultMaxChars: 20_000,
+  toolResultMaxChars: DEFAULT_TOOL_RESULT_CAP,
   fixCycles: 5,
+  contextEditAtTokens: 100_000,
 });
+
+/** Phase 17 (A3): tool uses whose results context editing keeps, and the least it clears (cache rewrite must pay off). */
+export const CONTEXT_EDIT_KEEP_TOOL_USES = 6;
+export const CONTEXT_EDIT_CLEAR_AT_LEAST = 20_000;
 
 function posInt(v: string | undefined): number | null {
   const n = Number((v ?? "").trim());
@@ -122,8 +149,8 @@ function posInt(v: string | undefined): number | null {
  * Limits from the environment (documented in .env.example):
  *   AGENT_MAX_STEPS (40) · AGENT_MAX_RUN_MINUTES (30) ·
  *   AGENT_MAX_RUN_COST_MICRO_USD (10000000 = $10) ·
- *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (20000) ·
- *   AGENT_FIX_CYCLES (5)
+ *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (8000) ·
+ *   AGENT_FIX_CYCLES (5) · AGENT_CONTEXT_EDIT_AT_TOKENS (100000)
  */
 export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
   const minutes = posInt(env.AGENT_MAX_RUN_MINUTES);
@@ -134,6 +161,7 @@ export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
     compactAtTokens: posInt(env.AGENT_COMPACT_AT_TOKENS) ?? DEFAULT_LOOP_LIMITS.compactAtTokens,
     toolResultMaxChars: posInt(env.AGENT_TOOL_RESULT_MAX_CHARS) ?? DEFAULT_LOOP_LIMITS.toolResultMaxChars,
     fixCycles: posInt(env.AGENT_FIX_CYCLES) ?? DEFAULT_LOOP_LIMITS.fixCycles,
+    contextEditAtTokens: posInt(env.AGENT_CONTEXT_EDIT_AT_TOKENS) ?? DEFAULT_LOOP_LIMITS.contextEditAtTokens,
   };
 }
 
@@ -160,6 +188,29 @@ export const handBackText = (cycles: number): string =>
   "The diff so far is on the run page. Tell me how you'd like to proceed, or point me at the failing part.";
 
 export const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
+
+// ── Phase 17 (WS=model): per-workload request shape ─────────────────────────
+
+/**
+ * A1: the static prefix's cache TTL. People pause longer than 5 minutes
+ * between chat turns (and code runs are long), so the lead / code workloads
+ * take the 1-hour TTL; sub-agents and background runs are bursts of calls
+ * seconds apart, where the default 5-minute entry stays warm on its own.
+ */
+export function cacheTtlForWorkload(workload: LlmWorkload, env: Record<string, string | undefined> = process.env): ChatCacheTtl {
+  // CHAT_CACHE_LAYOUT=legacy (evaluation only): the pre-Phase-17 5-minute TTL everywhere.
+  if ((env.CHAT_CACHE_LAYOUT ?? "").trim().toLowerCase() === "legacy") return "5m";
+  return workload === "lead" || workload === "code" || workload === "code_max" ? "1h" : "5m";
+}
+
+/**
+ * A4: nobody is waiting on a sub-agent / background / bulk call, so it never
+ * takes priority capacity ("standard_only"); a lead or code call keeps the
+ * API default ("auto").
+ */
+export function serviceTierForWorkload(workload: LlmWorkload): "standard_only" | undefined {
+  return workload === "lead" || workload === "code" || workload === "code_max" ? undefined : "standard_only";
+}
 export const MAX_TOKENS_NOTE =
   "Your last reply was cut off at the output-token limit. Continue exactly where you stopped; do not repeat what you already wrote.";
 
@@ -221,6 +272,10 @@ export interface LoopState {
   rowsSaved?: number;
   /** Phase 16: the last model call's cost (the budget guard expects the next one to cost as much). */
   lastCallCostMicroUsd?: number;
+  /** Phase 17 (A2): deferred tools search_tools surfaced (client-side path) — offered for the rest of the run. */
+  activatedTools?: string[];
+  /** Phase 17 (A3): full text of capped tool results, by handle (the tool_use id), for fetch_more. */
+  storedResults?: Record<string, string>;
 }
 
 export function isLoopState(v: unknown): v is LoopState {
@@ -262,6 +317,8 @@ export function initialLoopState(input: {
 
 export type LoopEvent =
   | { type: "text_delta"; step: number; text: string }
+  /** Phase 17: the model reasons before writing (its text is never carried). */
+  | { type: "thinking"; step: number; state: "started" | "ended" }
   | { type: "tool_start"; toolUseId: string; tool: string; args: Record<string, unknown> }
   | { type: "tool_result"; toolUseId: string; tool: string; status: ChatToolCall["status"]; summary: string }
   | { type: "step"; step: number; stopReason: ChatStopReason; model: string; costMicroUsd: number | null };
@@ -291,6 +348,12 @@ export interface AgentLoopInput {
   state?: LoopState | null;
   /** "build" routes the Operator to the code workload. */
   mode?: "build" | "default";
+  /**
+   * Phase 17 (A4): the workload of a fresh run when it is not the agent's
+   * own (a scheduled skill runs the lead's reach on the subagent workload:
+   * no person is waiting). Ignored on a resumed run (its state has one).
+   */
+  workload?: LlmWorkload;
   limits?: Partial<AgentLoopLimits>;
   /** Epoch ms: at a step boundary after this, stop with status "handoff". */
   handoffAt?: number;
@@ -409,15 +472,25 @@ export function testsFailed(result: ToolResult | null): boolean {
 
 /**
  * Streamed text → run events, in order, in chunks (not one row per token).
- * A chunk is written when ~200 characters have gathered or 250 ms passed,
- * and at every step boundary. A stream guard that trips withholds the rest
- * of the step's text (the final text is enforced again before delivery).
+ * The FIRST delta of a step is written at once (Phase 17: it is the first
+ * token the person sees — the in-process bus forwards the row the moment it
+ * is durable); after it a chunk is written when ~200 characters have
+ * gathered or 250 ms passed, and at every step boundary. A stream guard
+ * that trips withholds the rest of the step's text (the final text is
+ * enforced again before delivery).
+ *
+ * Phase 17: thinking deltas are not stored — only the STATE is, as one
+ * `text` event { kind: "thinking", state: "started" } on the first one and
+ * { state: "ended" } when the first text delta follows, so the chat can show
+ * "Thinking" while the model reasons.
  */
 class TextEventWriter {
   private buf = "";
   private acc = "";
   private timer: ReturnType<typeof setTimeout> | null = null;
   private chain: Promise<unknown> = Promise.resolve();
+  private firstFlushed = false;
+  private thinkingState: "none" | "started" | "ended" = "none";
   withheld = false;
 
   constructor(
@@ -430,6 +503,7 @@ class TextEventWriter {
 
   push(delta: string): void {
     if (this.withheld || !delta) return;
+    if (this.thinkingState === "started") this.thinking("ended");
     this.acc += delta;
     if (this.guard && this.guard(this.acc)) {
       this.withheld = true;
@@ -441,8 +515,26 @@ class TextEventWriter {
     this.onEvent?.({ type: "text_delta", step: this.step, text: delta });
     if (!this.persist) return;
     this.buf += delta;
-    if (this.buf.length >= 200) this.flush();
+    if (!this.firstFlushed || this.buf.length >= 200) this.flush();
     else if (!this.timer) this.timer = setTimeout(() => this.flush(), 250);
+  }
+
+  /** The model's thinking state changed (first thinking delta / first text after it). */
+  thinking(state: "started" | "ended"): void {
+    if (state === "started" && this.thinkingState !== "none") return;
+    if (state === "ended" && this.thinkingState !== "started") return;
+    this.thinkingState = state;
+    this.onEvent?.({ type: "thinking", step: this.step, state });
+    if (!this.persist || !this.ctx.runId) return;
+    const { workspaceId, runId } = this.ctx;
+    const step = this.step;
+    this.chain = this.chain.then(() =>
+      appendAgentRunEvent(workspaceId, runId!, {
+        type: "text",
+        summary: state === "started" ? "Thinking" : "Writing",
+        payload: { kind: "thinking", step, state },
+      }).catch(() => undefined),
+    );
   }
 
   flush(): void {
@@ -451,6 +543,7 @@ class TextEventWriter {
     const text = this.buf;
     this.buf = "";
     if (!text || !this.ctx.runId) return;
+    this.firstFlushed = true;
     const { workspaceId, runId } = this.ctx;
     const step = this.step;
     this.chain = this.chain.then(() =>
@@ -473,6 +566,7 @@ async function callModel(provider: LlmProvider, req: ChatRequest, writer: TextEv
   let final: ChatResponse | null = null;
   for await (const ev of provider.chatStream(req)) {
     if (ev.type === "text_delta") writer.push(ev.text);
+    else if (ev.type === "thinking_delta") writer.thinking("started");
     else if (ev.type === "final") final = ev.response;
   }
   if (!final) throw new Error("The model stream ended without a final response.");
@@ -509,7 +603,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       system: input.system,
       messages: input.messages,
       mode: input.mode,
-      workload: workloadForAgent(agentKey, { mode: input.mode }),
+      workload: input.workload ?? workloadForAgent(agentKey, { mode: input.mode }),
       now: now(),
     });
   }
@@ -540,13 +634,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     return { status: "waiting_on_children", finalText: "", proposal: tr.proposal, proposals: tr.proposals, calls: s.calls, state: s };
   };
 
-  const tools: LoopToolSet = buildLoopTools({
-    tools: allTools(),
-    grant: ctx.grant ?? null,
-    groupOf: toolGroup,
-    connectorTools: deps.connectorTools,
-    filter: input.toolFilter,
-  });
+  const tools: LoopToolSet = runToolSet(ctx, s, deps, input.toolFilter);
 
   const stopCheck = async (): Promise<string | null> => {
     if (await stopRequested(ctx)) return STOPPED_TEXT;
@@ -629,17 +717,31 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     }
 
     // ── the model call ───────────────────────────────────────────────────────
+    // Phase 17 (A2): server-side tool search where the provider runs it,
+    // else the client-side search_tools fallback.
+    const offer = requestTools(tools, s, provider);
     const req: ChatRequest = {
       system: [{ text: s.system, cache: true }],
       // A snapshot: the transcript grows after the call.
       messages: [...s.messages],
-      tools: tools.defs,
+      tools: offer.tools,
+      toolSearch: offer.toolSearch,
       serverTools: tools.serverTools,
       maxTokens: WORKLOAD_MAX_TOKENS[s.workload],
       thinking: "adaptive",
       cache: true,
+      // Phase 17 (A1): 1h for people, 5m for sub-agents / background.
+      cacheTtl: cacheTtlForWorkload(s.workload),
       cacheConversation: true,
       compaction: true,
+      // Phase 17 (A3): the provider clears old tool results past the trigger.
+      contextEditing: {
+        triggerInputTokens: limits.contextEditAtTokens,
+        keepToolUses: CONTEXT_EDIT_KEEP_TOOL_USES,
+        clearAtLeastTokens: CONTEXT_EDIT_CLEAR_AT_LEAST,
+      },
+      // Phase 17 (A4): background work never takes priority capacity.
+      serviceTier: serviceTierForWorkload(s.workload),
       signal: ctx.signal,
       usage: {
         workspaceId: ctx.workspaceId,
@@ -771,7 +873,54 @@ interface ToolStepResult {
   waiting: boolean;
 }
 
-/** Run one step's tool calls; append their results as one user message. */
+/** Phase 17: `safe` (read-only) tools of one step run side by side, this many at a time. */
+export const PARALLEL_SAFE_TOOLS = 4;
+
+interface StepItem {
+  i: number;
+  block: ChatToolUseBlock;
+  canonical: string;
+  call: ChatToolCall;
+  /** safe = read-only, may run beside other safe tools; serial = everything else (one at a time, in order). */
+  lane: "safe" | "serial";
+  /** Already answered (a saved result, invalid input, a refused or interrupted call): nothing to run. */
+  done: boolean;
+}
+
+/**
+ * Phase 17: split a step's calls into batches that keep the step's order —
+ * consecutive `safe` tools form one parallel batch; every other call is a
+ * batch of its own. PURE.
+ */
+export function stepBatches<T extends { lane: "safe" | "serial"; done: boolean }>(items: readonly T[]): Array<{ parallel: boolean; items: T[] }> {
+  const out: Array<{ parallel: boolean; items: T[] }> = [];
+  for (const it of items) {
+    if (it.done) continue;
+    const last = out[out.length - 1];
+    if (it.lane === "safe" && last?.parallel) last.items.push(it);
+    else out.push({ parallel: it.lane === "safe", items: [it] });
+  }
+  return out;
+}
+
+async function mapLimit<T>(items: readonly T[], limit: number, fn: (t: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]!);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+/**
+ * Run one step's tool calls; append their results as one user message.
+ *
+ * Phase 17 (latency): `safe` tools of the step run in parallel (at most
+ * PARALLEL_SAFE_TOOLS at once) and the results are appended in the model's
+ * order whatever finished first; a non-safe tool never runs beside another
+ * call. The transcript is saved ONCE at the end of the step (plus, as
+ * before, right before a non-safe tool starts — the at-most-once rule on
+ * resume needs that one), not after every tool.
+ */
 async function runToolStep(
   s: LoopState,
   toolUses: ChatToolUseBlock[],
@@ -784,105 +933,238 @@ async function runToolStep(
   const store = input.deps?.store ?? prismaTranscriptStore;
   const save = () =>
     ctx.runId ? store.save(ctx.workspaceId, ctx.runId, s, s.steps).catch(() => undefined) : Promise.resolve();
-  const results: ChatToolResultBlock[] = [];
-  const stepCalls: ChatToolCall[] = [];
+  const results: Array<ChatToolResultBlock | null> = toolUses.map(() => null);
   const proposals: ChatToolCall[] = [];
   let waiting = false;
   let failedTests = false;
+  let cancelled = false;
 
-  for (const block of toolUses) {
+  // Classify every call first (saved / invalid / refused / interrupted need
+  // no run); the rest get a lane.
+  const items: StepItem[] = [];
+  for (const [i, block] of toolUses.entries()) {
     const saved = s.toolResults[block.id];
     if (saved) {
       // Resumed after a crash: this call already ran — never again.
-      results.push(saved);
+      results[i] = saved;
       continue;
     }
     const canonical = tools.toCanonical(block.name);
     const call: ChatToolCall = { tool: canonical, args: block.input ?? {}, status: "executed", toolUseId: block.id };
     if (ctx.runId) call.runId = ctx.runId;
-
-    let result: ToolResult | null = null;
+    // Phase 17 (A2/A3): the loop's own read-only tools (search_tools,
+    // fetch_more) answer from the run's tool set / saved transcript; they
+    // never reach executeTool (they touch no workspace data), so they are
+    // settled here and take no lane.
+    if (canonical === SEARCH_TOOLS_TOOL || canonical === FETCH_MORE_TOOL) {
+      const r = loopInternalTool(canonical, block, s, tools, limits);
+      call.resultSummary = r.content as string;
+      if (r.isError) call.status = "error";
+      s.toolResults[block.id] = r;
+      results[i] = r;
+      input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary.slice(0, 200) });
+      items.push({ i, block, canonical, call, lane: "safe", done: true });
+      continue;
+    }
+    const def = getTool(canonical);
+    const sideEffects = !def || def.kind !== "safe";
+    const item: StepItem = { i, block, canonical, call, lane: sideEffects || isDelegationTool(canonical) ? "serial" : "safe", done: false };
     if (block.invalid && !isUnknownToolOnly(block.invalid)) {
       // Unparseable / schema-invalid input: never run; tell the model why.
       call.status = "error";
       call.resultSummary = `Invalid input for ${canonical}: ${block.invalid}`;
       const r = invalidToolResult(block);
       s.toolResults[block.id] = r;
-      results.push(r);
-      s.calls.push(call);
-      stepCalls.push(call);
-      await save();
-      continue;
-    }
-    const def = getTool(canonical);
-    const sideEffects = !def || def.kind !== "safe";
-    if (input.toolFilter && !input.toolFilter(canonical)) {
+      results[i] = r;
+      item.done = true;
+    } else if (input.toolFilter && !input.toolFilter(canonical)) {
       // Outside the run's narrower allow-list: refused like an ungranted tool.
       call.status = "denied";
       call.resultSummary = `This run may not use ${canonical} (not in its declared tools).`;
       await runEvent(ctx, `Refused ${canonical}: not in this run's declared tools`, { kind: "tool_result", tool: canonical, status: "denied", toolUseId: block.id }, "gate");
+      item.done = true;
     } else if (sideEffects && s.toolStarted.includes(block.id)) {
       // Started before a crash, result never saved: may or may not have run.
       call.status = "error";
       call.resultSummary = `${canonical} was interrupted (the worker restarted) and was not run again; it may or may not have completed. Check before retrying.`;
-    } else {
-      if (await stopRequested(ctx)) {
-        call.status = "cancelled";
-        call.resultSummary = "Not run — the task was stopped.";
-        s.calls.push(call);
-        await save();
-        return { cancelled: true, proposal: null, proposals: [], waiting: false };
-      }
-      if (sideEffects) {
-        s.toolStarted.push(block.id);
-        await save();
-      }
-      input.onEvent?.({ type: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
-      if (persistEvents) {
-        await runEvent(ctx, `Calling ${canonical}`, { kind: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
-      }
-      // The run's remaining budget rides along (a delegated child stays inside it).
-      const toolCtx: LoopContext = {
-        ...ctx,
-        toolUseId: block.id,
-        deadlineAt: Math.min(ctx.deadlineAt ?? Infinity, s.startedAt + limits.maxMs),
-        costLeftMicroUsd: Math.max(0, Math.min(ctx.costLeftMicroUsd ?? Infinity, limits.maxCostMicroUsd) - s.costMicroUsd),
-        // Phase 16: what a delegation may split (model calls left in this run).
-        stepsLeft: Math.max(0, limits.maxSteps - s.steps),
-      };
-      result = await executeTool(toolCtx, canonical, call.args, call);
-      if (call.status === "cancelled") {
-        s.calls.push(call);
-        await save();
-        return { cancelled: true, proposal: null, proposals: [], waiting: false };
-      }
-      // Phase 16: a delegation tool started a plan — the run waits after this step.
-      if (call.status === "executed" && isDelegationTool(canonical) && (result?.details as { delegationWait?: unknown } | undefined)?.delegationWait === true) {
-        waiting = true;
-      }
-      // A delegated sub-agent's spend counts against this run's budget.
-      const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
-      if (typeof childCost === "number" && Number.isFinite(childCost)) s.costMicroUsd += childCost;
-      if (testsFailed(result)) failedTests = true;
+      item.done = true;
     }
-    const r = toolResultFor(block.id, call, result, limits.toolResultMaxChars);
-    s.toolResults[block.id] = r;
-    results.push(r);
-    s.calls.push(call);
-    stepCalls.push(call);
-    input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
-    if (call.status === "pending_confirmation") proposals.push(call);
-    await save();
+    if (item.done) {
+      const r = toolResultFor(block.id, call, null, limits.toolResultMaxChars);
+      s.toolResults[block.id] = r;
+      results[i] = r;
+      input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
+    }
+    items.push(item);
   }
 
+  const runOne = async (it: StepItem): Promise<void> => {
+    const { block, canonical, call } = it;
+    if (cancelled) {
+      call.status = "cancelled";
+      call.resultSummary = "Not run — the task was stopped.";
+      return;
+    }
+    if (it.lane === "serial") {
+      s.toolStarted.push(block.id);
+      await save();
+    }
+    input.onEvent?.({ type: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
+    if (persistEvents) {
+      await runEvent(ctx, `Calling ${canonical}`, { kind: "tool_start", toolUseId: block.id, tool: canonical, args: call.args });
+    }
+    // The run's remaining budget rides along (a delegated child stays inside it).
+    const toolCtx: LoopContext = {
+      ...ctx,
+      toolUseId: block.id,
+      deadlineAt: Math.min(ctx.deadlineAt ?? Infinity, s.startedAt + limits.maxMs),
+      costLeftMicroUsd: Math.max(0, Math.min(ctx.costLeftMicroUsd ?? Infinity, limits.maxCostMicroUsd) - s.costMicroUsd),
+      // Phase 16: what a delegation may split (model calls left in this run).
+      stepsLeft: Math.max(0, limits.maxSteps - s.steps),
+    };
+    const result = await executeTool(toolCtx, canonical, call.args, call);
+    if (call.status === "cancelled") {
+      cancelled = true;
+      return;
+    }
+    // Phase 16: a delegation tool started a plan — the run waits after this step.
+    if (call.status === "executed" && isDelegationTool(canonical) && (result?.details as { delegationWait?: unknown } | undefined)?.delegationWait === true) {
+      waiting = true;
+    }
+    // A delegated sub-agent's spend counts against this run's budget.
+    const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
+    if (typeof childCost === "number" && Number.isFinite(childCost)) s.costMicroUsd += childCost;
+    if (testsFailed(result)) failedTests = true;
+    // Phase 17 (A3): capped for the model; the full text stays in the
+    // transcript for fetch_more.
+    const r = cappedToolResult(s, block.id, toolResultFor(block.id, call, result, Number.MAX_SAFE_INTEGER), limits.toolResultMaxChars);
+    s.toolResults[block.id] = r;
+    results[it.i] = r;
+    input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
+    if (call.status === "pending_confirmation") proposals.push(call);
+  };
+
+  for (const batch of stepBatches(items)) {
+    // Stop is checked before every batch (before every tool, for the
+    // serial ones — a parallel batch holds only read-only tools).
+    if (await stopRequested(ctx)) {
+      cancelled = true;
+      const first = batch.items[0]!;
+      first.call.status = "cancelled";
+      first.call.resultSummary = "Not run — the task was stopped.";
+      s.calls.push(first.call);
+      await save();
+      return { cancelled: true, proposal: null, proposals: [], waiting: false };
+    }
+    if (batch.parallel) await mapLimit(batch.items, PARALLEL_SAFE_TOOLS, runOne);
+    else await runOne(batch.items[0]!);
+    if (cancelled) {
+      for (const it of batch.items) if (it.call.status === "cancelled") s.calls.push(it.call);
+      await save();
+      return { cancelled: true, proposal: null, proposals: [], waiting: false };
+    }
+  }
+
+  // The step's calls and results, in the model's order.
+  for (const it of items) s.calls.push(it.call);
   if (failedTests) s.testFailCycles++;
-  s.messages.push({ role: "user", content: results });
+  s.messages.push({ role: "user", content: results.filter((r): r is ChatToolResultBlock => r !== null) });
 
   // Phase 16: every pending action of the step stays pending and is listed
   // to the user (none is turned into an error); "yes" confirms the listed
   // ones, each re-checked against the grant it was proposed under.
   await save();
-  return { cancelled: false, proposal: proposals[0] ?? null, proposals, waiting };
+  // Proposals in the model's order (a parallel batch may finish out of order).
+  const ordered = items.map((it) => it.call).filter((c) => proposals.includes(c));
+  return { cancelled: false, proposal: ordered[0] ?? null, proposals: ordered, waiting };
+}
+
+// ── Phase 17 (A2/A3, WS=model): the run's tool set, deferral, loop tools ────
+
+/**
+ * The run's tool set: the granted catalog + connector tools (deferred ones
+ * marked, lib/agents/tool-loading.ts) plus the loop's own fetch_more.
+ */
+export function runToolSet(
+  ctx: LoopContext,
+  s: Pick<LoopState, "mode">,
+  deps: Pick<AgentLoopDeps, "connectorTools">,
+  filter?: (canonical: string) => boolean,
+): LoopToolSet {
+  const base = { tools: allTools(), grant: ctx.grant ?? null, groupOf: toolGroup, connectorTools: deps.connectorTools, filter };
+  const plain = buildLoopTools(base);
+  const defer = deferralFor({ agentKey: ctx.agentKey ?? "lead", mode: s.mode, toolCount: plain.defs.length });
+  const set = defer ? buildLoopTools({ ...base, defer }) : plain;
+  // fetch_more is the loop's own (always loaded; answers from the saved transcript).
+  set.defs.push(FETCH_MORE_DEF);
+  set.canonical.push(FETCH_MORE_TOOL);
+  return set;
+}
+
+/**
+ * The tools one model call is offered. With server-side tool search every
+ * tool is sent (deferred ones marked); otherwise the deferred ones are
+ * replaced by search_tools until the model surfaces them (then they stay
+ * for the rest of the run, sorted with the rest — the adapter sorts).
+ */
+export function requestTools(
+  tools: LoopToolSet,
+  s: Pick<LoopState, "activatedTools">,
+  provider: LlmProvider,
+): { tools: ChatRequest["tools"]; toolSearch: boolean; mode: "server" | "client" | "none" } {
+  const deferred = tools.defs.filter((d) => d.deferLoading);
+  if (deferred.length === 0) return { tools: tools.defs, toolSearch: false, mode: "none" };
+  if (provider.supportsToolSearch?.() === true) return { tools: tools.defs, toolSearch: true, mode: "server" };
+  const active = new Set(s.activatedTools ?? []);
+  const out = tools.defs
+    .filter((d) => !d.deferLoading || active.has(d.name))
+    .map((d) => (d.deferLoading ? { name: d.name, description: d.description, inputSchema: d.inputSchema, ...(d.strict ? { strict: true } : {}) } : d));
+  if (deferred.some((d) => !active.has(d.name))) out.push(SEARCH_TOOLS_DEF);
+  return { tools: out, toolSearch: false, mode: "client" };
+}
+
+/** search_tools / fetch_more, answered from the run's state. */
+function loopInternalTool(
+  canonical: string,
+  block: ChatToolUseBlock,
+  s: LoopState,
+  tools: LoopToolSet,
+  limits: AgentLoopLimits,
+): ChatToolResultBlock {
+  const input = block.input ?? {};
+  if (canonical === SEARCH_TOOLS_TOOL) {
+    const query = typeof input.query === "string" ? input.query : "";
+    const limit = typeof input.limit === "number" ? input.limit : Number(input.limit) || 5;
+    const pool = tools.defs.filter((d) => d.deferLoading);
+    const found = searchTools(pool, query, limit);
+    if (found.length === 0) {
+      return { type: "tool_result", toolUseId: block.id, content: `No tools match "${query}". Try other words, or answer with the tools you have.` };
+    }
+    const active = new Set(s.activatedTools ?? []);
+    for (const d of found) active.add(d.name);
+    s.activatedTools = [...active].sort();
+    return {
+      type: "tool_result",
+      toolUseId: block.id,
+      content: [
+        `Found ${found.length} tool${found.length === 1 ? "" : "s"}; they can be called from the next step on:`,
+        ...found.map((d) => `- ${d.name}: ${d.description.slice(0, 300)}`),
+      ].join("\n"),
+    };
+  }
+  const handle = typeof input.handle === "string" ? input.handle : "";
+  const offset = typeof input.offset === "number" ? input.offset : Number(input.offset) || 0;
+  const r = sliceResult(s.storedResults?.[handle], handle, offset, limits.toolResultMaxChars);
+  return { type: "tool_result", toolUseId: block.id, content: r.text, ...(r.ok ? {} : { isError: true }) };
+}
+
+/** Cap a tool result at the limit; keep the full text in the transcript for fetch_more. */
+function cappedToolResult(s: LoopState, handle: string, r: ChatToolResultBlock, cap: number): ChatToolResultBlock {
+  if (typeof r.content !== "string") return r;
+  const { shown, stored } = capResult(handle, r.content, cap);
+  if (stored === null) return r;
+  s.storedResults = pruneStored({ ...(s.storedResults ?? {}), [handle]: stored });
+  return { ...r, content: shown };
 }
 
 /**
@@ -905,13 +1187,18 @@ async function compactClientSide(s: LoopState, provider: LlmProvider, tools: Loo
       ? { role: "user", content: [...(typeof last.content === "string" ? [{ type: "text" as const, text: last.content }] : last.content), { type: "text", text: COMPACT_INSTRUCTION }] }
       : { role: "user", content: COMPACT_INSTRUCTION };
   const messages = last?.role === "user" ? [...s.messages.slice(0, -1), tail] : [...s.messages, tail];
+  const offer = requestTools(tools, s, provider);
   const res = await provider.chat({
     system: [{ text: s.system, cache: true }],
     messages,
-    tools: tools.defs,
+    // The same tools as the run's calls (the cached prefix is reused).
+    tools: offer.tools,
+    toolSearch: offer.toolSearch,
     maxTokens: 8192,
     toolChoice: "none",
     cache: true,
+    cacheTtl: cacheTtlForWorkload(s.workload),
+    serviceTier: serviceTierForWorkload(s.workload),
     signal: ctx.signal,
     usage: { workspaceId: ctx.workspaceId, projectId: ctx.projectId || null, actorId: ctx.userId || null, runId: ctx.runId ?? null, agentKey: ctx.agentKey ?? "lead" },
   });

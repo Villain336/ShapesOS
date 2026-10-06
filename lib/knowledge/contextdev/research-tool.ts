@@ -20,7 +20,7 @@ function str(v: unknown): string | undefined {
 export const research_question: ToolDef = {
   name: "research_question",
   description:
-    "Research a question against the live web via Context.dev and get back structured JSON plus cited source URLs. Costs credits (fast: 10, ultra: 100) and counts against the workspace daily budget — prefer fast unless the question needs deep research. Every answer cites its sources; uncited answers are refused.",
+    "Research a question on the live web (Context.dev): structured JSON plus cited source URLs. Costs credits (fast 10, ultra 100) against the daily budget — prefer fast. Uncited answers are refused.",
   kind: "spend",
   minRole: "editor",
   argsSchema: {

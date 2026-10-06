@@ -171,7 +171,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
      `lib/cron/jobs.ts`): `* * * * *` `/api/cron/workflows` and `/api/scheduler/tick`;
      `*/5` `/api/cron/messaging`, `/api/cron/nurture`; `*/10` `/api/cron/connector-refresh`,
      `/api/calls/reminders/run` (bearer `REMINDERS_CRON_SECRET`, skipped when unset);
-     `*/15` `/api/cron/actions`, `/api/cron/contextdev-monitors`; daily `0 2`
+     `*/15` `/api/cron/actions`, `/api/cron/contextdev-monitors`; hourly `35 *`
+     `/api/cron/ai-cache-health` (Phase 17); daily `0 2`
      `/api/cron/learning-consolidate`, `15 4` `/api/cron/connector-intro-expiry`, `30 4`
      `/api/cron/connector-paths`, `45 4` `/api/cron/dataset-health`, `0 6`
      `/api/cron/funding-followups`, `15 6` `/api/cron/legal-deadlines`.

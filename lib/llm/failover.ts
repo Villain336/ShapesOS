@@ -73,6 +73,15 @@ export class FailoverLlmProvider implements LlmProvider {
     return this.meta.fallbackModel;
   }
 
+  /**
+   * Phase 17 (A2): the primary's answer. Nothing is lost on a failover: a
+   * fallback without tool search ignores ChatToolDef.deferLoading and sends
+   * every tool loaded (more tokens on that one call, the same tools).
+   */
+  supportsToolSearch(): boolean {
+    return this.primary.supportsToolSearch?.() ?? false;
+  }
+
   /** Log + remember a failover; returns the human reason. */
   private noteFailover(e: LlmProviderError): string {
     const reason = `${e.kind}${e.status ? ` (HTTP ${e.status})` : ""}`;

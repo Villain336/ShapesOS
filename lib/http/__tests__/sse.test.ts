@@ -9,6 +9,7 @@ import { formatSseEvent, lastEventIdOf, sseStream, sseResponse, SSE_HEARTBEAT_MS
 import {
   __resetShutdownForTests,
   beginDrain,
+  settleBackgroundWork,
   isDraining,
   onShutdown,
   openStreamCount,
@@ -234,6 +235,18 @@ describe("process drain (lib/runtime/shutdown.ts)", () => {
     await drained;
     assert.equal(exitCode, 0);
     assert.ok(Date.now() - started >= 75, "exited only after the flush window");
+  });
+
+  it("settleBackgroundWork waits for tracked work, including work it starts", async () => {
+    const order: string[] = [];
+    void trackBackgroundWork(
+      new Promise<void>((r) => setTimeout(r, 20)).then(() => {
+        order.push("first");
+        void trackBackgroundWork(new Promise<void>((r) => setTimeout(r, 20)).then(() => void order.push("second")));
+      }),
+    );
+    await settleBackgroundWork();
+    assert.deepEqual(order, ["first", "second"]);
   });
 
   it("exits at the deadline when work does not finish", async () => {

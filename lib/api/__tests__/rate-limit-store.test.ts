@@ -165,6 +165,18 @@ describe("checkRateLimitAsync", () => {
     assert.ok(Date.now() - t0 < 5_000);
   });
 
+  it("Phase 17: the read tier is counted per process (no store round trip); auth / write / ai stay shared", async () => {
+    const store = failingStore();
+    __setCounterStoreForTests(store);
+    const now = 5_000_000;
+    let allowed = 0;
+    for (let i = 0; i < TIER_LIMITS.read.limit + 5; i++) if ((await checkRateLimitAsync("read:user:p17", "read", now)).allowed) allowed++;
+    assert.equal(store.calls, 0, "a read never touches the shared store");
+    assert.equal(allowed, TIER_LIMITS.read.limit, "still limited, per process");
+    for (const tier of ["auth", "write", "ai"] as const) await checkRateLimitAsync(`${tier}:user:p17`, tier, now);
+    assert.equal(store.calls, 3, "the correctness / money tiers still go to the shared store");
+  });
+
   it("withStoreTimeout rejects past the bound and passes values through", async () => {
     await assert.rejects(() => withStoreTimeout(new Promise(() => {}), 20), /timed out/);
     assert.equal(await withStoreTimeout(Promise.resolve(7), 20), 7);

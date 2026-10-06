@@ -184,4 +184,12 @@ export const MARKETR_CUSTOM_NAMES = {
    * replica (GET /api/agents/chat/stream) from { runId, after, aguiRunId }.
    */
   reconnect: "marketr.reconnect",
+  /**
+   * Phase 17 (latency): the model is thinking (reasoning) before it writes —
+   * value { step, state: "started" | "ended" }. The chat shows a muted
+   * "Thinking" status line (running state), never the reasoning text.
+   */
+  thinking: "marketr.thinking",
+  /** Phase 17 (latency): the answer was reused from the answer cache (no model call) — value { question }. */
+  cached: "marketr.cached",
 } as const;

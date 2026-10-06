@@ -71,17 +71,17 @@ export function argsToJsonSchema(schema: {
   return out;
 }
 
-const KIND_NOTE: Record<string, string> = {
-  safe: "",
-  spend: " [costs money or runs a heavy job: waits for the user's OK unless a rule allows it]",
-  publish: " [publishes or sends: waits for the user's OK unless a rule allows it]",
-  destructive: " [destructive: always waits for the user's OK]",
-};
+// Phase 17 (A2): the per-tool KIND_NOTE suffix ("[costs money …: waits for
+// the user's OK unless a rule allows it]", ~75 characters on every non-safe
+// tool) is gone — one legend line in the static system prompt says the same
+// once (lib/chat/agent.ts TOOL_LEGEND), and the runtime's tool_result says
+// "waiting for the user's OK" whenever a call is held. The tier scan reads
+// ToolDef.description (never this chat copy), so no gate depends on it.
 
 export function toolDefToChat(t: ToolDef): ChatToolDef {
   return {
     name: apiToolName(t.name),
-    description: `${t.description}${KIND_NOTE[t.kind] ?? ""}`.slice(0, 4000),
+    description: t.description.slice(0, 4000),
     inputSchema: argsToJsonSchema(t.argsSchema),
   };
 }
@@ -89,7 +89,7 @@ export function toolDefToChat(t: ToolDef): ChatToolDef {
 export function connectorToolToChat(t: ConnectorChatTool): ChatToolDef {
   return {
     name: apiToolName(`${CONNECTOR_PREFIX}${t.connectorKey}.${t.name}`),
-    description: `[${t.connectorKey}] ${t.description}${t.mutating ? KIND_NOTE.publish : ""}`.slice(0, 4000),
+    description: `[${t.connectorKey}] ${t.description}`.slice(0, 4000),
     inputSchema: argsToJsonSchema(t.argsSchema),
   };
 }
@@ -113,6 +113,11 @@ export interface BuildLoopToolsInput {
   connectorTools?: readonly ConnectorChatTool[];
   /** Narrower than the grant (e.g. a skill's declared tools); canonical names. */
   filter?: (canonical: string) => boolean;
+  /**
+   * Phase 17 (A2): which offered tools are deferred (lib/agents/
+   * tool-loading.ts deferralFor) — marked deferLoading, never dropped.
+   */
+  defer?: ((canonical: string, group: string) => boolean) | null;
 }
 
 /**
@@ -124,7 +129,8 @@ export function buildLoopTools(input: BuildLoopToolsInput): LoopToolSet {
   const defs: ChatToolDef[] = [];
   const canonical: string[] = [];
   const map = new Map<string, string>();
-  const add = (canon: string, def: ChatToolDef) => {
+  const groups: string[] = [];
+  const add = (canon: string, def: ChatToolDef, group: string) => {
     if (input.filter && !input.filter(canon)) return;
     let name = def.name;
     // Two canonical names may sanitise to the same alias: disambiguate.
@@ -133,14 +139,21 @@ export function buildLoopTools(input: BuildLoopToolsInput): LoopToolSet {
     map.set(name, canon);
     defs.push({ ...def, name });
     canonical.push(canon);
+    groups.push(group);
   };
   for (const t of input.tools) {
-    if (!isGroupGranted(input.grant, input.groupOf(t.name) as never)) continue;
-    add(t.name, toolDefToChat(t));
+    const group = input.groupOf(t.name);
+    if (!isGroupGranted(input.grant, group as never)) continue;
+    add(t.name, toolDefToChat(t), group);
   }
   for (const c of input.connectorTools ?? []) {
-    if (!isGroupGranted(input.grant, connectorGroup(c.connectorKey))) continue;
-    add(`${CONNECTOR_PREFIX}${c.connectorKey}.${c.name}`, connectorToolToChat(c));
+    const group = connectorGroup(c.connectorKey);
+    if (!isGroupGranted(input.grant, group)) continue;
+    add(`${CONNECTOR_PREFIX}${c.connectorKey}.${c.name}`, connectorToolToChat(c), group);
+  }
+  // Phase 17 (A2): mark deferred tools (after the filter: only offered ones).
+  if (input.defer) {
+    for (let i = 0; i < defs.length; i++) if (input.defer(canonical[i], groups[i])) defs[i] = { ...defs[i], deferLoading: true };
   }
   const serverTools: ChatServerTool[] = isGroupGranted(input.grant, "web") ? ["web_search", "web_fetch"] : [];
   return {

@@ -112,14 +112,15 @@ afterEach(() => {
 });
 
 describe("request shape: tools, caching, thinking/effort, server tools", () => {
-  it("maps tools (sorted, schema as input_schema) and puts one cache breakpoint on the last system block", () => {
+  it("maps tools (sorted, schema as input_schema) and puts cache breakpoints on the last tool AND the last system block (Phase 17 A1)", () => {
     const { params: p } = params("claude-opus-5-5", base({ tools: [WRITE_FILE, LOOKUP], cache: true }));
     const tools = p.tools as P[];
     assert.deepEqual(tools.map((t) => t.name), ["account_lookup", "write_file"]);
     assert.deepEqual(tools[1].input_schema, WRITE_FILE.inputSchema);
     assert.equal(tools[1].description, WRITE_FILE.description);
     assert.equal("eager_input_streaming" in tools[1], false, "not on non-streaming requests");
-    assert.equal(tools.some((t) => "cache_control" in t), false, "system breakpoint covers the tools");
+    assert.equal("cache_control" in tools[0], false, "only the last loaded tool carries the tool breakpoint");
+    assert.deepEqual(tools[1].cache_control, { type: "ephemeral" }, "tools → system render order: the tool entry survives a system change");
     const system = p.system as P[];
     assert.deepEqual(system, [{ type: "text", text: "You are the lead agent.", cache_control: { type: "ephemeral" } }]);
     assert.equal("cache_control" in p, false, "no automatic caching unless asked");

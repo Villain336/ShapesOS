@@ -21,6 +21,7 @@ import type {
 import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
 import { notifyAgentRunFailed } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
+import { publishRunEvent } from "./live-events";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -80,7 +81,7 @@ export async function appendAgentRunEvent(
   event: AgentRunEventInput,
 ) {
   if (!event.summary?.trim()) throw new Error("appendAgentRunEvent: summary is required");
-  return withWorkspaceScope(workspaceId, async (tx) => {
+  const row = await withWorkspaceScope(workspaceId, async (tx) => {
     // Same outer transaction (withWorkspaceScope's) — no nested
     // $transaction: the seq increment and the event insert are atomic.
     const run = await tx.agentRun.update({
@@ -99,6 +100,10 @@ export async function appendAgentRunEvent(
       },
     });
   });
+  // Phase 17 (latency): the row is durable — hand it to the tails in this
+  // process at once (the AG-UI chat stream), instead of their next poll.
+  publishRunEvent(runId, { seq: row.seq, type: row.type, summary: row.summary, payload: row.payload });
+  return row;
 }
 
 /**
@@ -228,6 +233,64 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
     tx.agentRunEvent.findMany({
       where: { runId, workspaceId },
       orderBy: { seq: "asc" },
+    }),
+  );
+}
+
+/**
+ * Phase 17 (latency): one page of a run's TIMELINE events (streamed text and
+ * usage bookkeeping excluded), NEWEST first, before a seq cursor. The run
+ * page shows the newest page and loads older ones on demand ("Load earlier
+ * steps") instead of reading every event of a long run. `before` = the
+ * cursor for the next (older) page, null when this was the oldest.
+ */
+export const RUN_EVENTS_PAGE = 100;
+const NOT_TIMELINE: AgentRunEventType[] = ["text", "usage"];
+
+export async function listAgentRunEventsPage(
+  workspaceId: string,
+  runId: string,
+  opts: { beforeSeq?: number | null; limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(Math.floor(opts.limit ?? RUN_EVENTS_PAGE), 1), 500);
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const [rows, total] = await Promise.all([
+      tx.agentRunEvent.findMany({
+        where: {
+          runId,
+          workspaceId,
+          type: { notIn: NOT_TIMELINE },
+          ...(typeof opts.beforeSeq === "number" ? { seq: { lt: opts.beforeSeq } } : {}),
+        },
+        orderBy: { seq: "desc" },
+        take: limit + 1,
+      }),
+      typeof opts.beforeSeq === "number"
+        ? Promise.resolve(null)
+        : tx.agentRunEvent.count({ where: { runId, workspaceId, type: { notIn: NOT_TIMELINE } } }),
+    ]);
+    const more = rows.length > limit;
+    const events = more ? rows.slice(0, limit) : rows;
+    return { events, before: more ? events[events.length - 1]!.seq : null, total };
+  });
+}
+
+/** Phase 17: only the run's events of these types (usage totals) or payload kinds (the sandbox console). */
+export async function listAgentRunEventsWhere(
+  workspaceId: string,
+  runId: string,
+  filter: { types?: AgentRunEventType[]; payloadKindPrefix?: string },
+) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: {
+        runId,
+        workspaceId,
+        ...(filter.types ? { type: { in: filter.types } } : {}),
+        ...(filter.payloadKindPrefix ? { payload: { path: ["kind"], string_starts_with: filter.payloadKindPrefix } } : {}),
+      },
+      orderBy: { seq: "asc" },
+      take: 5_000,
     }),
   );
 }

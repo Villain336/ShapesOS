@@ -605,10 +605,13 @@ describe("Phase 16 automatic delegation (fake Responses API, real loop + queue +
     assert.ok(offered(on).includes("delegate_tasks"));
     assert.match(on.instructions ?? "", /Working with sub-agents/);
     assert.match(on.instructions ?? "", /Never delegate a single tool call/);
-    assert.match(on.instructions ?? "", /asked for the work to be split or run in parallel/);
+    // Phase 17 (A1): the per-request nudge rides in the user turn's
+    // <workspace-context> block, never in the cached system prefix.
+    assert.doesNotMatch(on.instructions ?? "", /Note on this request/, "the nudge is per request: not in the static prefix");
+    assert.match(allText(on), /asked for the work to be split or run in parallel/);
 
     await turn(t.id, "What are my keywords?");
-    assert.doesNotMatch(model.requests.at(-1)!.body.instructions ?? "", /Note on this request/, "no nudge on a small request");
+    assert.doesNotMatch(allText(model.requests.at(-1)!.body), /Note on this request/, "no nudge on a small request");
 
     await withWorkspaceScope(WS, (tx) => tx.agentDelegationSetting.create({ data: { workspaceId: WS, autoDelegation: false, updatedBy: USER } }));
     try {

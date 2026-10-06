@@ -15,6 +15,10 @@
 //               plan whose parent saved its waiting state (safety net).
 //   delegation_join — Phase 16: every task of a plan finished — the delegating
 //               run carries on (a chat turn, or a sub-agent one level up).
+//   llm_usage — Phase 17 (latency): one model call's metering, written as an
+//               outbox row by the call and normally processed at once by the
+//               process that wrote it; a worker takes the ones left behind
+//               (idempotent per call id — lib/llm/usage.ts).
 //
 // Handlers are imported lazily so the worker module stays light (and tests
 // can pass their own handler table).
@@ -61,6 +65,15 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     if (payload.workspaceId !== job.workspaceId) throw new Error("subagent_run payload belongs to another workspace");
     return runDelegatedChild(payload, { signal: ctx.signal, lastAttempt: ctx.lastAttempt });
   },
+  // Phase 17 (A4): one Message Batches step (submit / poll / deliver) — lib/llm/batch.ts.
+  async llm_batch(job) {
+    const { runLlmBatchJob } = await import("@/lib/llm/batch");
+    // Purposes register their delivery handlers on import.
+    await import("@/lib/llm/batch-purposes");
+    const payload = job.payload as { workspaceId: string; batchId: string };
+    if (payload.workspaceId !== job.workspaceId) throw new Error("llm_batch payload belongs to another workspace");
+    return runLlmBatchJob(payload);
+  },
   async delegation_tick(job) {
     const { pumpDelegation } = await import("@/lib/chat/delegation");
     const payload = job.payload as { workspaceId: string; parentRunId: string; check?: number };
@@ -73,6 +86,13 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     const ws = payload.kind === "chat_turn" ? payload.turn.workspaceId : payload.run.workspaceId;
     if (ws !== job.workspaceId) throw new Error("delegation_join payload belongs to another workspace");
     return runDelegationJoin(payload, { signal: ctx.signal, lastAttempt: ctx.lastAttempt });
+  },
+  async llm_usage(job) {
+    const { processUsageRecord } = await import("@/lib/llm/usage");
+    const payload = job.payload as import("@/lib/llm/usage").UsageOutboxPayload;
+    if (payload.record?.context?.workspaceId !== job.workspaceId) throw new Error("llm_usage payload belongs to another workspace");
+    await processUsageRecord(payload.record, payload.idempotencyKey);
+    return { idempotencyKey: payload.idempotencyKey };
   },
   async slack_mention(job) {
     const { runSlackMention } = await import("@/lib/slack/mention");

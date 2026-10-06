@@ -16,6 +16,8 @@ import {
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { compilePattern } from "@/lib/intelligence/company/style-check";
 import { StyleRuleKind, StyleRuleSeverity } from "@prisma/client";
+// Phase 17 (latency): the chat turn memoizes active rules per workspace; a write drops the memo.
+import { invalidateStyleRules } from "@/lib/intelligence/company/style-check";
 
 const KINDS = Object.values(StyleRuleKind) as string[];
 const SEVERITIES = Object.values(StyleRuleSeverity) as string[];
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest) {
       },
     }),
   );
+  invalidateStyleRules(access.workspaceId);
   return Response.json({ rule }, { status: 201 });
 }
 
