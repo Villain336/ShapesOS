@@ -88,6 +88,9 @@ const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/websites\/generate$/, // site generation (LLM)
   /^\/api\/ads\/creatives\/[^/]+\/regenerate$/, // AI creative regen
   /^\/api\/local\/grids\/[^/]+\/run$/, // local grid runs
+  // Phase 19A (WS=server): the agentic cursor — a turn calls the vision
+  // model, agent mode starts a background run, tts calls a paid voice.
+  /^\/api\/cursor\/(turn|agent|tts)$/,
 ];
 
 /** Pure classifier: tier for a request path + method. Unit-tested. */
