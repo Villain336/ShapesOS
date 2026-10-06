@@ -188,7 +188,7 @@ function usageFor(row: BatchRow): ChatUsageContext {
 export async function advanceLlmBatch(workspaceId: string, batchId: string, deps: BatchDeps = {}): Promise<AdvanceOutcome> {
   const store = deps.store ?? (await defaultStore());
   const now = deps.now ?? Date.now;
-  let row = await store.get(workspaceId, batchId);
+  let row: BatchRow | null = await store.get(workspaceId, batchId);
   if (!row) return { status: "noop" };
   const fail = async (msg: string): Promise<AdvanceOutcome> => {
     await store.update(workspaceId, batchId, { status: "failed", lastError: msg.slice(0, 1000) });
@@ -238,7 +238,7 @@ export async function advanceLlmBatch(workspaceId: string, batchId: string, deps
         const batcher = batchProviderOf(provider);
         if (!batcher || !row.providerBatchId) return fail("the batch's provider is no longer configured for this workload");
         const st = await batcher.batchStatus(row.providerBatchId);
-        const polls = row.polls + 1;
+        const polls: number = row.polls + 1;
         if (!st.ended) {
           await store.update(workspaceId, batchId, { polls });
           return { status: "polling", pollAfterMs: nextPollDelayMs(polls) };

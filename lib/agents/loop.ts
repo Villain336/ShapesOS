@@ -999,7 +999,7 @@ export function runToolSet(
 export function requestTools(
   tools: LoopToolSet,
   s: Pick<LoopState, "activatedTools">,
-  provider: Pick<LlmProvider, "supportsToolSearch">,
+  provider: LlmProvider,
 ): { tools: ChatRequest["tools"]; toolSearch: boolean; mode: "server" | "client" | "none" } {
   const deferred = tools.defs.filter((d) => d.deferLoading);
   if (deferred.length === 0) return { tools: tools.defs, toolSearch: false, mode: "none" };
