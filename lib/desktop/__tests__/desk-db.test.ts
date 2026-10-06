@@ -286,13 +286,22 @@ describe("Control Center: pause all agents", () => {
 
   it("the auto-approve summary never reports a locked (money / irreversible) action as auto", async () => {
     // Even a forged every-agent "auto" row for a Tier 3 action reads as "ask".
-    await withWorkspaceScope(WS, (tx) => tx.automationSetting.create({ data: { workspaceId: WS, agentKey: "*", action: "spend_budget", behavior: "auto" } })).catch(() => undefined);
+    const { KNOWN_ACTIONS: actions } = await import("@/lib/automation/policy");
+    const locked = actions.find((a) => !a.autoAllowed)!;
+    await withWorkspaceScope(WS, (tx) =>
+      tx.automationSetting.create({ data: { workspaceId: WS, agentKey: "*", action: locked.action, behavior: "auto", updatedBy: ADMIN } }),
+    );
     const s = await autoApproveSummary(WS);
+    // The forged row is read as "ask", never "auto".
+    const { resolveAutomationFromRows, listAutomationRows } = await import("@/lib/automation/policy");
+    assert.equal(resolveAutomationFromRows(await listAutomationRows(WS), locked.action).behavior, "auto", "the row really is there");
     assert.ok(s.locked > 0);
     assert.ok(s.ask + s.auto + s.never > 0);
     const { KNOWN_ACTIONS } = await import("@/lib/automation/policy");
     assert.equal(s.auto + s.ask + s.never, KNOWN_ACTIONS.length);
     assert.ok(s.auto <= KNOWN_ACTIONS.filter((a) => a.autoAllowed).length);
+    const withoutRow = KNOWN_ACTIONS.filter((a) => a.autoAllowed && a.defaultBehavior === "auto").length;
+    assert.equal(s.auto, withoutRow, "the forged auto row on a locked action did not add to 'auto'");
   });
 });
 
