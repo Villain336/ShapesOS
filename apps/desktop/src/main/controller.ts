@@ -96,6 +96,8 @@ export class CursorController {
     focusedApp?: () => Promise<FocusedApp | null>;
     transcript?: string | null;
     capture?: () => Promise<Shot[]>;
+    /** Xvfb has no window manager focus: treat the ShapesOS window as in front. */
+    shapesFocused?: boolean;
   } = {};
 
   constructor(private d: ControllerDeps) {
@@ -557,7 +559,7 @@ export class CursorController {
 
   private async whichApp(): Promise<{ focused: FocusedApp | null; turnApp: TurnApp | null }> {
     const win = this.d.mainWindow();
-    if (win && !win.isDestroyed() && win.isFocused()) {
+    if (win && !win.isDestroyed() && (win.isFocused() || this.testOverrides.shapesFocused)) {
       const url = win.webContents.getURL();
       return {
         focused: { name: "ShapesOS", title: win.getTitle(), url },

@@ -242,6 +242,11 @@ function boot(): void {
   handle("settings:open-shapes", (p) => openShapes(typeof p === "string" && p.startsWith("/") ? p : undefined));
 
   // ---- global shortcuts ----------------------------------------------------------
+  // Spotlight: focus ShapesOS and open its ⌘K palette.
+  const spotlight = () => {
+    openShapes();
+    mainWindow?.webContents.send(PAGE_CHANNELS.openPalette, { mac: process.platform === "darwin" });
+  };
   const registered: string[] = [];
   const applyShortcuts = () => {
     for (const a of registered.splice(0)) globalShortcut.unregister(a);
@@ -254,10 +259,7 @@ function boot(): void {
       }
     };
     // Spotlight: focus ShapesOS and open ⌘K.
-    reg(s.spotlightKey, () => {
-      openShapes();
-      mainWindow?.webContents.send(PAGE_CHANNELS.openPalette, { mac: process.platform === "darwin" });
-    });
+    reg(s.spotlightKey, spotlight);
     reg(s.typeKey, ask);
     holdKey.apply(s);
   };
@@ -294,7 +296,7 @@ function boot(): void {
 
   if (__TEST_HOOKS__) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    (require("./test-hooks") as typeof import("./test-hooks")).installTestHooks({ controller, overlays, tray, speechOut, holdKey });
+    (require("./test-hooks") as typeof import("./test-hooks")).installTestHooks({ controller, overlays, tray, speechOut, holdKey, openSettings, openPalette: spotlight });
   }
 
   app.on("second-instance", () => openShapes());

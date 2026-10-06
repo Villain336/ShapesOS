@@ -15,6 +15,7 @@ import type { OverlayManager } from "./overlay-manager";
 import type { TrayController } from "./tray";
 import type { SpeechOut } from "./speech";
 import type { HoldKeyService } from "./hold-key";
+import { captureScreens } from "./capture";
 
 export interface TestHookDeps {
   controller: CursorController;
@@ -22,11 +23,14 @@ export interface TestHookDeps {
   tray: TrayController;
   speechOut: SpeechOut;
   holdKey: HoldKeyService;
+  openSettings: () => void;
+  openPalette: () => void;
 }
 
 export function installTestHooks(d: TestHookDeps): void {
   let captureCalls: { at: number; heldAtCall: boolean }[] = [];
   let held = false;
+  let lastShots: { screen: number; width: number; height: number; scaleFactor: number; bytes: number }[] = [];
   const hook = {
     label: "TEST-ONLY HOOK: compiled out of production builds",
     /** Simulated talk key DOWN (as uiohook would deliver after the hold delay). */
@@ -48,6 +52,30 @@ export function installTestHooks(d: TestHookDeps): void {
     },
     setFocusedApp(app: FocusedApp | null): void {
       d.controller.testOverrides.focusedApp = async () => app;
+      d.controller.testOverrides.shapesFocused = false;
+    },
+    /** Treat the ShapesOS window as the app in front (no WM focus under Xvfb). */
+    focusShapes(): void {
+      d.controller.testOverrides.shapesFocused = true;
+    },
+    openSettings(): void {
+      d.openSettings();
+    },
+    /** The spotlight hotkey's action (focus ShapesOS, open ⌘K). */
+    openPalette(): void {
+      d.openPalette();
+    },
+    /** The REAL desktopCapturer path, instrumented to record when each capture ran. */
+    useRealCapture(): void {
+      d.controller.testOverrides.capture = async (): Promise<Shot[]> => {
+        captureCalls.push({ at: Date.now(), heldAtCall: held });
+        const shots = await captureScreens("all");
+        lastShots = shots.map((x) => ({ screen: x.screen, width: x.width, height: x.height, scaleFactor: x.scaleFactor, bytes: x.jpegBase64.length }));
+        return shots;
+      };
+    },
+    lastShots() {
+      return lastShots;
     },
     /** A labelled fake capture: a tiny JPEG-shaped string per display, recording when it ran. */
     useFakeCapture(): void {
