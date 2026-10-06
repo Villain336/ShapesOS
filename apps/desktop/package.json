@@ -14,9 +14,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "smoke": "node scripts/build.mjs --test-hooks && playwright test -c test/playwright.config.ts",
-    "pack:dir": "node scripts/build.mjs && electron-builder --dir --config electron-builder.yml",
-    "dist:mac": "node scripts/build.mjs && electron-builder --mac --config electron-builder.yml",
-    "dist:win": "node scripts/build.mjs && electron-builder --win --config electron-builder.yml",
+    "pack:dir": "node scripts/build.mjs && DESKTOP_UPDATE_URL=${DESKTOP_UPDATE_URL:-https://updates.example.invalid} DESKTOP_CHANNEL=${DESKTOP_CHANNEL:-stable} electron-builder --dir --config electron-builder.yml --publish never",
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac --config electron-builder.yml --publish never",
+    "dist:win": "node scripts/build.mjs && electron-builder --win --config electron-builder.yml --publish never",
     "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
