@@ -592,12 +592,28 @@ interface MessageStreamLike extends AsyncIterable<Anthropic.Messages.RawMessageS
   abort?(): void;
 }
 
+/**
+ * Phase 17 (A4): the slice of the SDK's Message Batches resource the batch
+ * path uses (client.messages.batches — SDK resources/messages/batches.d.ts:
+ * create({ requests: [{ custom_id, params }] }), retrieve(id) →
+ * processing_status 'in_progress' | 'canceling' | 'ended', results(id) →
+ * JSONL of { custom_id, result: { type: 'succeeded', message } | errored |
+ * canceled | expired }).
+ */
+export interface BatchesLike {
+  create(params: { requests: Array<{ custom_id: string; params: Anthropic.Messages.MessageCreateParamsNonStreaming }> }): PromiseLike<{ id: string; processing_status: string }>;
+  retrieve(id: string): PromiseLike<{ id: string; processing_status: string; request_counts?: Record<string, number> }>;
+  results(id: string): PromiseLike<AsyncIterable<{ custom_id: string; result: { type: string; message?: Anthropic.Messages.Message; error?: unknown } }>>;
+}
+
 interface MessagesLike {
   create(
     params: Anthropic.Messages.MessageCreateParamsNonStreaming,
     options?: { signal?: AbortSignal },
   ): PromiseLike<Anthropic.Messages.Message>;
   stream(params: Anthropic.Messages.MessageStreamParams, options?: { signal?: AbortSignal }): MessageStreamLike;
+  /** Phase 17 (A4): Message Batches (the real SDK client always has it). */
+  batches?: BatchesLike;
 }
 
 /** The slice of the SDK client this adapter uses (a test seam). */
@@ -655,6 +671,111 @@ export class AnthropicLlmProvider implements LlmProvider {
 
   getDefaultEffort(): ChatEffort | null {
     return this.defaultEffort;
+  }
+
+  /** Router workload (metering label). */
+  getWorkload(): string | null {
+    return this.workload;
+  }
+
+  // ── Phase 17 (A4): Message Batches ────────────────────────────────────────
+
+  /** True when this client can send Message Batches (50% of standard prices). */
+  supportsBatch(): boolean {
+    return Boolean(this.client.messages.batches);
+  }
+
+  /**
+   * Submit prompts as one Message Batch. Gated by the credit cap like any
+   * call (assertModelSpendAllowed); never sent for a capped workspace.
+   * The params are exactly generate()'s (no service_tier: a batch is its
+   * own tier).
+   */
+  async submitBatch(
+    requests: ReadonlyArray<{ customId: string; prompt: string; maxTokens: number }>,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<{ providerBatchId: string; status: string }> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    await assertModelSpendAllowed(usage, this.keySource, this.name);
+    try {
+      const b = await batches.create({
+        requests: requests.map((r) => ({
+          custom_id: r.customId,
+          params: { model: this.model, max_tokens: r.maxTokens, messages: [{ role: "user", content: r.prompt }] },
+        })),
+      });
+      return { providerBatchId: b.id, status: b.processing_status };
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+  }
+
+  /** Poll a batch: ended once processing_status is "ended". */
+  async batchStatus(providerBatchId: string): Promise<{ ended: boolean; status: string }> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    try {
+      const b = await batches.retrieve(providerBatchId);
+      return { ended: b.processing_status === "ended", status: b.processing_status };
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+  }
+
+  /**
+   * An ended batch's results, one per request (any order — keyed by
+   * customId). Each succeeded message's usage is recorded (llm_tokens, the
+   * batch tier at 50%), idempotent per response id: a re-read after a worker
+   * restart never charges twice.
+   */
+  async batchResults(
+    providerBatchId: string,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<Record<string, { text: string } | { error: string }>> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    const out: Record<string, { text: string } | { error: string }> = {};
+    let decoder: AsyncIterable<{ custom_id: string; result: { type: string; message?: Anthropic.Messages.Message; error?: unknown } }>;
+    try {
+      decoder = await batches.results(providerBatchId);
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+    for await (const line of decoder) {
+      const r = line.result;
+      if (r.type === "succeeded" && r.message) {
+        const msg = r.message;
+        const u = mapUsage(msg.usage);
+        // Batch results report usage.service_tier "batch"; default to it.
+        const serviceTier = (msg.usage as { service_tier?: string | null } | null)?.service_tier ?? "batch";
+        if (usage) {
+          await recordChatUsage({
+            context: usage,
+            workload: this.workload,
+            provider: this.name,
+            model: this.model,
+            usage: u,
+            costMicroUsd: estimateCostMicroUsd(priceFor(this.model) ? this.model : msg.model, u, { serviceTier }),
+            responseId: msg.id ?? null,
+            keySource: this.keySource,
+            timing: null,
+            effort: null,
+            serviceTier,
+          });
+        }
+        const text = msg.content
+          .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+          .trim();
+        out[line.custom_id] = text ? { text } : { error: `empty response (stop_reason ${msg.stop_reason ?? "unknown"})` };
+      } else {
+        const detail = r.type === "errored" ? `errored: ${JSON.stringify(r.error ?? {}).slice(0, 300)}` : r.type;
+        out[line.custom_id] = { error: detail };
+      }
+    }
+    return out;
   }
 
   /** Phase 17 (A2): tool search is server-side on the models the docs list. */

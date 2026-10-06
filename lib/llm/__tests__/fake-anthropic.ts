@@ -221,7 +221,7 @@ export async function startFakeAnthropic(opts: { agentWorker?: "off" | "external
             const body = JSON.parse(raw) as { requests: Array<{ custom_id: string; params: AnthropicBody }> };
             const batch: FakeBatch = { id: `msgbatch_fake_${++seq}`, requests: body.requests, polls: 0, createdAt: Date.now() };
             fake.batches.set(batch.id, batch);
-            return json(res, 200, batchView(batch, fake.batchEndsAfterPolls));
+            return json(res, 200, batchView(batch, fake.batchEndsAfterPolls, fake.baseUrl));
           }
           const batch = id ? fake.batches.get(id) : undefined;
           if (!batch) return json(res, 404, { type: "error", error: { type: "not_found_error", message: "batch not found" } });
@@ -241,7 +241,7 @@ export async function startFakeAnthropic(opts: { agentWorker?: "off" | "external
             return res.end(lines.join("\n") + "\n");
           }
           batch.polls++;
-          return json(res, 200, batchView(batch, fake.batchEndsAfterPolls));
+          return json(res, 200, batchView(batch, fake.batchEndsAfterPolls, fake.baseUrl));
         }
 
         // ── Messages ──────────────────────────────────────────────────────
@@ -296,7 +296,7 @@ export async function startFakeAnthropic(opts: { agentWorker?: "off" | "external
   return fake;
 }
 
-function batchView(batch: FakeBatch, endsAfter: number): Record<string, unknown> {
+function batchView(batch: FakeBatch, endsAfter: number, baseUrl: string): Record<string, unknown> {
   const ended = batch.polls >= endsAfter;
   const n = batch.requests.length;
   return {
@@ -309,7 +309,8 @@ function batchView(batch: FakeBatch, endsAfter: number): Record<string, unknown>
     expires_at: new Date(batch.createdAt + 86_400_000).toISOString(),
     archived_at: null,
     cancel_initiated_at: null,
-    results_url: ended ? `/v1/messages/batches/${batch.id}/results` : null,
+    // Absolute, as the real API returns it (the SDK GETs it as is).
+    results_url: ended ? `${baseUrl}/v1/messages/batches/${batch.id}/results` : null,
   };
 }
 
