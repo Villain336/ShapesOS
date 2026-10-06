@@ -87,6 +87,29 @@ export const WORKLOAD_EFFORT: Readonly<Partial<Record<LlmWorkload, ChatEffort>>>
   code: "high",
 };
 
+/**
+ * Phase 17 (evaluation): the effort a workload runs at — LLM_EFFORT_<WORKLOAD>
+ * (e.g. LLM_EFFORT_LEAD=low) when set to a valid level, else WORKLOAD_EFFORT.
+ * The evaluation harness (scripts/eval) sweeps it; nothing changes unless an
+ * operator sets it. Read at call time, like every routing env var.
+ */
+export const WORKLOAD_EFFORT_ENV: Record<LlmWorkload, string> = {
+  copy: "LLM_EFFORT_COPY",
+  bulk: "LLM_EFFORT_BULK",
+  background: "LLM_EFFORT_BACKGROUND",
+  lead: "LLM_EFFORT_LEAD",
+  subagent: "LLM_EFFORT_SUBAGENT",
+  code: "LLM_EFFORT_CODE",
+  code_max: "LLM_EFFORT_CODE_MAX",
+};
+const EFFORTS: readonly ChatEffort[] = ["low", "medium", "high", "max"];
+
+export function workloadEffort(workload: LlmWorkload, env: Record<string, string | undefined> = process.env): ChatEffort | null {
+  const v = (env[WORKLOAD_EFFORT_ENV[workload]] ?? "").trim().toLowerCase();
+  if ((EFFORTS as readonly string[]).includes(v)) return v as ChatEffort;
+  return WORKLOAD_EFFORT[workload] ?? null;
+}
+
 export type LlmFamily = "anthropic" | "openai";
 
 /** Each family's default per workload: what single-key mode routes to, and
@@ -432,7 +455,7 @@ function toMock(
     fallbackReason: reason,
     singleKey,
     failoverModel: null,
-    effort: WORKLOAD_EFFORT[workload] ?? null,
+    effort: workloadEffort(workload),
     retention: null,
     keySource: null,
   };
@@ -446,7 +469,7 @@ function resolvePrimary(workload: LlmWorkload, ks: KeySet): ResolvedWorkload {
   let model = resolved.model;
   let singleKey: ResolvedWorkload["singleKey"] = null;
   let retention: ResolvedWorkload["retention"] = null;
-  let effort: ChatEffort | null = WORKLOAD_EFFORT[workload] ?? null;
+  let effort: ChatEffort | null = workloadEffort(workload);
   const openAiKey = keys.openai;
   const anthropicKey = keys.anthropic;
 
@@ -620,7 +643,7 @@ export function resolveWorkload(workload: LlmWorkload, opts: ResolveOptions = {}
   if (!primary.provider.isLive) return primary;
   const fbModel = failoverModelFor(workload, primary.requestedModel, opts.workspaceKeys);
   const fallback = fbModel
-    ? hostedProvider(fbModel, ks, { workload, defaultEffort: WORKLOAD_EFFORT[workload] ?? null })
+    ? hostedProvider(fbModel, ks, { workload, defaultEffort: workloadEffort(workload) })
     : null;
   if (!fbModel || !fallback) return primary;
   return {

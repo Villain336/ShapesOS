@@ -65,6 +65,15 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     if (payload.workspaceId !== job.workspaceId) throw new Error("subagent_run payload belongs to another workspace");
     return runDelegatedChild(payload, { signal: ctx.signal, lastAttempt: ctx.lastAttempt });
   },
+  // Phase 17 (A4): one Message Batches step (submit / poll / deliver) — lib/llm/batch.ts.
+  async llm_batch(job) {
+    const { runLlmBatchJob } = await import("@/lib/llm/batch");
+    // Purposes register their delivery handlers on import.
+    await import("@/lib/llm/batch-purposes");
+    const payload = job.payload as { workspaceId: string; batchId: string };
+    if (payload.workspaceId !== job.workspaceId) throw new Error("llm_batch payload belongs to another workspace");
+    return runLlmBatchJob(payload);
+  },
   async delegation_tick(job) {
     const { pumpDelegation } = await import("@/lib/chat/delegation");
     const payload = job.payload as { workspaceId: string; parentRunId: string; check?: number };

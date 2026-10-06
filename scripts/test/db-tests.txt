@@ -194,3 +194,11 @@ lib/agents/runs/__tests__/events-page-db.test.ts
 lib/twin/__tests__/twin-signal-db.test.ts
 # Phase 17 (latency): no-model fast paths through the real turn + fake model counter — slash commands 0 model calls, proposing commands through the same gate (asks / Tier 0-2 rule / Tier 3 never auto), answer cache hit + label, data change and tool-using answers never served.
 lib/chat/__tests__/fast-paths-db.test.ts
+# Phase 17 (model): through the real chat turn against a FAKE Anthropic Messages API (MOCK) — byte-stable tools+system prefix across turns/threads/workspaces with 1h breakpoints on the last loaded tool + system; dynamic context in the first user turn; usage_events carry ttft/duration/effort/cache hit/service tier; the thread facts summary stored + injected (labelled); a deferred tool found by tool search runs.
+lib/chat/__tests__/p17-model-db.test.ts
+# Phase 17 (model): Message Batches end to end — llm_batch_jobs (FORCE RLS) + the real agent queue/AgentWorker + the Anthropic adapter against a FAKE Messages/Batches API (MOCK): submit, a worker dying mid-poll, reclaim, results, the nightly learning pass delivered once, llm_tokens at the batch tier (50%), idempotent per night.
+lib/llm/__tests__/batch-db.test.ts
+# Phase 17 (model): AI cost & speed from the llm_tokens ledger (cost per day, cache hits, p50/p95 first token, by model, top runs) and the cache-health alert (admins notified once per day when the 24 h cache-read share is under 60%).
+lib/metering/__tests__/ai-health-db.test.ts
+# Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
+scripts/eval/__tests__/eval-dry-run-db.test.ts

@@ -122,11 +122,15 @@ Return ONLY valid JSON: {"mentioned": boolean, "sentiment": "positive"|"neutral"
 export async function judgeGeoResponse(
   brand: string,
   responseText: string,
+  /** Phase 17 (A4): the workspace the run is for — its key and its metering (generate() records usage). */
+  workspaceId?: string,
 ): Promise<GeoJudgment> {
   const heuristic = heuristicJudge(brand, responseText);
   let provider: LlmProvider;
   try {
-    provider = getLlmProviderFor("bulk");
+    provider = workspaceId
+      ? await (await import("@/lib/llm/workspace")).getLlmProviderForWorkspace("bulk", { workspaceId, billing: "included" }) // recorded; charged once, by recordApiMeter("judge") below
+      : getLlmProviderFor("bulk");
   } catch {
     return heuristic;
   }
@@ -249,7 +253,7 @@ export async function runPanel(
     const { provider, model } = providers.get(job.engine) as { provider: LlmProvider; model: string };
     const prompt = panel.prompts[job.promptIdx];
     const text = await provider.generate(prompt, { maxTokens: 1024 });
-    const judgment = await judgeGeoResponse(opts.brand, text);
+    const judgment = await judgeGeoResponse(opts.brand, text, workspaceId);
     const genCost = NANO_GEN_COST_USD[job.engine] ?? 0.001;
     estimatedCostUsd += genCost + JUDGE_CALL_COST_USD;
 

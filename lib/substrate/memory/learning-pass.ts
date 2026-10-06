@@ -404,6 +404,10 @@ export interface LearningPassReport {
     | "skipped_already_ran"
     | "skipped_no_material"
     | "skipped_no_llm"
+    // Phase 17 (A4): the LLM step was sent through the Message Batches API;
+    // the lessons are applied when the batch ends (lib/llm/batch.ts →
+    // applyLearningPassOutput). Counts as tonight's pass for the guard.
+    | "submitted_batch"
     | "failed";
   learningsExtracted: number;
   learningsSkippedDup: number;
@@ -420,6 +424,13 @@ export interface LearningPassOptions {
   llm?: (prompt: string) => Promise<string>;
   /** Force the model label (defaults to the resolved background model). */
   modelLabel?: string;
+  /**
+   * Phase 17 (A4): send the LLM step through the Message Batches API (50%
+   * off; nobody waits for the nightly pass) when the background provider has
+   * one. Default: on unless LLM_BATCH=0 or the agent worker is off (nothing
+   * would poll). Ignored with an injected `llm`.
+   */
+  batch?: boolean;
   lookbackDays?: number;
   maxEpisodes?: number;
   similarityThreshold?: number;
@@ -475,7 +486,7 @@ function readLearningPassBookkeeping(errorJson: string | null): { ran: boolean; 
     const parsed = JSON.parse(errorJson) as {
       learningPass?: { status?: string; at?: string };
     };
-    if (parsed?.learningPass?.status === "ran") {
+    if (parsed?.learningPass?.status === "ran" || parsed?.learningPass?.status === "submitted_batch") {
       return { ran: true, at: parsed.learningPass.at };
     }
   } catch {
@@ -896,6 +907,24 @@ export async function executeLearningPass(
     if (opts.llm) {
       modelLabel = opts.modelLabel ?? "injected-test";
       raw = await opts.llm(buildLearningPrompt(workspaceId, materials, dateLabel));
+    } else if (await shouldBatch(workspaceId, opts)) {
+      // Phase 17 (A4): nobody waits for the nightly pass — the Batch API
+      // (50% off). The lessons land when the batch ends (applyLearningPassOutput).
+      const { submitLlmBatch } = await import("@/lib/llm/batch");
+      await import("@/lib/llm/batch-purposes");
+      const prompt = buildLearningPrompt(workspaceId, materials, dateLabel);
+      await submitLlmBatch({
+        workspaceId,
+        purpose: LEARNING_PASS_BATCH_PURPOSE,
+        idempotencyKey: `learning_pass:${dateLabel}`,
+        workload: "background",
+        requests: [{ customId: "pass", prompt, maxTokens: WORKLOAD_MAX_TOKENS.background }],
+        context: { dateLabel, threshold, decayDays, decayConfidence },
+      });
+      report.status = "submitted_batch";
+      report.llmUsage = { model: "batch", promptChars: prompt.length, estInputTokens: Math.ceil(prompt.length / 4), estOutputTokens: 0 };
+      console.log(`[learning-pass] workspace ${workspaceId}: LLM step submitted as a Message Batch (learning_pass:${dateLabel}).`);
+      return report;
     } else {
       const maxTokens = WORKLOAD_MAX_TOKENS.background;
       const resolved = await defaultLlmGenerate(
@@ -931,6 +960,38 @@ export async function executeLearningPass(
   );
 
   // 5. Parse + apply.
+  return applyLearningPassOutput(workspaceId, raw, modelLabel, { dateLabel, threshold, decayDays, decayConfidence }, report);
+}
+
+/** Phase 17 (A4): the batch purpose key of the nightly pass. */
+export const LEARNING_PASS_BATCH_PURPOSE = "learning_pass";
+
+/** Batch the LLM step? (only when it would actually be polled and is cheaper). */
+async function shouldBatch(workspaceId: string, opts: LearningPassOptions): Promise<boolean> {
+  if (opts.batch === false) return false;
+  const { batchEnabled, batchProviderOf } = await import("@/lib/llm/batch");
+  const { agentWorkerMode } = await import("@/lib/agents/queue/config");
+  if (!batchEnabled() || agentWorkerMode() === "off") return false;
+  if (opts.batch === true) return true;
+  const { resolveWorkloadForWorkspace } = await import("@/lib/llm/workspace");
+  const provider = (await resolveWorkloadForWorkspace("background", workspaceId)).provider;
+  return provider.isLive && batchProviderOf(provider) !== null;
+}
+
+/**
+ * Step 5 of the pass: parse the model's output and write it back (lessons,
+ * dedupe, decay, voice / knowledge / style-rule proposals). Shared by the
+ * direct pass and the Message Batches delivery (Phase 17 A4). Idempotent
+ * enough to run twice: lessons are deduped against active ones.
+ */
+export async function applyLearningPassOutput(
+  workspaceId: string,
+  raw: string,
+  modelLabel: string,
+  p: { dateLabel: string; threshold: number; decayDays: number; decayConfidence: number },
+  report: LearningPassReport = emptyReport("ran"),
+): Promise<LearningPassReport> {
+  const { dateLabel, threshold, decayDays, decayConfidence } = p;
   const parsed = parseLearningPassOutput(raw);
   if (!parsed) {
     report.status = "failed";

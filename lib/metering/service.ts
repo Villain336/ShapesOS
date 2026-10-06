@@ -105,6 +105,14 @@ export interface LlmUsageFields {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   costMicroUsd: number | null;
+  // Phase 17 (A1, WS=model): per-call observability — time to first token,
+  // wall-clock, the effort sent, whether the prompt cache was read, and the
+  // provider's service tier. Optional: every older caller keeps working.
+  ttftMs?: number | null;
+  durationMs?: number | null;
+  effort?: string | null;
+  cacheHit?: boolean | null;
+  serviceTier?: string | null;
 }
 
 function nonNegInt(n: number, field: string): number {
@@ -331,6 +339,13 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         llmCacheReadTokens: nonNegInt(llm.cacheReadTokens, "cacheReadTokens"),
         llmCacheWriteTokens: nonNegInt(llm.cacheWriteTokens, "cacheWriteTokens"),
         llmCostMicroUsd: llm.costMicroUsd === null ? null : BigInt(nonNegInt(llm.costMicroUsd, "costMicroUsd")),
+        // Phase 17 (A1): observability columns (nullable; rounded to whole ms).
+        llmTtftMs: typeof llm.ttftMs === "number" && Number.isFinite(llm.ttftMs) ? Math.max(0, Math.round(llm.ttftMs)) : null,
+        llmDurationMs:
+          typeof llm.durationMs === "number" && Number.isFinite(llm.durationMs) ? Math.max(0, Math.round(llm.durationMs)) : null,
+        llmEffort: llm.effort ?? null,
+        llmCacheHit: typeof llm.cacheHit === "boolean" ? llm.cacheHit : null,
+        llmServiceTier: llm.serviceTier ?? null,
       }
     : {};
 

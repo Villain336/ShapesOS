@@ -398,6 +398,44 @@ export async function notifyTicketSlaBreached(input: TicketSlaBreachedInput, db:
 // stopped while late, register left open) → editors, once per condition.
 // ---------------------------------------------------------------------------
 
+export interface CacheShareLowInput {
+  workspaceId: string;
+  /** The last 24 h's cache-read share, 0..1. */
+  share: number;
+  calls: number;
+  /** UTC day (YYYY-MM-DD): one notification per recipient per day. */
+  day: string;
+}
+
+/**
+ * Phase 17 (observability): the prompt cache stopped paying — the last 24 h
+ * read less than 60% of input tokens from it. → the workspace's admins (the
+ * people who see Settings → Usage), once per day.
+ */
+export async function notifyCacheShareLow(input: CacheShareLowInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const admins = await membersAtLeast(db, input.workspaceId, "admin");
+    const pct = Math.round(input.share * 100);
+    return await createAndEmit(
+      db,
+      admins.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: `Model cache reads fell to ${pct}%`,
+        body: `In the last 24 hours only ${pct}% of model input was read from the prompt cache (${input.calls} calls; below 60% means something keeps changing the cached prefix). AI cost per message is higher until it recovers.`,
+        href: "/dashboard/settings/usage#ai-cost-speed",
+        sourceType: "usage",
+        sourceId: `cache_share:${input.day}`,
+        dedupKey: `cache_share_low:${input.workspaceId}:${input.day}`,
+      })),
+    );
+  } catch (e) {
+    warn("cache_share_low", e);
+    return 0;
+  }
+}
+
 export interface TwinAlertInput {
   workspaceId: string;
   siteId: string;

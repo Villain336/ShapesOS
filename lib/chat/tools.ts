@@ -448,7 +448,7 @@ const get_workflows: ToolDef = {
 const load_skill: ToolDef = {
   name: "load_skill",
   description:
-    "Load an enabled project's skill by slug: returns the full SKILL.md playbook (name, description, steps, tools it may invoke). Call this BEFORE acting whenever a task matches a skill in the AVAILABLE SKILLS section.",
+    "Load an enabled skill's full SKILL.md playbook by slug. Call it BEFORE acting whenever a task matches a skill listed under AVAILABLE SKILLS.",
   kind: "safe",
   minRole: "viewer",
   argsSchema: {
@@ -598,7 +598,7 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
+    "Run an SEO audit of a project site (heavy job): findings go to the audit inbox, site files are never edited. live=true crawls the live URLs instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
@@ -803,7 +803,7 @@ const approve_autopilot_item: ToolDef = {
 const design_qr_code: ToolDef = {
   name: "design_qr_code",
   description:
-    "Design a brand-styled QR code from a natural-language style request (e.g. 'round QR, modules as little snakes, brand colors, logo in the center'). Renders the styled code on the real QR matrix, runs automated validation (glyph fill, contrast, finder integrity, quiet zone, error correction H) and a real decoder scan test. Failures come back with the named reason plus a bolder auto-regenerated variant. A verified design is print-locked and its sha256 hash is returned for the media-buy approval binding. The AI only ever styles the artwork — never the encoded data.",
+    "Design a brand-styled QR code from a style request (e.g. 'round, snake modules, brand colors, logo in the center') on the real QR matrix, then validate it (contrast, finders, quiet zone, error correction H) and scan-test it; a failure returns the reason plus a bolder variant. A verified design is print-locked and its sha256 returned for the media-buy approval. Only the artwork is styled, never the encoded data.",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
@@ -1005,7 +1005,7 @@ const automation_flow_status: ToolDef = {
 const ask_business_data: ToolDef = {
   name: "ask_business_data",
   description:
-    "Answer a question about the business (FAQs, products, policies, SOPs, company facts, pricing) strictly from the datasets this workspace published to RAG + Feed. Returns the best-matching passage plus Source → Document → Chunk citations; says so when nothing matches. Use it before answering factual questions about the tenant's own business.",
+    "Answer a question about the business (FAQs, products, policies, SOPs, facts, pricing) only from the datasets the workspace published, with citations; says so when nothing matches. Use it before answering factual questions about the business.",
   kind: "safe",
   minRole: "viewer",
   argsSchema: {

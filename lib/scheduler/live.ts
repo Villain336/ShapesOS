@@ -131,6 +131,10 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
       system,
       messages: [{ role: "user", content: `${input.subtask.label}\n\n${input.subtask.detail}` }],
       toolFilter: declaredToolFilter(input.skill.declaredTools),
+      // Phase 17 (A4): a scheduled skill has no person waiting — it runs the
+      // lead's reach on the subagent workload (the cheaper model, no
+      // priority capacity, 5-minute cache entries).
+      workload: "subagent",
     });
     const ok = loop.status !== "error" && loop.status !== "cancelled";
     await finishAgentRun(input.workspaceId, run.id, loop.status === "cancelled" ? "cancelled" : ok ? "succeeded" : "failed");

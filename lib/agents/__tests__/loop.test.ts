@@ -142,7 +142,11 @@ describe("agent loop: native tool protocol", () => {
     assert.equal(req.cache, true);
     assert.equal(req.cacheConversation, true);
     assert.equal(req.thinking, "adaptive");
-    assert.ok(req.tools?.some((t) => t.name === "t_echo"));
+    // Phase 17 (A2): a registered extra tool outside the lead's core set is
+    // deferred — on a provider without server-side tool search it is reached
+    // through search_tools (and still runs when named, as above).
+    assert.ok(req.tools?.some((t) => t.name === "search_tools"));
+    assert.ok(req.tools?.some((t) => t.name === "get_keywords"), "a core tool is loaded");
     assert.deepEqual(req.serverTools, ["web_search", "web_fetch"], "a null grant includes web");
   });
 
@@ -444,7 +448,8 @@ describe("agent loop: native tool protocol", () => {
       toolFilter: (name) => name === "t_count",
     });
     const res = await p;
-    assert.deepEqual(provider.chatCalls[0]!.tools?.map((t) => t.name), ["t_count"]);
+    // Phase 17 (A3): the loop's own fetch_more rides along (it reads only this run's capped results).
+    assert.deepEqual(provider.chatCalls[0]!.tools?.map((t) => t.name), ["t_count", "fetch_more"]);
     assert.equal(res.calls[0]?.status, "denied");
     assert.equal(echoRuns, 0);
   });

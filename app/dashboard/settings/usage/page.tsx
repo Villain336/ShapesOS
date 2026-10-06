@@ -9,6 +9,8 @@ import UsageDashboard from "@/components/settings/UsageDashboard";
 import BillingSection from "@/components/settings/BillingSection";
 // Phase 15.4 (zernio): connected Zernio accounts (appended section).
 import ZernioUsageSection from "@/components/settings/ZernioUsageSection";
+// Phase 17 (observability): model cost per day, cache hits, first-token speed, top runs.
+import AiCostSpeedSection from "@/components/settings/AiCostSpeedSection";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,7 @@ export default async function UsageSettingsPage() {
       </div>
       <SettingsNav />
       <UsageDashboard workspaceId={workspace.id} />
+      <AiCostSpeedSection workspaceId={workspace.id} />
       <BillingSection workspaceId={workspace.id} />
       <ZernioUsageSection workspaceId={workspace.id} />
     </div>

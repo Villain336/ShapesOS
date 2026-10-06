@@ -148,6 +148,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 13. The tightest twin threshold is a truck 30 minutes past its ETA; a 5-minute sweep flags it within 5 minutes, and each condition alerts once (dedup keys), so the cadence never repeats an alert.",
     timeoutMs: SHORT,
   },
+  // Phase 17 (observability): the prompt cache's 24 h read share → admin notification when below 60%.
+  {
+    key: "ai-cache-health",
+    path: "/api/cron/ai-cache-health",
+    cron: "35 * * * *",
+    source: "picked",
+    note: "New in Phase 17. A rolling 24 h window and one notification per workspace per day (dedup key), so hourly catches a cache breaker within the hour of it crossing the threshold without ever repeating the alert.",
+    timeoutMs: SHORT,
+  },
   // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
   {
     key: "ops-reorder",

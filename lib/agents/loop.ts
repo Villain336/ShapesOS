@@ -56,6 +56,7 @@ import { invalidToolResult } from "@/lib/llm/tool-input";
 import { LlmProviderError } from "@/lib/llm/errors";
 import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import type {
+  ChatCacheTtl,
   ChatContentBlock,
   ChatMessage,
   ChatRequest,
@@ -77,6 +78,18 @@ import {
 } from "@/lib/chat/tool-exec";
 import { waitingPlaceholder } from "./delegation/plan";
 import { buildLoopTools, type ConnectorChatTool, type LoopToolSet } from "./loop-tools";
+import {
+  capResult,
+  DEFAULT_TOOL_RESULT_CAP,
+  deferralFor,
+  FETCH_MORE_DEF,
+  FETCH_MORE_TOOL,
+  pruneStored,
+  SEARCH_TOOLS_DEF,
+  SEARCH_TOOLS_TOOL,
+  searchTools,
+  sliceResult,
+} from "./tool-loading";
 import { appendAgentRunEvent } from "./runs/service";
 import { isLeaseLost, isRunStopped } from "./runs/abort";
 import { isDraining } from "@/lib/runtime/shutdown";
@@ -98,10 +111,19 @@ export interface AgentLoopLimits {
   maxCostMicroUsd: number;
   /** Input tokens of one call above which the loop compacts client-side. */
   compactAtTokens: number;
-  /** Characters of one tool result sent back to the model. */
+  /**
+   * Characters of one tool result sent back to the model. Phase 17 (A3):
+   * 8,000 (was 20,000); the rest stays readable through fetch_more.
+   */
   toolResultMaxChars: number;
   /** Phase 9: failed test/check cycles before code mode escalates (and again before it hands back). */
   fixCycles: number;
+  /**
+   * Phase 17 (A3): input tokens of one call above which the provider clears
+   * old tool results server-side (Anthropic context editing). Below the
+   * client compaction threshold, so clearing comes first.
+   */
+  contextEditAtTokens: number;
 }
 
 export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
@@ -109,9 +131,14 @@ export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
   maxMs: 30 * 60_000,
   maxCostMicroUsd: 10_000_000,
   compactAtTokens: 150_000,
-  toolResultMaxChars: 20_000,
+  toolResultMaxChars: DEFAULT_TOOL_RESULT_CAP,
   fixCycles: 5,
+  contextEditAtTokens: 100_000,
 });
+
+/** Phase 17 (A3): tool uses whose results context editing keeps, and the least it clears (cache rewrite must pay off). */
+export const CONTEXT_EDIT_KEEP_TOOL_USES = 6;
+export const CONTEXT_EDIT_CLEAR_AT_LEAST = 20_000;
 
 function posInt(v: string | undefined): number | null {
   const n = Number((v ?? "").trim());
@@ -122,8 +149,8 @@ function posInt(v: string | undefined): number | null {
  * Limits from the environment (documented in .env.example):
  *   AGENT_MAX_STEPS (40) · AGENT_MAX_RUN_MINUTES (30) ·
  *   AGENT_MAX_RUN_COST_MICRO_USD (10000000 = $10) ·
- *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (20000) ·
- *   AGENT_FIX_CYCLES (5)
+ *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (8000) ·
+ *   AGENT_FIX_CYCLES (5) · AGENT_CONTEXT_EDIT_AT_TOKENS (100000)
  */
 export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
   const minutes = posInt(env.AGENT_MAX_RUN_MINUTES);
@@ -134,6 +161,7 @@ export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
     compactAtTokens: posInt(env.AGENT_COMPACT_AT_TOKENS) ?? DEFAULT_LOOP_LIMITS.compactAtTokens,
     toolResultMaxChars: posInt(env.AGENT_TOOL_RESULT_MAX_CHARS) ?? DEFAULT_LOOP_LIMITS.toolResultMaxChars,
     fixCycles: posInt(env.AGENT_FIX_CYCLES) ?? DEFAULT_LOOP_LIMITS.fixCycles,
+    contextEditAtTokens: posInt(env.AGENT_CONTEXT_EDIT_AT_TOKENS) ?? DEFAULT_LOOP_LIMITS.contextEditAtTokens,
   };
 }
 
@@ -160,6 +188,29 @@ export const handBackText = (cycles: number): string =>
   "The diff so far is on the run page. Tell me how you'd like to proceed, or point me at the failing part.";
 
 export const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
+
+// ── Phase 17 (WS=model): per-workload request shape ─────────────────────────
+
+/**
+ * A1: the static prefix's cache TTL. People pause longer than 5 minutes
+ * between chat turns (and code runs are long), so the lead / code workloads
+ * take the 1-hour TTL; sub-agents and background runs are bursts of calls
+ * seconds apart, where the default 5-minute entry stays warm on its own.
+ */
+export function cacheTtlForWorkload(workload: LlmWorkload, env: Record<string, string | undefined> = process.env): ChatCacheTtl {
+  // CHAT_CACHE_LAYOUT=legacy (evaluation only): the pre-Phase-17 5-minute TTL everywhere.
+  if ((env.CHAT_CACHE_LAYOUT ?? "").trim().toLowerCase() === "legacy") return "5m";
+  return workload === "lead" || workload === "code" || workload === "code_max" ? "1h" : "5m";
+}
+
+/**
+ * A4: nobody is waiting on a sub-agent / background / bulk call, so it never
+ * takes priority capacity ("standard_only"); a lead or code call keeps the
+ * API default ("auto").
+ */
+export function serviceTierForWorkload(workload: LlmWorkload): "standard_only" | undefined {
+  return workload === "lead" || workload === "code" || workload === "code_max" ? undefined : "standard_only";
+}
 export const MAX_TOKENS_NOTE =
   "Your last reply was cut off at the output-token limit. Continue exactly where you stopped; do not repeat what you already wrote.";
 
@@ -221,6 +272,10 @@ export interface LoopState {
   rowsSaved?: number;
   /** Phase 16: the last model call's cost (the budget guard expects the next one to cost as much). */
   lastCallCostMicroUsd?: number;
+  /** Phase 17 (A2): deferred tools search_tools surfaced (client-side path) — offered for the rest of the run. */
+  activatedTools?: string[];
+  /** Phase 17 (A3): full text of capped tool results, by handle (the tool_use id), for fetch_more. */
+  storedResults?: Record<string, string>;
 }
 
 export function isLoopState(v: unknown): v is LoopState {
@@ -293,6 +348,12 @@ export interface AgentLoopInput {
   state?: LoopState | null;
   /** "build" routes the Operator to the code workload. */
   mode?: "build" | "default";
+  /**
+   * Phase 17 (A4): the workload of a fresh run when it is not the agent's
+   * own (a scheduled skill runs the lead's reach on the subagent workload:
+   * no person is waiting). Ignored on a resumed run (its state has one).
+   */
+  workload?: LlmWorkload;
   limits?: Partial<AgentLoopLimits>;
   /** Epoch ms: at a step boundary after this, stop with status "handoff". */
   handoffAt?: number;
@@ -542,7 +603,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       system: input.system,
       messages: input.messages,
       mode: input.mode,
-      workload: workloadForAgent(agentKey, { mode: input.mode }),
+      workload: input.workload ?? workloadForAgent(agentKey, { mode: input.mode }),
       now: now(),
     });
   }
@@ -573,13 +634,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     return { status: "waiting_on_children", finalText: "", proposal: tr.proposal, proposals: tr.proposals, calls: s.calls, state: s };
   };
 
-  const tools: LoopToolSet = buildLoopTools({
-    tools: allTools(),
-    grant: ctx.grant ?? null,
-    groupOf: toolGroup,
-    connectorTools: deps.connectorTools,
-    filter: input.toolFilter,
-  });
+  const tools: LoopToolSet = runToolSet(ctx, s, deps, input.toolFilter);
 
   const stopCheck = async (): Promise<string | null> => {
     if (await stopRequested(ctx)) return STOPPED_TEXT;
@@ -662,17 +717,31 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     }
 
     // ── the model call ───────────────────────────────────────────────────────
+    // Phase 17 (A2): server-side tool search where the provider runs it,
+    // else the client-side search_tools fallback.
+    const offer = requestTools(tools, s, provider);
     const req: ChatRequest = {
       system: [{ text: s.system, cache: true }],
       // A snapshot: the transcript grows after the call.
       messages: [...s.messages],
-      tools: tools.defs,
+      tools: offer.tools,
+      toolSearch: offer.toolSearch,
       serverTools: tools.serverTools,
       maxTokens: WORKLOAD_MAX_TOKENS[s.workload],
       thinking: "adaptive",
       cache: true,
+      // Phase 17 (A1): 1h for people, 5m for sub-agents / background.
+      cacheTtl: cacheTtlForWorkload(s.workload),
       cacheConversation: true,
       compaction: true,
+      // Phase 17 (A3): the provider clears old tool results past the trigger.
+      contextEditing: {
+        triggerInputTokens: limits.contextEditAtTokens,
+        keepToolUses: CONTEXT_EDIT_KEEP_TOOL_USES,
+        clearAtLeastTokens: CONTEXT_EDIT_CLEAR_AT_LEAST,
+      },
+      // Phase 17 (A4): background work never takes priority capacity.
+      serviceTier: serviceTierForWorkload(s.workload),
       signal: ctx.signal,
       usage: {
         workspaceId: ctx.workspaceId,
@@ -883,6 +952,20 @@ async function runToolStep(
     const canonical = tools.toCanonical(block.name);
     const call: ChatToolCall = { tool: canonical, args: block.input ?? {}, status: "executed", toolUseId: block.id };
     if (ctx.runId) call.runId = ctx.runId;
+    // Phase 17 (A2/A3): the loop's own read-only tools (search_tools,
+    // fetch_more) answer from the run's tool set / saved transcript; they
+    // never reach executeTool (they touch no workspace data), so they are
+    // settled here and take no lane.
+    if (canonical === SEARCH_TOOLS_TOOL || canonical === FETCH_MORE_TOOL) {
+      const r = loopInternalTool(canonical, block, s, tools, limits);
+      call.resultSummary = r.content as string;
+      if (r.isError) call.status = "error";
+      s.toolResults[block.id] = r;
+      results[i] = r;
+      input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary.slice(0, 200) });
+      items.push({ i, block, canonical, call, lane: "safe", done: true });
+      continue;
+    }
     const def = getTool(canonical);
     const sideEffects = !def || def.kind !== "safe";
     const item: StepItem = { i, block, canonical, call, lane: sideEffects || isDelegationTool(canonical) ? "serial" : "safe", done: false };
@@ -952,7 +1035,9 @@ async function runToolStep(
     const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
     if (typeof childCost === "number" && Number.isFinite(childCost)) s.costMicroUsd += childCost;
     if (testsFailed(result)) failedTests = true;
-    const r = toolResultFor(block.id, call, result, limits.toolResultMaxChars);
+    // Phase 17 (A3): capped for the model; the full text stays in the
+    // transcript for fetch_more.
+    const r = cappedToolResult(s, block.id, toolResultFor(block.id, call, result, Number.MAX_SAFE_INTEGER), limits.toolResultMaxChars);
     s.toolResults[block.id] = r;
     results[it.i] = r;
     input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
@@ -994,6 +1079,94 @@ async function runToolStep(
   return { cancelled: false, proposal: ordered[0] ?? null, proposals: ordered, waiting };
 }
 
+// ── Phase 17 (A2/A3, WS=model): the run's tool set, deferral, loop tools ────
+
+/**
+ * The run's tool set: the granted catalog + connector tools (deferred ones
+ * marked, lib/agents/tool-loading.ts) plus the loop's own fetch_more.
+ */
+export function runToolSet(
+  ctx: LoopContext,
+  s: Pick<LoopState, "mode">,
+  deps: Pick<AgentLoopDeps, "connectorTools">,
+  filter?: (canonical: string) => boolean,
+): LoopToolSet {
+  const base = { tools: allTools(), grant: ctx.grant ?? null, groupOf: toolGroup, connectorTools: deps.connectorTools, filter };
+  const plain = buildLoopTools(base);
+  const defer = deferralFor({ agentKey: ctx.agentKey ?? "lead", mode: s.mode, toolCount: plain.defs.length });
+  const set = defer ? buildLoopTools({ ...base, defer }) : plain;
+  // fetch_more is the loop's own (always loaded; answers from the saved transcript).
+  set.defs.push(FETCH_MORE_DEF);
+  set.canonical.push(FETCH_MORE_TOOL);
+  return set;
+}
+
+/**
+ * The tools one model call is offered. With server-side tool search every
+ * tool is sent (deferred ones marked); otherwise the deferred ones are
+ * replaced by search_tools until the model surfaces them (then they stay
+ * for the rest of the run, sorted with the rest — the adapter sorts).
+ */
+export function requestTools(
+  tools: LoopToolSet,
+  s: Pick<LoopState, "activatedTools">,
+  provider: LlmProvider,
+): { tools: ChatRequest["tools"]; toolSearch: boolean; mode: "server" | "client" | "none" } {
+  const deferred = tools.defs.filter((d) => d.deferLoading);
+  if (deferred.length === 0) return { tools: tools.defs, toolSearch: false, mode: "none" };
+  if (provider.supportsToolSearch?.() === true) return { tools: tools.defs, toolSearch: true, mode: "server" };
+  const active = new Set(s.activatedTools ?? []);
+  const out = tools.defs
+    .filter((d) => !d.deferLoading || active.has(d.name))
+    .map((d) => (d.deferLoading ? { name: d.name, description: d.description, inputSchema: d.inputSchema, ...(d.strict ? { strict: true } : {}) } : d));
+  if (deferred.some((d) => !active.has(d.name))) out.push(SEARCH_TOOLS_DEF);
+  return { tools: out, toolSearch: false, mode: "client" };
+}
+
+/** search_tools / fetch_more, answered from the run's state. */
+function loopInternalTool(
+  canonical: string,
+  block: ChatToolUseBlock,
+  s: LoopState,
+  tools: LoopToolSet,
+  limits: AgentLoopLimits,
+): ChatToolResultBlock {
+  const input = block.input ?? {};
+  if (canonical === SEARCH_TOOLS_TOOL) {
+    const query = typeof input.query === "string" ? input.query : "";
+    const limit = typeof input.limit === "number" ? input.limit : Number(input.limit) || 5;
+    const pool = tools.defs.filter((d) => d.deferLoading);
+    const found = searchTools(pool, query, limit);
+    if (found.length === 0) {
+      return { type: "tool_result", toolUseId: block.id, content: `No tools match "${query}". Try other words, or answer with the tools you have.` };
+    }
+    const active = new Set(s.activatedTools ?? []);
+    for (const d of found) active.add(d.name);
+    s.activatedTools = [...active].sort();
+    return {
+      type: "tool_result",
+      toolUseId: block.id,
+      content: [
+        `Found ${found.length} tool${found.length === 1 ? "" : "s"}; they can be called from the next step on:`,
+        ...found.map((d) => `- ${d.name}: ${d.description.slice(0, 300)}`),
+      ].join("\n"),
+    };
+  }
+  const handle = typeof input.handle === "string" ? input.handle : "";
+  const offset = typeof input.offset === "number" ? input.offset : Number(input.offset) || 0;
+  const r = sliceResult(s.storedResults?.[handle], handle, offset, limits.toolResultMaxChars);
+  return { type: "tool_result", toolUseId: block.id, content: r.text, ...(r.ok ? {} : { isError: true }) };
+}
+
+/** Cap a tool result at the limit; keep the full text in the transcript for fetch_more. */
+function cappedToolResult(s: LoopState, handle: string, r: ChatToolResultBlock, cap: number): ChatToolResultBlock {
+  if (typeof r.content !== "string") return r;
+  const { shown, stored } = capResult(handle, r.content, cap);
+  if (stored === null) return r;
+  s.storedResults = pruneStored({ ...(s.storedResults ?? {}), [handle]: stored });
+  return { ...r, content: shown };
+}
+
 /**
  * Client-side compaction: ask the same model (same system + tools, so the
  * cached prefix is reused) to summarise the run, then replace the whole
@@ -1014,13 +1187,18 @@ async function compactClientSide(s: LoopState, provider: LlmProvider, tools: Loo
       ? { role: "user", content: [...(typeof last.content === "string" ? [{ type: "text" as const, text: last.content }] : last.content), { type: "text", text: COMPACT_INSTRUCTION }] }
       : { role: "user", content: COMPACT_INSTRUCTION };
   const messages = last?.role === "user" ? [...s.messages.slice(0, -1), tail] : [...s.messages, tail];
+  const offer = requestTools(tools, s, provider);
   const res = await provider.chat({
     system: [{ text: s.system, cache: true }],
     messages,
-    tools: tools.defs,
+    // The same tools as the run's calls (the cached prefix is reused).
+    tools: offer.tools,
+    toolSearch: offer.toolSearch,
     maxTokens: 8192,
     toolChoice: "none",
     cache: true,
+    cacheTtl: cacheTtlForWorkload(s.workload),
+    serviceTier: serviceTierForWorkload(s.workload),
     signal: ctx.signal,
     usage: { workspaceId: ctx.workspaceId, projectId: ctx.projectId || null, actorId: ctx.userId || null, runId: ctx.runId ?? null, agentKey: ctx.agentKey ?? "lead" },
   });
