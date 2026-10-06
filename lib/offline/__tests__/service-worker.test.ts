@@ -197,6 +197,17 @@ describe("service worker (public/sw.js)", () => {
     await assert.rejects(() => w.fetchVia("/api/notes") as Promise<unknown>, "offline: nothing to serve");
   });
 
+  it("landing on /login (a revoked or expired session is sent there) purges the data caches", async () => {
+    await w.dispatch("message", { data: { type: "session", key: KEY_A }, origin: ORIGIN });
+    await w.fetchVia("/api/notes");
+    assert.equal(w.storage.caches.get(`shapes-data-${KEY_A}`)!.store.size, 1);
+    w.network.respond = () => new Response("<html>login</html>", { headers: { "content-type": "text/html" } });
+    const res = (await w.fetchVia("/login", { mode: "navigate" }))!;
+    assert.equal(await res.text(), "<html>login</html>");
+    assert.equal([...w.storage.caches.keys()].filter((k) => k.startsWith("shapes-data-")).length, 0);
+    assert.equal(await (await w.storage.open("shapes-meta")).match("/__shapes/session"), undefined);
+  });
+
   it("static assets are cache-first (not in dev); HTML on a static path is never stored", async () => {
     w.network.respond = () => new Response("js", { headers: { "content-type": "text/javascript" } });
     await w.fetchVia("/_next/static/chunks/app.js");

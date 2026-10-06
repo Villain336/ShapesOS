@@ -18,16 +18,18 @@
  *      the network is down. Stored PER PERSON (cache "shapes-data-<key>",
  *      key = a hash of the signed-in subject posted by the app) and deleted
  *      on sign-out (the POST to /api/auth/signout is seen here), whenever
- *      another person signs in on this browser, and when a data route answers
- *      401 (the session ended elsewhere — e.g. revoked from Settings → You →
- *      Privacy, "Sign out other sessions"). No key = nothing cached.
+ *      another person signs in on this browser, and when the session ended
+ *      elsewhere (revoked from Settings → You → Privacy, "Sign out other
+ *      sessions", or expired): a data route answering 401, or any navigation
+ *      landing on /login (where the proxy sends a signed-out browser). The app
+ *      posts its key again after the next sign-in. No key = nothing cached.
  *   4. Writes are never cached or replayed here: the app queues its few safe
  *      writes itself (lib/offline/queue.ts) and replays them when online.
  *   5. Web Push: show the notification (lib/push/web.ts payload) and open its
  *      same-origin link on click.
  */
 
-const VERSION = "2026-10-06.5";
+const VERSION = "2026-10-06.6";
 const STATIC_CACHE = "shapes-static-" + VERSION;
 const META_CACHE = "shapes-meta";
 const DATA_PREFIX = "shapes-data-";
@@ -213,6 +215,9 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   if (req.mode === "navigate") {
+    // Phase 18.3 integration: a browser on the sign-in page is signed out
+    // (the proxy redirects a revoked / expired session here) — its copies go.
+    if (url.pathname === "/login") event.waitUntil(signOut());
     // Never cached: the page carries the request's CSP nonce and the person's data.
     event.respondWith(fetch(req).catch(() => offlinePage()));
     return;
