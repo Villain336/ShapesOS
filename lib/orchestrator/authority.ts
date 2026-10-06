@@ -66,6 +66,10 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   // no external audience; reversible (cancel the booking, free the forklift).
   "book_dock",
   "assign_equipment",
+  // Phase 18.2 (WS=comms): the person's OWN reminders (a project-less task
+  // assigned to them) — no money, no audience, reversible (reopen / remove).
+  "create_reminder",
+  "complete_reminder",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

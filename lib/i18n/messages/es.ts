@@ -4,6 +4,7 @@
 // de frase. Nombres de producto (ShapesOS, CRM, CAD, MCP) sin traducir.
 
 import type { Catalogue } from "./en";
+import { commsEs } from "./comms.es";
 
 export const es: Catalogue = {
   common: {
@@ -82,6 +83,8 @@ export const es: Catalogue = {
       "/dashboard": { label: "Resumen", description: "Inicio: lo que necesita atención" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
       "/dashboard/prospects": { label: "Prospectos", description: "Listas de prospectos y enriquecimiento" },
       "/dashboard/nurture": { label: "Seguimiento", description: "Secuencias de seguimiento y difusiones" },
       "/dashboard/projects": { label: "Proyectos SEO", description: "Sitios, palabras clave, posiciones, contenido" },
@@ -165,6 +168,9 @@ export const es: Catalogue = {
       alert_fired: "Alertas",
       run_failed: "Ejecuciones fallidas",
       invite_accepted: "Equipo",
+      mention: "Menciones",
+      direct_message: "Mensajes directos",
+      reminder_due: "Recordatorios",
     },
   },
 
@@ -469,6 +475,9 @@ export const es: Catalogue = {
         alert_fired: "Alertas",
         run_failed: "Ejecuciones fallidas",
         invite_accepted: "Invitaciones aceptadas",
+        mention: "Menciones a ti",
+        direct_message: "Mensajes directos",
+        reminder_due: "Recordatorios pendientes",
       },
       workspaceDefaults: "Los valores por defecto de todo el espacio de trabajo están en Espacio de trabajo → Notificaciones.",
     },
@@ -561,6 +570,8 @@ export const es: Catalogue = {
       "key-numbers": { title: "Cifras clave", description: "Proyectos, palabras clave, contenido y visibilidad de un vistazo" },
       projects: { title: "Proyectos", description: "Tus proyectos SEO, con un formulario para añadir uno" },
       suggestions: { title: "Gana esta semana", description: "El camino más corto hacia más tráfico" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Recordatorios", description: "Tus tareas pendientes, primero las que vencen antes" },
     },
     desktop: {
       region: "Escritorio",
@@ -904,4 +915,6 @@ export const es: Catalogue = {
       },
     },
   },
+  // Phase 18.2 (WS=comms): Correo, Calendario, Contactos, Mensajes, Reuniones, Recordatorios.
+  comms: commsEs,
 };

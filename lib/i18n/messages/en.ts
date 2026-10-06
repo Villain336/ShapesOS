@@ -8,6 +8,8 @@
 // Sentence case, the product's own words (docs/design/DESIGN.md "Writing").
 // Never put user data in a catalogue.
 
+import { commsEn } from "./comms.en";
+
 export const en = {
   common: {
     save: "Save",
@@ -85,6 +87,8 @@ export const en = {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
       "/dashboard/projects": { label: "SEO projects", description: "Sites, keywords, rankings, content" },
@@ -169,6 +173,9 @@ export const en = {
       alert_fired: "Alerts",
       run_failed: "Failed runs",
       invite_accepted: "Team",
+      mention: "Mentions",
+      direct_message: "Direct messages",
+      reminder_due: "Reminders",
     },
   },
 
@@ -473,6 +480,9 @@ export const en = {
         alert_fired: "Alerts",
         run_failed: "Failed runs",
         invite_accepted: "Invites accepted",
+        mention: "Mentions of you",
+        direct_message: "Direct messages",
+        reminder_due: "Reminders due",
       },
       workspaceDefaults: "Workspace-wide defaults are in Workspace → Notifications.",
     },
@@ -571,6 +581,8 @@ export const en = {
       "key-numbers": { title: "Key numbers", description: "Projects, keywords, content and visibility at a glance" },
       projects: { title: "Projects", description: "Your SEO projects, with a form to add one" },
       suggestions: { title: "Win this week", description: "The shortest path to more traffic" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Reminders", description: "Your open to-dos, the soonest due first" },
     },
     desktop: {
       region: "Desktop",
@@ -915,6 +927,8 @@ export const en = {
       },
     },
   },
+  // Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+  comms: commsEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

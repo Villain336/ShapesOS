@@ -61,6 +61,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "Scheduled skills fire on the next tick after nextRunAt; every minute keeps them on time (the tick catches up missed slots once).",
     timeoutMs: SHORT,
   },
+  {
+    // Phase 18.2 (WS=comms): reminders that came due → one notification per occurrence.
+    key: "comms-reminders",
+    path: "/api/cron/comms-reminders",
+    cron: "* * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. A reminder set for 09:00 should arrive at 09:00, so the sweep runs every minute; each occurrence notifies once (dedup key + reminder_notified_at).",
+    timeoutMs: SHORT,
+  },
 
   // --- Every 5–15 minutes -------------------------------------------------
   { key: "newsletter", path: "/api/cron/newsletter", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },

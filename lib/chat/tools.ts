@@ -46,6 +46,8 @@ import { generate_image } from "@/lib/images/tool";
 import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
 // Phase 18.1 (WS=find): Spotlight for agents — the same search people run in ⌘K.
 import { search_workspace } from "@/lib/search/tool";
+// Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+import { COMMS_TOOLS, COMMS_TOOL_ACTION, COMMS_TOOL_GROUP } from "@/lib/comms/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1062,6 +1064,8 @@ export const TOOLS: ToolDef[] = [
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
@@ -1216,6 +1220,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
   web_scrape: "web",
   web_crawl: "web",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_GROUP,
 };
 
 /**
@@ -1322,6 +1328,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
   web_scrape: "fetch_web_pages",
   web_crawl: "fetch_web_pages",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_ACTION,
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

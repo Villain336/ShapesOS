@@ -496,3 +496,116 @@ export async function notifyTwinAlert(input: TwinAlertInput, db: ProducerDb = de
     return 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 18.2 (WS=comms): Messages and Reminders. Same producer seam as every
+// other kind, so the member's channel preferences filter them (a muted kind
+// writes nothing) and focus / do not disturb holds them until focus ends.
+// ---------------------------------------------------------------------------
+
+export interface ReminderDueInput {
+  workspaceId: string;
+  userId: string;
+  reminderId: string;
+  title: string;
+  /** The occurrence's due time (one notification per occurrence). */
+  dueAt: Date;
+}
+
+/** "Call the bank" is due → the reminder's owner, once per occurrence. */
+export async function notifyReminderDue(input: ReminderDueInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    if (!(await isMember(db, input.workspaceId, input.userId))) return 0;
+    return await createAndEmit(db, [
+      {
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+        kind: "reminder_due",
+        title: input.title.slice(0, 200),
+        body: null,
+        href: `/dashboard/reminders?reminder=${encodeURIComponent(input.reminderId)}`,
+        sourceType: "reminder",
+        sourceId: input.reminderId,
+        dedupKey: `reminder_due:${input.reminderId}:${input.dueAt.toISOString()}`,
+      },
+    ]);
+  } catch (e) {
+    warn("reminder_due", e);
+    return 0;
+  }
+}
+
+export interface ChannelMessageNoticeInput {
+  workspaceId: string;
+  channelId: string;
+  messageId: string;
+  /** Recipients (members of the channel; the author is never notified). */
+  userIds: readonly string[];
+  authorUserId: string | null;
+  authorName: string;
+  /** "#launch" or the DM's name — shown in the title. */
+  channelName: string;
+  /** The message text (trimmed to a preview). */
+  body: string;
+  /** Deep link to the message in the Messages app. */
+  href: string;
+}
+
+function preview(text: string): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+}
+
+/** "@Ana" in a channel → Ana (a member of the workspace), once per message. */
+export async function notifyMention(input: ChannelMessageNoticeInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients: string[] = [];
+    for (const u of new Set(input.userIds)) {
+      if (u && u !== input.authorUserId && (await isMember(db, input.workspaceId, u))) recipients.push(u);
+    }
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "mention",
+        title: `${input.authorName} mentioned you in ${input.channelName}`.slice(0, 200),
+        body: preview(input.body),
+        href: input.href,
+        sourceType: "team_chat_message",
+        sourceId: input.messageId,
+        dedupKey: `mention:${input.messageId}`,
+      })),
+    );
+  } catch (e) {
+    warn("mention", e);
+    return 0;
+  }
+}
+
+/** A direct message → the other people in the DM, once per message. */
+export async function notifyDirectMessage(input: ChannelMessageNoticeInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients: string[] = [];
+    for (const u of new Set(input.userIds)) {
+      if (u && u !== input.authorUserId && (await isMember(db, input.workspaceId, u))) recipients.push(u);
+    }
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "direct_message",
+        title: `${input.authorName} sent you a message`.slice(0, 200),
+        body: preview(input.body),
+        href: input.href,
+        sourceType: "team_chat_message",
+        sourceId: input.messageId,
+        dedupKey: `direct_message:${input.messageId}`,
+      })),
+    );
+  } catch (e) {
+    warn("direct_message", e);
+    return 0;
+  }
+}

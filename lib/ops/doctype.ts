@@ -189,7 +189,7 @@ export async function opsList(
     throw new OpsError(400, `Invalid limit: must be an integer between 1 and ${OPS_LIST_MAX}`);
   }
   const limit = Math.min(rawLimit, OPS_LIST_MAX);
-  const where: Record<string, unknown> = { workspaceId: actor.workspaceId };
+  const where: Record<string, unknown> = { ...(def.scopeWhere ?? {}), workspaceId: actor.workspaceId };
   for (const f of def.filterable) {
     const v = query.filters?.[f];
     if (typeof v === "string" && v) where[f] = v;
@@ -570,7 +570,7 @@ export async function opsPatch(
   const d = delegateFor(tx, def);
 
   // 404 for "not your workspace's row" (RLS + explicit scope).
-  const existing = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
+  const existing = await d.findFirst({ where: { ...(def.scopeWhere ?? {}), id, workspaceId: actor.workspaceId } });
   if (!existing) throw new OpsNotFoundError(def.slug, id);
   // Illegal moves fail before anything is proposed or written.
   assertOpsPatchAllowed(def, existing, patch);
