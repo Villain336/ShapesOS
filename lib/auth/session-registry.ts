@@ -18,8 +18,6 @@
 
 /** Touch last_seen_at at most this often per session. */
 export const SESSION_TOUCH_MS = 5 * 60_000;
-/** How long one process trusts an "ok" answer before asking the database again. */
-export const SESSION_CHECK_TTL_MS = 10_000;
 /** Id of the per-person cutoff row for tokens that predate the registry. */
 export const LEGACY_ROW_PREFIX = "legacy:";
 

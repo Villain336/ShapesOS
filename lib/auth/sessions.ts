@@ -20,7 +20,6 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { USER_GUC } from "@/lib/desktop/scope";
 import {
-  SESSION_CHECK_TTL_MS,
   deviceLabel,
   ipPrefix,
   legacyRowId,
@@ -42,7 +41,7 @@ export async function withSessionOwner<T>(userId: string, fn: (tx: Tx) => Promis
   });
 }
 
-// Per-process answers: sid → { decision, at }. "reject" never expires.
+// Per-process refusals: sid → { decision, at }. Never expires (a revoke is final).
 const checks = new Map<string, { decision: ClaimDecision; at: number }>();
 
 /** Test hook. */
@@ -78,7 +77,6 @@ export async function startUserSession(input: StartSessionInput): Promise<string
       select: { id: true },
     }),
   );
-  checks.set(row.id, { decision: "allow", at: now.getTime() });
   return row.id;
 }
 
@@ -96,7 +94,10 @@ export async function checkUserSession(
   // A legacy token's answer depends on its own sign-in time: key it by both.
   const cacheKey = sid ?? `${legacyRowId(sub)}@${typeof token.authAt === "number" ? token.authAt : 0}`;
   const hit = checks.get(cacheKey);
-  if (hit && (hit.decision === "reject" || now.getTime() - hit.at < SESSION_CHECK_TTL_MS)) return hit.decision;
+  // Only a refusal is cached (a revoked session never comes back); an "allow"
+  // is asked of the database on every session read, so a revoke made in any
+  // process or module instance ends the token on its very next request.
+  if (hit?.decision === "reject") return hit.decision;
   try {
     const decision = await withSessionOwner(sub, async (tx) => {
       let state: SessionRowState;
@@ -115,7 +116,7 @@ export async function checkUserSession(
       }
       return sessionClaimDecision(token, state, now);
     });
-    checks.set(cacheKey, { decision, at: now.getTime() });
+    if (decision === "reject") checks.set(cacheKey, { decision, at: now.getTime() });
     return decision;
   } catch (err) {
     console.warn("[sessions] registry check failed; allowing this request:", err instanceof Error ? err.message : err);
