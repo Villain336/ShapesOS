@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import type { MailFolder, MailMessageView, MailSource, MailThreadView } from "@/lib/comms/mail/types";
 import { Card, Chip, EmptyState, ErrorLine, iconBtnCls, inputCls, inputSmCls, labelCls, MockChip, Note, PersonTile, textareaCls } from "./ui";
 import { Modal } from "./Modal";
+import { ShareMenu } from "@/components/share/ShareMenu";
 
 interface SourceStatus {
   source: MailSource;
@@ -492,6 +493,8 @@ function ThreadPane({ threadKey, canEdit, onBack, onChanged }: { threadKey: stri
           </p>
         </div>
         <div className="flex items-center gap-1">
+          {/* Phase 18.3 (WS=flow): the share sheet. A mail thread is personal: its own link + agents, never a note link. */}
+          <ShareMenu record={{ kind: "mail", id: threadKey, title: th.subject || t("comms.common.noSubject"), href: `/dashboard/mail?thread=${encodeURIComponent(threadKey)}` }} role={canEdit ? "editor" : "viewer"} />
           <button type="button" className={aosButton({ variant: "secondary", size: "xs" })} onClick={summarize} disabled={busy === "summarize"}>
             {busy === "summarize" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Sparkles className="size-4" aria-hidden />}
             {busy === "summarize" ? t("comms.mail.summarizing") : t("comms.mail.summarize")}

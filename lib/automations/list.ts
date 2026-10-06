@@ -26,41 +26,9 @@ import { EVENT_SOURCE_CATALOG } from "@/lib/scheduler/events";
 import { NODE_CATALOG } from "@/lib/workflow/catalog";
 import { TRIGGERS as ALERT_TRIGGERS } from "@/lib/alerts/triggers";
 
-export const AUTOMATION_KINDS = ["workflow", "scheduled_skill", "ops_workflow", "autopilot", "activepieces", "alert_rule", "cron_job"] as const;
-export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
+import { AUTOMATION_KINDS, type AutomationItem, type AutomationKind, type RouteCall, type RunState } from "./model";
 
-/** A run's state in plain words. Only scheduled-skill runs are AGENT runs (status colour + shape); the rest show neutral text. */
-export type RunState = "queued" | "running" | "needs_you" | "done" | "failed" | "cancelled" | "paused";
-
-export interface RouteCall {
-  method: "POST" | "PATCH";
-  url: string;
-  body: Record<string, unknown>;
-}
-
-export interface AutomationItem {
-  /** "<kind>:<id>" */
-  id: string;
-  kind: AutomationKind;
-  name: string;
-  /** Plain-words trigger ("Every day at 09:00 UTC", "Rank drop", "Manual"). */
-  trigger: string;
-  lastRun: { at: string; state: RunState; agentRun: boolean } | null;
-  nextRunAt: string | null;
-  /** null = this system has no on/off (code-defined, managed elsewhere). */
-  enabled: boolean | null;
-  owner: string | null;
-  project: { id: string; name: string } | null;
-  /** The system's own editor / page. */
-  href: string;
-  /** The system's own route for on/off (body gets enabled/status merged in by onBody/offBody). */
-  toggle: { on: RouteCall; off: RouteCall; minRole: WorkspaceRole } | null;
-  /** The system's own route for "Run now". */
-  run: (RouteCall & { minRole: WorkspaceRole }) | null;
-  /** Why there's no toggle / run here (shown to the person). */
-  note: string | null;
-  readOnly: boolean;
-}
+export { AUTOMATION_KINDS, canUse, filterAutomations, type AutomationFilter, type AutomationItem, type AutomationKind, type RouteCall, type RunState } from "./model";
 
 const CRON_EVERY: Record<string, string> = {
   "* * * * *": "Every minute",
@@ -298,29 +266,6 @@ export function toCronJobItems(last: Map<string, { startedAt: Date; status: stri
       readOnly: true,
     };
   });
-}
-
-/** May this role use a descriptor's route? (UI hint only — the route decides.) */
-export function canUse(role: WorkspaceRole | null | undefined, minRole: WorkspaceRole): boolean {
-  return !!role && roleAtLeast(role, minRole);
-}
-
-export interface AutomationFilter {
-  kind?: AutomationKind | "all";
-  q?: string;
-  state?: "all" | "on" | "off";
-  projectId?: string | null;
-}
-
-export function filterAutomations(items: AutomationItem[], f: AutomationFilter): AutomationItem[] {
-  const q = (f.q ?? "").trim().toLowerCase();
-  return items.filter(
-    (i) =>
-      (!f.kind || f.kind === "all" || i.kind === f.kind) &&
-      (!f.projectId || i.project?.id === f.projectId) &&
-      (!f.state || f.state === "all" || (f.state === "on" ? i.enabled === true : i.enabled === false)) &&
-      (!q || i.name.toLowerCase().includes(q) || i.trigger.toLowerCase().includes(q)),
-  );
 }
 
 // ── Loader ──────────────────────────────────────────────────────────────────

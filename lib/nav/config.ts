@@ -46,6 +46,8 @@ import {
   Gauge, // Phase 18.2 (WS=content): Activity Monitor
   SquareTerminal, // Phase 18.2 (WS=content): Terminal
   Store, // Phase 18.2 (WS=content): Store
+  Workflow, // Phase 18.3 (WS=flow): Automations
+  Clock3, // Phase 18.3 (WS=flow): Time Machine
   Paintbrush,
   PenLine,
   Phone,
@@ -192,6 +194,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/actions", label: "Actions", icon: Zap, description: "Connected app actions", keywords: "composio tools connections" },
       // Phase 18.2 (WS=content): one catalogue of everything installable (lib/store).
       { href: "/dashboard/store", label: "Store", icon: Store, description: "Install apps, skills, templates and connectors", keywords: "store marketplace install apps skills templates connectors mcp toolkits catalogue" },
+      // Phase 18.3 (WS=flow): one list over every automation system (lib/automations) and Time Machine (lib/timemachine).
+      { href: "/dashboard/automations", label: "Automations", icon: Workflow, description: "Every schedule, workflow and rule in one list", keywords: "automations shortcuts power automate workflows schedules triggers rules autopilot alerts cron describe it" },
+      { href: "/dashboard/time-machine", label: "Time machine", icon: Clock3, description: "Snapshots, versions and undoing an agent run", keywords: "time machine backup snapshot restore versions history undo revert" },
       { href: "/dashboard/substrate", label: "Substrate", icon: Brain, description: "Business graph and growth memory", keywords: "graph memory campaigns" },
     ],
   },

@@ -29,6 +29,7 @@ import { activateOnKey } from "@/lib/ui/keyboard";
 import { usePeople, type Person } from "./ProjectsViews";
 import { EmptyBlock, LoadingLine, OpsModal, OpsSlideOver, ViewHeader, fmtDateTime, opsJson, sentence, useOpsList } from "./shared";
 import { SubTabs } from "./SubTabs";
+import { ShareMenu } from "@/components/share/ShareMenu";
 
 interface TicketRow {
   id: string;
@@ -272,6 +273,8 @@ function TicketDetail({ ticketId, people, onClose, onChanged }: { ticketId: stri
       }
       meta={`${ticket.requesterName ?? ticket.requesterEmail ?? "No requester"} · ${dueLabel(ticket)}`}
       onClose={onClose}
+      // Phase 18.3 (WS=flow): the share sheet (Send to… / Open with).
+      actions={<ShareMenu record={{ kind: "ticket", id: ticket.id, title: `#${ticket.number} ${ticket.subject}`, href: `/dashboard/ops/helpdesk?ticket=${encodeURIComponent(ticket.id)}` }} role="editor" />}
     >
       {error && <div className={`${errorBoxCls} mb-3`}>{error}</div>}
       {note && <div className={`${noteBoxCls} mb-3`}>{note}</div>}

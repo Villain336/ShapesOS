@@ -17,6 +17,7 @@ import {
 // Phase 10 (finance): number, PDF, delivery, partial payments, credit notes,
 // payment link and recurring schedules.
 import { InvoiceFinancePanel, invoiceLabel } from "@/components/ops-finance/InvoiceFinancePanel";
+import { ShareMenu } from "@/components/share/ShareMenu";
 import { backdropCls, btnApprove, btnDeny, btnExecute, btnGhost, btnPrimary, btnReview, chipCls, errorBoxCls, inputCls, needsBoxCls, noteBoxCls, sectionTitleCls, slideoverCls, tableCls } from "./ui";
 
 interface PendingGate {
@@ -215,9 +216,13 @@ export function InvoiceDetail({
                 {who} · {formatMoney(invoice.totalCents)} · due {fmtDate(invoice.dueAt)}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
-              <X size={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {/* Phase 18.3 (WS=flow): the share sheet (Send to… / Open with). */}
+              <ShareMenu record={{ kind: "invoice", id: invoice.id, title: invoiceLabel(invoice), href: `/dashboard/ops/invoices?invoice=${encodeURIComponent(invoice.id)}` }} role="editor" />
+              <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">

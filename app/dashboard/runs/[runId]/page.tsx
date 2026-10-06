@@ -36,6 +36,8 @@ import { LiveWatch } from "./LiveWatch";
 import { ChangesReview } from "./ChangesReview";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 import { RestoreCheckpointButton } from "./RestoreCheckpointButton";
+// Phase 18.3 (WS=flow): "Undo this agent run" (lib/timemachine/undo.ts).
+import { UndoRunPanel } from "@/components/timemachine/UndoRunPanel";
 import { DelegationPlanLive } from "./DelegationPlanLive";
 import { loadDelegationView } from "@/lib/agents/delegation/store";
 import { StatusShape } from "@/components/aos/StatusShape";
@@ -305,6 +307,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
+          {/* Phase 18.3 (WS=flow): what the run changed, and undo — its starter or an admin; not while it runs. */}
+          {!live && !run.parentRunId && (run.startedBy === user.id || roleAtLeast(membership?.role, "admin")) ? <UndoRunPanel runId={run.id} /> : null}
           {run.status === "failed" && failure ? (
             <Banner
               status="failed"

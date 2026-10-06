@@ -26,6 +26,7 @@ import { parseCron } from "@/lib/scheduler/cron";
 import { CONDITION_LABELS, NODE_CATALOG, nodeTypeDef } from "@/lib/workflow/catalog";
 import { allTools, type ToolDef } from "@/lib/chat/tools";
 import { actionEntryForTool } from "./catalog";
+export { workflowGraphBody } from "./model";
 
 export const DRAFT_TEXT_MAX = 2000;
 const MAX_DRAFT_NODES = 12;
@@ -213,22 +214,6 @@ export function validateDraft(raw: unknown, ctx: DraftContext, tools: readonly P
     return { ok: true, draft: { format: "workflow", name, why, workflow: { projectId, name, schedule, timezone, nodes, edges } } };
   }
   return { ok: false, problems: ['A draft is a "schedule" or a "workflow".'] };
-}
-
-/** The PUT /api/workflows/[id]/nodes body for a workflow draft (tmp- ids, laid out left to right). */
-export function workflowGraphBody(w: WorkflowDraft): { nodes: Array<Record<string, unknown>>; edges: Array<Record<string, unknown>> } {
-  const depth = new Map<string, number>(w.nodes.map((n) => [n.key, 0]));
-  for (let pass = 0; pass < w.nodes.length; pass++) for (const e of w.edges) depth.set(e.to, Math.max(depth.get(e.to) ?? 0, (depth.get(e.from) ?? 0) + 1));
-  const row = new Map<number, number>();
-  return {
-    nodes: w.nodes.map((n) => {
-      const d = depth.get(n.key) ?? 0;
-      const r = row.get(d) ?? 0;
-      row.set(d, r + 1);
-      return { id: `tmp-${n.key}`, kind: n.kind, type: n.type, label: n.label, config: n.config, positionX: 80 + d * 280, positionY: 80 + r * 140 };
-    }),
-    edges: w.edges.map((e) => ({ sourceNodeId: `tmp-${e.from}`, targetNodeId: `tmp-${e.to}`, label: e.label ?? null })),
-  };
 }
 
 // ── The mock drafter (no live model; labelled) ──────────────────────────────

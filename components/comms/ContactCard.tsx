@@ -13,6 +13,7 @@ import { aosButton } from "@/components/aos/button";
 import { Card, Chip, ErrorLine, iconBtnCls, PersonTile } from "./ui";
 import { SuggestionsList } from "./ContactsApp";
 import { openNewTask } from "@/components/command-bar/NewTaskDialog";
+import { ShareMenu } from "@/components/share/ShareMenu";
 
 type Kind = "lead" | "ops_contact" | "connector_person" | "funding_contact";
 type TimelineType = "mail" | "sms" | "meeting" | "call" | "deal" | "ticket" | "invoice" | "note" | "funding" | "booking";
@@ -130,6 +131,8 @@ export function ContactCard({ identityId, canEdit }: { identityId: string; canEd
             <Bot className="size-4" aria-hidden />
             {t("comms.contacts.askAgent")}
           </button>
+          {/* Phase 18.3 (WS=flow): the share sheet (Send to… / Open with). */}
+          <ShareMenu record={{ kind: "contact", id: identityId, title: d.identity.name, href: `/dashboard/contacts/${encodeURIComponent(identityId)}` }} role={canEdit ? "editor" : "viewer"} size="sm" />
         </div>
       </div>
       <ErrorLine message={error} />
