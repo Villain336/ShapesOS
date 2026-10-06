@@ -50,6 +50,7 @@ import { RecentsTracker } from "@/components/desk/RecentsTracker";
 import { AppSwitcher } from "@/components/desk/AppSwitcher";
 import { PaneBridge, ShortcutHost } from "@/components/desk/ShortcutHost";
 import { PausedBanner } from "@/components/desk/PausedBanner";
+import { ControlCenter } from "@/components/desk/ControlCenter";
 
 export default async function DashboardLayout({
   children,
@@ -161,7 +162,16 @@ export default async function DashboardLayout({
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
         {/* AppTopBar (bell + needs-you) is desktop-only; mobile gets the bell here. */}
-        <MobileNav {...sidebarProps} headerActions={<NotificationBell />} />
+        <MobileNav
+          {...sidebarProps}
+          headerActions={
+            <>
+              <NotificationBell />
+              {/* Phase 18.1 (WS=desk): Control Center on mobile too. */}
+              <ControlCenter />
+            </>
+          }
+        />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
           <div className="min-w-0 flex-1">
