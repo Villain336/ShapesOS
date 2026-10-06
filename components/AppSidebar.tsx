@@ -20,8 +20,14 @@ import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { Dialog } from "@base-ui/react/dialog";
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
+  ChevronDown,
   ChevronsUpDown,
+  History,
+  Pin,
+  PinOff,
   CreditCard,
   LogOut,
   Menu as MenuIcon,
@@ -52,7 +58,13 @@ import { LogoMark } from "@/components/aos/LogoMark";
 import { AgentTree } from "@/components/aos/AgentTree";
 import { CountBadge } from "@/components/aos/AgentAvatar";
 import { StatusShape } from "@/components/aos/StatusShape";
-import { activeNavHref, NAV_GROUPS } from "@/lib/nav/config";
+import { activeNavHref, visibleNavGroups, type NavItem } from "@/lib/nav/config";
+// Phase 18.1 (WS=desk): the dock — pins + recents over the one nav list.
+import { pinnedNavItems } from "@/lib/desktop/nav-overlay";
+import { appForHref } from "@/lib/desktop/recents";
+import { useDock, type DockState } from "@/components/desk/useDock";
+import { openAppSwitcher } from "@/components/desk/events";
+import { useInPane, useLocalFlag, writeLocalFlag } from "@/components/desk/useInPane";
 import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
 import { STATUS_META } from "@/lib/aos/status";
 
@@ -316,86 +328,273 @@ function UserRow({
 // Nav
 // ---------------------------------------------------------------------------
 
-function NavList({
+/** One nav row: the link, its count pill, and (expanded) the pin toggle. */
+function NavRow({
+  item,
+  active,
+  collapsed,
+  count,
+  pinned,
+  onTogglePin,
+  onNavigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  count: number;
+  pinned?: boolean;
+  onTogglePin?: (href: string) => void;
+  onNavigate?: () => void;
+}) {
+  const Icon = item.icon;
+  if (collapsed) {
+    const tip = count > 0 ? `${item.label}: ${count} waiting on you` : item.label;
+    return (
+      <li>
+        <RailTip label={tip}>
+          <Link
+            href={item.href}
+            aria-label={tip}
+            aria-current={active ? "page" : undefined}
+            onClick={onNavigate}
+            className={cn(
+              "relative flex size-11 items-center justify-center rounded-full transition-[background-color,color] duration-150",
+              active ? "bg-paper text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+            )}
+          >
+            <Icon aria-hidden className="size-[18px]" />
+            {count > 0 ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-ink" /> : null}
+          </Link>
+        </RailTip>
+      </li>
+    );
+  }
+  return (
+    <li className="group/row relative">
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        onClick={onNavigate}
+        className={cn(
+          "flex h-10 items-center gap-3 rounded-full px-3 text-base transition-[background-color,color] duration-150",
+          onTogglePin && "pr-10",
+          active ? "bg-paper font-semibold text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+        )}
+      >
+        <Icon aria-hidden className="size-[18px] shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {count > 0 ? <CountBadge count={count} tone="needs" label={`${count} approval${count === 1 ? "" : "s"} waiting on you`} /> : null}
+      </Link>
+      {onTogglePin ? (
+        <button
+          type="button"
+          onClick={() => onTogglePin(item.href)}
+          aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+          aria-pressed={pinned}
+          title={pinned ? "Unpin" : "Pin to the top"}
+          className={cn(
+            "absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100",
+            active ? "text-ink hover:bg-hover" : "text-night-soft hover:bg-night-raised hover:text-paper",
+          )}
+        >
+          {pinned ? <PinOff className="size-3.5" aria-hidden /> : <Pin className="size-3.5" aria-hidden />}
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+const RECENTS_COLLAPSE_KEY = "shapesos:sidebar:recents-collapsed";
+
+/** Phase 18.1: the dock — the member's pins (in their order) and recents. */
+function DockSections({
   pathname,
   collapsed,
   needsYou,
+  role,
+  dock,
   onNavigate,
 }: {
   pathname: string;
   collapsed: boolean;
   needsYou: number;
+  role: string | null | undefined;
+  dock: ReturnType<typeof useDock>;
   onNavigate?: () => void;
 }) {
-  const current = activeNavHref(pathname);
   const uid = useId();
+  const [editing, setEditing] = useState(false);
+  const recentsCollapsed = useLocalFlag(RECENTS_COLLAPSE_KEY);
+  const current = activeNavHref(pathname);
+  const pins = pinnedNavItems({ pinned: dock.pinned }, role);
+  const recents = dock.recents.filter((r) => r.href !== pathname);
+  if (collapsed) {
+    if (pins.length === 0) return null;
+    return (
+      <div role="group" aria-label="Pinned" className="border-t border-night-line pt-3">
+        <ul className="flex flex-col items-center gap-0.5">
+          {pins.map((item) => (
+            <NavRow key={item.href} item={item} active={item.href === current} collapsed count={item.badge === "needs-you" ? needsYou : 0} onNavigate={onNavigate} />
+          ))}
+        </ul>
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col gap-3">
-      {NAV_GROUPS.map((group) => {
-        const headingId = `${uid}-nav-${group.id}`;
-        return (
-          <div
-            key={group.id}
-            role="group"
-            aria-labelledby={group.title && !collapsed ? headingId : undefined}
-            aria-label={group.title ? (collapsed ? group.title : undefined) : group.id === "account" ? "Account" : "Home"}
-            className={cn(group.id === "account" && "border-t border-night-line pt-3", collapsed && group.title && "border-t border-night-line pt-3")}
-          >
-            {group.title && !collapsed ? (
-              <div id={headingId} className="mb-1 px-3 text-xs font-semibold text-night-muted">
-                {group.title}
-              </div>
-            ) : null}
-            <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
-              {group.items.map((item) => {
-                const active = item.href === current;
-                const Icon = item.icon;
-                const count = item.badge === "needs-you" ? needsYou : 0;
-                if (collapsed) {
-                  const tip = count > 0 ? `${item.label}: ${count} waiting on you` : item.label;
-                  return (
-                    <li key={item.href}>
-                      <RailTip label={tip}>
-                        <Link
-                          href={item.href}
-                          aria-label={tip}
-                          aria-current={active ? "page" : undefined}
-                          onClick={onNavigate}
-                          className={cn(
-                            "relative flex size-11 items-center justify-center rounded-full transition-[background-color,color] duration-150",
-                            active ? "bg-paper text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
-                          )}
-                        >
-                          <Icon aria-hidden className="size-[18px]" />
-                          {count > 0 ? (
-                            <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-ink" />
-                          ) : null}
-                        </Link>
-                      </RailTip>
-                    </li>
-                  );
-                }
+    <>
+      {pins.length ? (
+        <div role="group" aria-labelledby={`${uid}-pinned`} data-testid="dock-pinned">
+          <div className="mb-1 flex items-center justify-between px-3">
+            <span id={`${uid}-pinned`} className="text-xs font-semibold text-night-muted">
+              Pinned
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditing((e) => !e)}
+              aria-pressed={editing}
+              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
+            >
+              {editing ? "Done" : "Reorder"}
+            </button>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {pins.map((item, i) =>
+              editing ? (
+                <li key={item.href} className="flex h-10 items-center gap-2 rounded-full px-3 text-base text-night-soft">
+                  <item.icon aria-hidden className="size-[18px] shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-paper">{item.label}</span>
+                  <button type="button" onClick={() => dock.move(item.href, -1)} disabled={i === 0} aria-label={`Move ${item.label} up`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
+                    <ArrowUp className="size-3.5" aria-hidden />
+                  </button>
+                  <button type="button" onClick={() => dock.move(item.href, 1)} disabled={i === pins.length - 1} aria-label={`Move ${item.label} down`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper disabled:opacity-30">
+                    <ArrowDown className="size-3.5" aria-hidden />
+                  </button>
+                  <button type="button" onClick={() => dock.toggle(item.href)} aria-label={`Unpin ${item.label}`} className="flex size-7 items-center justify-center rounded-full hover:bg-night-raised hover:text-paper">
+                    <PinOff className="size-3.5" aria-hidden />
+                  </button>
+                </li>
+              ) : (
+                <NavRow
+                  key={item.href}
+                  item={item}
+                  active={item.href === current}
+                  collapsed={false}
+                  count={item.badge === "needs-you" ? needsYou : 0}
+                  pinned
+                  onTogglePin={dock.toggle}
+                  onNavigate={onNavigate}
+                />
+              ),
+            )}
+          </ul>
+        </div>
+      ) : null}
+      {recents.length ? (
+        <div role="group" aria-labelledby={`${uid}-recent`} data-testid="dock-recents">
+          <div className="mb-1 flex items-center justify-between px-3">
+            <button
+              type="button"
+              id={`${uid}-recent`}
+              onClick={() => writeLocalFlag(RECENTS_COLLAPSE_KEY, !recentsCollapsed)}
+              aria-expanded={!recentsCollapsed}
+              className="flex items-center gap-1 rounded-full text-xs font-semibold text-night-muted hover:text-paper"
+            >
+              Recent
+              <ChevronDown aria-hidden className={cn("size-3 transition-transform duration-150", recentsCollapsed && "-rotate-90")} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                openAppSwitcher();
+              }}
+              title="Switch app (⌃Tab)"
+              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
+            >
+              Switch
+            </button>
+          </div>
+          {recentsCollapsed ? null : (
+            <ul className="flex flex-col gap-0.5">
+              {recents.map((r) => {
+                const app = appForHref(r.href);
+                const Icon = app?.icon ?? History;
                 return (
-                  <li key={item.href}>
+                  <li key={r.href}>
                     <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
+                      href={r.href}
                       onClick={onNavigate}
-                      className={cn(
-                        "flex h-10 items-center gap-3 rounded-full px-3 text-base transition-[background-color,color] duration-150",
-                        active ? "bg-paper font-semibold text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
-                      )}
+                      className="flex h-9 items-center gap-3 rounded-full px-3 text-sm text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
                     >
-                      <Icon aria-hidden className="size-[18px] shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {count > 0 ? (
-                        <CountBadge count={count} tone="needs" label={`${count} approval${count === 1 ? "" : "s"} waiting on you`} />
-                      ) : null}
+                      <Icon aria-hidden className="size-4 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{r.title}</span>
                     </Link>
                   </li>
                 );
               })}
             </ul>
+          )}
+        </div>
+      ) : null}
+      {dock.error ? <p className="px-3 text-xs text-failed-night">{dock.error}</p> : null}
+    </>
+  );
+}
+
+function NavList({
+  pathname,
+  collapsed,
+  needsYou,
+  role,
+  dock,
+  onNavigate,
+}: {
+  pathname: string;
+  collapsed: boolean;
+  needsYou: number;
+  role?: string | null;
+  dock: ReturnType<typeof useDock>;
+  onNavigate?: () => void;
+}) {
+  const current = activeNavHref(pathname);
+  const uid = useId();
+  // Phase 18.1: the nav as this member's role sees it (gated items hidden).
+  const groups = visibleNavGroups(role);
+  const pinnedSet = new Set(dock.pinned);
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => {
+        const headingId = `${uid}-nav-${group.id}`;
+        return (
+          <div key={group.id} className="contents">
+            <div
+              role="group"
+              aria-labelledby={group.title && !collapsed ? headingId : undefined}
+              aria-label={group.title ? (collapsed ? group.title : undefined) : group.id === "account" ? "Account" : "Home"}
+              className={cn(group.id === "account" && "border-t border-night-line pt-3", collapsed && group.title && "border-t border-night-line pt-3")}
+            >
+              {group.title && !collapsed ? (
+                <div id={headingId} className="mb-1 px-3 text-xs font-semibold text-night-muted">
+                  {group.title}
+                </div>
+              ) : null}
+              <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
+                {group.items.map((item) => (
+                  <NavRow
+                    key={item.href}
+                    item={item}
+                    active={item.href === current}
+                    collapsed={collapsed}
+                    count={item.badge === "needs-you" ? needsYou : 0}
+                    pinned={pinnedSet.has(item.href)}
+                    onTogglePin={collapsed ? undefined : dock.toggle}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+              </ul>
+            </div>
+            {/* Phase 18.1: the dock sits right under Home (Overview). */}
+            {group.id === "home" ? <DockSections pathname={pathname} collapsed={collapsed} needsYou={needsYou} role={role} dock={dock} onNavigate={onNavigate} /> : null}
           </div>
         );
       })}
@@ -491,6 +690,9 @@ export interface SidebarPanelProps {
   extra?: ReactNode;
   /** Mobile drawer: a close button next to the workspace switcher. */
   onClose?: () => void;
+  /** Phase 18.1: the member's role here (nav gating) and their dock. */
+  role?: string | null;
+  initialDock?: DockState | null;
 }
 
 export function SidebarPanel({
@@ -508,8 +710,11 @@ export function SidebarPanel({
   onNavigate,
   extra,
   onClose,
+  role,
+  initialDock,
 }: SidebarPanelProps) {
   const planText = planLabel(plan);
+  const dock = useDock(initialDock ?? null);
   const toggle = onToggleCollapsed ? (
     <button
       type="button"
@@ -587,7 +792,7 @@ export function SidebarPanel({
           )}
         </div>
         <nav aria-label="Dashboard" className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
-          <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} onNavigate={onNavigate} />
+          <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} role={role} dock={dock} onNavigate={onNavigate} />
           {extra && !collapsed ? <div className="mt-4 border-t border-night-line pt-3">{extra}</div> : null}
         </nav>
         <div className={cn("shrink-0", collapsed && "px-2")}>
@@ -618,10 +823,14 @@ export interface DashboardChromeProps {
   /** Server-rendered first paint of "Running now" and the usage meter. */
   initialTree?: SidebarTree;
   initialUsage?: SidebarUsage;
+  /** Phase 18.1 (WS=desk): role for nav gating; the dock's first paint. */
+  role?: string | null;
+  initialDock?: DockState | null;
 }
 
 export function AppSidebar(props: DashboardChromeProps) {
   const pathname = usePathname();
+  const inPane = useInPane();
   const chat = useChat();
   const { actionable } = useNeedsYouCount();
   const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
@@ -646,6 +855,8 @@ export function AppSidebar(props: DashboardChromeProps) {
   }
   // On the assistant page the sidebar gains the chat-thread list (AI tab).
   const showThreads = !collapsed && pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
+  // Phase 18.1: never inside a split-view pane.
+  if (inPane) return null;
   return (
     <aside className={cn("aos-night sticky top-0 hidden h-screen shrink-0 md:block", collapsed ? "w-20" : "w-72")}>
       <SidebarPanel
@@ -685,6 +896,8 @@ export function MobileNav({
   const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
   const [open, setOpen] = useState(false);
   const lead = tree?.lead ?? null;
+  const inPane = useInPane();
+  if (inPane) return null;
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-paper px-4 md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="ShapesOS home">

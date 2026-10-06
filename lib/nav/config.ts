@@ -14,6 +14,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
   AppWindow,
+  ArrowLeftRight, // Phase 18.1: Switch app
+  Columns2, // Phase 18.1: Split view
   BookOpen,
   Bell,
   Building2, // Phase 10 (ops-core): Operations
@@ -74,7 +76,17 @@ export interface NavItem {
   activePrefix?: string;
   /** Slot for a live count pill rendered next to the label. */
   badge?: "needs-you";
+  /**
+   * Phase 18.1 (WS=desk): lowest workspace role that sees the item (the page
+   * itself enforces the same role). Absent = every member. The dock overlay
+   * (lib/desktop/nav-overlay.ts) keeps gated items gated, pinned or not.
+   */
+  minRole?: NavRole;
 }
+
+/** Workspace roles, lowest first (same ranks as lib/authz ROLE_RANK; kept local so this file stays client-safe). */
+export type NavRole = "viewer" | "editor" | "admin" | "owner";
+const NAV_ROLE_RANK: Record<NavRole, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 };
 
 export interface NavGroup {
   id: NavGroupId;
@@ -160,10 +172,29 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "account",
     items: [
       { href: "/dashboard/settings", label: "Settings", icon: Settings, description: "Workspace settings", keywords: "config preferences members connectors" },
-      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, description: "Plan, credits and invoices", keywords: "plan subscription credits payment" },
+      // Phase 18.1: the billing page is admin+ (app/dashboard/billing/page.tsx), so is its nav row.
+      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, description: "Plan, credits and invoices", keywords: "plan subscription credits payment", minRole: "admin" },
     ],
   },
 ];
+
+/**
+ * Phase 18.1: may a member with `role` see this item? Items without a
+ * minRole are for everyone. An unknown role (not signed in to this
+ * workspace) only sees the ungated items.
+ */
+export function navItemVisible(item: Pick<NavItem, "minRole">, role: string | null | undefined): boolean {
+  if (!item.minRole) return true;
+  const r = NAV_ROLE_RANK[(role ?? "") as NavRole];
+  return typeof r === "number" && r >= NAV_ROLE_RANK[item.minRole];
+}
+
+/** Phase 18.1: the groups as `role` sees them (gated items removed, empty groups dropped). */
+export function visibleNavGroups(role: string | null | undefined, groups: NavGroup[] = NAV_GROUPS): NavGroup[] {
+  return groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => navItemVisible(i, role)) }))
+    .filter((g) => g.items.length > 0);
+}
 
 /** Every nav item in display order. */
 export function allNavItems(groups: NavGroup[] = NAV_GROUPS): NavItem[] {
@@ -218,8 +249,46 @@ export interface NavCommand {
   icon: LucideIcon;
 }
 
-/** The ⌘K "Go" section: one command per nav destination, in nav order. */
+/**
+ * Phase 18.1 (WS=desk): system destinations that are not sidebar rows — the
+ * app switcher and split view. They reach ⌘K through navCommands() (the
+ * command bar's extension point), so the palette needs no edit; each href is
+ * a real page (lib/nav/__tests__ checks).
+ */
+export const NAV_SYSTEM_ACTIONS: readonly (NavItem & { hotkey?: string })[] = [
+  {
+    href: "/dashboard/switch",
+    label: "Switch app",
+    icon: ArrowLeftRight,
+    description: "Jump to a recent app or record (⌃Tab)",
+    keywords: "switcher recent recents apps records jump back alt tab ctrl tab",
+    hotkey: "⌃ Tab",
+  },
+  {
+    href: "/dashboard/split",
+    label: "Split view",
+    icon: Columns2,
+    description: "Two pages side by side, or a page next to the Assistant",
+    keywords: "split side by side two panes assistant compare",
+  },
+];
+
+/** The ⌘K "Go" section: one command per nav destination, in nav order, then the system actions. */
 export function navCommands(groups: NavGroup[] = NAV_GROUPS): NavCommand[] {
+  return [...navGroupCommands(groups), ...NAV_SYSTEM_ACTIONS.map((a) => ({
+    id: `go:${a.href}`,
+    section: "go" as const,
+    title: a.label,
+    subtitle: a.description,
+    keywords: a.keywords ?? "",
+    ...(a.hotkey ? { hotkey: a.hotkey } : {}),
+    action: "go" as const,
+    href: a.href,
+    icon: a.icon,
+  }))];
+}
+
+function navGroupCommands(groups: NavGroup[]): NavCommand[] {
   return groups.flatMap((g) =>
     g.items.map((item) => ({
       id: `go:${item.href}`,

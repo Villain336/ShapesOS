@@ -202,3 +202,5 @@ lib/llm/__tests__/batch-db.test.ts
 lib/metering/__tests__/ai-health-db.test.ts
 # Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
 scripts/eval/__tests__/eval-dry-run-db.test.ts
+# Phase 18.1 (desk): desktop layout / dock / recents owner-only RLS (workspace AND person) + per-user isolation; the Today briefing once per member per day (direct + batch, mock never writes); Pause all agents (kill switch, every live run stopped, audit, new runs refused until Resume); focus queues notifications and delivers them when it ends; the UserPrefs seam.
+lib/desktop/__tests__/desk-db.test.ts

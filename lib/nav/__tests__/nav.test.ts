@@ -10,7 +10,10 @@ import {
   allNavItems,
   NAV_GROUPS,
   NAV_HOTKEYS,
+  NAV_SYSTEM_ACTIONS,
   navCommands,
+  navItemVisible,
+  visibleNavGroups,
   pathMatches,
 } from "../config";
 import { capIdleSection, rankCommands, type CommandItem } from "../../../components/command-bar/lib";
@@ -107,9 +110,10 @@ describe("activeNavHref", () => {
 });
 
 describe("⌘K Go section", () => {
-  it("covers every nav destination exactly once", () => {
+  it("covers every nav destination exactly once, then the system actions", () => {
     const goHrefs = navCommands().map((c) => c.href);
-    assert.deepEqual(goHrefs, allNavItems().map((i) => i.href));
+    // Phase 18.1: Switch app + Split view follow the sidebar destinations.
+    assert.deepEqual(goHrefs, [...allNavItems().map((i) => i.href), ...NAV_SYSTEM_ACTIONS.map((a) => a.href)]);
     for (const c of navCommands()) {
       assert.equal(c.section, "go");
       assert.equal(c.id, `go:${c.href}`);
@@ -147,5 +151,33 @@ describe("⌘K Go section", () => {
     assert.equal(idle.length, 8);
     const searched = capIdleSection(rankCommands(items, "a", {}, 0), "a", "go", 8);
     assert.ok(searched.length > 8);
+  });
+});
+
+describe("Phase 18.1: system actions and role gating", () => {
+  it("system actions are real pages and not sidebar rows", () => {
+    const sidebar = new Set(allNavItems().map((i) => i.href));
+    for (const a of NAV_SYSTEM_ACTIONS) {
+      assert.ok(existsSync(pageFileFor(a.href)), `${a.label} → ${a.href} has no page`);
+      assert.ok(!sidebar.has(a.href), `${a.href} must not be a second nav row`);
+    }
+    const titles = navCommands().map((c) => c.title);
+    assert.ok(titles.includes("Switch app"));
+    assert.ok(titles.includes("Split view"));
+  });
+
+  it("Billing is admin+ like its page; everything else is for every member", () => {
+    const billing = allNavItems().find((i) => i.href === "/dashboard/billing")!;
+    assert.equal(billing.minRole, "admin");
+    assert.equal(navItemVisible(billing, "viewer"), false);
+    assert.equal(navItemVisible(billing, "editor"), false);
+    assert.equal(navItemVisible(billing, "admin"), true);
+    assert.equal(navItemVisible(billing, "owner"), true);
+    assert.equal(navItemVisible(billing, null), false);
+    const src = readFileSync(path.join(ROOT, "app/dashboard/billing/page.tsx"), "utf8");
+    assert.match(src, /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/);
+    const viewerHrefs = visibleNavGroups("viewer").flatMap((g) => g.items.map((i) => i.href));
+    assert.ok(!viewerHrefs.includes("/dashboard/billing"));
+    assert.equal(viewerHrefs.length, allNavItems().length - 1);
   });
 });

@@ -2,6 +2,7 @@
 // requires a session; unauthenticated visitors bounce to /login.
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import {
   getAccessibleWorkspaces,
   getOrCreateWorkspace,
@@ -40,6 +41,16 @@ import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { planHasFeature } from "@/lib/billing/entitlements";
 // Phase 4d: sidebar "Running now" (lead agent → sub-agents) + usage meter.
 import { safeAgentActivity, safeUsageMeter } from "@/lib/aos/activity.server";
+// Phase 18.1 (WS=desk): the dock (pins + recents), the ⌃Tab switcher, the
+// keyboard host + "?" cheat-sheet, the "Agents paused" banner, and the
+// chrome-less layout inside a split-view pane.
+import { getDesk, listRecents } from "@/lib/desktop/store.server";
+import { getUserPreferences } from "@/lib/desktop/prefs";
+import { RecentsTracker } from "@/components/desk/RecentsTracker";
+import { AppSwitcher } from "@/components/desk/AppSwitcher";
+import { PaneBridge, ShortcutHost } from "@/components/desk/ShortcutHost";
+import { PausedBanner } from "@/components/desk/PausedBanner";
+import { ControlCenter } from "@/components/desk/ControlCenter";
 
 export default async function DashboardLayout({
   children,
@@ -65,6 +76,18 @@ export default async function DashboardLayout({
     safeUsageMeter(workspace.id),
   ]);
   const isAdmin = roleAtLeast(membership?.role, "admin");
+  // Phase 18.1 (WS=desk): inside a split-view pane (a same-origin iframe the
+  // browser marks Sec-Fetch-Dest: iframe) the page renders without the
+  // sidebar and top bar; the split view around it is the chrome.
+  const pane = (await headers()).get("sec-fetch-dest") === "iframe";
+  const role = membership?.role ?? null;
+  const [desk, recents, prefs, frozen] = await Promise.all([
+    getDesk(workspace.id, user.id, role).catch(() => null),
+    listRecents(workspace.id, user.id).catch(() => []),
+    getUserPreferences(user.id).catch(() => ({ shortcuts: {} as Record<string, string> })),
+    prisma.workspace.findUnique({ where: { id: workspace.id }, select: { frozenAt: true } }).catch(() => null),
+  ]);
+  const initialDock = { pinned: desk?.nav.pinned ?? [], recents };
   const trial = trialView(workspace);
 
   const sidebarProps = {
@@ -76,6 +99,9 @@ export default async function DashboardLayout({
     // The needs-you count and this tree refresh client-side (polled).
     initialTree: activity?.tree ? { lead: activity.tree.lead, branches: activity.tree.branches } : null,
     initialUsage: usage,
+    // Phase 18.1 (WS=desk): nav gating by role + the dock's first paint.
+    role,
+    initialDock,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
@@ -105,9 +131,30 @@ export default async function DashboardLayout({
     (defaultKit?.colors as Record<string, string> | null)?.primary,
   );
 
+  if (pane) {
+    return (
+      <BrandTheme primary={brandPrimary}>
+        <ChatProvider>
+          <CommandBar workspaceId={workspace.id} />
+          <NewTaskDialog />
+          <FeedbackHost />
+          <RecentsTracker />
+          <PaneBridge initialOverrides={prefs.shortcuts} />
+          <GrowthBookProvider config={gbConfig}>
+            <DashboardMain pane>{children}</DashboardMain>
+          </GrowthBookProvider>
+        </ChatProvider>
+      </BrandTheme>
+    );
+  }
+
   return (
     <BrandTheme primary={brandPrimary}>
       <ChatProvider>
+        {/* Phase 18.1 (WS=desk): visits → recents; ⌃Tab switcher; keyboard host + "?". */}
+        <RecentsTracker />
+        <AppSwitcher role={role} initialDock={initialDock} />
+        <ShortcutHost initialOverrides={prefs.shortcuts} />
         <CommandBar workspaceId={workspace.id} />
         <NewTaskDialog />
         <FeedbackHost />
@@ -115,11 +162,22 @@ export default async function DashboardLayout({
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
         {/* AppTopBar (bell + needs-you) is desktop-only; mobile gets the bell here. */}
-        <MobileNav {...sidebarProps} headerActions={<NotificationBell />} />
+        <MobileNav
+          {...sidebarProps}
+          headerActions={
+            <>
+              <NotificationBell />
+              {/* Phase 18.1 (WS=desk): Control Center on mobile too. */}
+              <ControlCenter />
+            </>
+          }
+        />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
           <div className="min-w-0 flex-1">
             <AppTopBar />
+            {/* Phase 18.1 (WS=desk): Control Center → Pause all agents froze the workspace. */}
+            {frozen?.frozenAt ? <PausedBanner since={frozen.frozenAt.toISOString()} canResume={isAdmin} /> : null}
             <GrowthBookProvider config={gbConfig}>
               <DashboardMain
                 banner={trial ? <TrialBanner trial={trial} canManageBilling={isAdmin} /> : null}

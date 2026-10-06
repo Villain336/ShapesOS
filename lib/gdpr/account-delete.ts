@@ -33,6 +33,7 @@ import { prisma } from "@/lib/prisma";
 import { BadRequestError, ConflictError } from "@/lib/api/errors";
 import { LIVE_SUBSCRIPTION, purgeWorkspace, readSubscription } from "@/lib/workspace/lifecycle";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
+import { USER_GUC } from "@/lib/desktop/scope";
 import { isUserRefColumn, loadCatalog, q, type Catalog } from "./catalog";
 import { emailFromUserId } from "@/lib/auth/email/tokens";
 
@@ -134,6 +135,8 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   // Phase 6: the email + password account (its single-use links are keyed by
   // address and deleted just before; see EMAIL_TOKEN_TABLE).
   { table: "email_accounts", column: "user_id" },
+  // Phase 18.1 (WS=desk): focus state, voice + shortcut overrides (per person).
+  { table: "user_desk_state", column: "user_id" },
   { table: "user_security", column: "user_id" },
 ];
 
@@ -151,6 +154,11 @@ export const EMAIL_TOKEN_TABLE = "email_auth_tokens";
 export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] = [
   { table: "push_devices", column: "user_id" },
   { table: "conversation_reads", column: "user_id" },
+  // Phase 18.1 (WS=desk): owner-only (workspace + app.user_id) — the delete
+  // pass sets the person GUC to the subject too.
+  { table: "user_desktop_layouts", column: "user_id" },
+  { table: "user_recent_items", column: "user_id" },
+  { table: "desktop_briefings", column: "user_id" },
 ];
 
 /**
@@ -291,6 +299,8 @@ export async function deleteAccount(opts: {
           UPDATE "file_change_log" SET "summary" = replace("summary", ${email}, '[deleted user]')
            WHERE "summary" ILIKE ${`%${email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`;
       }
+      // Phase 18.1: owner-only tables answer only to their member (app.user_id).
+      await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
       for (const p of PERSONAL_RLS_TABLES) {
         if (!catalog.has(p.table)) continue;
         for (const ws of scopeWorkspaces) {

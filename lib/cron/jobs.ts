@@ -100,6 +100,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     secretEnv: "REMINDERS_CRON_SECRET",
   },
   {
+    // Phase 18.1 (WS=desk): focus ends → queued notifications delivered; the morning "Today" briefings.
+    key: "desk",
+    path: "/api/cron/desk",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. Releases what focus / do not disturb queued once focus ends (within 15 minutes even with the app closed) and writes each opted-in member's briefing once their local morning (06:00) has come; idempotent per member per day.",
+    timeoutMs: SHORT,
+  },
+  {
     // Phase 9 (repos): webhook fallback for agent PR feedback; a no-op unless GITHUB_PR_POLL=on.
     key: "github-prs",
     path: "/api/cron/github-prs",

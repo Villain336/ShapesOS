@@ -31,6 +31,16 @@ function defaultDb(): ProducerDb {
   return prisma as unknown as ProducerDb;
 }
 
+/** Phase 18.1: recipients in focus right now (best-effort: on error nobody is held). */
+async function recipientsInFocus(inputs: NotificationInput[]): Promise<Set<string>> {
+  try {
+    const { usersInFocus } = await import("@/lib/desktop/focus.server");
+    return await usersInFocus(inputs.map((n) => n.userId));
+  } catch {
+    return new Set();
+  }
+}
+
 function warn(producer: string, err: unknown) {
   // Best-effort by design: log and move on.
   console.warn(`[notifications] ${producer} skipped:`, err instanceof Error ? err.message : err);
@@ -50,9 +60,12 @@ export function actorUserId(actor: string | null | undefined): string | null {
  * notification's own, so a duplicate notification never re-fires.
  */
 async function createAndEmit(db: ProducerDb, inputs: NotificationInput[]): Promise<number> {
-  const created = await createNotifications(db, inputs);
+  // Phase 18.1 (WS=desk): a recipient in focus / do not disturb gets the row
+  // queued (held_at) and no push now — both arrive when focus ends.
+  const held = await recipientsInFocus(inputs);
+  const created = await createNotifications(db, inputs, { heldUserIds: held });
   if (created > 0) {
-    queuePushForNotifications(inputs);
+    queuePushForNotifications(held.size ? inputs.filter((n) => !held.has(n.userId)) : inputs);
     for (const n of inputs) {
       await emitWebhookEvent({
         workspaceId: n.workspaceId,
