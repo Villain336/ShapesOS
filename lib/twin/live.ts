@@ -26,6 +26,12 @@ export interface TwinLiveOptions {
   snapshot: () => Promise<TwinSnapshot>;
   /** Re-checked every loop: false ends the stream. */
   stillAllowed: () => Promise<boolean>;
+  /**
+   * Phase 17 (latency): the change signal (lib/twin/signal.ts). While it does
+   * not move the snapshot is not rebuilt (nothing it reads changed); absent,
+   * every loop rebuilds as before.
+   */
+  signal?: () => Promise<string>;
   pollMs?: number;
   maxMs?: number;
   heartbeatMs?: number;
@@ -52,6 +58,7 @@ export function twinLiveStream(first: TwinSnapshot, opts: TwinLiveOptions): Read
       const deadline = Date.now() + maxMs;
       let last = first;
       let reason = "max-duration";
+      let lastSignal = opts.signal ? await opts.signal().catch(() => null) : null;
       ch.send("snapshot", first);
       while (!ch.closed) {
         await sseSleep(ch, Math.max(0, Math.min(pollMs, deadline - Date.now())));
@@ -60,6 +67,11 @@ export function twinLiveStream(first: TwinSnapshot, opts: TwinLiveOptions): Read
         if (!(await opts.stillAllowed().catch(() => false))) {
           reason = "access-revoked";
           break;
+        }
+        if (opts.signal) {
+          const sig = await opts.signal().catch(() => null);
+          if (sig !== null && sig === lastSignal) continue; // nothing the snapshot reads changed
+          lastSignal = sig;
         }
         let next: TwinSnapshot;
         try {

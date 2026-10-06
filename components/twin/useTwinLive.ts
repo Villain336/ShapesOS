@@ -45,6 +45,17 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
     setSnapshot(initial);
   }, [initial]);
 
+  // Phase 17 (latency): the polling fallback asks the cheap change signal
+  // first and fetches the full snapshot only when the version moved.
+  const versionRef = useRef<string | null>(null);
+  const pollTick = useCallback(async () => {
+    const r = await sharedJson(TWIN_API.signal(siteId), { fresh: true }).catch(() => null);
+    const version = r?.ok ? ((r.body as { version?: unknown } | null)?.version ?? null) : null;
+    if (typeof version === "string" && version === versionRef.current) return;
+    versionRef.current = typeof version === "string" ? version : null;
+    await resyncRef.current();
+  }, [siteId]);
+
   const resync = useCallback(async () => {
     const r = await sharedJson(TWIN_API.state(siteId), { fresh: true }).catch(() => null);
     const body = r?.ok ? (r.body as { snapshot?: unknown } | TwinSnapshot | null) : null;
@@ -52,6 +63,8 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
     if (snap) setSnapshot(snap);
     return !!snap;
   }, [siteId]);
+  const resyncRef = useRef(resync);
+  resyncRef.current = resync;
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
@@ -69,8 +82,9 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
       if (closed) return;
       setStatus("polling");
       if (!pollTimer) {
-        void resync();
-        pollTimer = setInterval(() => void resync(), TWIN_LIVE_POLL_MS);
+        versionRef.current = null;
+        void pollTick();
+        pollTimer = setInterval(() => void pollTick(), TWIN_LIVE_POLL_MS);
       }
       // keep trying the stream once a minute while polling
       if (retryTimer) clearTimeout(retryTimer);
@@ -163,7 +177,7 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
       stopPolling();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [enabled, siteId, resync]);
+  }, [enabled, siteId, resync, pollTick]);
 
   return { snapshot, status: enabled && !ended ? status : ("off" as TwinLiveStatus), resync, setSnapshot };
 }

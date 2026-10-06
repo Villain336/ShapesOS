@@ -190,3 +190,5 @@ lib/llm/__tests__/usage-outbox-db.test.ts
 lib/ops/__tests__/overview-payments-db.test.ts
 # Phase 17 (latency): run-event pagination (newest first, seq cursor, every timeline event once, text/usage excluded, RLS).
 lib/agents/runs/__tests__/events-page-db.test.ts
+# Phase 17 (latency): twin change signal — moves exactly when a record the snapshot reads changes (object, stock, booking, site status, delete) or the minute turns; not for another workspace or unrelated tables; the live stream skips unchanged ticks.
+lib/twin/__tests__/twin-signal-db.test.ts
