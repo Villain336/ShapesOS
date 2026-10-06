@@ -241,7 +241,7 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
                         <td className="px-3 py-2 text-right align-top whitespace-nowrap tabular-nums text-ink">{formatCost(row.costMicroUsd)}</td>
                         <td className="px-3 py-2 align-top">
                           {used === null ? (
-                            <span className="text-xs text-subtle">{t("activityApp.noBudget")}</span>
+                            <span className="text-xs text-muted">{t("activityApp.noBudget")}</span>
                           ) : (
                             <div suppressHydrationWarning className="flex items-center gap-2" title={t("activityApp.budgetUsed", { pct: Math.round(used * 100) })}>
                               <div className="h-1.5 w-20 overflow-hidden rounded-full bg-line" aria-hidden>
@@ -267,7 +267,7 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
                               {stopping.has(row.key) ? t("activityApp.stopping") : t("activityApp.stop")}
                             </button>
                           ) : row.live ? (
-                            <span className="text-xs text-subtle">{t(`activityApp.stopReasons.${row.stop.reason}` as MessageKey)}</span>
+                            <span className="text-xs text-muted">{t(`activityApp.stopReasons.${row.stop.reason}` as MessageKey)}</span>
                           ) : null}
                         </td>
                       </tr>
@@ -306,7 +306,7 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
         <h2 id="activity-health" className="aos-subheading">
           {t("activityApp.health.title")}
         </h2>
-        <span suppressHydrationWarning className="text-xs text-subtle">{t("activityApp.health.updated", { time: formatTime(health.generatedAt) })}</span>
+        <span suppressHydrationWarning className="text-xs text-muted">{t("activityApp.health.updated", { time: formatTime(health.generatedAt) })}</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
         {stats.map((s) => (

@@ -233,7 +233,7 @@ export function NotesApp({ initialNotes, initialFacets, initialNote }: NotesAppP
                       </span>
                       {n.preview ? <span className={`line-clamp-2 text-sm ${active ? "text-on-ink-muted" : "text-muted"}`}>{n.preview}</span> : null}
                       {/* Relative time: the server's "now" and the browser's differ by the render gap. */}
-                      <span suppressHydrationWarning className={`text-xs ${active ? "text-on-ink-muted" : "text-subtle"}`}>
+                      <span suppressHydrationWarning className={`text-xs ${active ? "text-on-ink-muted" : "text-muted"}`}>
                         {format.relative(n.updatedAt)}
                         {n.shareState === "workspace" ? ` · ${t("notes.sharedShort")}` : ""}
                         {n.links.length ? ` · ${t("notes.linkCount", { count: n.links.length })}` : ""}
@@ -295,6 +295,8 @@ function NotePane({
   const [collab, setCollab] = useState<CollabConfig | null | undefined>(undefined);
   const [collabStatus, setCollabStatus] = useState<CollabStatus>("connecting");
   const [peers, setPeers] = useState<string[]>([]);
+  // Awareness fires on every caret move: keep the same array unless the names changed.
+  const onPeers = useCallback((names: string[]) => setPeers((p) => (p.length === names.length && p.every((x, i) => x === names[i]) ? p : names)), []);
   const [editorKey, setEditorKey] = useState(0);
   const [content, setContent] = useState<unknown>(note.content);
   const version = useRef(note.version);
@@ -548,7 +550,7 @@ function NotePane({
               <Link href={recordHref(l.kind, l.id)} className="max-w-[16rem] truncate hover:underline">
                 {l.label ?? l.id}
               </Link>
-              <span className="text-xs font-normal text-subtle">{kindLabel(l.kind)}</span>
+              <span className="text-xs font-normal text-muted">{kindLabel(l.kind)}</span>
               {note.canEdit ? (
                 <button
                   type="button"
@@ -601,7 +603,7 @@ function NotePane({
             ariaLabel={t("notes.editor.label", { title: title || note.title })}
             onChange={onEditorChange}
             onCollabStatus={setCollabStatus}
-            onPeers={setPeers}
+            onPeers={onPeers}
             onReset={() => setEditorKey((k) => k + 1)}
           />
         )}

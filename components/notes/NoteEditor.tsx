@@ -216,7 +216,7 @@ function CollabEditorBody({
     [ydoc, provider],
   );
   useEffect(() => {
-    editor?.setEditable(writable);
+    if (editor && editor.isEditable !== writable) editor.setEditable(writable);
   }, [editor, writable]);
 
   const [synced, setSynced] = useState(provider.isSynced);

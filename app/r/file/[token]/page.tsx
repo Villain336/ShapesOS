@@ -98,7 +98,7 @@ export default async function SharedFilePage({ params, searchParams }: { params:
             )}
           </section>
         )}
-        <p className="text-center text-xs text-subtle">{t("filesApp.share.footer")}</p>
+        <p className="text-center text-xs text-muted">{t("filesApp.share.footer")}</p>
       </div>
     </main>
   );

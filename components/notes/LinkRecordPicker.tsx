@@ -103,7 +103,7 @@ export function LinkRecordPicker({ onPick, exclude = [] }: { onPick: (r: PickedR
                 <span className="block truncate text-md font-semibold">{r.title}</span>
                 {r.subtitle ? <span className={`block truncate text-xs ${i === active ? "text-on-ink-muted" : "text-muted"}`}>{r.subtitle}</span> : null}
               </span>
-              <span className={`shrink-0 text-xs ${i === active ? "text-on-ink-muted" : "text-subtle"}`}>{kindLabel(r.kind)}</span>
+              <span className={`shrink-0 text-xs ${i === active ? "text-on-ink-muted" : "text-muted"}`}>{kindLabel(r.kind)}</span>
             </button>
           </li>
         ))}

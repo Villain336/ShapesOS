@@ -57,7 +57,7 @@ export function RecordNotes({ kind, id, label, className }: { kind: string; id: 
               <Link href={`/dashboard/notes?note=${encodeURIComponent(n.id)}`} className="flex flex-col gap-0.5 rounded-sm px-2 py-2.5 hover:bg-hover-paper">
                 <span className="truncate text-md font-semibold text-ink">{n.title}</span>
                 {n.preview ? <span className="line-clamp-2 text-sm text-muted">{n.preview}</span> : null}
-                <span suppressHydrationWarning className="text-xs text-subtle">{format.relative(n.updatedAt)}</span>
+                <span suppressHydrationWarning className="text-xs text-muted">{format.relative(n.updatedAt)}</span>
               </Link>
             </li>
           ))}

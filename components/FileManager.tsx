@@ -258,7 +258,7 @@ export function FileManager({
             >
               <Folder className="size-4" aria-hidden />
               <span>{t(`filesApp.roots.${r.key}` as MessageKey)}</span>
-              <span className="hidden text-xs font-normal text-subtle sm:inline">{t(`filesApp.rootHints.${r.key}` as MessageKey)}</span>
+              <span className="hidden text-xs font-normal text-muted sm:inline">{t(`filesApp.rootHints.${r.key}` as MessageKey)}</span>
             </button>
           );
         })}

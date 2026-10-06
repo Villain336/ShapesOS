@@ -281,7 +281,7 @@ export function StoreApp({ initial, initialPublications, clients, role, canInsta
                           {` · ${top === null ? t("storeApp.noTools") : t("storeApp.upToTier", { tier: top })}`}
                         </span>
                       </span>
-                      <span className={`shrink-0 text-xs font-semibold ${active ? "text-paper" : i.installed ? "text-ink" : "text-subtle"}`}>
+                      <span className={`shrink-0 text-xs font-semibold ${active ? "text-paper" : i.installed ? "text-ink" : "text-muted"}`}>
                         {t(`storeApp.states.${i.state}` as MessageKey)}
                       </span>
                     </button>
