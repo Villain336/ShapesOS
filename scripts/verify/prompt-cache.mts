@@ -27,6 +27,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { runTrackedAgentTurn } from "@/lib/chat/agent";
+import { flushUsageRecording } from "@/lib/llm/usage";
+import { settleThreadFacts } from "@/lib/chat/facts";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { startFakeAnthropic, type AnthropicBody, type FakeAnthropic } from "@/lib/llm/__tests__/fake-anthropic";
 import { writeFileSync } from "node:fs";
 
@@ -239,6 +242,14 @@ async function main(): Promise<number> {
     return 0;
   } finally {
     await fake.close();
+    // Usage is recorded in the background (Phase 17 outbox): let it land
+    // before the workspaces go, or the delete and the late usage write lock
+    // the same workspace and balance rows in opposite orders (a deadlock).
+    // The thread-facts summary (a background model call) records its own
+    // usage when it finishes, so settle it first, then the usage writes.
+    await settleThreadFacts().catch(() => undefined);
+    await flushUsageRecording().catch(() => undefined);
+    await settleBackgroundWork().catch(() => undefined);
     await prisma.workspace.deleteMany({ where: { id: { in: [WS_A, WS_B] } } }).catch(() => undefined);
     await prisma.$disconnect();
   }

@@ -116,6 +116,16 @@ export function trackBackgroundWork<T>(p: Promise<T>): Promise<T> {
   return p;
 }
 
+/**
+ * Wait until no tracked background work is left (work that starts more work
+ * is waited for too). For scripts and tests that tear their data down after
+ * a turn: usage records, facts summaries and run events land in the
+ * background, and deleting their workspace under them races those writes.
+ */
+export async function settleBackgroundWork(): Promise<void> {
+  while (state.background.size > 0) await Promise.allSettled([...state.background]);
+}
+
 /** Run `run` when the process starts draining (in registration order). */
 export function onShutdown(name: string, run: Hook["run"]): void {
   if (state.hooks.some((h) => h.name === name)) return;
