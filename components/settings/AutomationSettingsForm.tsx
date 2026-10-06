@@ -99,7 +99,7 @@ function conditionText(rule: EscalationRule): string {
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 
 // Tiers are categories (risk levels), not live agent states — neutral chips.
 function TierBadge({ tier }: { tier: Tier }) {
@@ -110,7 +110,7 @@ function TierBadge({ tier }: { tier: Tier }) {
     3: "Tier 3 · Always asks",
   };
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {labels[tier]}
     </span>
   );
@@ -121,14 +121,14 @@ function TierBadge({ tier }: { tier: Tier }) {
 function EffectBadge({ effect }: { effect: "require_approval" | "notify" }) {
   if (effect === "require_approval") {
     return (
-      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs-tint px-1.5 py-0.5 text-[10px] font-medium leading-tight text-ink">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs-tint px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-ink">
       <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Requires approval" />
         Require approval
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       Notify
     </span>
   );
@@ -179,7 +179,7 @@ function BehaviorControl({
         locked={lock ? { auto: lock } : undefined}
         disabled={disabled}
       />
-      {lock ? <span className="text-[11px] text-muted">{lock}</span> : null}
+      {lock ? <span className="text-[0.6875rem] text-muted">{lock}</span> : null}
     </div>
   );
 }
@@ -336,7 +336,7 @@ export default function AutomationSettingsForm() {
 
   if (!data || !rules) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-muted">
+      <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
         <Loader2 size={16} className="aos-spin" />
         Loading automation settings…
       </div>
@@ -353,7 +353,7 @@ export default function AutomationSettingsForm() {
       {/* Info note — tiers in plain language */}
       <div className="flex gap-2.5 rounded-lg border border-line bg-canvas p-3">
         <Info size={16} className="mt-0.5 shrink-0 text-subtle" />
-        <p className="text-[13px] leading-relaxed text-muted">
+        <p className="text-[0.8125rem] leading-relaxed text-muted">
           <span className="font-semibold text-ink">How automation works:</span> every action asks you
           first until you set it to <span className="font-medium">Auto-run</span>. You can do that for
           any <span className="font-medium">Tier 0</span> (reads, drafts),{" "}
@@ -376,7 +376,7 @@ export default function AutomationSettingsForm() {
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
                 tab === t.id
                   ? "border-ink text-ink"
                   : "border-transparent text-muted hover:text-ink"
@@ -392,7 +392,7 @@ export default function AutomationSettingsForm() {
       {error && (
         <div
           role="alert"
-          className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text"
+          className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text"
         >
           <span className="h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
           {error}
@@ -402,7 +402,7 @@ export default function AutomationSettingsForm() {
         </div>
       )}
       {notice && (
-        <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-[0.8125rem] text-muted">
           <Check size={15} className="shrink-0 text-ink" />
           {notice}
         </div>
@@ -413,8 +413,8 @@ export default function AutomationSettingsForm() {
           {/* Workspace threshold */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper p-3">
             <div className="min-w-[220px] flex-1">
-              <div className="text-[13px] font-semibold text-ink">Small-action threshold</div>
-              <div className="text-[12px] text-muted">
+              <div className="text-[0.8125rem] font-semibold text-ink">Small-action threshold</div>
+              <div className="text-[0.75rem] text-muted">
                 An action carrying an amount runs on Auto-run only at or under this amount; above it, it asks.
               </div>
             </div>
@@ -445,8 +445,8 @@ export default function AutomationSettingsForm() {
               an agent's own rule wins over it. */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper p-3">
             <div className="min-w-[220px] flex-1">
-              <div className="text-[13px] font-semibold text-ink">Rules for</div>
-              <div className="text-[12px] text-muted">
+              <div className="text-[0.8125rem] font-semibold text-ink">Rules for</div>
+              <div className="text-[0.75rem] text-muted">
                 Set a rule for one agent (e.g. let Writer draft content without asking). An agent&apos;s own
                 rule wins over the every-agent rule. Tier 3 always asks.
               </div>
@@ -472,7 +472,7 @@ export default function AutomationSettingsForm() {
 
           {/* Per-action table */}
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="min-w-[720px] w-full text-left text-[13px]">
+            <table className="min-w-[720px] w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs text-muted">
                   <th className="px-3 py-2 font-medium">Action</th>
@@ -513,8 +513,8 @@ export default function AutomationSettingsForm() {
                     >
                       <td className="px-3 py-2.5">
                         <div className="font-medium text-ink">{a.label}</div>
-                        <div className="font-mono text-[11px] text-subtle">{a.action}</div>
-                        <div className="max-w-[300px] text-[12px] text-muted">{a.description}</div>
+                        <div className="font-mono text-[0.6875rem] text-subtle">{a.action}</div>
+                        <div className="max-w-[300px] text-[0.75rem] text-muted">{a.description}</div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <TierBadge tier={a.tier} />
@@ -529,13 +529,13 @@ export default function AutomationSettingsForm() {
                           }
                         />
                         {inherited ? (
-                          <div className="mt-1 text-[11px] text-subtle">From every agent</div>
+                          <div className="mt-1 text-[0.6875rem] text-subtle">From every agent</div>
                         ) : null}
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         {a.tier === 1 ? (
                           <div className="flex items-center rounded-md border border-line bg-canvas px-2 focus-within:border-focus focus-within:ring-[3px] focus-within:ring-[var(--aos-focus-halo)]">
-                            <span className="text-[13px] text-subtle">$</span>
+                            <span className="text-[0.8125rem] text-subtle">$</span>
                             <input
                               defaultValue={row?.thresholdCents != null ? String(row.thresholdCents / 100) : ""}
                               placeholder={fmtDollars(data.thresholdCents)}
@@ -551,11 +551,11 @@ export default function AutomationSettingsForm() {
                                 }
                               }}
                               data-focus-ring="container"
-                              className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none placeholder:text-subtle"
+                              className="w-20 bg-transparent px-1 py-1.5 text-[0.8125rem] text-ink outline-none placeholder:text-subtle"
                             />
                           </div>
                         ) : (
-                          <span className="text-[12px] text-subtle">—</span>
+                          <span className="text-[0.75rem] text-subtle">—</span>
                         )}
                       </td>
                     </tr>
@@ -566,7 +566,7 @@ export default function AutomationSettingsForm() {
               </tbody>
             </table>
           </div>
-          <p className="text-[12px] text-muted">
+          <p className="text-[0.75rem] text-muted">
             Leave a threshold blank to use the workspace default ({fmtDollars(data.thresholdCents)}).
             Tier 3 rows can never be set to Auto-run. That lock lives in the safety core, not on this page.
             Destructive tools always ask too, whatever a row says.
@@ -576,7 +576,7 @@ export default function AutomationSettingsForm() {
 
       {tab === "rules" && (
         <div className="flex flex-col gap-4">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             Escalation rules describe the conditions that should stop the system instead of asking
             you about everything. They are saved here for review; the approval gates don&apos;t read
             them yet, so to make an action ask, set it to{" "}
@@ -584,7 +584,7 @@ export default function AutomationSettingsForm() {
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="min-w-[640px] w-full text-left text-[13px]">
+            <table className="min-w-[640px] w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs text-muted">
                   <th className="px-3 py-2 font-medium">Rule</th>
@@ -633,7 +633,7 @@ export default function AutomationSettingsForm() {
 
           {/* Add rule */}
           <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-3">
-            <div className="text-[13px] font-semibold text-ink">Add escalation rule</div>
+            <div className="text-[0.8125rem] font-semibold text-ink">Add escalation rule</div>
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex min-w-[160px] flex-1 flex-col gap-1">
                 <span className="text-xs font-medium text-muted">Name</span>

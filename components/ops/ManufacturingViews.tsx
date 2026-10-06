@@ -255,7 +255,7 @@ function MoListView() {
             <tbody>
               {rows.map((m) => (
                 <tr key={m.id} className={trClickableCls} tabIndex={0} onClick={() => setSelectedId(m.id)} onKeyDown={activateOnKey(() => setSelectedId(m.id))}>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{moLabel(m)}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{moLabel(m)}</td>
                   <td className={tdCls}>{P.get(m.productId)?.name ?? m.productId}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{m.qty}</td>
                   <td className={tdCls}>
@@ -454,7 +454,7 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
       </div>
       {completing && (mo.status === "confirmed" || mo.status === "in_progress") && (
         <div className={`${noteBoxCls} mb-4 flex flex-col gap-3`}>
-          <p className="text-[13px] text-ink">
+          <p className="text-[0.8125rem] text-ink">
             Completing uses up the components for every unit made or scrapped, adds the good units to stock and posts the cost of components and labour to the books.
           </p>
           <div className="grid grid-cols-2 gap-3">
@@ -480,7 +480,7 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
         </div>
       )}
       {mo.status === "done" && (
-        <div className="mb-4 grid grid-cols-2 gap-2 text-[13px]">
+        <div className="mb-4 grid grid-cols-2 gap-2 text-[0.8125rem]">
           <Stat label="Produced" value={`${mo.producedQty}${mo.scrappedQty ? ` (+${mo.scrappedQty} scrapped)` : ""}`} />
           <Stat label="Components" value={fmtCents(mo.componentCostCents)} />
           <Stat label="Labour" value={fmtCents(mo.labourCostCents)} />
@@ -489,11 +489,11 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
           {mo.plannedCostCents != null && <Stat label="Planned (CAD estimate)" value={fmtCents(mo.plannedCostCents)} />}
         </div>
       )}
-      <h4 className="mb-2 text-[13px] font-bold text-ink">{mo.status === "draft" ? "Components (from the CAD bill of materials)" : "Components"}</h4>
+      <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">{mo.status === "draft" ? "Components (from the CAD bill of materials)" : "Components"}</h4>
       {components === null ? (
         <LoadingLine label="Loading the bill of materials" />
       ) : components.length === 0 ? (
-        <p className="mb-4 text-[13px] text-muted">No bill of materials: give the product a routing that points at a CAD BOM revision.</p>
+        <p className="mb-4 text-[0.8125rem] text-muted">No bill of materials: give the product a routing that points at a CAD BOM revision.</p>
       ) : (
         <div className={`${tableWrapCls} mb-4`}>
           <table className={tableCls}>
@@ -511,7 +511,7 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
                 <tr key={c.bomLineId}>
                   <td className={tdCls}>
                     {c.name}
-                    {c.sku && <span className="ml-1 font-mono text-[12px] text-muted">{c.sku}</span>}
+                    {c.sku && <span className="ml-1 font-mono text-[0.75rem] text-muted">{c.sku}</span>}
                   </td>
                   <td className={`${tdCls} text-right tabular-nums`}>{c.qtyPerUnit}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{c.consumedQty ?? Math.ceil(c.qtyPerUnit * mo.qty - 1e-9)}</td>
@@ -533,8 +533,8 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-line bg-canvas px-3 py-2">
-      <p className="text-[12px] font-semibold text-muted">{label}</p>
-      <p className="text-[15px] font-semibold tabular-nums text-ink">{value}</p>
+      <p className="text-[0.75rem] font-semibold text-muted">{label}</p>
+      <p className="text-[0.9375rem] font-semibold tabular-nums text-ink">{value}</p>
     </div>
   );
 }
@@ -582,7 +582,7 @@ function WorkOrderTable({ moId, onChanged }: { moId?: string; onChanged?: () => 
           </select>
         </ViewHeader>
       )}
-      {moId && <h4 className="text-[13px] font-bold text-ink">Work orders</h4>}
+      {moId && <h4 className="text-[0.8125rem] font-bold text-ink">Work orders</h4>}
       {(error || actionError) && <div className={errorBoxCls}>{error ?? actionError}</div>}
       {loading ? (
         <LoadingLine label="Loading work orders" />
@@ -607,7 +607,7 @@ function WorkOrderTable({ moId, onChanged }: { moId?: string; onChanged?: () => 
                 const open = ["pending", "in_progress", "paused"].includes(w.status);
                 return (
                   <tr key={w.id}>
-                    {!moId && <td className={`${tdCls} font-mono text-[12px]`}>{M.get(w.moId) ? moLabel(M.get(w.moId)!) : w.moId.slice(-6)}</td>}
+                    {!moId && <td className={`${tdCls} font-mono text-[0.75rem]`}>{M.get(w.moId) ? moLabel(M.get(w.moId)!) : w.moId.slice(-6)}</td>}
                     <td className={tdCls}>
                       {w.sequence}. {w.name}
                     </td>
@@ -696,7 +696,7 @@ function LogTimeModal({ workOrder, onClose, onLogged }: { workOrder: WorkOrderRo
           <span className={labelCls}>Note (optional)</span>
           <input className={`${inputCls} w-full`} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <p className="text-[13px] text-muted">Time logs can't be edited; a correction is a new entry.</p>
+        <p className="text-[0.8125rem] text-muted">Time logs can't be edited; a correction is a new entry.</p>
         <div className="flex justify-end gap-2">
           <button type="button" className={btnGhost} onClick={onClose}>
             Cancel
@@ -758,7 +758,7 @@ function WorkCentersView() {
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id}>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{c.code}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{c.code}</td>
                   <td className={tdCls}>{c.name}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{c.capacity}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{fmtCents(c.hourlyCostCents)}</td>
@@ -965,7 +965,7 @@ function PartLinks({ catalog, products, onChanged }: { catalog: CadCatalog | nul
                 <tr key={p.id}>
                   <td className={tdCls}>
                     {p.name}
-                    {p.sku && <span className="ml-1 font-mono text-[12px] text-muted">{p.sku}</span>}
+                    {p.sku && <span className="ml-1 font-mono text-[0.75rem] text-muted">{p.sku}</span>}
                   </td>
                   <td className={tdCls}>
                     <select className={selectCls} value={p.opsProductId ?? ""} disabled={busyId === p.id} onChange={(e) => link(p.id, e.target.value)} aria-label={`Product for ${p.name}`}>
@@ -1065,7 +1065,7 @@ function NewRoutingModal({
           <div className="flex flex-col gap-2">
             {ops.map((o, i) => (
               <div key={i} className="grid grid-cols-[24px_1fr_1fr_96px_auto] items-center gap-2">
-                <span className="text-[13px] tabular-nums text-muted">{i + 1}.</span>
+                <span className="text-[0.8125rem] tabular-nums text-muted">{i + 1}.</span>
                 <input className={inputCls} value={o.name} onChange={(e) => set(i, { name: e.target.value })} placeholder="Step name" aria-label={`Step ${i + 1} name`} />
                 <select className={selectCls} value={o.workCenterId} onChange={(e) => set(i, { workCenterId: e.target.value })} aria-label={`Step ${i + 1} work centre`}>
                   {active.map((c) => (

@@ -193,14 +193,14 @@ export function ActivateView() {
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="rounded-lg bg-failed-tint p-4 text-[13px] text-failed-text" role="alert">
+        <div className="rounded-lg bg-failed-tint p-4 text-[0.8125rem] text-failed-text" role="alert">
           {error}
         </div>
       )}
 
       {/* Publish cards */}
       {datasets.length === 0 && (
-        <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           No datasets yet. Classify chunks and compile a version on the Build
           tab first, then publish it here.
         </div>
@@ -214,8 +214,8 @@ export function ActivateView() {
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-[15px] font-semibold">{d.label}</h2>
-                <p className="mt-0.5 text-[13px] text-muted">
+                <h2 className="text-[0.9375rem] font-semibold">{d.label}</h2>
+                <p className="mt-0.5 text-[0.8125rem] text-muted">
                   {d.latestVersion !== null
                     ? `Latest compiled version v${d.latestVersion} · ${d.latestChunkCount ?? 0} chunks`
                     : "Not compiled yet — compile a version on the Build tab first"}
@@ -236,34 +236,34 @@ export function ActivateView() {
                 >
                   <Rocket size={16} className="text-muted" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-semibold">{t.label}</p>
+                    <p className="text-[0.875rem] font-semibold">{t.label}</p>
                     {t.published ? (
-                      <p className="mt-0.5 text-[13px] text-muted">
+                      <p className="mt-0.5 text-[0.8125rem] text-muted">
                         v{t.version} live · published {formatDate(t.publishedAt)} ·{" "}
                         {t.chunkCount} chunks
-                        <span className="font-mono text-[12px] text-subtle">
+                        <span className="font-mono text-[0.75rem] text-subtle">
                           {" "}
                           {t.artifactRef}
                         </span>
                       </p>
                     ) : (
-                      <p className="mt-0.5 text-[13px] text-subtle">
+                      <p className="mt-0.5 text-[0.8125rem] text-subtle">
                         Not published yet
                       </p>
                     )}
                     {t.stale && (
-                      <p className="mt-1 flex items-center gap-1.5 text-[13px] text-muted">
+                      <p className="mt-1 flex items-center gap-1.5 text-[0.8125rem] text-muted">
                         <TriangleAlert size={13} />
                         v{t.latestVersion} compiled — publish it to refresh
                       </p>
                     )}
                     {t.target === "briefnow" && t.published && t.artifactRef?.startsWith("mcp://") && (
-                      <p className="mt-1 flex items-start gap-1.5 text-[13px] text-muted">
+                      <p className="mt-1 flex items-start gap-1.5 text-[0.8125rem] text-muted">
                         <Plug size={13} className="mt-0.5 shrink-0" />
                         <span>
                           Live pull: your BriefNow connector calls the ShapesOS MCP tool{" "}
-                          <span className="font-mono text-[12px]">get_dataset_adapter</span> with{" "}
-                          <span className="font-mono text-[12px]">type={d.type}</span>, using a workspace MCP key
+                          <span className="font-mono text-[0.75rem]">get_dataset_adapter</span> with{" "}
+                          <span className="font-mono text-[0.75rem]">type={d.type}</span>, using a workspace MCP key
                           (Settings → Developers).
                         </span>
                       </p>
@@ -273,7 +273,7 @@ export function ActivateView() {
                     <select
                       value={pick}
                       onChange={(e) => setChosen((c) => ({ ...c, [key]: Number(e.target.value) }))}
-                      className="h-10 rounded-full border border-control bg-paper px-3 text-[14px]"
+                      className="h-10 rounded-full border border-control bg-paper px-3 text-[0.875rem]"
                       aria-label={`Version to make live on ${t.label}`}
                     >
                       {versionOptions.map((v) => (
@@ -289,7 +289,7 @@ export function ActivateView() {
                     type="button"
                     disabled={d.latestVersion === null || isLive || publishing === key}
                     onClick={() => void publish(d.id as string, t.target, pick, latest, d.label)}
-                    className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+                    className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
                     {publishing === key ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -318,9 +318,9 @@ export function ActivateView() {
       <div className="rounded-lg bg-paper p-4 shadow-hairline md:p-6">
         <div className="flex items-center gap-2">
           <MessageCircleQuestion size={16} className="text-muted" />
-          <h2 className="text-[15px] font-semibold">Ask your data</h2>
+          <h2 className="text-[0.9375rem] font-semibold">Ask your data</h2>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           Test the live RAG snapshot. Every answer cites the source, document,
           and chunk it came from — or says it could not find an answer.
         </p>
@@ -329,7 +329,7 @@ export function ActivateView() {
             <select
               value={askDatasetId}
               onChange={(e) => setAskDatasetId(e.target.value)}
-              className="h-11 rounded-full border border-control bg-paper px-4 text-[14px]"
+              className="h-11 rounded-full border border-control bg-paper px-4 text-[0.875rem]"
               aria-label="Dataset to ask"
             >
               <option value="">Choose a dataset</option>
@@ -346,14 +346,14 @@ export function ActivateView() {
                 if (e.key === "Enter") void ask();
               }}
               placeholder="Ask a question about your business data"
-              className="h-11 min-w-0 flex-1 rounded-full border border-control bg-paper px-4 text-[14px] placeholder:text-subtle"
+              className="h-11 min-w-0 flex-1 rounded-full border border-control bg-paper px-4 text-[0.875rem] placeholder:text-subtle"
               aria-label="Question"
             />
             <button
               type="button"
               disabled={!askDatasetId || !question.trim() || asking}
               onClick={() => void ask()}
-              className="aos-press flex h-11 items-center justify-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+              className="aos-press flex h-11 items-center justify-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
             >
               {asking ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -364,14 +364,14 @@ export function ActivateView() {
             </button>
           </div>
           {askError && (
-            <p className="text-[13px] text-failed-text" role="alert">
+            <p className="text-[0.8125rem] text-failed-text" role="alert">
               {askError}
             </p>
           )}
           {answer && (
             <div className="mt-2 rounded-lg border border-line p-4">
-              <p className="text-[14px]">{answer.answer}</p>
-              <p className="mt-2 text-[12px] text-subtle">
+              <p className="text-[0.875rem]">{answer.answer}</p>
+              <p className="mt-2 text-[0.75rem] text-subtle">
                 {answer.grounded
                   ? `${answer.datasetLabel} · v${answer.datasetVersion} · confidence ${answer.confidence}`
                   : "No grounded answer — add documents covering this topic"}
@@ -383,15 +383,15 @@ export function ActivateView() {
                       key={c.chunkId}
                       className="rounded-lg bg-canvas p-3"
                     >
-                      <p className="flex items-center gap-1.5 font-mono text-[12px] text-muted">
+                      <p className="flex items-center gap-1.5 font-mono text-[0.75rem] text-muted">
                         <FileText size={12} />
                         {c.sourceName} → {c.documentName} → chunk{" "}
                         <span className="text-subtle">{c.chunkId.slice(0, 12)}</span>
                       </p>
-                      <p className="mt-1 text-[13px] text-muted">
+                      <p className="mt-1 text-[0.8125rem] text-muted">
                         “{c.excerpt}”
                       </p>
-                      <p className="mt-1 font-mono text-[11px] text-subtle">
+                      <p className="mt-1 font-mono text-[0.6875rem] text-subtle">
                         {c.engine} {c.engineVersion}
                       </p>
                     </div>

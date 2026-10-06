@@ -202,3 +202,11 @@ lib/llm/__tests__/batch-db.test.ts
 lib/metering/__tests__/ai-health-db.test.ts
 # Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
 scripts/eval/__tests__/eval-dry-run-db.test.ts
+# Phase 18.1 (desk): desktop layout / dock / recents owner-only RLS (workspace AND person) + per-user isolation; the Today briefing once per member per day (direct + batch, mock never writes); Pause all agents (kill switch, every live run stopped, audit, new runs refused until Resume); focus queues notifications and delivers them when it ends; the UserPrefs seam.
+lib/desktop/__tests__/desk-db.test.ts
+# Phase 18.1 (find): per-user preferences — defaults, one-key upserts, ownership (one person's write never touches another; the route reads the subject from the session only), all-or-nothing validation, CHECK constraints against raw SQL, PATCH /api/preferences + shell cookie + 401, notification channel filter (bell/push/muted, fail-open), account deletion lists the table.
+lib/preferences/__tests__/preferences-db.test.ts
+# Phase 18.1 (find): Spotlight — words inside an uploaded PDF (real upload → existing PDF extractor → chunks → GIN) and an Office doc, meaning-search through pgvector (deterministic MOCK embedder), tickets by message, inbox, contacts/companies/deals/people/apps, personal chats (never a teammate's), draft apps hidden from viewers, other workspace never, trashed files gone, FORCE RLS on the chunks, ranking + websearch syntax, idempotent backfill + re-index on change, search_workspace returns the same hits and reads a file by id.
+lib/search/__tests__/spotlight-db.test.ts
+# Phase 18.1 (integration): notification producers apply find's channel filter first (a muted kind is never written, even in focus), then desk's focus hold (written held, not pushed), then push only rows not held; release on focus end (switch-off and cron sweep) delivers to the bell and pushes through the same push filter (push MOCK).
+lib/notifications/__tests__/focus-channels-db.test.ts

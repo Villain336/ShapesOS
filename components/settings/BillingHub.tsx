@@ -24,7 +24,7 @@ import { confirmAction } from "@/lib/ui/feedback";
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
 const btnPrimary =
-  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const chipCls =
@@ -376,7 +376,7 @@ export default function BillingHub({
                   <CreditCard className="h-5 w-5 text-subtle" />
                   <div>
                     <p className="text-base font-semibold text-ink">{currentPlanName}</p>
-                    <p className="text-[13px] text-muted">
+                    <p className="text-[0.8125rem] text-muted">
                       {sub.subscription?.currentPeriodEnd
                         ? `Renews ${new Date(sub.subscription.currentPeriodEnd).toLocaleDateString()}`
                         : sub.subscription
@@ -435,7 +435,7 @@ export default function BillingHub({
                   </tbody>
                 </table>
                 {seats.unapprovedExtra > 0 && (
-                  <p className="mt-3 text-[13px] text-ink">
+                  <p className="mt-3 text-[0.8125rem] text-ink">
                     {seats.unapprovedExtra} member{seats.unapprovedExtra === 1 ? " is" : "s are"} past your approved
                     seats (for example after a plan change) and {seats.unapprovedExtra === 1 ? "isn't" : "aren't"} billed.
                     Approve more extra seats below, or remove members.
@@ -472,7 +472,7 @@ export default function BillingHub({
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-[13px] text-muted">{seats.billableReason}</p>
+                  <p className="mt-3 text-[0.8125rem] text-muted">{seats.billableReason}</p>
                 )}
                 <p className="mt-3 text-xs text-muted">
                   Extra seats are only charged after an admin confirms the price — when adding a member past
@@ -522,12 +522,12 @@ export default function BillingHub({
                     }`}
                   >
                     {p.badge && (
-                      <span className="absolute -top-2.5 left-4 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                      <span className="absolute -top-2.5 left-4 rounded-full bg-ink px-2.5 py-0.5 text-[0.6875rem] font-semibold text-white">
                         {p.badge}
                       </span>
                     )}
                     <p className="text-lg font-semibold text-ink">{p.name}</p>
-                    <p className="mt-0.5 text-[13px] text-muted">{p.tagline}</p>
+                    <p className="mt-0.5 text-[0.8125rem] text-muted">{p.tagline}</p>
                     <p className="mt-3">
                       <span className="text-3xl font-bold tracking-tight text-ink">
                         {billingInterval === "year" ? p.annualPriceDisplay : p.priceDisplay}
@@ -535,13 +535,13 @@ export default function BillingHub({
                       <span className="text-sm text-muted"> / {billingInterval === "year" ? "year" : "month"}</span>
                     </p>
                     {billingInterval === "year" && (
-                      <p className="mt-1 text-[13px] text-muted">
+                      <p className="mt-1 text-[0.8125rem] text-muted">
                         {usd(Math.round(p.annualPriceCents / 12))} / month, billed yearly
                       </p>
                     )}
                     <ul className="mt-4 flex flex-1 flex-col gap-1.5">
                       {p.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2 text-[13px] text-muted">
+                        <li key={f} className="flex items-start gap-2 text-[0.8125rem] text-muted">
                           <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" />
                           {f}
                         </li>
@@ -570,7 +570,7 @@ export default function BillingHub({
                 );
               })}
             </div>
-            <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
+            <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[0.8125rem] text-muted">
               <p>
                 Every plan is a base fee with seats and AI credits included; extra seats are billed per seat
                 once you confirm them. Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
@@ -588,7 +588,7 @@ export default function BillingHub({
           {/* Billing history pointer */}
           <section>
             <h2 className="text-sm font-semibold text-ink">Billing history</h2>
-            <div className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
+            <div className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-[0.8125rem] text-muted">
               {sub.subscription ? (
                 <p>
                   Subscription invoices and receipts live on Stripe&rsquo;s billing portal — use{" "}
@@ -625,7 +625,7 @@ export default function BillingHub({
       {/* Billing summary link for admins who land here directly */}
       <Link
         href="/dashboard/settings/usage"
-        className="inline-flex w-fit items-center gap-1 text-[13px] font-medium text-ink hover:underline"
+        className="inline-flex w-fit items-center gap-1 text-[0.8125rem] font-medium text-ink hover:underline"
       >
         <BadgeCheck className="h-3.5 w-3.5" />
         View credit usage, spend cap, and top-ups

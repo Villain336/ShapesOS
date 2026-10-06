@@ -121,11 +121,11 @@ export function ProjectsTab() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Projects</h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Client delivery work — milestones, progress, and time tracking, linked to CRM leads.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-muted">
+        <div className="flex items-center gap-4 text-[0.8125rem] text-muted">
           <span>
             Active{" "}
             <span className="font-bold text-ink tabular-nums">{activeCount}</span>
@@ -172,14 +172,14 @@ export function ProjectsTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading projects…
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
           <FolderKanban size={28} className="mx-auto text-subtle" />
-          <p className="mt-2 text-[13px] font-semibold text-ink">No projects yet</p>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-2 text-[0.8125rem] font-semibold text-ink">No projects yet</p>
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Create a project to track milestones and time against a client.
           </p>
         </div>
@@ -216,7 +216,7 @@ export function ProjectsTab() {
                             style={{ width: `${prog.pct}%` }}
                           />
                         </div>
-                        <span className="text-[12px] text-muted tabular-nums">{prog.pct}%</span>
+                        <span className="text-[0.75rem] text-muted tabular-nums">{prog.pct}%</span>
                       </div>
                     </td>
                     <td className="text-ink tabular-nums">

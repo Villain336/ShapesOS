@@ -44,7 +44,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 function chip(text: string, key: string) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${STATUS_CHIP[key] ?? "border-line bg-paper text-muted"}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${STATUS_CHIP[key] ?? "border-line bg-paper text-muted"}`}>
       {text}
     </span>
   );
@@ -148,7 +148,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="aos-heading">{campaign.name}</h1>
-            <p className="mt-0.5 text-[13px] text-muted">
+            <p className="mt-0.5 text-[0.8125rem] text-muted">
               Depth {campaign.depth} · {domain ? `sending via ${domain.domain}` : "no sending domain"} ·
               cap ≤ {campaign.dailyCap}/day
             </p>
@@ -191,9 +191,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Prospect</th>
                   <th className="px-3 py-2 font-medium">Reply</th>
                   <th className="px-3 py-2 font-medium">Received</th>
@@ -204,8 +204,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                 {replies.map((r) => (
                   <tr key={`${r.sequenceId}-${r.ts.getTime()}`} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">{prospectById.get(r.prospectId)?.domain ?? "unknown"}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">{r.replyId.slice(0, 12)}…</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{r.ts.toLocaleString()}</td>
+                    <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">{r.replyId.slice(0, 12)}…</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{r.ts.toLocaleString()}</td>
                     <td className="px-3 py-2">{chip("auto-suppressed", "draft")}</td>
                   </tr>
                 ))}
@@ -229,9 +229,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Site</th>
                   <th className="px-3 py-2 font-medium">Contact</th>
                   <th className="px-3 py-2 font-medium">Quality</th>
@@ -264,7 +264,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                         <td className="px-3 py-2">
                           <span className="text-muted">{p.contactName ?? "—"}</span>
                           {p.emailVerified && (
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-ink">
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.6875rem] text-ink">
                               <BadgeCheck className="h-3 w-3" /> verified
                             </span>
                           )}
@@ -274,7 +274,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                         <td className="px-3 py-2">{chip(p.status, p.status)}</td>
                         <td className="px-3 py-2">
                           {seq ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                            <span className="inline-flex items-center gap-1 text-[0.6875rem] text-muted">
                               {SEQ_STATUS_LABEL[seq.status] ?? seq.status}
                               {seq.status === "draft" && !expired && (
                                 <span className="inline-flex items-center gap-0.5 text-ink">
@@ -307,7 +307,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                               </>
                             ) : null}
                             {campaign.depth === 1 && !seq && (
-                              <span className="text-[11px] text-subtle">Depth 1: prospecting only — no drafts or sends.</span>
+                              <span className="text-[0.6875rem] text-subtle">Depth 1: prospecting only — no drafts or sends.</span>
                             )}
                           </div>
                           {!seq && canEdit && p.status === "qualified" && campaign.depth !== 1 && (

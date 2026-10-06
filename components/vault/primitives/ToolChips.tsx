@@ -177,7 +177,7 @@ export default function ToolChips({
             return !current;
           })
         }
-        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-control px-1.5 py-1 text-[12.5px] text-ink-2 transition-colors duration-100 hover:bg-hover-2"
+        className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-control px-1.5 py-1 text-[0.78125rem] text-ink-2 transition-colors duration-100 hover:bg-hover-2"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>
           <path d="M6 9l6 6 6-6" />
@@ -216,10 +216,10 @@ export default function ToolChips({
                     <path d="M6 9l6 6 6-6" />
                   </svg>
                 </span>
-                <span className="shrink-0 text-[12.5px] font-medium text-ink">{row.label}</span>
+                <span className="shrink-0 text-[0.78125rem] font-medium text-ink">{row.label}</span>
                 <span
                   className={`inline-flex h-5.5 min-w-0 flex-1 cursor-pointer items-center truncate rounded-chip bg-field px-1.5
-                    text-[11.5px] text-ink-2 shadow-hairline transition-colors duration-100 hover:bg-hover-2
+                    text-[0.71875rem] text-ink-2 shadow-hairline transition-colors duration-100 hover:bg-hover-2
                     ${row.mono ? "font-mono" : ""}`}
                 >
                   {row.chip}
@@ -236,7 +236,7 @@ export default function ToolChips({
                     {row.detail.map((line) => (
                       <span
                         key={line.text}
-                        className={`truncate text-[11.5px] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-green" : "text-ink-2"}`}
+                        className={`truncate text-[0.71875rem] leading-[1.6] ${row.detailMono ? "font-mono" : ""} ${line.tone === "add" ? "text-green" : "text-ink-2"}`}
                       >
                         {line.text}
                       </span>
@@ -267,7 +267,7 @@ export default function ToolChips({
                 onFocus={openPreview(d.file)}
                 onBlur={closePreview(d.file)}
                 className="inline-flex h-7 max-w-full items-center gap-2 rounded-chip
-                  bg-surface px-2 font-mono text-[11.5px] text-ink shadow-btn
+                  bg-surface px-2 font-mono text-[0.71875rem] text-ink shadow-btn
                   transition-colors duration-100 hover:bg-hover"
                 style={{ animation: `pop-in 250ms cubic-bezier(0.23,1,0.32,1) ${i * 80}ms both` }}
               >
@@ -280,7 +280,7 @@ export default function ToolChips({
           ))}
           <button
             type="button"
-            className="inline-flex h-7 items-center rounded-chip px-1.5 font-mono text-[11.5px] text-ink-3
+            className="inline-flex h-7 items-center rounded-chip px-1.5 font-mono text-[0.71875rem] text-ink-3
               underline decoration-transparent underline-offset-2 transition-colors duration-100
               hover:text-ink-2 hover:decoration-current"
             style={{ animation: `fade-in 300ms ease-out ${diffs.length * 80}ms both` }}
@@ -302,7 +302,7 @@ export default function ToolChips({
             transformOrigin: preview.top === undefined ? "bottom left" : "top left",
           }}
         >
-          <div className="flex items-center justify-between border-b border-line px-2.5 py-1.5 font-mono text-[11px]">
+          <div className="flex items-center justify-between border-b border-line px-2.5 py-1.5 font-mono text-[0.6875rem]">
             <span className="min-w-0 truncate text-ink-2">{preview.file}</span>
             <span className="shrink-0 tabular-nums">
               <span className="text-green">+{diffs.find((diff) => diff.file === preview.file)?.add}</span>
@@ -311,7 +311,7 @@ export default function ToolChips({
               )}
             </span>
           </div>
-          <div className="py-1 font-mono text-[11px] leading-[1.8]">
+          <div className="py-1 font-mono text-[0.6875rem] leading-[1.8]">
             {(diffLines[preview.file] ?? []).map((line, index) => (
               <div
                 key={index}

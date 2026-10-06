@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { authorityTablesReady } from "@/lib/authority/db";
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium leading-tight";
 const chipSlate = `${chip} bg-paper text-muted border-line`;
 const chipRed = `${chip} bg-failed-tint text-failed-text border-failed`;
 
@@ -52,7 +52,7 @@ export default async function AuthorityPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="aos-heading">Authority &amp; relevance</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Outreach, PR, listings, AEO, and reviews — every external action is approval-bound.
           </p>
         </div>

@@ -19,7 +19,7 @@ export default async function ApiMcpSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">API / MCP</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — expose this workspace to MCP clients. The MCP server is off by
           default; API keys are scoped per tool, revocable, and every call is audited.
         </p>

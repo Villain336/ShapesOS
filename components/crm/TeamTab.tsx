@@ -140,7 +140,7 @@ export function TeamTab() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Team</h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Team directory and time-off requests. Approving leave needs a manager&apos;s approval.
           </p>
         </div>
@@ -169,7 +169,7 @@ export function TeamTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-10 text-[13px] text-muted">
+        <div className="flex items-center gap-2 py-10 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading team…
         </div>
       ) : (
@@ -199,8 +199,8 @@ export function TeamTab() {
           {filteredMembers.length === 0 ? (
             <div className="rounded-md border border-line bg-canvas px-4 py-8 text-center">
               <UserRound size={20} className="mx-auto text-subtle" />
-              <p className="mt-2 text-[13px] font-semibold text-ink">No team members yet</p>
-              <p className="mt-0.5 text-[13px] text-muted">Add your first team member to build the directory.</p>
+              <p className="mt-2 text-[0.8125rem] font-semibold text-ink">No team members yet</p>
+              <p className="mt-0.5 text-[0.8125rem] text-muted">Add your first team member to build the directory.</p>
             </div>
           ) : (
             <div className={tableWrapCls}>
@@ -238,7 +238,7 @@ export function TeamTab() {
 
           {/* Leave requests */}
           <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-[15px] font-bold tracking-tight text-ink">Leave requests</h3>
+            <h3 className="text-[0.9375rem] font-bold tracking-tight text-ink">Leave requests</h3>
             <select
               value={leaveStatus}
               onChange={(e) => setLeaveStatus(e.target.value as typeof leaveStatus)}
@@ -254,8 +254,8 @@ export function TeamTab() {
 
           {leaves.length === 0 ? (
             <div className="rounded-md border border-line bg-canvas px-4 py-8 text-center">
-              <p className="text-[13px] font-semibold text-ink">No leave requests</p>
-              <p className="mt-0.5 text-[13px] text-muted">Requests appear here for manager approval.</p>
+              <p className="text-[0.8125rem] font-semibold text-ink">No leave requests</p>
+              <p className="mt-0.5 text-[0.8125rem] text-muted">Requests appear here for manager approval.</p>
             </div>
           ) : (
             <div className={tableWrapCls}>

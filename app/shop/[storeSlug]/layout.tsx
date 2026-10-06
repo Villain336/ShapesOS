@@ -35,18 +35,18 @@ export default async function ShopLayout({ children, params }: LayoutProps<"/sho
           </Link>
           <Link
             href={`${base}/cart`}
-            className="inline-flex h-control-sm items-center gap-2 rounded-full bg-paper px-4 text-[15px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)]"
+            className="inline-flex h-control-sm items-center gap-2 rounded-full bg-paper px-4 text-[0.9375rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)]"
             aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
           >
             <ShoppingBag size={16} aria-hidden />
             Cart
-            {count > 0 && <span className="rounded-full bg-ink px-2 text-[12px] font-semibold text-paper tabular-nums">{count}</span>}
+            {count > 0 && <span className="rounded-full bg-ink px-2 text-[0.75rem] font-semibold text-paper tabular-nums">{count}</span>}
           </Link>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">{children}</main>
       <footer className="border-t border-line bg-paper">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-5 py-4 text-[13px] text-muted">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-5 py-4 text-[0.8125rem] text-muted">
           <span>
             {store.name}
             {store.contactEmail && (

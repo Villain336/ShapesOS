@@ -70,10 +70,10 @@ export function MenuRow({
       {leading ?? (IconCmp ? <IconCmp className="size-4 shrink-0" aria-hidden /> : null)}
       <span className="min-w-0 flex-1 truncate">
         {label}
-        {hint ? <span className={cn("ml-2 text-sm font-normal", active ? "text-night-soft" : "text-muted")}>{hint}</span> : null}
+        {hint ? <span className={cn("ml-2 text-sm font-normal", active ? "text-on-ink-muted" : "text-muted")}>{hint}</span> : null}
       </span>
       {trailing}
-      {shortcut ? <span className={cn("aos-mono shrink-0 text-xs", active ? "text-night-soft" : "text-muted")}>{shortcut}</span> : null}
+      {shortcut ? <span className={cn("aos-mono shrink-0 text-xs", active ? "text-on-ink-muted" : "text-muted")}>{shortcut}</span> : null}
     </button>
   );
 }

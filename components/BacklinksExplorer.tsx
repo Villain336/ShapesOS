@@ -226,7 +226,7 @@ export default function BacklinksExplorer({
             </span>
             <button
               onClick={openRefresh}
-              className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-night-hover aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-ink-hover aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Refresh backlinks…
             </button>
@@ -404,7 +404,7 @@ export default function BacklinksExplorer({
                 <button
                   onClick={confirmPull}
                   disabled={!preview || !preview.withinCap || pulling}
-                  className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   {pulling ? "Pulling…" : `Confirm pull${preview ? ` — $${preview.estimatedCostUsd.toFixed(4)}` : ""}`}
                 </button>

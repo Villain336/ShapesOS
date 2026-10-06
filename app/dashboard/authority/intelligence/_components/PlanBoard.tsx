@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Loader2, Hand } from "lucide-react";
 function chip(text: React.ReactNode, cls: string) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );

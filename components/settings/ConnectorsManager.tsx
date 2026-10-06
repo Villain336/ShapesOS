@@ -27,7 +27,7 @@ const labelCls = "mb-1 block text-xs font-medium text-muted";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnDeny =
@@ -534,7 +534,7 @@ export default function ConnectorsManager({
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
                 tab === t.id
                   ? "border-ink text-ink"
                   : "border-transparent text-muted hover:text-ink"
@@ -707,7 +707,7 @@ export default function ConnectorsManager({
       </div>
 
       {shopFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4">
           <div className="w-full max-w-md rounded-lg border border-line bg-paper p-5 shadow-overlay">
             <h3 className="font-medium text-ink">Connect your Shopify store</h3>
             <p className="mt-1 text-sm text-muted">
@@ -744,7 +744,7 @@ export default function ConnectorsManager({
       )}
 
       {credFor && activeMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4">
           <div
             role="dialog"
             aria-modal="true"

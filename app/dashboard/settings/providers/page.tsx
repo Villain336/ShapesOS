@@ -141,7 +141,7 @@ export default async function ProvidersSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Providers</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — which external providers ShapesOS is using, where
           each key comes from, and the keys this workspace brings itself.
           Host keys are environment variables (change them on the host and

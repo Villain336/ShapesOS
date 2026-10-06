@@ -88,7 +88,7 @@ function formatDate(iso: string | null): string {
 }
 
 function inputClass() {
-  return "h-11 w-full rounded-md border-[1.5px] border-control bg-white px-3 text-[15px] text-ink";
+  return "h-11 w-full rounded-md border-[1.5px] border-control bg-white px-3 text-[0.9375rem] text-ink";
 }
 
 export function InvestorDrawer({
@@ -238,11 +238,11 @@ export function InvestorDrawer({
 
   const provenanceBadge =
     investor?.enrichmentSource === "enriched" ? (
-      <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-muted">
+      <span className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-muted">
         Enriched · fetched {formatDate(investor.enrichmentFetchedAt)}
       </span>
     ) : (
-      <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-muted">
+      <span className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-muted">
         Self-reported
       </span>
     );
@@ -265,14 +265,14 @@ export function InvestorDrawer({
             <div className="flex items-center gap-2">
               <User size={16} className="shrink-0 text-ink" />
               <h2
-                className="truncate text-[24px] font-bold text-ink"
+                className="truncate text-[1.5rem] font-bold text-ink"
                 style={{ fontStretch: "115%", fontWeight: 750 }}
               >
                 {investor?.name ?? "Investor"}
               </h2>
             </div>
             {investor && (
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted">
                 <span>
                   {[investor.firm, investor.title].filter(Boolean).join(" · ") ||
                     "No firm on file"}
@@ -305,7 +305,7 @@ export function InvestorDrawer({
             {error && (
               <p
                 role="alert"
-                className="rounded-lg bg-paper p-3 text-[13px] font-semibold text-failed-text shadow-hairline"
+                className="rounded-lg bg-paper p-3 text-[0.8125rem] font-semibold text-failed-text shadow-hairline"
               >
                 {error}
               </p>
@@ -318,16 +318,16 @@ export function InvestorDrawer({
             >
               <div className="mb-2 flex items-center justify-between">
                 <h3
-                  className="text-[18px] font-bold text-ink"
+                  className="text-[1.125rem] font-bold text-ink"
                   style={{ fontStretch: "115%" }}
                 >
                   Stage
                 </h3>
-                <span className="rounded-full bg-black px-2.5 py-1 text-[12px] font-semibold text-white">
+                <span className="rounded-full bg-black px-2.5 py-1 text-[0.75rem] font-semibold text-white">
                   {STAGE_LABELS[investor.stage] ?? investor.stage}
                 </span>
               </div>
-              <p className="mb-3 text-[13px] text-muted">
+              <p className="mb-3 text-[0.8125rem] text-muted">
                 Move only through legal steps — every move is recorded with
                 who made it and when.
               </p>
@@ -338,14 +338,14 @@ export function InvestorDrawer({
                     type="button"
                     disabled={busy}
                     onClick={() => void transition(next)}
-                    className="aos-press flex h-9 items-center gap-1 rounded-full bg-black px-3.5 text-[13px] font-semibold text-white disabled:opacity-50"
+                    className="aos-press flex h-9 items-center gap-1 rounded-full bg-black px-3.5 text-[0.8125rem] font-semibold text-white disabled:opacity-50"
                   >
                     Move to {STAGE_LABELS[next] ?? next}
                     <ArrowRight size={13} />
                   </button>
                 ))}
                 {(STAGE_TRANSITIONS[investor.stage] ?? []).length === 0 && (
-                  <p className="text-[13px] text-muted">
+                  <p className="text-[0.8125rem] text-muted">
                     This stage is terminal — the deal is done.
                   </p>
                 )}
@@ -359,7 +359,7 @@ export function InvestorDrawer({
             >
               <div className="mb-2 flex items-center justify-between">
                 <h3
-                  className="text-[18px] font-bold text-ink"
+                  className="text-[1.125rem] font-bold text-ink"
                   style={{ fontStretch: "115%" }}
                 >
                   Enrichment
@@ -367,14 +367,14 @@ export function InvestorDrawer({
                 <button
                   type="button"
                   onClick={() => setEditing((v) => !v)}
-                  className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-semibold text-ink shadow-control"
+                  className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-[0.8125rem] font-semibold text-ink shadow-control"
                 >
                   <Pencil size={13} />
                   {editing ? "Cancel" : "Edit"}
                 </button>
               </div>
               {!editing ? (
-                <dl className="grid gap-2 text-[13px]">
+                <dl className="grid gap-2 text-[0.8125rem]">
                   <div className="flex gap-2">
                     <dt className="w-28 shrink-0 font-semibold text-ink">Email</dt>
                     <dd className="text-muted">
@@ -416,7 +416,7 @@ export function InvestorDrawer({
                 <div className="flex flex-col gap-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">Firm</span>
+                      <span className="text-[0.8125rem] font-semibold text-ink">Firm</span>
                       <input
                         value={enrich.firm}
                         onChange={(e) => setEnrich((f) => ({ ...f, firm: e.target.value }))}
@@ -424,7 +424,7 @@ export function InvestorDrawer({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">Title</span>
+                      <span className="text-[0.8125rem] font-semibold text-ink">Title</span>
                       <input
                         value={enrich.title}
                         onChange={(e) => setEnrich((f) => ({ ...f, title: e.target.value }))}
@@ -432,7 +432,7 @@ export function InvestorDrawer({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">Email</span>
+                      <span className="text-[0.8125rem] font-semibold text-ink">Email</span>
                       <input
                         value={enrich.email}
                         onChange={(e) => setEnrich((f) => ({ ...f, email: e.target.value }))}
@@ -440,7 +440,7 @@ export function InvestorDrawer({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">
+                      <span className="text-[0.8125rem] font-semibold text-ink">
                         Check size min / max (USD)
                       </span>
                       <div className="flex gap-2">
@@ -461,7 +461,7 @@ export function InvestorDrawer({
                       </div>
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">
+                      <span className="text-[0.8125rem] font-semibold text-ink">
                         Stages (comma separated)
                       </span>
                       <input
@@ -472,7 +472,7 @@ export function InvestorDrawer({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">
+                      <span className="text-[0.8125rem] font-semibold text-ink">
                         Sectors (comma separated)
                       </span>
                       <input
@@ -483,7 +483,7 @@ export function InvestorDrawer({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-ink">
+                      <span className="text-[0.8125rem] font-semibold text-ink">
                         Enrichment source
                       </span>
                       <select
@@ -497,7 +497,7 @@ export function InvestorDrawer({
                     </label>
                     {enrich.enrichmentSource === "enriched" && (
                       <label className="flex flex-col gap-1">
-                        <span className="text-[13px] font-semibold text-ink">
+                        <span className="text-[0.8125rem] font-semibold text-ink">
                           Fetched at
                         </span>
                         <input
@@ -510,30 +510,30 @@ export function InvestorDrawer({
                     )}
                   </div>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-ink">Thesis fit</span>
+                    <span className="text-[0.8125rem] font-semibold text-ink">Thesis fit</span>
                     <textarea
                       value={enrich.thesisFit}
                       onChange={(e) => setEnrich((f) => ({ ...f, thesisFit: e.target.value }))}
                       rows={2}
-                      className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[15px] text-ink"
+                      className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[0.9375rem] text-ink"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-ink">
+                    <span className="text-[0.8125rem] font-semibold text-ink">
                       Enrichment notes
                     </span>
                     <textarea
                       value={enrich.enrichmentNotes}
                       onChange={(e) => setEnrich((f) => ({ ...f, enrichmentNotes: e.target.value }))}
                       rows={2}
-                      className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[15px] text-ink"
+                      className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[0.9375rem] text-ink"
                     />
                   </label>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => void saveEnrichment()}
-                    className="aos-press flex h-11 w-fit items-center rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                    className="aos-press flex h-11 w-fit items-center rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                   >
                     Save enrichment
                   </button>
@@ -549,14 +549,14 @@ export function InvestorDrawer({
               <div className="mb-2 flex items-center gap-2">
                 <CalendarClock size={15} className="text-ink" />
                 <h3
-                  className="text-[18px] font-bold text-ink"
+                  className="text-[1.125rem] font-bold text-ink"
                   style={{ fontStretch: "115%" }}
                 >
                   Follow-ups
                 </h3>
               </div>
               {followUps.length === 0 ? (
-                <p className="mb-3 text-[13px] text-muted">
+                <p className="mb-3 text-[0.8125rem] text-muted">
                   No follow-ups yet. Due ones surface through your alert rules.
                 </p>
               ) : (
@@ -582,13 +582,13 @@ export function InvestorDrawer({
                       )}
                       <div className="min-w-0">
                         <div
-                          className={`text-[14px] font-semibold text-ink ${
+                          className={`text-[0.875rem] font-semibold text-ink ${
                             f.done ? "line-through" : ""
                           }`}
                         >
                           {f.note}
                         </div>
-                        <div className="text-[12px] text-muted">
+                        <div className="text-[0.75rem] text-muted">
                           Due {formatDate(f.dueAt)}
                           {f.done && f.doneAt
                             ? ` · done ${formatDate(f.doneAt)}`
@@ -601,7 +601,7 @@ export function InvestorDrawer({
               )}
               <div className="grid gap-2 md:grid-cols-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[13px] font-semibold text-ink">Due date</span>
+                  <span className="text-[0.8125rem] font-semibold text-ink">Due date</span>
                   <input
                     type="date"
                     value={followUpForm.dueAt}
@@ -612,7 +612,7 @@ export function InvestorDrawer({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[13px] font-semibold text-ink">Note</span>
+                  <span className="text-[0.8125rem] font-semibold text-ink">Note</span>
                   <input
                     value={followUpForm.note}
                     onChange={(e) =>
@@ -627,7 +627,7 @@ export function InvestorDrawer({
                 type="button"
                 disabled={busy}
                 onClick={() => void addFollowUp()}
-                className="aos-press mt-2 flex h-10 w-fit items-center rounded-full bg-black px-4 text-[14px] font-semibold text-white disabled:opacity-50"
+                className="aos-press mt-2 flex h-10 w-fit items-center rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white disabled:opacity-50"
               >
                 Add follow-up
               </button>
@@ -641,14 +641,14 @@ export function InvestorDrawer({
               <div className="mb-2 flex items-center gap-2">
                 <History size={15} className="text-ink" />
                 <h3
-                  className="text-[18px] font-bold text-ink"
+                  className="text-[1.125rem] font-bold text-ink"
                   style={{ fontStretch: "115%" }}
                 >
                   History
                 </h3>
               </div>
               {interactions.length === 0 ? (
-                <p className="mb-3 text-[13px] text-muted">
+                <p className="mb-3 text-[0.8125rem] text-muted">
                   Nothing recorded yet.
                 </p>
               ) : (
@@ -664,16 +664,16 @@ export function InvestorDrawer({
                       </div>
                       <div className="min-w-0 pb-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-ink">
+                          <span className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-ink">
                             {INTERACTION_KIND_LABELS[i.kind] ?? i.kind}
                           </span>
-                          <span className="text-[12px] text-muted">
+                          <span className="text-[0.75rem] text-muted">
                             {formatDate(i.occurredAt)}
                             {i.actor ? ` · ${i.actor}` : ""}
                             {i.contactName ? ` · via ${i.contactName}` : ""}
                           </span>
                         </div>
-                        <p className="mt-1 text-[14px] text-ink">{i.summary}</p>
+                        <p className="mt-1 text-[0.875rem] text-ink">{i.summary}</p>
                       </div>
                     </li>
                   ))}
@@ -682,7 +682,7 @@ export function InvestorDrawer({
               <div className="grid gap-2">
                 <div className="grid gap-2 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-ink">Kind</span>
+                    <span className="text-[0.8125rem] font-semibold text-ink">Kind</span>
                     <select
                       value={logForm.kind}
                       onChange={(e) =>
@@ -699,7 +699,7 @@ export function InvestorDrawer({
                     </select>
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-ink">
+                    <span className="text-[0.8125rem] font-semibold text-ink">
                       Date (optional)
                     </span>
                     <input
@@ -713,7 +713,7 @@ export function InvestorDrawer({
                   </label>
                 </div>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[13px] font-semibold text-ink">Summary</span>
+                  <span className="text-[0.8125rem] font-semibold text-ink">Summary</span>
                   <textarea
                     value={logForm.summary}
                     onChange={(e) =>
@@ -721,14 +721,14 @@ export function InvestorDrawer({
                     }
                     rows={2}
                     placeholder="What happened"
-                    className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[15px] text-ink"
+                    className="w-full rounded-md border-[1.5px] border-control bg-white px-3 py-2 text-[0.9375rem] text-ink"
                   />
                 </label>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void logInteraction()}
-                  className="aos-press flex h-10 w-fit items-center rounded-full bg-black px-4 text-[14px] font-semibold text-white disabled:opacity-50"
+                  className="aos-press flex h-10 w-fit items-center rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                 >
                   Log interaction
                 </button>

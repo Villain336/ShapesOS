@@ -45,7 +45,7 @@ function statusPill(_s: string): string {
 }
 
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnSecondary =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
@@ -145,7 +145,7 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="aos-heading">Connectors</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Webhook-first where real, scheduled pulls with per-platform rate budgets
             elsewhere. Credentials live in the vault — never in the graph. Fake mode
             is the default until credentials are connected.
@@ -176,9 +176,9 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
       {loading && <div className="text-sm text-subtle">Loading connectors…</div>}
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line text-left text-[11px] text-muted">
+            <tr className="border-b border-line text-left text-[0.6875rem] text-muted">
               <th className="px-3 py-2 font-medium">Connector</th>
               <th className="px-3 py-2 font-medium">Tier</th>
               <th className="px-3 py-2 font-medium">Status</th>

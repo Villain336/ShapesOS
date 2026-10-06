@@ -34,13 +34,13 @@ function Metric({
         <span className="truncate">{label}</span>
       </div>
       <div
-        className={`mt-1 truncate text-[20px] font-semibold tabular-nums ${
+        className={`mt-1 truncate text-[1.25rem] font-semibold tabular-nums ${
           alert ? "text-failed-text" : "text-ink"
         }`}
       >
         {value}
       </div>
-      {sub && <div className="truncate text-[11px] text-subtle">{sub}</div>}
+      {sub && <div className="truncate text-[0.6875rem] text-subtle">{sub}</div>}
     </div>
   );
 }
@@ -119,7 +119,7 @@ export function BrainHealthStrip({ graph }: { graph: BrainGraph }) {
         </div>
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
           {(Object.keys(s.pillarChunks) as BrainPillar[]).map((p) => (
-            <div key={p} className="flex items-center gap-1.5 text-[12px] text-muted">
+            <div key={p} className="flex items-center gap-1.5 text-[0.75rem] text-muted">
               <span
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: PILLAR_COLORS[p] }}

@@ -180,10 +180,10 @@ export default function FilesClient({
                   <FileText className="size-4" />
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-ink">
+                  <p className="truncate text-[0.84375rem] font-medium text-ink">
                     {f.filename}
                   </p>
-                  <p className="text-[12px] text-ink-3">
+                  <p className="text-[0.75rem] text-ink-3">
                     {formatSize(f.sizeBytes)}
                     {" · "}
                     {f.source === "upload" ? "Upload" : `Connector: ${f.connectorKey}`}
@@ -218,25 +218,25 @@ export default function FilesClient({
       {canEdit && (
         <div className="flex flex-col gap-4 rounded-control bg-inset p-4">
           <div className="flex flex-col gap-2">
-            <h4 className="text-[13.5px] font-medium text-ink">Upload a file</h4>
+            <h4 className="text-[0.84375rem] font-medium text-ink">Upload a file</h4>
             <input
               ref={fileInputRef}
               type="file"
               aria-label="Choose a file to upload"
               onChange={(e) => void uploadSelected(e.target.files)}
-              className="text-[12.5px] text-ink-2 file:mr-3 file:rounded-control file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-[12.5px] file:font-medium file:text-ink file:shadow-hairline hover:file:bg-hover"
+              className="text-[0.78125rem] text-ink-2 file:mr-3 file:rounded-control file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-[0.78125rem] file:font-medium file:text-ink file:shadow-hairline hover:file:bg-hover"
             />
-            <p className="text-[12px] text-ink-3">
+            <p className="text-[0.75rem] text-ink-3">
               {uploading ? "Uploading…" : "Max 25 MB per file."}
             </p>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-line pt-4">
-            <h4 className="text-[13.5px] font-medium text-ink">
+            <h4 className="text-[0.84375rem] font-medium text-ink">
               Reference from a connector
             </h4>
             {connectorOptions.length === 0 ? (
-              <p className="text-[12.5px] text-ink-3">
+              <p className="text-[0.78125rem] text-ink-3">
                 Bind a Drive or Notion connection on the Data tab first.
               </p>
             ) : (
@@ -295,7 +295,7 @@ export default function FilesClient({
       )}
 
       {error && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-red">
+        <p className="flex items-center gap-1.5 text-[0.78125rem] text-red">
           <TriangleAlert className="size-3.5" />
           {error}
         </p>

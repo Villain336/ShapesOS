@@ -46,13 +46,14 @@ export async function gotoClean(page: Page, path: string) {
   expect(errors, `page/console errors on ${path}`).toEqual([]);
   // Failed-request check. Two benign signatures are ignored:
   // - favicon.ico 404s (no favicon shipped in this build), and
-  // - Next.js `?_rsc=` prefetch requests aborted with net::ERR_ABORTED.
+  // - Next.js `?_rsc=` / `&_rsc=` prefetch requests aborted with net::ERR_ABORTED
+  //   (a link whose href has its own query string gets `&_rsc=`).
   //   The App Router prefetches <Link> targets best-effort and cancels those
   //   fetches whenever router state changes; the cancellations are invisible
   //   to users and say nothing about the page under test. Anything else that
   //   fails to load still fails the test.
   const realFailed = failed.filter(
-    (f) => !f.includes("favicon.ico") && !(f.includes("?_rsc=") && f.includes("ERR_ABORTED")),
+    (f) => !f.includes("favicon.ico") && !(/[?&]_rsc=/.test(f) && f.includes("ERR_ABORTED")),
   );
   expect(realFailed, `failed requests on ${path}`).toEqual([]);
 }

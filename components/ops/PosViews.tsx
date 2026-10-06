@@ -124,7 +124,7 @@ export function PosWorkspace() {
                       <td className={tdCls}>{r.name}</td>
                       <td className={`${tdCls} text-muted`}>{locations.find((l) => l.id === r.locationId)?.path ?? "Any location"}</td>
                       <td className={`${tdCls} text-muted`}>{rate ? `${rate.name} (${(rate.rateBps / 100).toFixed(2)}%)` : "None"}</td>
-                      <td className={`${tdCls} font-mono text-[12px] text-muted`}>{r.terminalReaderId ?? "—"}</td>
+                      <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>{r.terminalReaderId ?? "—"}</td>
                       <td className={tdCls}>{open ? <span className={chipCls}>{`${open.number} · ${sentence(open.status)}`}</span> : <span className="text-muted">Closed</span>}</td>
                       <td className={`${tdCls} text-right`}>
                         {open ? (
@@ -170,7 +170,7 @@ export function PosWorkspace() {
               <tbody>
                 {sessions.rows.map((s) => (
                   <tr key={s.id}>
-                    <td className={`${tdCls} font-mono text-[12px]`}>
+                    <td className={`${tdCls} font-mono text-[0.75rem]`}>
                       {s.status === "closed" ? s.number : <Link className="underline" href={`/dashboard/ops/pos/till/${s.id}`}>{s.number}</Link>}
                     </td>
                     <td className={tdCls}>{R.get(s.registerId)?.name ?? s.registerId}</td>
@@ -522,9 +522,9 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">
-            {session.registerName} · <span className="font-mono text-[15px]">{session.number}</span>
+            {session.registerName} · <span className="font-mono text-[0.9375rem]">{session.number}</span>
           </h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             {session.totals.orderCount} sale(s) · {fmtCents(session.totals.netSalesCents + session.totals.taxCents)} taken · cash expected {fmtCents(session.expectedCashCents)}
           </p>
         </div>
@@ -562,7 +562,7 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
         <section className="flex min-w-0 flex-col gap-3" aria-label="Products">
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
-            <input className={`${inputCls} h-control w-full pl-9 text-[15px]`} placeholder="Search products" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search products" />
+            <input className={`${inputCls} h-control w-full pl-9 text-[0.9375rem]`} placeholder="Search products" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search products" />
           </div>
           {shown.length === 0 ? (
             <EmptyBlock icon={Search} title="No products match" hint="Active products appear here." />
@@ -576,10 +576,10 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
                   onClick={() => add(i)}
                   className="aos-press flex min-h-[96px] flex-col justify-between rounded-lg bg-paper p-3 text-left shadow-hairline hover:shadow-outline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40"
                 >
-                  <span className="line-clamp-2 text-[15px] font-semibold text-ink">{i.name}</span>
+                  <span className="line-clamp-2 text-[0.9375rem] font-semibold text-ink">{i.name}</span>
                   <span className="mt-2 flex flex-col gap-0.5">
-                    <span className="truncate font-mono text-[12px] text-muted">{i.sku}</span>
-                    <span className="text-[15px] font-semibold tabular-nums text-ink">{fmtCents(i.priceCents)}</span>
+                    <span className="truncate font-mono text-[0.75rem] text-muted">{i.sku}</span>
+                    <span className="text-[0.9375rem] font-semibold tabular-nums text-ink">{fmtCents(i.priceCents)}</span>
                   </span>
                 </button>
               ))}
@@ -588,23 +588,23 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
         </section>
 
         <aside className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline" aria-label="Current sale">
-          <h3 className="text-[15px] font-bold text-ink">Current sale</h3>
+          <h3 className="text-[0.9375rem] font-bold text-ink">Current sale</h3>
           {cart.length === 0 ? (
-            <p className="text-[13px] text-muted">Tap a product to add it.</p>
+            <p className="text-[0.8125rem] text-muted">Tap a product to add it.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-line">
               {cart.map((l) => (
                 <li key={l.item.key} className="flex items-center gap-2 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-medium text-ink">{l.item.name}</p>
-                    <p className="text-[13px] tabular-nums text-muted">
+                    <p className="truncate text-[0.9375rem] font-medium text-ink">{l.item.name}</p>
+                    <p className="text-[0.8125rem] tabular-nums text-muted">
                       {l.qty} × {fmtCents(l.item.priceCents)}
                     </p>
                   </div>
                   <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full bg-paper shadow-outline aos-press" onClick={() => bump(l.item.key, -1)} aria-label={`One less ${l.item.name}`}>
                     <Minus size={16} />
                   </button>
-                  <span className="w-6 text-center text-[15px] font-semibold tabular-nums">{l.qty}</span>
+                  <span className="w-6 text-center text-[0.9375rem] font-semibold tabular-nums">{l.qty}</span>
                   <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full bg-paper shadow-outline aos-press" onClick={() => bump(l.item.key, 1)} aria-label={`One more ${l.item.name}`}>
                     <Plus size={16} />
                   </button>
@@ -624,8 +624,8 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
               </button>
             )}
           </div>
-          {totals.promo && !totals.promo.ok && <p className="text-[13px] text-failed-text">{totals.promo.reason ?? "That code can't be used."}</p>}
-          <dl className="flex flex-col gap-1 text-[14px]">
+          {totals.promo && !totals.promo.ok && <p className="text-[0.8125rem] text-failed-text">{totals.promo.reason ?? "That code can't be used."}</p>}
+          <dl className="flex flex-col gap-1 text-[0.875rem]">
             <div className="flex justify-between">
               <dt className="text-muted">Subtotal</dt>
               <dd className="tabular-nums">{fmtCents(totals.subtotalCents)}</dd>
@@ -640,17 +640,17 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
               <dt className="text-muted">Tax</dt>
               <dd className="tabular-nums">{fmtCents(totals.taxCents)}</dd>
             </div>
-            <div className="flex justify-between border-t border-line pt-2 text-[18px] font-bold">
+            <div className="flex justify-between border-t border-line pt-2 text-[1.125rem] font-bold">
               <dt>Total</dt>
               <dd className="tabular-nums">{fmtCents(totals.totalCents)}</dd>
             </div>
           </dl>
-          {offlinePricing && <p className="text-[13px] text-muted">Offline price: the server re-checks it when the sale syncs.</p>}
-          {totals.blocker && <p className="text-[13px] text-failed-text">{totals.blocker}</p>}
+          {offlinePricing && <p className="text-[0.8125rem] text-muted">Offline price: the server re-checks it when the sale syncs.</p>}
+          {totals.blocker && <p className="text-[0.8125rem] text-failed-text">{totals.blocker}</p>}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className={`${btnPrimary} h-control-lg text-[15px]`}
+              className={`${btnPrimary} h-control-lg text-[0.9375rem]`}
               disabled={!sellable || cart.length === 0 || pricing || Boolean(totals.blocker) || totals.totalCents <= 0 || (offlinePricing && Boolean(appliedPromo))}
               onClick={() => setPay("cash")}
             >
@@ -658,7 +658,7 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
             </button>
             <button
               type="button"
-              className={`${btnGhost} h-control-lg text-[15px]`}
+              className={`${btnGhost} h-control-lg text-[0.9375rem]`}
               disabled={!sellable || cart.length === 0 || pricing || offlinePricing || Boolean(totals.blocker) || !online || !cardMode || totals.totalCents <= 0}
               onClick={() => setPay("card")}
               title={!cardMode ? "Connect Stripe in Finance settings to take cards" : undefined}
@@ -724,7 +724,7 @@ function CashModal({ totalCents, onClose, onPay }: { totalCents: number; onClose
         {error && <div className={errorBoxCls}>{error}</div>}
         <label>
           <span className={labelCls}>Cash handed over ($)</span>
-          <input className={`${inputCls} h-control w-full text-[18px]`} inputMode="decimal" value={given} onChange={(e) => setGiven(e.target.value)} autoFocus />
+          <input className={`${inputCls} h-control w-full text-[1.125rem]`} inputMode="decimal" value={given} onChange={(e) => setGiven(e.target.value)} autoFocus />
         </label>
         <div className="flex flex-wrap gap-2">
           {quick.map((n) => (
@@ -733,7 +733,7 @@ function CashModal({ totalCents, onClose, onPay }: { totalCents: number; onClose
             </button>
           ))}
         </div>
-        <p className="text-[18px] font-bold tabular-nums text-ink">Change: {ok ? fmtCents(cents! - totalCents) : "—"}</p>
+        <p className="text-[1.125rem] font-bold tabular-nums text-ink">Change: {ok ? fmtCents(cents! - totalCents) : "—"}</p>
         <div className="flex justify-end gap-2">
           <button type="button" className={btnGhost} onClick={onClose}>
             Back
@@ -792,7 +792,7 @@ function CardModal({ sessionId, saleId, nextTry, totalCents, mode, onClose, onPa
       <div className="flex flex-col gap-3">
         {mode === "mock" && <div className={needsBoxCls}>Mock card terminal (POS_TERMINAL_MOCK): every payment is approved and recorded as a mock — no real money moves.</div>}
         {error && <div className={errorBoxCls}>{error}</div>}
-        <p className="text-[14px] text-ink">
+        <p className="text-[0.875rem] text-ink">
           {state === "waiting" ? "Waiting for the customer to tap or insert their card on the reader…" : state === "recording" ? "Card approved — recording the sale…" : "Send the amount to the card reader."}
         </p>
         <div className="flex justify-end gap-2">
@@ -822,7 +822,7 @@ function SaleDoneModal({ result, onClose }: { result: { label: string; orderId: 
         {result.offline ? (
           <div className={needsBoxCls}>No connection — the sale is saved on this device and will sync automatically. Its receipt is available once it syncs.</div>
         ) : null}
-        {result.changeCents > 0 && <p className="text-[24px] font-bold tabular-nums text-ink">Change: {fmtCents(result.changeCents)}</p>}
+        {result.changeCents > 0 && <p className="text-[1.5rem] font-bold tabular-nums text-ink">Change: {fmtCents(result.changeCents)}</p>}
         <div className="flex justify-end gap-2">
           {result.orderId && (
             <a className={btnGhost} href={`/api/ops/pos/orders/${result.orderId}/receipt`} target="_blank" rel="noreferrer">
@@ -905,7 +905,7 @@ function CloseSessionModal({
             onExecute={gate.execute}
           />
         )}
-        <dl className="grid grid-cols-2 gap-2 text-[14px]">
+        <dl className="grid grid-cols-2 gap-2 text-[0.875rem]">
           <dt className="text-muted">Opening float</dt>
           <dd className="text-right tabular-nums">{fmtCents(session.openingCashCents)}</dd>
           <dt className="text-muted">Cash sales</dt>
@@ -919,9 +919,9 @@ function CloseSessionModal({
           <>
             <label>
               <span className={labelCls}>Cash counted ($)</span>
-              <input className={`${inputCls} h-control w-full text-[18px]`} inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} autoFocus />
+              <input className={`${inputCls} h-control w-full text-[1.125rem]`} inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} autoFocus />
             </label>
-            <p className="text-[13px] text-muted">Counting stops sales on this session until you close it or re-open it.</p>
+            <p className="text-[0.8125rem] text-muted">Counting stops sales on this session until you close it or re-open it.</p>
             <div className="flex justify-end gap-2">
               <button type="button" className={btnGhost} onClick={onClose}>
                 Back
@@ -936,7 +936,7 @@ function CloseSessionModal({
             <div className={noteBoxCls}>
               Counted {fmtCents(session.countedCashCents)} — {session.cashDifferenceCents == null ? "" : describeDifference(session.cashDifferenceCents)}.
             </div>
-            <p className="text-[13px] text-muted">Closing posts the session's sales, tax, cash, card takings and any cash difference to the books as one entry. It asks for approval.</p>
+            <p className="text-[0.8125rem] text-muted">Closing posts the session's sales, tax, cash, card takings and any cash difference to the books as one entry. It asks for approval.</p>
             <div className="flex justify-end gap-2">
               <button type="button" className={btnGhost} disabled={busy || gate.busy} onClick={reopen}>
                 Re-open for sales

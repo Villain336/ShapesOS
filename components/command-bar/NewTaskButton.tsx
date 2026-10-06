@@ -6,12 +6,15 @@
 import { Plus } from "lucide-react";
 import { aosButton, type AosButtonVariant } from "@/components/aos/button";
 import { openNewTask } from "./NewTaskDialog";
+// Phase 18.1 (integration): label in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
-export function NewTaskButton({ variant = "primary", label = "New task" }: { variant?: AosButtonVariant; label?: string }) {
+export function NewTaskButton({ variant = "primary", label }: { variant?: AosButtonVariant; label?: string }) {
+  const { t } = useI18n();
   return (
-    <button type="button" onClick={() => openNewTask()} aria-haspopup="dialog" title="New task (⌘N)" className={aosButton({ variant })}>
+    <button type="button" onClick={() => openNewTask()} aria-haspopup="dialog" title={t("kit.newTaskHint")} className={aosButton({ variant })}>
       <Plus className="size-4" aria-hidden />
-      {label}
+      {label ?? t("kit.newTask")}
     </button>
   );
 }

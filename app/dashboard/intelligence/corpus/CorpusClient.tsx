@@ -95,11 +95,11 @@ export function CorpusClient({ manifest }: { manifest: CorpusManifest | null }) 
         </div>
         <p className="mt-1">
           The expert corpus has not been ingested in this environment. Run{" "}
-          <code className="rounded bg-night px-1 py-0.5 font-mono text-[12px] text-night-text">
+          <code className="rounded bg-night px-1 py-0.5 font-mono text-[0.75rem] text-night-text">
             npx tsx scripts/ingest-corpus.mts
           </code>{" "}
           to build{" "}
-          <code className="rounded bg-night px-1 py-0.5 font-mono text-[12px] text-night-text">
+          <code className="rounded bg-night px-1 py-0.5 font-mono text-[0.75rem] text-night-text">
             data/corpus/
           </code>
           .
@@ -146,7 +146,7 @@ export function CorpusClient({ manifest }: { manifest: CorpusManifest | null }) 
               { label: "Updated", value: manifest.updatedAt.slice(0, 10), icon: CheckCircle2 },
             ].map((s) => (
               <div key={s.label} className="rounded-lg bg-paper p-3 shadow-hairline">
-                <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+                <div className="flex items-center gap-1.5 text-[0.6875rem] font-medium text-muted">
                   <s.icon className="h-3.5 w-3.5" /> {s.label}
                 </div>
                 <div className="mt-1 text-lg font-bold tracking-tight text-ink">{s.value}</div>

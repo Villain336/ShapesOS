@@ -30,14 +30,14 @@ export default async function RepurposePage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Repurpose</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Turn expert-corpus knowledge into derivative assets. Retrieval grounds every
             asset in cited sources; the copy is always synthesized fresh — never verbatim.
           </p>
         </div>
         <Link
           href="/dashboard/intelligence/corpus"
-          className="flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-muted hover:bg-hover-paper"
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-muted hover:bg-hover-paper"
         >
           <Database className="h-3.5 w-3.5" /> Expert corpus
         </Link>

@@ -138,13 +138,13 @@ export default async function PublicSharePage({
             <h1 className="truncate text-xl font-heading stretch-heading tracking-heading text-ink">
               {share.design.name}
             </h1>
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               Shared design preview — {pages.length} page{pages.length === 1 ? "" : "s"}
               {wlDomain ? ` · ${wlDomain}` : ""}
             </p>
           </div>
           <span
-            className={`rounded-full px-3 py-1 text-[12px] font-semibold ${status.cls}`}
+            className={`rounded-full px-3 py-1 text-[0.75rem] font-semibold ${status.cls}`}
           >
             {status.label}
           </span>
@@ -155,7 +155,7 @@ export default async function PublicSharePage({
             const res = exportPageToSvg(doc, p.id);
             return (
               <section key={p.id}>
-                <h2 className="mb-2 text-[13px] font-semibold text-ink">{p.name}</h2>
+                <h2 className="mb-2 text-[0.8125rem] font-semibold text-ink">{p.name}</h2>
                 <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
                   {res.ok ? (
                     // H1: rendered as an IMAGE, never inline HTML. SVG loaded
@@ -168,7 +168,7 @@ export default async function PublicSharePage({
                       className="block h-auto w-full"
                     />
                   ) : (
-                    <p className="p-6 text-[13px] text-muted">
+                    <p className="p-6 text-[0.8125rem] text-muted">
                       This page could not be rendered.
                     </p>
                   )}
@@ -184,7 +184,7 @@ export default async function PublicSharePage({
             Comments ({comments.length})
           </h2>
           {comments.length === 0 ? (
-            <p className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
+            <p className="rounded-lg bg-paper p-4 text-[0.8125rem] text-muted shadow-hairline">
               No comments yet.
             </p>
           ) : (
@@ -195,26 +195,26 @@ export default async function PublicSharePage({
                   className="rounded-lg bg-paper p-4 shadow-hairline"
                 >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-ink">
+                    <span className="text-[0.8125rem] font-semibold text-ink">
                       {c.authorName}
                     </span>
                     {c.resolvedAt && (
-                      <span className="flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold text-ink">
+                      <span className="flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[0.75rem] font-semibold text-ink">
                         <CheckCircle2 className="h-3 w-3" />
                         Resolved
                       </span>
                     )}
-                    <span className="ml-auto flex items-center gap-1 text-[11px] text-muted">
+                    <span className="ml-auto flex items-center gap-1 text-[0.6875rem] text-muted">
                       <Clock3 className="h-3 w-3" />
                       {new Date(c.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="whitespace-pre-wrap text-[13px] text-ink">{c.body}</p>
+                  <p className="whitespace-pre-wrap text-[0.8125rem] text-ink">{c.body}</p>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-3 text-[12px] text-muted">
+          <p className="mt-3 text-[0.75rem] text-muted">
             Commenting is disabled on public previews — sign in to the workspace to join the
             discussion.
           </p>

@@ -97,7 +97,7 @@ export function ContactsView() {
         <button type="button" className={btnPrimary} onClick={() => setShow(true)}>
           <Plus size={15} /> New contact
         </button>
-        <span className="ml-auto text-[13px] text-muted">Leads become contacts with “Convert to contact” on the lead.</span>
+        <span className="ml-auto text-[0.8125rem] text-muted">Leads become contacts with “Convert to contact” on the lead.</span>
       </div>
       {contacts.error && <div className={errorBoxCls}>{contacts.error}</div>}
       {contacts.loading ? (
@@ -251,7 +251,7 @@ export function CompaniesView() {
               {filtered.map((c) => (
                 <tr key={c.id}>
                   <td className={`${tdCls} font-semibold`}>{c.name}</td>
-                  <td className={`${tdCls} font-mono text-[12px] text-muted`}>{c.domain ?? "—"}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>{c.domain ?? "—"}</td>
                   <td className={`${tdCls} text-muted`}>{c.industry ?? "—"}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{counts.get(c.id)?.contacts ?? 0}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{fmtCents(counts.get(c.id)?.openCents ?? 0)}</td>
@@ -343,7 +343,7 @@ export function DealsView({ pipeline }: { pipeline: CrmPipeline }) {
         <button type="button" className={btnPrimary} onClick={() => setShow(true)}>
           <Plus size={15} /> New deal
         </button>
-        <span className="ml-auto flex gap-4 text-[13px] text-muted">
+        <span className="ml-auto flex gap-4 text-[0.8125rem] text-muted">
           <span>
             Open <span className="font-bold tabular-nums text-ink">{fmtCents(open)}</span>
           </span>
@@ -369,17 +369,17 @@ export function DealsView({ pipeline }: { pipeline: CrmPipeline }) {
               <>
                 <span className="flex items-center gap-2">
                   <StageBadge label={s.label} color={s.color} />
-                  <span className="text-[12px] font-semibold tabular-nums text-muted">{col.length}</span>
+                  <span className="text-[0.75rem] font-semibold tabular-nums text-muted">{col.length}</span>
                 </span>
-                <span className="text-[12px] font-semibold tabular-nums text-muted">{fmtCents(col.reduce((a, d) => a + d.valueCents, 0))}</span>
+                <span className="text-[0.75rem] font-semibold tabular-nums text-muted">{fmtCents(col.reduce((a, d) => a + d.valueCents, 0))}</span>
               </>
             );
           }}
           renderCard={(d) => (
             <>
-              <div className="truncate text-[13px] font-semibold text-ink">{d.title}</div>
-              <div className="truncate text-[12px] text-muted">{C.get(d.companyId ?? "")?.name ?? d.ownerName ?? "—"}</div>
-              <div className="mt-2 flex items-center justify-between text-[12px]">
+              <div className="truncate text-[0.8125rem] font-semibold text-ink">{d.title}</div>
+              <div className="truncate text-[0.75rem] text-muted">{C.get(d.companyId ?? "")?.name ?? d.ownerName ?? "—"}</div>
+              <div className="mt-2 flex items-center justify-between text-[0.75rem]">
                 <span className="text-muted">{d.expectedCloseAt ? `Close ${fmtDate(d.expectedCloseAt)}` : "No close date"}</span>
                 <span className="font-semibold tabular-nums text-ink">{fmtCents(d.valueCents)}</span>
               </div>
@@ -523,7 +523,7 @@ export function ConvertLeadStrip({ leadId, hasValue, onConverted }: { leadId: st
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-2.5">
       <UserCheck size={15} className="text-muted" />
-      <span className="text-[13px] text-muted">Customer record</span>
+      <span className="text-[0.8125rem] text-muted">Customer record</span>
       <button type="button" className={btnGhostSm} disabled={busy} onClick={() => convert(false)}>
         {busy ? <Loader2 size={12} className="animate-spin" /> : <Contact size={12} />} Convert to contact
       </button>

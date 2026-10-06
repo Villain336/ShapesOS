@@ -14,6 +14,8 @@ import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { invalidateShared, sharedJson } from "@/lib/ui/shared-fetch";
 import { NotificationIcon, timeAgo, type NotificationItem } from "./NotificationIcon";
+// Phase 18.1 (WS=find): shell strings in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 const POLL_MS = 60_000;
 
@@ -43,6 +45,8 @@ export function useNotifications(limit = 8) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    // Release the connection (an unread body keeps it busy).
+    await res.text().catch(() => "");
     if (!res.ok) return;
     // The shared list is now stale for every mounted bell.
     invalidateShared(`/api/notifications?limit=${limit}`);
@@ -78,6 +82,7 @@ export function NotificationBell({ className }: { className?: string }) {
   const [marking, setMarking] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +125,7 @@ export function NotificationBell({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={unread > 0 ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
         className="relative inline-flex size-10 items-center justify-center rounded-full text-ink transition-[background-color] duration-150 ease-aos hover:bg-hover active:scale-[0.97]"
       >
         <Bell className="size-[18px]" aria-hidden />
@@ -134,31 +139,31 @@ export function NotificationBell({ className }: { className?: string }) {
       {open && (
         <div
           role="menu"
-          aria-label="Notifications"
+          aria-label={t("notifications.title")}
           className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg bg-paper shadow-raised"
         >
           <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <span className="text-base font-semibold text-ink">Notifications</span>
+            <span className="text-base font-semibold text-ink">{t("notifications.title")}</span>
             <button
               type="button"
               onClick={() => void markAll()}
               disabled={unread === 0 || marking}
               className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-ink hover:bg-hover disabled:text-disabled-fg disabled:hover:bg-transparent"
             >
-              {marking ? <Loader2 size={14} className="aos-spin" /> : <CheckCheck size={14} />}
-              Mark all read
+              {marking ? <Loader2 size={14} className="aos-spin" aria-hidden /> : <CheckCheck size={14} aria-hidden />}
+              {t("notifications.markAllRead")}
             </button>
           </div>
 
           <div className="max-h-[420px] overflow-y-auto p-1.5">
             {!loaded ? (
               <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted">
-                <Loader2 size={14} className="aos-spin" />
-                Loading
+                <Loader2 size={14} className="aos-spin" aria-hidden />
+                {t("common.loading")}
               </div>
             ) : items.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted">
-                You're all caught up. Approvals, alerts and failed runs will show up here.
+                {t("notifications.empty")}
               </div>
             ) : (
               items.map((n) => (
@@ -177,8 +182,8 @@ export function NotificationBell({ className }: { className?: string }) {
                     {n.body && <span className="block truncate text-xs text-muted">{n.body}</span>}
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-xs text-subtle">{timeAgo(n.createdAt)}</span>
-                    {!n.readAt && <span className="size-2 rounded-full bg-ink" aria-label="Unread" />}
+                    <span className="text-xs text-subtle">{timeAgo(n.createdAt) === "now" ? t("notifications.now") : timeAgo(n.createdAt)}</span>
+                    {!n.readAt && <span className="size-2 rounded-full bg-ink" role="img" aria-label={t("notifications.unread")} />}
                   </span>
                 </button>
               ))
@@ -191,7 +196,7 @@ export function NotificationBell({ className }: { className?: string }) {
               onClick={() => setOpen(false)}
               className="flex h-10 items-center justify-center rounded-sm text-sm font-semibold text-ink hover:bg-hover"
             >
-              View all notifications
+              {t("notifications.viewAll")}
             </Link>
           </div>
         </div>

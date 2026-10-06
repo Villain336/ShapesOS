@@ -89,7 +89,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
 
   if (error && !invoice) {
     return (
-      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
+      <div className="rounded-lg bg-paper p-4 text-[0.8125rem] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
           <span>{error}</span>
@@ -100,7 +100,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
 
   if (!invoice) {
     return (
-      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
+      <div className="rounded-lg bg-paper p-4 text-[0.8125rem] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading invoice…</span>
@@ -119,7 +119,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
           <span className="text-sm font-semibold text-ink">
             Invoice {invoice.id.slice(0, 8)}…
           </span>
-          {customerName && <span className="text-[13px] text-muted">{customerName}</span>}
+          {customerName && <span className="text-[0.8125rem] text-muted">{customerName}</span>}
         </div>
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -129,7 +129,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
           {invoice.status}
         </span>
       </div>
-      <table className="w-full text-[13px]">
+      <table className="w-full text-[0.8125rem]">
         <thead>
           <tr className="text-left text-muted">
             <th className="px-4 py-2 font-medium">Item</th>
@@ -164,7 +164,7 @@ export function OpsInvoiceCard({ invoiceId }: OpsInvoiceCardProps) {
         </tfoot>
       </table>
       {invoice.dueAt && (
-        <div className="border-t border-line px-4 py-2 text-[12px] text-muted">
+        <div className="border-t border-line px-4 py-2 text-[0.75rem] text-muted">
           Due {new Date(invoice.dueAt).toLocaleDateString()}
         </div>
       )}

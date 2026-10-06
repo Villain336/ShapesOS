@@ -57,6 +57,11 @@
   --color-focus: var(--aos-focus);
   --color-focus-night: var(--aos-focus-on-night);
 
+  /* Phase 18.1: the hover of an ink (primary) fill; lighter in dark mode. */
+  --color-ink-hover: var(--aos-ink-hover);
+  --color-on-ink-muted: var(--aos-on-ink-muted);
+  --color-ink-raised: var(--aos-ink-raised);
+
   /* Fonts */
   --font-*: initial;
   --font-sans: var(--aos-font-sans);
@@ -118,6 +123,11 @@
 @utility h-control-sm { height: var(--aos-h-sm); }
 @utility h-control { height: var(--aos-h-md); }
 @utility h-control-lg { height: var(--aos-h-lg); }
+
+/* Phase 18.1 density: rows and page gutters follow the density preference. */
+@utility min-h-row { min-height: var(--aos-row-h); }
+@utility h-row { height: var(--aos-row-h); }
+@utility px-gutter { padding-left: var(--aos-gutter); padding-right: var(--aos-gutter); }
 
 /* Width axis for Archivo headings */
 @utility stretch-heading { font-stretch: var(--aos-stretch-heading); }

@@ -12,7 +12,7 @@ import {
   type CounterStore,
   type LockoutRecord,
 } from "../rate-limit-store";
-import { __resetRateLimits, checkRateLimit, checkRateLimitAsync, TIER_LIMITS } from "../rate-limit";
+import { __resetRateLimits, checkRateLimit, checkRateLimitAsync, DEFAULT_READ_LIMIT, readLimitFromEnv, TIER_LIMITS } from "../rate-limit";
 import {
   __resetLoginAttempts,
   LOGIN_ACCOUNT_MAX_FAILURES,
@@ -253,5 +253,28 @@ describe("login lockout over the shared store", () => {
     __setCounterStoreForTests(failingStore());
     for (let i = 0; i < 3; i++) await recordLoginFailureAsync("1.0.0.2", "g@x.io", now);
     assert.equal(await captchaRequiredAsync("1.0.0.2", "g@x.io", { env: TURNSTILE, now }), true);
+  });
+});
+
+describe("RATE_LIMIT_READ_PER_MIN (read tier only)", () => {
+  it("defaults to 120 and accepts a whole number in 30–6000", () => {
+    assert.equal(DEFAULT_READ_LIMIT, 120);
+    assert.equal(readLimitFromEnv(env({})), 120);
+    assert.equal(readLimitFromEnv(env({ RATE_LIMIT_READ_PER_MIN: "600" })), 600);
+    assert.equal(readLimitFromEnv(env({ RATE_LIMIT_READ_PER_MIN: "30" })), 30);
+    assert.equal(readLimitFromEnv(env({ RATE_LIMIT_READ_PER_MIN: "6000" })), 6000);
+  });
+
+  it("ignores anything out of range or not a whole number", () => {
+    for (const bad of ["0", "29", "6001", "-5", "12.5", "lots", " "]) {
+      assert.equal(readLimitFromEnv(env({ RATE_LIMIT_READ_PER_MIN: bad })), 120, bad);
+    }
+  });
+
+  it("never changes the auth, write or ai tiers", () => {
+    assert.deepEqual(
+      { auth: TIER_LIMITS.auth.limit, write: TIER_LIMITS.write.limit, ai: TIER_LIMITS.ai.limit },
+      { auth: 10, write: 60, ai: 20 },
+    );
   });
 });

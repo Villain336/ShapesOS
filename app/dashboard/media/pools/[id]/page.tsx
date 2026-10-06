@@ -10,7 +10,7 @@ import { poolUtilization } from "@/lib/media/pools";
 import PoolControls from "./_components/PoolControls";
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-canvas text-muted border-line";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight bg-canvas text-muted border-line";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pool — Media — ShapesOS" };
@@ -45,7 +45,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
             Budget pool · {pool.period} · {pool.status}
           </p>
           <h1 className="aos-heading mt-1 text-ink">{pool.name}</h1>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[0.8125rem] text-muted">
             Cap {money(pool.capCents, pool.currency)} · allowlist: {pool.platformAllowlist.join(", ")}
           </p>
         </div>
@@ -100,7 +100,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-muted">
+                <tr className="border-b border-line bg-canvas text-[0.6875rem] font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Time</th>
                   <th className="px-3 py-2 font-medium">Kind</th>
                   <th className="px-3 py-2 font-medium">Amount</th>

@@ -173,7 +173,7 @@ function TreeNode({
             >
               <span className="w-3" />
               <FileText size={14} className="text-muted" />
-              <span className="truncate font-mono text-[13px]">{entry.name}</span>
+              <span className="truncate font-mono text-[0.8125rem]">{entry.name}</span>
             </button>
             <button
               onClick={() => onAttach(entry)}
@@ -630,13 +630,13 @@ export default function SiteIde({
         <div className="flex gap-1 border-b border-line">
           <button
             onClick={() => setTab("editor")}
-            className={`border-b-2 px-3 py-2 text-[13.5px] font-semibold transition-colors ${tab === "editor" ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
+            className={`border-b-2 px-3 py-2 text-[0.84375rem] font-semibold transition-colors ${tab === "editor" ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
             Editor
           </button>
           <button
             onClick={() => setTab("activity")}
-            className={`border-b-2 px-3 py-2 text-[13.5px] font-semibold transition-colors ${tab === "activity" ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
+            className={`border-b-2 px-3 py-2 text-[0.84375rem] font-semibold transition-colors ${tab === "activity" ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
             Activity
           </button>
@@ -738,7 +738,7 @@ export default function SiteIde({
             </label>
             <div className="col-span-2">
               {formError && <p className="mb-2 text-sm text-failed-text">{formError}</p>}
-              <button onClick={() => void createConnection(false)} disabled={formBusy} className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+              <button onClick={() => void createConnection(false)} disabled={formBusy} className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                 {formBusy ? "Saving…" : "Save connection"}
               </button>
               <p className="mt-2 text-xs text-muted">
@@ -832,7 +832,7 @@ export default function SiteIde({
                 openPath={openPath}
               />
             )}
-            <p className="px-2 py-2 text-[11px] text-muted">Hover a file and press + to attach it to the AI chat.</p>
+            <p className="px-2 py-2 text-[0.6875rem] text-muted">Hover a file and press + to attach it to the AI chat.</p>
           </div>
 
           {/* editor */}
@@ -852,7 +852,7 @@ export default function SiteIde({
               <button
                 onClick={() => void saveFile("manual")}
                 disabled={!openPath || !dirty || saving}
-                className="rounded-full bg-ink px-3 py-1 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="rounded-full bg-ink px-3 py-1 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -883,13 +883,13 @@ export default function SiteIde({
           <div className="col-span-3 flex max-h-[640px] flex-col rounded-lg bg-paper shadow-hairline">
             <div className="border-b border-line px-3 py-2">
               <h2 className="text-sm font-semibold text-ink">AI assistant</h2>
-              <p className="text-[11px] text-muted">Proposes diffs. Nothing is written until you click Apply.</p>
+              <p className="text-[0.6875rem] text-muted">Proposes diffs. Nothing is written until you click Apply.</p>
             </div>
 
             {attached.length > 0 && (
               <div className="flex flex-wrap gap-1 border-b border-line px-3 py-2">
                 {attached.map((a) => (
-                  <span key={a.path} className="flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 font-mono text-[11px] text-muted">
+                  <span key={a.path} className="flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 font-mono text-[0.6875rem] text-muted">
                     {a.path}
                     <button onClick={() => setAttached((prev) => prev.filter((x) => x.path !== a.path))} className="text-muted hover:text-ink">✕</button>
                   </span>
@@ -906,8 +906,8 @@ export default function SiteIde({
               )}
               {chat.map((m, i) => (
                 <div key={i} className={`rounded-md px-2.5 py-2 text-sm ${m.role === "user" ? "bg-ink text-white" : "bg-canvas text-ink"}`}>
-                  <div className="mb-0.5 text-[11px] font-semibold opacity-70">{m.role === "user" ? "You" : "Assistant"}</div>
-                  <div className="whitespace-pre-wrap text-[13px]">{m.text}</div>
+                  <div className="mb-0.5 text-[0.6875rem] font-semibold opacity-70">{m.role === "user" ? "You" : "Assistant"}</div>
+                  <div className="whitespace-pre-wrap text-[0.8125rem]">{m.text}</div>
                 </div>
               ))}
               {asking && <p className="text-xs text-muted">Thinking…</p>}
@@ -966,7 +966,7 @@ export default function SiteIde({
                 <button
                   onClick={() => void sendMessage()}
                   disabled={asking || !input.trim()}
-                  className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   Send
                 </button>

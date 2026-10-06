@@ -86,7 +86,7 @@ function CostPerDay({ perDay, days }: { perDay: AiCostSpeed["perDay"]; days: num
             onBlur={() => setHover(null)}
           >
             <div
-              className={`w-full rounded-t-[4px] ${hover === i ? "bg-night-hover" : "bg-ink"}`}
+              className={`w-full rounded-t-[4px] ${hover === i ? "bg-ink-hover" : "bg-ink"}`}
               style={{ height: d.costMicroUsd > 0 ? `${Math.max(2, (d.costMicroUsd / max) * 100)}%` : "0%" }}
             />
           </div>
@@ -164,7 +164,7 @@ export default function AiCostSpeedSection({ workspaceId }: { workspaceId: strin
               type="button"
               aria-pressed={days === r}
               onClick={() => setDays(r)}
-              className={`inline-flex h-8 items-center rounded-full px-3 text-[13px] font-semibold aos-press ${
+              className={`inline-flex h-8 items-center rounded-full px-3 text-[0.8125rem] font-semibold aos-press ${
                 days === r ? "bg-ink text-paper" : "bg-paper text-ink shadow-control hover:shadow-outline"
               }`}
             >

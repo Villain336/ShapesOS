@@ -75,7 +75,7 @@ function ModeSwitch({
             onClick={() => onChange(o.id)}
             title={o.hint}
             aria-pressed={active}
-            className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[14px] font-semibold disabled:opacity-50 ${
+            className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold disabled:opacity-50 ${
               active ? "bg-black text-white" : "text-muted"
             }`}
           >
@@ -97,7 +97,7 @@ function WarmthMeter({ score, compact }: { score: number; compact?: boolean }) {
       <span className={`overflow-hidden rounded-full bg-canvas ${compact ? "h-1.5 w-16" : "h-2 w-24"}`}>
         <span className="block h-full rounded-full bg-ink" style={{ width: `${score}%` }} />
       </span>
-      <span className={`font-semibold text-ink ${compact ? "text-[13px]" : "text-[15px]"}`}>
+      <span className={`font-semibold text-ink ${compact ? "text-[0.8125rem]" : "text-[0.9375rem]"}`}>
         {score}
       </span>
     </span>
@@ -106,7 +106,7 @@ function WarmthMeter({ score, compact }: { score: number; compact?: boolean }) {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-8 items-center rounded-full bg-canvas px-3 text-[13px] font-semibold text-ink">
+    <span className="inline-flex h-8 items-center rounded-full bg-canvas px-3 text-[0.8125rem] font-semibold text-ink">
       {children}
     </span>
   );
@@ -115,11 +115,11 @@ function Chip({ children }: { children: React.ReactNode }) {
 function BreakdownBar({ label, value, max }: { label: string; value: number; max: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-28 shrink-0 text-[13px] text-muted">{label}</span>
+      <span className="w-28 shrink-0 text-[0.8125rem] text-muted">{label}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-canvas">
         <span className="block h-full rounded-full bg-ink" style={{ width: `${(value / max) * 100}%` }} />
       </span>
-      <span className="w-12 shrink-0 text-right text-[13px] font-semibold text-ink">
+      <span className="w-12 shrink-0 text-right text-[0.8125rem] font-semibold text-ink">
         {value}/{max}
       </span>
     </div>
@@ -153,14 +153,14 @@ function PersonDetail({
       </div>
 
       <div>
-        <p className="mb-2 text-[12px] font-semibold text-muted">Relationship warmth</p>
+        <p className="mb-2 text-[0.75rem] font-semibold text-muted">Relationship warmth</p>
         {rel ? (
           <div className="flex flex-col gap-2">
             <WarmthMeter score={rel.warmthScore} />
             <BreakdownBar label="Recency" value={rel.warmthBreakdown.recency} max={50} />
             <BreakdownBar label="Frequency" value={rel.warmthBreakdown.frequency} max={30} />
             <BreakdownBar label="Reciprocity" value={rel.warmthBreakdown.reciprocity} max={20} />
-            <p className="mt-1 text-[13px] text-muted">
+            <p className="mt-1 text-[0.8125rem] text-muted">
               {rel.touchCount} {rel.touchCount === 1 ? "touch" : "touches"}
               {rel.lastTouchAt
                 ? ` · last ${new Date(rel.lastTouchAt).toLocaleDateString()}`
@@ -174,7 +174,7 @@ function PersonDetail({
                 type="button"
                 disabled={touching}
                 onClick={() => onTouch("inbound")}
-                className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[14px] font-semibold text-white disabled:opacity-50"
+                className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white disabled:opacity-50"
               >
                 <PhoneIncoming size={15} /> They reached out
               </button>
@@ -182,7 +182,7 @@ function PersonDetail({
                 type="button"
                 disabled={touching}
                 onClick={() => onTouch("outbound")}
-                className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[14px] font-semibold text-ink shadow-outline disabled:opacity-50"
+                className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[0.875rem] font-semibold text-ink shadow-outline disabled:opacity-50"
               >
                 <PhoneOutgoing size={15} /> I reached out
               </button>
@@ -195,23 +195,23 @@ function PersonDetail({
 
       {rel?.boundaries && (
         <div className="rounded-md border border-line bg-canvas p-3">
-          <p className="text-[12px] font-semibold text-muted">Boundaries</p>
-          <p className="mt-0.5 text-[14px] text-ink">{rel.boundaries}</p>
+          <p className="text-[0.75rem] font-semibold text-muted">Boundaries</p>
+          <p className="mt-0.5 text-[0.875rem] text-ink">{rel.boundaries}</p>
         </div>
       )}
       {rel?.notes && (
         <div>
-          <p className="text-[12px] font-semibold text-muted">Context</p>
-          <p className="mt-0.5 text-[14px] text-ink">{rel.notes}</p>
+          <p className="text-[0.75rem] font-semibold text-muted">Context</p>
+          <p className="mt-0.5 text-[0.875rem] text-ink">{rel.notes}</p>
         </div>
       )}
 
       {person.employments.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[12px] font-semibold text-muted">Employment</p>
+          <p className="mb-1.5 text-[0.75rem] font-semibold text-muted">Employment</p>
           <div className="flex flex-col gap-1.5">
             {person.employments.map((e) => (
-              <div key={e.id} className="flex items-center gap-2 text-[14px]">
+              <div key={e.id} className="flex items-center gap-2 text-[0.875rem]">
                 <Building2 size={14} className="text-muted" />
                 <span className="font-semibold text-ink">{e.companyName}</span>
                 {e.title && <span className="text-muted">· {e.title}</span>}
@@ -228,16 +228,16 @@ function PersonDetail({
       )}
 
       <div className="border-t border-line pt-3">
-        <p className="mb-1.5 text-[12px] font-semibold text-muted">Provenance</p>
+        <p className="mb-1.5 text-[0.75rem] font-semibold text-muted">Provenance</p>
         {person.importBatch ? (
-          <p className="text-[13px] text-ink">
+          <p className="text-[0.8125rem] text-ink">
             Imported via <span className="font-semibold">{person.importBatch.source}</span>
             {" "}on {new Date(person.importBatch.createdAt).toLocaleDateString()}
             {" "}· consent by <span className="font-semibold">{person.consentedBy}</span>
             {" "}on {new Date(person.consentedAt).toLocaleDateString()}
           </p>
         ) : (
-          <p className="text-[13px] text-ink">
+          <p className="text-[0.8125rem] text-ink">
             Added manually · consent by <span className="font-semibold">{person.consentedBy}</span>
             {" "}on {new Date(person.consentedAt).toLocaleDateString()}
           </p>
@@ -287,7 +287,7 @@ function AddPersonForm({ onAdded }: { onAdded: () => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white"
+        className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white"
       >
         <Plus size={16} /> Add person
       </button>
@@ -298,40 +298,40 @@ function AddPersonForm({ onAdded }: { onAdded: () => void }) {
     <div className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline">
       <div className="grid gap-3 md:grid-cols-3">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold text-muted">Name</span>
+          <span className="text-[0.75rem] font-semibold text-muted">Name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ada Lovelace"
-            className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
+            className="h-control rounded-md border border-control bg-paper px-3 text-[0.9375rem] text-ink"
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold text-muted">Roles (comma-separated)</span>
+          <span className="text-[0.75rem] font-semibold text-muted">Roles (comma-separated)</span>
           <input
             value={roles}
             onChange={(e) => setRoles(e.target.value)}
             placeholder="Partner, Angel investor"
-            className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
+            className="h-control rounded-md border border-control bg-paper px-3 text-[0.9375rem] text-ink"
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold text-muted">Contact handles (comma-separated)</span>
+          <span className="text-[0.75rem] font-semibold text-muted">Contact handles (comma-separated)</span>
           <input
             value={handles}
             onChange={(e) => setHandles(e.target.value)}
             placeholder="ada@example.com"
-            className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
+            className="h-control rounded-md border border-control bg-paper px-3 text-[0.9375rem] text-ink"
           />
         </label>
       </div>
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           disabled={saving || !name.trim()}
           onClick={submit}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {saving && <Loader2 size={15} className="animate-spin" />}
           {saving ? "Adding" : "Add person"}
@@ -339,7 +339,7 @@ function AddPersonForm({ onAdded }: { onAdded: () => void }) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[15px] font-semibold text-ink shadow-outline"
+          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[0.9375rem] font-semibold text-ink shadow-outline"
         >
           Cancel
         </button>
@@ -480,7 +480,7 @@ export function ConnectorApp() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setTab(t.id)}
-                className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+                className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold ${
                   active ? "bg-black text-white" : "bg-paper text-muted shadow-hairline"
                 }`}
               >
@@ -488,7 +488,7 @@ export function ConnectorApp() {
                 {t.label}
                 {typeof t.badge === "number" && t.badge > 0 && (
                   <span
-                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${
+                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-bold ${
                       active ? "bg-needs text-black" : "bg-needs text-black"
                     }`}
                     aria-label={`${t.badge} pending approvals`}
@@ -506,7 +506,7 @@ export function ConnectorApp() {
             type="button"
             onClick={recompute}
             disabled={recomputing}
-            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[14px] font-semibold text-ink shadow-hairline disabled:opacity-50"
+            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[0.875rem] font-semibold text-ink shadow-hairline disabled:opacity-50"
             title="Recompute every warmth score from interaction signals"
           >
             {recomputing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
@@ -520,7 +520,7 @@ export function ConnectorApp() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="flex flex-col gap-2">
             {!graph || graph.persons.length === 0 ? (
-              <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+              <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
                 No people in your network yet. Add your first person above — every
                 contact records where it came from and whose consent brought it in.
               </div>
@@ -536,10 +536,10 @@ export function ConnectorApp() {
                   }`}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[15px] font-semibold text-ink">
+                    <span className="block truncate text-[0.9375rem] font-semibold text-ink">
                       {p.name}
                     </span>
-                    <span className="block truncate text-[13px] text-muted">
+                    <span className="block truncate text-[0.8125rem] text-muted">
                       {[p.roles[0], p.employments[0]?.companyName].filter(Boolean).join(" · ") ||
                         "No role yet"}
                     </span>
@@ -557,7 +557,7 @@ export function ConnectorApp() {
                 onTouch={(d) => recordTouch(selected.id, d)}
               />
             ) : (
-              <div className="flex h-full min-h-40 items-center justify-center rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+              <div className="flex h-full min-h-40 items-center justify-center rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
                 Select a person to see warmth, boundaries, and provenance.
               </div>
             )}
@@ -568,7 +568,7 @@ export function ConnectorApp() {
       {tab === "companies" && (
         <div className="flex flex-col gap-2">
           {!graph || graph.companies.length === 0 ? (
-            <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+            <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
               No companies yet. Link people to their employers to grow this list.
             </div>
           ) : (
@@ -577,11 +577,11 @@ export function ConnectorApp() {
                 key={c.id}
                 className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-sm bg-paper px-4 py-3 shadow-hairline"
               >
-                <span className="text-[15px] font-semibold text-ink">{c.name}</span>
-                {c.industry && <span className="text-[13px] text-muted">{c.industry}</span>}
+                <span className="text-[0.9375rem] font-semibold text-ink">{c.name}</span>
+                {c.industry && <span className="text-[0.8125rem] text-muted">{c.industry}</span>}
                 {c.sizeBand && <Chip>{c.sizeBand}</Chip>}
                 {c.relationship && <Chip>{c.relationship}</Chip>}
-                <span className="ml-auto flex items-center gap-1.5 text-[13px] text-muted">
+                <span className="ml-auto flex items-center gap-1.5 text-[0.8125rem] text-muted">
                   <ArrowLeftRight size={13} />
                   {c.employeeCount} {c.employeeCount === 1 ? "contact" : "contacts"}
                 </span>
@@ -617,7 +617,7 @@ export function ConnectorApp() {
       {tab === "batches" && (
         <div className="flex flex-col gap-2">
           {!graph || graph.batches.length === 0 ? (
-            <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+            <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
               No imports yet. Every import batch records its source and the consent
               behind it — nothing enters the graph without that record.
             </div>
@@ -627,9 +627,9 @@ export function ConnectorApp() {
                 key={b.id}
                 className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-sm bg-paper px-4 py-3 shadow-hairline"
               >
-                <span className="text-[15px] font-semibold capitalize text-ink">{b.source}</span>
-                {b.note && <span className="text-[13px] text-muted">{b.note}</span>}
-                <span className="ml-auto text-[13px] text-muted">
+                <span className="text-[0.9375rem] font-semibold capitalize text-ink">{b.source}</span>
+                {b.note && <span className="text-[0.8125rem] text-muted">{b.note}</span>}
+                <span className="ml-auto text-[0.8125rem] text-muted">
                   {b.personCount} {b.personCount === 1 ? "person" : "people"} · consent by{" "}
                   <span className="font-semibold text-ink">{b.consentedBy}</span> ·{" "}
                   {new Date(b.consentedAt).toLocaleDateString()}

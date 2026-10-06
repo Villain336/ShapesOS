@@ -25,6 +25,8 @@ import {
 import { getStorageAdapter } from "./storage";
 import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditEvent } from "@/lib/auditlog";
+// Phase 18.1 (WS=find): Spotlight indexes the text inside each new file.
+import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 
 export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
 export const TRASH_RETENTION_DAYS = 30;
@@ -212,6 +214,8 @@ export async function writeFile(opts: WriteOptions): Promise<PublicFile> {
     summary: `Stored file "${row.filename}" at ${row.logicalPath}`,
     actorUserId: createdBy,
   }).catch(() => {});
+  // Background: extraction never delays the upload (lib/search/text-index.ts).
+  scheduleFileTextIndex(workspaceId, row.id);
   return toPublic(row);
 }
 

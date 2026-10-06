@@ -62,6 +62,27 @@ describe("scanTsx rules", () => {
     assert.deepEqual(rules(`<input data-focus-ring="container" className="outline-none" />`), []);
     assert.deepEqual(rules(`<input className="outline-hidden" />`), []);
   });
+
+  // Phase 18.1 (WS=find)
+  it("icon-only buttons and links need an accessible name", () => {
+    assert.deepEqual(rules(`<button onClick={go}><X size={14} /></button>`), ["icon-button-name"]);
+    assert.deepEqual(rules(`<Link href="/x"><Settings className="size-4" /></Link>`), ["icon-button-name"]);
+    assert.deepEqual(rules(`<button onClick={go}>{open ? <ChevronUp /> : <ChevronDown />}</button>`), ["icon-button-name"]);
+    assert.deepEqual(rules(`<button aria-label="Close" onClick={go}><X /></button>`), []);
+    assert.deepEqual(rules(`<button title="Close" onClick={go}><X /></button>`), []);
+    assert.deepEqual(rules(`<button onClick={go}><X /> Close</button>`), []);
+    assert.deepEqual(rules(`<button onClick={go}><X /><span className="sr-only">Close</span></button>`), []);
+    assert.deepEqual(rules(`<button onClick={go}>{label}</button>`), [], "an expression may be text");
+    assert.deepEqual(rules(`<button {...props}><X /></button>`), [], "spread props may carry the name");
+    assert.deepEqual(rules(`<button onClick={go}><KeyCap>esc</KeyCap></button>`), [], "a text-bearing component");
+  });
+
+  it("no positive tabIndex", () => {
+    assert.deepEqual(rules(`<div tabIndex={2} />`), ["positive-tabindex"]);
+    assert.deepEqual(rules(`<div tabIndex="1" />`), ["positive-tabindex"]);
+    assert.deepEqual(rules(`<div tabIndex={0} />`), []);
+    assert.deepEqual(rules(`<div tabIndex={-1} />`), []);
+  });
 });
 
 describe("repository", () => {

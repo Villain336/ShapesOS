@@ -43,6 +43,8 @@ export const LEAD_CORE_TOOLS: ReadonlySet<string> = new Set([
   "get_workflows",
   "ops_operations_summary",
   "ask_business_data",
+  // Phase 18.1: Spotlight for agents (lib/search/tool.ts).
+  "search_workspace",
   "load_skill",
   "research_question",
   "create_content_draft",
@@ -61,6 +63,8 @@ export const SUB_AGENT_CORE_READS: ReadonlySet<string> = new Set([
   "get_alerts",
   "ops_operations_summary",
   "ask_business_data",
+  // Phase 18.1: every agent searches the same index people do.
+  "search_workspace",
   "load_skill",
 ]);
 

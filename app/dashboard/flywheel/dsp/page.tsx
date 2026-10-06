@@ -12,7 +12,7 @@ import { ShieldCheck } from "lucide-react";
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -21,12 +21,12 @@ function chip(text: React.ReactNode, cls?: string) {
 // Ledger reconciliation: balanced = neutral ink check, imbalanced = failed.
 function reconcileBadge(balanced: boolean) {
   return balanced ? (
-    <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink">
+    <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink">
       <ShieldCheck className="h-3.5 w-3.5" />
       Lines distinct
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-failed-text">
+    <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-failed-text">
       <span className="size-2.5 rounded-[2px] bg-failed" aria-hidden />
       Imbalanced
     </span>
@@ -104,7 +104,7 @@ export default async function DspPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">DSP readiness</h1>
-          <p className="mt-0.5 max-w-3xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-3xl text-[0.8125rem] text-muted">
             Seat-agnostic programmatic rails — adapters for TTD, DV360, Amazon, and Basis. No
             seat ships in v1: every adapter fails closed until your agency connects its own
             seat. Preview data below; live tables land when the Phase 7 schema merges.
@@ -116,8 +116,8 @@ export default async function DspPage() {
       {/* Zero custody — stone note */}
       <div className="rounded-xl border border-line bg-canvas p-4">
         <h2 className="text-sm font-semibold tracking-tight text-ink">Zero custody — structural</h2>
-        <p className="mt-1 text-[13px] text-muted">{ZERO_CUSTODY_COPY}</p>
-        <p className="mt-2 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">{ZERO_CUSTODY_COPY}</p>
+        <p className="mt-2 text-[0.8125rem] text-muted">
           Seat connection requires a vault reference only — ShapesOS never accepts raw seat
           credentials, and no field anywhere in this track can hold a client payment
           instrument.
@@ -129,7 +129,7 @@ export default async function DspPage() {
         <section className="rounded-xl border border-line bg-white p-4">
           <h2 className="text-sm font-semibold tracking-tight text-ink">DSP adapters</h2>
           <div className="mt-2 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Adapter</th>
@@ -141,7 +141,7 @@ export default async function DspPage() {
                   <tr key={dsp} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">
                       <span className="font-medium text-ink">{DSP_LABELS[dsp]}</span>
-                      <span className="block text-[12px] text-muted">Bring your own seat</span>
+                      <span className="block text-[0.75rem] text-muted">Bring your own seat</span>
                     </td>
                     <td className="px-3 py-2">
                       {chip("No seat")}
@@ -163,10 +163,10 @@ export default async function DspPage() {
             <h2 className="text-sm font-semibold tracking-tight text-ink">Volume tripwire</h2>
             {chip("$30K/mo fixture", "border-line bg-hover text-muted")}
           </div>
-          <p className="mt-2 text-[13px] font-medium text-ink">{preview.tripwire.bandLabel}</p>
-          <p className="mt-1 text-[13px] text-muted">{preview.tripwire.recommendation}</p>
+          <p className="mt-2 text-[0.8125rem] font-medium text-ink">{preview.tripwire.bandLabel}</p>
+          <p className="mt-1 text-[0.8125rem] text-muted">{preview.tripwire.recommendation}</p>
           <div className="mt-2 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Rail</th>
@@ -195,7 +195,7 @@ export default async function DspPage() {
         <section className="rounded-xl border border-line bg-white p-4">
           <h2 className="text-sm font-semibold tracking-tight text-ink">Fee schedules</h2>
           <div className="mt-2 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">DSP</th>
@@ -231,7 +231,7 @@ export default async function DspPage() {
             {reconcileBadge(preview.reconciliation.balanced)}
           </div>
           <div className="mt-2 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Line</th>
@@ -250,7 +250,7 @@ export default async function DspPage() {
                   <tr key={`${r.id}-${label}`} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 text-muted">
                       {label}
-                      <span className="block text-[11px] text-subtle">{r.period} · {r.dsp.toUpperCase()} · fee schedule v{r.feeScheduleVersion}</span>
+                      <span className="block text-[0.6875rem] text-subtle">{r.period} · {r.dsp.toUpperCase()} · fee schedule v{r.feeScheduleVersion}</span>
                     </td>
                     <td className="px-3 py-2 text-right font-mono font-semibold text-ink">{money(cents)}</td>
                   </tr>

@@ -291,7 +291,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (249 keys)</summary>
+<details><summary>Not set on Render, on purpose (254 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -306,6 +306,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | hosted deployment | `MARKETR_SELF_HOSTED` |
 | default http://127.0.0.1:$PORT is right | `CRON_RUNNER_ORIGIN` |
 | set per service in render.yaml (heap sized to the plan) | `NODE_OPTIONS` |
+| default 120 reads/min per person per web instance; set it in shapesos-web only if many people share one IP | `RATE_LIMIT_READ_PER_MIN` |
 | local disk path; hosted files live in R2 (MARKETR_STORAGE=s3) | `MARKETR_STORAGE_DIR` |
 | legacy fallback for AUTH_SECRET; leave unset so there is one session secret | `NEXTAUTH_SECRET` |
 | OpenAI-compatible override; OPENAI_API_KEY is used on hosted | `LLM_API_KEY` |
@@ -354,6 +355,9 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | default 90 is right | `DATASET_STALE_AFTER_DAYS` |
 | the memory pass runs as the app role with in-session budgets (no extra DB login on Render) | `MEMORY_WORKER_ROLE` |
 | default cache dir | `MEMORY_MODEL_CACHE` |
+| default on: meaning-search uses the cached local MiniLM | `SPOTLIGHT_SEMANTIC` |
+| default on: uploads index their text in the background | `SPOTLIGHT_INDEX_ON_WRITE` |
+| default 200 per search-index cron run is right | `SEARCH_INDEX_BATCH` |
 | demo/test only | `POS_TERMINAL_MOCK` |
 | bring-your-own media buying | `VIBE_CLIENT_ID`, `VIBE_CLIENT_SECRET`, `VIBE_API_TOKEN` |
 | default test mode stays on | `VIBE_TEST_MODE` |
@@ -376,7 +380,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | tests only (backup.sh against a fake Render API) | `RENDER_API_BASE` |
 | local disk path; on hosted, files live in shared object storage (MARKETR_STORAGE=s3) | `FIX_SNAPSHOT_DIR`, `REPORT_STORAGE_DIR`, `SITE_STORAGE_DIR`, `AUDIO_BRIEF_STORAGE_DIR`, `EDDM_BRIEF_STORAGE_DIR`, `IO_BRIEF_STORAGE_DIR`, `LAUNCH_PACKET_STORAGE_DIR`, `SITEMAP_STORAGE_DIR`, `SANDBOX_SNAPSHOT_DIR`, `CORPUS_DIR`, `CC_GRAPH_DIR` |
 | Docker sandbox settings; hosted sandboxes run on E2B | `SANDBOX_IMAGE`, `SANDBOX_CPUS`, `SANDBOX_MEMORY_MB`, `SANDBOX_PIDS`, `SANDBOX_DISK_MB`, `SANDBOX_IDLE_MINUTES`, `SANDBOX_EGRESS_ALLOW`, `SANDBOX_PREVIEW_BIND`, `SANDBOX_PREVIEW_HOST`, `SANDBOX_SNAPSHOT_MAX_MB` |
-| default is right (change in the dashboard only to tune) | `AGENT_INLINE_BUDGET_SECONDS`, `AGENT_WORKER_POLL_MS`, `AGENT_JOB_LEASE_SECONDS`, `AGENT_JOB_HEARTBEAT_SECONDS`, `AGENT_JOB_MAX_ATTEMPTS`, `AGENT_MAX_STEPS`, `AGENT_MAX_RUN_MINUTES`, `AGENT_MAX_RUN_COST_MICRO_USD`, `AGENT_COMPACT_AT_TOKENS`, `AGENT_TOOL_RESULT_MAX_CHARS`, `AGENT_FIX_CYCLES`, `LLM_MODEL_COPY`, `LLM_MODEL_BULK`, `LLM_MODEL_BACKGROUND`, `LLM_MODEL_LEAD`, `LLM_MODEL_SUBAGENT`, `LLM_MODEL_CODE`, `LLM_MODEL_CODE_MAX`, `LEARNING_LOOKBACK_DAYS`, `LEARNING_MAX_EPISODES`, `LEARNING_SIMILARITY_THRESHOLD`, `LEARNING_DECAY_DAYS`, `LEARNING_DECAY_CONFIDENCE`, `LEARNING_CONSOLIDATE_MAX_WORKSPACES`, `AGENT_CONTEXT_EDIT_AT_TOKENS`, `LLM_BATCH` |
+| default is right (change in the dashboard only to tune) | `AGENT_INLINE_BUDGET_SECONDS`, `AGENT_WORKER_POLL_MS`, `AGENT_JOB_LEASE_SECONDS`, `AGENT_JOB_HEARTBEAT_SECONDS`, `AGENT_JOB_MAX_ATTEMPTS`, `AGENT_MAX_STEPS`, `AGENT_MAX_RUN_MINUTES`, `AGENT_MAX_RUN_COST_MICRO_USD`, `AGENT_COMPACT_AT_TOKENS`, `AGENT_TOOL_RESULT_MAX_CHARS`, `AGENT_FIX_CYCLES`, `LLM_MODEL_COPY`, `LLM_MODEL_BULK`, `LLM_MODEL_BACKGROUND`, `LLM_MODEL_LEAD`, `LLM_MODEL_SUBAGENT`, `LLM_MODEL_CODE`, `LLM_MODEL_CODE_MAX`, `LEARNING_LOOKBACK_DAYS`, `LEARNING_MAX_EPISODES`, `LEARNING_SIMILARITY_THRESHOLD`, `LEARNING_DECAY_DAYS`, `LEARNING_DECAY_CONFIDENCE`, `LEARNING_CONSOLIDATE_MAX_WORKSPACES`, `DESK_BRIEFING_MAX_MEMBERS`, `AGENT_CONTEXT_EDIT_AT_TOKENS`, `LLM_BATCH` |
 | evaluation knobs (scripts/eval); unset = the measured defaults | `LLM_EFFORT_LEAD`, `LLM_EFFORT_SUBAGENT`, `LLM_EFFORT_CODE`, `LLM_EFFORT_CODE_MAX`, `LLM_EFFORT_COPY`, `LLM_EFFORT_BULK`, `LLM_EFFORT_BACKGROUND`, `CHAT_CACHE_LAYOUT` |
 | the Anthropic SDK's own override; only the test fake and the eval dry run set it | `ANTHROPIC_BASE_URL` |
 | local-disk blob root; hosted runs MARKETR_STORAGE=s3 | `MARKETR_BLOB_DIR` |
@@ -474,7 +478,7 @@ Restore drill (quarterly, and after major upgrades):
 - **Database**: `plan: 2c-8g` → `4c-16g` (400 connections). Read replicas and high availability (`highAvailability: enabled`, Pro workspace) when uptime needs it.
 - **Long requests**: Render allows HTTP responses up to 100 minutes ([Render vs Vercel](https://render.com/docs/render-vs-vercel-comparison)); Cloudflare closes a proxied connection idle for ~100 s, which the SSE heartbeats (every 15 s) prevent.
 - **Shutdown**: `maxShutdownDelaySeconds` is 120 s on web and 300 s (the maximum) on worker: Render sends SIGTERM, waits, then SIGKILL ([deploys](https://render.com/docs/deploys#graceful-shutdown)).
-- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check). If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
+- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check), plus extra swap (`scripts/ci/add-swap.sh`) because the compile peaks at ~10 GB: past 8 GB it pages out instead of killing the runner, at some cost in build time. If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
 
 ## 15. HIPAA, and when to move to AWS
 

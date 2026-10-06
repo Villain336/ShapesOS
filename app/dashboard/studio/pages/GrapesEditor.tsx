@@ -41,9 +41,9 @@ interface BrandDefaults {
 }
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[0.8125rem] font-semibold text-white aos-press disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
 const btnIconActive = "bg-ink text-white";
 const btnIconIdle = "text-subtle hover:bg-hover-paper";
 
@@ -234,18 +234,18 @@ export function GrapesEditor({ pageId }: { pageId: string }) {
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-paper px-3 py-2">
         <Link
           href="/dashboard/studio"
-          className="flex items-center gap-1 text-[13px] font-medium text-muted hover:text-ink"
+          className="flex items-center gap-1 text-[0.8125rem] font-medium text-muted hover:text-ink"
         >
           <ArrowLeft size={14} /> Pages
         </Link>
         <span className="text-subtle">/</span>
-        <span className="max-w-56 truncate text-[13px] font-semibold text-ink">{name}</span>
-        <span className="rounded-full border border-line bg-canvas px-2 py-0.5 text-[10px] font-medium text-muted">
+        <span className="max-w-56 truncate text-[0.8125rem] font-semibold text-ink">{name}</span>
+        <span className="rounded-full border border-line bg-canvas px-2 py-0.5 text-[0.625rem] font-medium text-muted">
           {kind === "email" ? "Email" : "Landing page"}
         </span>
-        {dirty && !saving && <span className="text-[12px] text-subtle">Unsaved changes</span>}
+        {dirty && !saving && <span className="text-[0.75rem] text-subtle">Unsaved changes</span>}
         {savedAt && !dirty && (
-          <span className="flex items-center gap-1 text-[12px] text-muted">
+          <span className="flex items-center gap-1 text-[0.75rem] text-muted">
             <Check size={12} /> Saved {savedAt}
           </span>
         )}
@@ -288,7 +288,7 @@ export function GrapesEditor({ pageId }: { pageId: string }) {
       </div>
 
       {error && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div className="flex shrink-0 items-start gap-2 border-b border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -296,7 +296,7 @@ export function GrapesEditor({ pageId }: { pageId: string }) {
 
       <div className="relative min-h-0 flex-1 bg-canvas">
         {!ready && !error && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-canvas text-[13px] text-muted">
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-canvas text-[0.8125rem] text-muted">
             <Loader2 size={16} className="animate-spin" /> Loading page builder…
           </div>
         )}

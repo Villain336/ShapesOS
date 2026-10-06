@@ -74,7 +74,7 @@ export function PostButton({ id }: { id: string }) {
         type="button"
         onClick={act}
         disabled={busy}
-        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
+        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40"
       >
         {busy ? "Posting…" : "Post to GBP"}
       </button>

@@ -7,25 +7,30 @@ import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import SettingsNav from "@/components/settings/SettingsNav";
 import { SETTINGS_GROUPS } from "@/components/settings/settingsSections";
+// Phase 18.1 (WS=find): "You" first, every label in the person's language.
+import { getI18n } from "@/lib/i18n/server";
+import { settingsPageText } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Settings — ShapesOS",
-  description: "Workspace settings: members, billing, integrations, brand, and developer access.",
+  description: "Your preferences and the workspace's settings: members, billing, integrations, brand, and developer access.",
 };
 
 export default async function SettingsLandingPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const { t, messages } = await getI18n();
+  const groupLabels = messages.settings.groups as Record<string, string>;
 
   return (
     <div className="bg-canvas p-4 md:p-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <div>
-          <h1 className="aos-heading">Settings</h1>
-          <p className="mt-0.5 text-sm text-muted">{workspace.name}: every workspace setting, by section.</p>
+          <h1 className="aos-heading">{t("settings.title")}</h1>
+          <p className="mt-0.5 text-sm text-muted">{t("settings.subtitle", { workspace: workspace.name })}</p>
         </div>
         <SettingsNav />
         <div className="flex flex-col gap-6">
@@ -35,11 +40,12 @@ export default async function SettingsLandingPage() {
               <section key={group.id} aria-labelledby={`settings-${group.id}`}>
                 <h2 id={`settings-${group.id}`} className="aos-subheading flex items-center gap-2">
                   <GroupIcon size={18} aria-hidden />
-                  {group.label}
+                  {groupLabels[group.id] ?? group.label}
                 </h2>
                 <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                   {group.pages.map((s) => {
                     const Icon = s.icon;
+                    const text = settingsPageText(messages, s.href);
                     return (
                       <li key={s.href}>
                         <Link
@@ -48,8 +54,8 @@ export default async function SettingsLandingPage() {
                         >
                           <Icon size={16} className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-ink" aria-hidden />
                           <span className="min-w-0">
-                            <span className="block text-base font-semibold text-ink">{s.label}</span>
-                            <span className="block text-sm leading-snug text-muted">{s.description}</span>
+                            <span className="block text-base font-semibold text-ink">{text.label ?? s.label}</span>
+                            <span className="block text-sm leading-snug text-muted">{text.description ?? s.description}</span>
                           </span>
                         </Link>
                       </li>

@@ -37,7 +37,7 @@ export default function DecayActions({ projectId, findingId }: { projectId: stri
         <button
           onClick={() => act("create_brief")}
           disabled={busy !== null}
-          className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy === "create_brief" ? "Creating…" : "Create refresh brief →"}
         </button>

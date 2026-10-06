@@ -24,6 +24,7 @@ export function Banner({
   action,
   onDismiss,
   className,
+  statusLabel,
 }: {
   status: AosColorStatus;
   title: string;
@@ -31,6 +32,8 @@ export function Banner({
   action?: BannerAction | null;
   onDismiss?: () => void;
   className?: string;
+  /** Phase 18.1: the state word for screen readers in the person's language. */
+  statusLabel?: string;
 }) {
   const meta = STATUS_META[status];
   // On yellow the action is black; on blue/green/red it is white.
@@ -40,7 +43,7 @@ export function Banner({
       role={status === "failed" ? "alert" : "status"}
       className={cn("flex min-h-[72px] flex-wrap items-center gap-x-4 gap-y-3 rounded-md px-5 py-3 sm:flex-nowrap", meta.fill, meta.onFill, className)}
     >
-      <StatusShape status={status} size={14} tone="inherit" live={false} label={meta.label} className="self-start mt-[3px] sm:self-center sm:mt-0" />
+      <StatusShape status={status} size={14} tone="inherit" live={false} label={statusLabel ?? meta.label} className="self-start mt-[3px] sm:self-center sm:mt-0" />
       <div className="min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:basis-auto">
         <p className="text-base leading-5 font-semibold">{title}</p>
         {description ? <p className="mt-0.5 text-md leading-5">{description}</p> : null}

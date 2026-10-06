@@ -90,7 +90,7 @@ export function OpsWorkflowRunCard({ runId }: OpsWorkflowRunCardProps) {
 
   if (error && !run) {
     return (
-      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
+      <div className="rounded-lg bg-paper p-4 text-[0.8125rem] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4" />
           <span>{error}</span>
@@ -101,7 +101,7 @@ export function OpsWorkflowRunCard({ runId }: OpsWorkflowRunCardProps) {
 
   if (!run) {
     return (
-      <div className="rounded-lg bg-paper p-4 text-[13px] text-muted shadow-hairline">
+      <div className="rounded-lg bg-paper p-4 text-[0.8125rem] text-muted shadow-hairline">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading workflow run…</span>
@@ -120,12 +120,12 @@ export function OpsWorkflowRunCard({ runId }: OpsWorkflowRunCardProps) {
           <span className="text-sm font-semibold text-ink">
             {run.workflowName}
           </span>
-          <span className="text-[12px] text-muted">
+          <span className="text-[0.75rem] text-muted">
             run {run.runKey} · {doneSteps}/{run.stepStates.length} steps done
           </span>
         </div>
         <span
-          className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold ${
+          className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[0.75rem] font-semibold ${
             STATUS_BADGE[run.status] ?? STATUS_BADGE.running
           }`}
         >
@@ -138,26 +138,26 @@ export function OpsWorkflowRunCard({ runId }: OpsWorkflowRunCardProps) {
       </div>
       <ul className="divide-y divide-line">
         {run.stepStates.map((s) => (
-          <li key={s.name} className="flex items-center gap-3 px-4 py-2 text-[13px]">
+          <li key={s.name} className="flex items-center gap-3 px-4 py-2 text-[0.8125rem]">
             <span className={`shrink-0 [--aos-shape-size:9px] ${STEP_SHAPE[s.status] ?? STEP_SHAPE.pending}`} aria-hidden="true" />
             <span className="font-medium text-ink">{s.name}</span>
-            <span className="text-[12px] text-muted">{s.status}</span>
-            {s.errorMessage && <span className="truncate text-[12px] text-failed-text">{s.errorMessage}</span>}
+            <span className="text-[0.75rem] text-muted">{s.status}</span>
+            {s.errorMessage && <span className="truncate text-[0.75rem] text-failed-text">{s.errorMessage}</span>}
           </li>
         ))}
       </ul>
       {run.failure && (
-        <div role="alert" className="border-t border-line bg-failed-tint px-4 py-2 text-[12px] text-failed-text">
+        <div role="alert" className="border-t border-line bg-failed-tint px-4 py-2 text-[0.75rem] text-failed-text">
           Failed at step {run.failure.step}: {run.failure.errorMessage}
         </div>
       )}
       {run.compensationLog.length > 0 && (
         <div className="border-t border-line px-4 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-ink">
+          <div className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-ink">
             <Undo2 className="h-3.5 w-3.5" />
             Rollback log
           </div>
-          <ul className="space-y-0.5 text-[12px] text-muted">
+          <ul className="space-y-0.5 text-[0.75rem] text-muted">
             {run.compensationLog.map((c, i) => (
               <li key={i}>
                 <span className={c.ok ? "text-ink" : "text-failed-text"}>

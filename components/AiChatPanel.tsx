@@ -95,11 +95,11 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                       approvals — grounded in this project’s data.
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-                      <span className="text-[12px] text-muted">Try:</span>
+                      <span className="text-[0.75rem] text-muted">Try:</span>
                       {["/rankings", "/keywords", "/alerts", "/help"].map((c) => (
                         <code
                           key={c}
-                          className="rounded-key bg-paper px-1.5 py-0.5 font-mono text-[12px] text-ink shadow-hairline"
+                          className="rounded-key bg-paper px-1.5 py-0.5 font-mono text-[0.75rem] text-ink shadow-hairline"
                         >
                           {c}
                         </code>
@@ -151,7 +151,7 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                                 </div>
                               </BubbleContent>
                               {m.toolCalls?.some((c) => c.tool === CACHED_ANSWER_TOOL) ? (
-                                <p className="mt-1 text-[12px] text-muted">Cached answer — reused from a recent identical question</p>
+                                <p className="mt-1 text-[0.75rem] text-muted">Cached answer — reused from a recent identical question</p>
                               ) : null}
                               {m.toolCalls && toolSteps(m.toolCalls).length > 0 && (
                                 <div className="mt-2">
@@ -223,12 +223,12 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                   />
                 </div>
               ) : (
-                <div className="rounded-xl bg-paper px-4 py-3 text-center text-[13px] text-muted shadow-raised">
+                <div className="rounded-xl bg-paper px-4 py-3 text-center text-[0.8125rem] text-muted shadow-raised">
                   You need the editor role to chat with ShapesOS.
                 </div>
               )}
               {mockMode && canEdit && (
-                <p className="mt-2 text-center text-[12px] text-muted">
+                <p className="mt-2 text-center text-[0.75rem] text-muted">
                   Mock mode — the assistant runs a rule-based demo. Type{" "}
                   <code className="rounded-key bg-paper px-1 font-mono shadow-hairline">/help</code>{" "}
                   to see commands.

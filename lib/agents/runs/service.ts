@@ -22,6 +22,7 @@ import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
 import { notifyAgentRunFailed } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
 import { publishRunEvent } from "./live-events";
+import { HttpError } from "@/lib/api/errors";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -39,10 +40,26 @@ export interface AttachRecordingInput {
   retentionUntil: Date;
 }
 
+/**
+ * Phase 18.1 (WS=desk): "Pause all agents" (Control Center) freezes the
+ * workspace through the kill switch (lib/orchestrator/killswitch.ts). Every
+ * agent run — chat turns, scheduled skills, missions, browser runs, sub-agents
+ * — is created here, so a frozen workspace starts nothing new until an admin
+ * resumes it. 409 with code "agents_paused" for request handlers.
+ */
+export class AgentsPausedError extends HttpError {
+  constructor() {
+    super(409, "Agents are paused in this workspace. An admin can resume them from Control Center.", { code: "agents_paused" });
+    this.name = "AgentsPausedError";
+  }
+}
+
 /** Create a run in `queued` status; links back to the chat thread/mission. */
 export async function createAgentRun(input: CreateAgentRunInput) {
   if (!input.workspaceId) throw new Error("createAgentRun: workspaceId is required");
   if (!input.startedBy) throw new Error("createAgentRun: startedBy is required");
+  const ws = await prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { frozenAt: true } });
+  if (ws?.frozenAt) throw new AgentsPausedError();
   return withWorkspaceScope(input.workspaceId, (tx) =>
     tx.agentRun.create({
       data: {

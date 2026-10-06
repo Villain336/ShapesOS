@@ -52,24 +52,24 @@ function ContactCard({ contact }: { contact: ContactView }) {
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-ink">{contact.name}</span>
+            <span className="text-[0.9375rem] font-semibold text-ink">{contact.name}</span>
             {contact.isStarterContact && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-black px-2 py-0.5 text-[11px] font-semibold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-black px-2 py-0.5 text-[0.6875rem] font-semibold text-white">
                 <Sparkles size={11} />
                 Starter contact
               </span>
             )}
           </div>
-          {contact.role && <div className="text-[13px] text-muted">{contact.role}</div>}
+          {contact.role && <div className="text-[0.8125rem] text-muted">{contact.role}</div>}
         </div>
       </div>
       {contact.handle && (
-        <div className="flex items-center gap-1.5 text-[13px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.8125rem] text-muted">
           <Mail size={13} />
           <span className="font-mono">{contact.handle}</span>
         </div>
       )}
-      {contact.note && <p className="text-[13px] text-muted">{contact.note}</p>}
+      {contact.note && <p className="text-[0.8125rem] text-muted">{contact.note}</p>}
     </div>
   );
 }
@@ -97,11 +97,11 @@ export function NetworkView({
       <section aria-label="Your network">
         <div className="mb-2 flex items-center gap-2">
           <Users size={15} className="text-ink" />
-          <h2 className="text-[18px] font-bold text-ink" style={{ fontStretch: "115%" }}>
+          <h2 className="text-[1.125rem] font-bold text-ink" style={{ fontStretch: "115%" }}>
             Your network
           </h2>
         </div>
-        <p className="mb-3 text-[13px] text-muted">
+        <p className="mb-3 text-[0.8125rem] text-muted">
           Boardy is preloaded as your first contact — your starter network. His
           job is to help you grow this graph through warm intros matched to
           your target investor profile. There is no programmatic Boardy API;
@@ -123,11 +123,11 @@ export function NetworkView({
       <section aria-label="Intro requests">
         <div className="mb-2 flex items-center gap-2">
           <Handshake size={15} className="text-ink" />
-          <h2 className="text-[18px] font-bold text-ink" style={{ fontStretch: "115%" }}>
+          <h2 className="text-[1.125rem] font-bold text-ink" style={{ fontStretch: "115%" }}>
             Intro requests
           </h2>
         </div>
-        <p className="mb-3 text-[13px] text-muted">
+        <p className="mb-3 text-[0.8125rem] text-muted">
           Intro requests are rate-limited and context-rich — one per contact and
           investor pair, no spray-and-pray. Boardy&rsquo;s reputation is the
           asset; this feature protects it.
@@ -145,12 +145,12 @@ export function NetworkView({
                 className="flex flex-col gap-1 rounded-lg bg-paper p-3 shadow-hairline md:flex-row md:items-center md:justify-between"
               >
                 <div className="min-w-0">
-                  <div className="text-[14px] font-semibold text-ink">
+                  <div className="text-[0.875rem] font-semibold text-ink">
                     {r.contactName} → {r.investorName}
                   </div>
-                  <div className="truncate text-[13px] text-muted">{r.reason}</div>
+                  <div className="truncate text-[0.8125rem] text-muted">{r.reason}</div>
                 </div>
-                <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-paper px-2.5 py-1 text-[12px] font-semibold text-muted shadow-control">
+                <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-paper px-2.5 py-1 text-[0.75rem] font-semibold text-muted shadow-control">
                   {STATUS_LABELS[r.status] ?? r.status}
                 </span>
               </div>

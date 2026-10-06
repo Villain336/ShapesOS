@@ -31,7 +31,7 @@ export default async function DesignEditorPage({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-canvas px-4 py-2">
         <Link
           href="/dashboard/studio"
-          className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-ink"
+          className="flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Studio

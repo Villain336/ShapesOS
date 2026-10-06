@@ -27,7 +27,7 @@ export function Chip({
 }) {
   void tone;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
@@ -42,7 +42,7 @@ export const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 export const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 
 export const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
@@ -58,8 +58,8 @@ export const btnApprove =
 export const btnReview =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press hover:opacity-90 disabled:opacity-40";
 
-export const tableCls = "w-full text-left text-[13px]";
-export const theadCls = "border-b border-line text-[11px] font-medium text-muted";
+export const tableCls = "w-full text-left text-[0.8125rem]";
+export const theadCls = "border-b border-line text-[0.6875rem] font-medium text-muted";
 export const thCls = "px-3 py-2";
 export const rowCls = "border-b border-line hover:bg-hover-paper";
 export const tdCls = "px-3 py-2 text-muted";
@@ -78,7 +78,7 @@ export function VoiceTabs({ active }: { active: string }) {
         <a
           key={t.id}
           href={t.href}
-          className={`px-3 py-2 text-[13px] font-medium ${
+          className={`px-3 py-2 text-[0.8125rem] font-medium ${
             active === t.id
               ? "border-b-2 border-ink text-ink"
               : "text-muted hover:text-ink"
@@ -94,7 +94,7 @@ export function VoiceTabs({ active }: { active: string }) {
 /** Info note strip (border-line bg-paper per house pattern). */
 export function Note({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-md border border-line bg-paper px-3 py-2 text-[12px] text-muted">
+    <div className="rounded-md border border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
       {children}
     </div>
   );

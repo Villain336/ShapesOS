@@ -96,7 +96,7 @@ export function AiPanel() {
     if (s.kind === "idle") return null;
     if (s.kind === "busy") {
       return (
-        <p className="flex items-center gap-1.5 text-[12px] text-running">
+        <p className="flex items-center gap-1.5 text-[0.75rem] text-running">
           <span className="aos-shape aos-shape--running aos-is-live" />
           {s.label} This can take ~30 seconds.
         </p>
@@ -104,7 +104,7 @@ export function AiPanel() {
     }
     return (
       <p
-        className={`flex items-start gap-1.5 rounded-md border px-2.5 py-2 text-[12px] leading-snug ${
+        className={`flex items-start gap-1.5 rounded-md border px-2.5 py-2 text-[0.75rem] leading-snug ${
           s.kind === "error"
             ? "border-failed bg-failed-tint text-failed-text"
             : "border-line bg-paper text-ink"
@@ -139,7 +139,7 @@ export function AiPanel() {
               <button
                 key={s.key}
                 onClick={() => setDesignSize(s)}
-                className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
+                className={`rounded-md border px-2 py-1.5 text-left text-[0.6875rem] font-medium ${
                   designSize.key === s.key
                     ? "border-ink bg-ink text-white"
                     : "border-line bg-paper text-muted hover:border-line-strong"
@@ -158,7 +158,7 @@ export function AiPanel() {
             {designStatus.kind === "busy" ? "Drafting…" : "Generate design"}
           </button>
           <div className="mt-2">{renderStatus(designStatus)}</div>
-          <p className="mt-1.5 text-[11px] leading-snug text-subtle">
+          <p className="mt-1.5 text-[0.6875rem] leading-snug text-subtle">
             The AI drafts a starting page — you refine every detail. Nothing is published automatically.
           </p>
         </section>
@@ -178,7 +178,7 @@ export function AiPanel() {
               <button
                 key={s.key}
                 onClick={() => setImageSize(s.key)}
-                className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium ${
+                className={`flex-1 rounded-md border px-2 py-1.5 text-[0.6875rem] font-medium ${
                   imageSize === s.key
                     ? "border-ink bg-ink text-white"
                     : "border-line bg-paper text-muted hover:border-line-strong"
@@ -197,7 +197,7 @@ export function AiPanel() {
             {imageStatus.kind === "busy" ? "Painting…" : "Generate image"}
           </button>
           <div className="mt-2">{renderStatus(imageStatus)}</div>
-          <p className="mt-1.5 text-[11px] leading-snug text-subtle">
+          <p className="mt-1.5 text-[0.6875rem] leading-snug text-subtle">
             Uses your OpenAI image key (LLM_IMAGE_MODEL). Images land in Uploads — you place them.
           </p>
         </section>

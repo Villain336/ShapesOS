@@ -43,12 +43,12 @@ export default async function GeneralSettingsPage({
         />
         <CardBody className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[13px] text-ink-2">Domain</span>
-            <span className="text-[13.5px] font-medium text-ink">{project.domain}</span>
+            <span className="text-[0.8125rem] text-ink-2">Domain</span>
+            <span className="text-[0.84375rem] font-medium text-ink">{project.domain}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[13px] text-ink-2">Locale</span>
-            <span className="text-[13.5px] font-medium text-ink">{project.locale}</span>
+            <span className="text-[0.8125rem] text-ink-2">Locale</span>
+            <span className="text-[0.84375rem] font-medium text-ink">{project.locale}</span>
           </div>
         </CardBody>
       </Card>

@@ -75,7 +75,7 @@ export function ReviewLandingClient({
         <button
           onClick={handleCta}
           disabled={state !== "idle"}
-          className="mt-6 flex h-control-lg w-full items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold text-paper aos-press disabled:opacity-70"
+          className="mt-6 flex h-control-lg w-full items-center justify-center gap-2 rounded-full px-6 text-[0.9375rem] font-semibold text-paper aos-press disabled:opacity-70"
           style={{ backgroundColor: accent }}
         >
           {state === "sending" ? (

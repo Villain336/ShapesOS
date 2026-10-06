@@ -104,7 +104,7 @@ function SeverityPill({ severity }: { severity: DigitalFindingSeverity }) {
           ? "bg-canvas"
           : "text-muted";
   return (
-    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold ${cls}`}>
+    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.8125rem] font-semibold ${cls}`}>
       {severity === "critical" && <TriangleAlert size={13} />}
       {SEVERITY_LABELS[severity]}
     </span>
@@ -120,7 +120,7 @@ const SOURCE_ICONS: Record<DigitalFindingSource, typeof ClipboardCheck> = {
 function SourcePill({ source }: { source: DigitalFindingSource }) {
   const Icon = SOURCE_ICONS[source];
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
       <Icon size={13} />
       {findingSourceLabel(source)}
     </span>
@@ -204,13 +204,13 @@ export function DigitalView({
       {/* Information-not-advice label — also on every API response. */}
       <div className="flex items-start gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <Info size={16} className="mt-0.5 shrink-0" />
-        <p className="text-[14px]">{disclaimer}</p>
+        <p className="text-[0.875rem]">{disclaimer}</p>
       </div>
 
       {/* Hullcheck framing: the digital side of "don't get sued". */}
       <div className="flex items-start gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" />
-        <div className="text-[14px]">
+        <div className="text-[0.875rem]">
           <p className="font-semibold">Don&apos;t get sued — the digital side</p>
           <p className="mt-1 text-muted">
             Register your websites and apps, walk a plain-English self-assessment,
@@ -225,7 +225,7 @@ export function DigitalView({
       {error && (
         <div className="flex items-center gap-3 rounded-lg bg-paper p-4 shadow-hairline">
           <TriangleAlert size={16} className="shrink-0" />
-          <p className="text-[14px]">{error}</p>
+          <p className="text-[0.875rem]">{error}</p>
           <button
             type="button"
             onClick={() => setError(null)}
@@ -238,7 +238,7 @@ export function DigitalView({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           {properties.length} {properties.length === 1 ? "property" : "properties"} ·{" "}
           {openTotal} open {openTotal === 1 ? "finding" : "findings"}
         </p>
@@ -246,7 +246,7 @@ export function DigitalView({
           <button
             type="button"
             onClick={() => setShowAdd((v) => !v)}
-            className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[14px] font-semibold text-white"
+            className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white"
           >
             <Plus size={15} />
             Add property
@@ -266,9 +266,9 @@ export function DigitalView({
 
       {/* Property list — dense table, house pattern. */}
       <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
-        <table className="w-full text-left text-[14px]">
+        <table className="w-full text-left text-[0.875rem]">
           <thead>
-            <tr className="border-b border-line text-[12px] font-semibold text-muted">
+            <tr className="border-b border-line text-[0.75rem] font-semibold text-muted">
               <th className="px-4 py-3">Property</th>
               <th className="px-4 py-3">Kind</th>
               <th className="px-4 py-3">URL</th>
@@ -324,7 +324,7 @@ export function DigitalView({
                   </td>
                   <td className="px-4 py-3">
                     {p.openFindingCount > 0 ? (
-                      <span className="font-mono text-[13px]">
+                      <span className="font-mono text-[0.8125rem]">
                         {p.openFindingCount}
                         {p.criticalOpenCount > 0 && (
                           <span className="text-muted"> ({p.criticalOpenCount} critical)</span>
@@ -409,55 +409,55 @@ function AddPropertyForm({
       onSubmit={(e) => void submit(e)}
       className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline"
     >
-      <p className="text-[15px] font-semibold">Add a digital property</p>
+      <p className="text-[0.9375rem] font-semibold">Add a digital property</p>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">Name</span>
+          <span className="text-[0.8125rem] font-semibold">Name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. My store's website"
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
             required
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">Kind</span>
+          <span className="text-[0.8125rem] font-semibold">Kind</span>
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as DigitalPropertyKind)}
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
           >
             <option value="website">Website</option>
             <option value="app">App</option>
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">URL (optional)</span>
+          <span className="text-[0.8125rem] font-semibold">URL (optional)</span>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com"
             inputMode="url"
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">Notes (optional)</span>
+          <span className="text-[0.8125rem] font-semibold">Notes (optional)</span>
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="What this property is for"
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
           />
         </label>
       </div>
-      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={busy}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? "Adding" : "Add property"}
@@ -465,7 +465,7 @@ function AddPropertyForm({
         <button
           type="button"
           onClick={onCancel}
-          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[15px] font-semibold shadow-outline"
+          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[0.9375rem] font-semibold shadow-outline"
         >
           Cancel
         </button>
@@ -512,10 +512,10 @@ function PropertyDetail({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-[18px] font-bold" style={{ fontStretch: "115%" }}>
+        <h3 className="text-[1.125rem] font-bold" style={{ fontStretch: "115%" }}>
           {detail.name}
         </h3>
-        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
           {detail.kind === "website" ? <Globe size={13} /> : <Smartphone size={13} />}
           {detail.kind === "website" ? "Website" : "App"}
         </span>
@@ -526,7 +526,7 @@ function PropertyDetail({
               setShowAssess((v) => !v);
               setShowAddFinding(false);
             }}
-            className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[14px] font-semibold text-white"
+            className="aos-press flex h-10 items-center gap-2 rounded-full bg-black px-4 text-[0.875rem] font-semibold text-white"
           >
             <ClipboardCheck size={15} />
             Walk the self-assessment
@@ -537,7 +537,7 @@ function PropertyDetail({
               setShowAddFinding((v) => !v);
               setShowAssess(false);
             }}
-            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[14px] font-semibold shadow-outline"
+            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-4 text-[0.875rem] font-semibold shadow-outline"
           >
             <Plus size={15} />
             Add finding
@@ -568,8 +568,8 @@ function PropertyDetail({
 
       {open.length === 0 && closed.length === 0 ? (
         <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-          <p className="text-[15px] font-semibold">No findings yet</p>
-          <p className="mt-1 text-[14px] text-muted">
+          <p className="text-[0.9375rem] font-semibold">No findings yet</p>
+          <p className="mt-1 text-[0.875rem] text-muted">
             Walk the self-assessment to surface the gaps — in plain English, no
             scanner jargon.
           </p>
@@ -582,13 +582,13 @@ function PropertyDetail({
             return (
               <section key={layer.value} className="flex flex-col gap-2">
                 <div className="flex items-baseline gap-2">
-                  <h4 className="text-[15px] font-bold" style={{ fontStretch: "110%" }}>
+                  <h4 className="text-[0.9375rem] font-bold" style={{ fontStretch: "110%" }}>
                     {layer.label}
                   </h4>
-                  <span className="rounded-full bg-black px-2 py-0.5 font-mono text-[11px] text-white">
+                  <span className="rounded-full bg-black px-2 py-0.5 font-mono text-[0.6875rem] text-white">
                     {items.length}
                   </span>
-                  <p className="text-[13px] text-muted">{layer.whatItCovers}</p>
+                  <p className="text-[0.8125rem] text-muted">{layer.whatItCovers}</p>
                 </div>
                 {items.map((f) => (
                   <FindingCard
@@ -605,7 +605,7 @@ function PropertyDetail({
 
           {closed.length > 0 && (
             <section className="flex flex-col gap-2">
-              <h4 className="text-[15px] font-bold" style={{ fontStretch: "110%" }}>
+              <h4 className="text-[0.9375rem] font-bold" style={{ fontStretch: "110%" }}>
                 Closed ({closed.length})
               </h4>
               {closed.map((f) => (
@@ -642,11 +642,11 @@ function FindingCard({
       <div className="flex flex-wrap items-center gap-2">
         <SeverityPill severity={finding.severity} />
         <SourcePill source={finding.source} />
-        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
           {LayerLabel({ layer: finding.hullcheckLayer })} layer
         </span>
         {!open && (
-          <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold text-muted">
+          <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold text-muted">
             {finding.status === "fixed" ? <CheckCircle2 size={13} /> : <EyeOff size={13} />}
             {finding.status === "fixed" ? "Fixed" : "Dismissed"}
           </span>
@@ -658,7 +658,7 @@ function FindingCard({
                 type="button"
                 disabled={busy}
                 onClick={() => onSetStatus("fixed")}
-                className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[13px] font-semibold shadow-outline disabled:opacity-50"
+                className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[0.8125rem] font-semibold shadow-outline disabled:opacity-50"
               >
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                 Mark fixed
@@ -667,7 +667,7 @@ function FindingCard({
                 type="button"
                 disabled={busy}
                 onClick={() => onSetStatus("dismissed")}
-                className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[13px] font-semibold shadow-outline disabled:opacity-50"
+                className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[0.8125rem] font-semibold shadow-outline disabled:opacity-50"
               >
                 <EyeOff size={13} />
                 Dismiss
@@ -678,7 +678,7 @@ function FindingCard({
               type="button"
               disabled={busy}
               onClick={() => onSetStatus("open")}
-              className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[13px] font-semibold shadow-outline disabled:opacity-50"
+              className="aos-press flex h-9 items-center gap-1.5 rounded-full bg-paper px-3.5 text-[0.8125rem] font-semibold shadow-outline disabled:opacity-50"
             >
               {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
               Reopen
@@ -688,13 +688,13 @@ function FindingCard({
       </div>
 
       <div>
-        <p className="text-[15px] font-semibold">{finding.title}</p>
-        <p className="mt-1 text-[14px] text-muted">{finding.plainEnglishSummary}</p>
+        <p className="text-[0.9375rem] font-semibold">{finding.title}</p>
+        <p className="mt-1 text-[0.875rem] text-muted">{finding.plainEnglishSummary}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {finding.confirmWithProfessional && (
-          <span className="flex items-center gap-1.5 text-[13px] text-muted">
+          <span className="flex items-center gap-1.5 text-[0.8125rem] text-muted">
             <Info size={13} />
             Have an attorney confirm the fix — this one is legal, not just technical.
           </span>
@@ -703,7 +703,7 @@ function FindingCard({
           <button
             type="button"
             onClick={onShowObligations}
-            className="aos-press flex h-8 items-center gap-1.5 rounded-full bg-canvas px-3 text-[13px] font-semibold"
+            className="aos-press flex h-8 items-center gap-1.5 rounded-full bg-canvas px-3 text-[0.8125rem] font-semibold"
           >
             <Link2 size={13} />
             Related obligation{finding.obligationTitle ? `: ${finding.obligationTitle}` : ""}
@@ -777,7 +777,7 @@ function AssessmentPanel({
     <div className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline">
       <div className="flex items-start gap-3">
         <ClipboardCheck size={16} className="mt-0.5 shrink-0" />
-        <div className="text-[14px]">
+        <div className="text-[0.875rem]">
           <p className="font-semibold">Self-assessment — your answers, not a scan</p>
           <p className="mt-1 text-muted">
             Answer each question honestly. &ldquo;No&rdquo; creates a finding at full
@@ -793,7 +793,7 @@ function AssessmentPanel({
         const current = answers[item.key];
         return (
           <div key={item.key} className="flex flex-col gap-2 rounded-md border border-line p-3">
-            <p className="text-[14px] font-medium">{item.question}</p>
+            <p className="text-[0.875rem] font-medium">{item.question}</p>
             <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={item.question}>
               {SELF_ASSESSMENT_ANSWERS.map((a) => {
                 const pressed = current === a.value;
@@ -806,7 +806,7 @@ function AssessmentPanel({
                     onClick={() =>
                       setAnswers((prev) => ({ ...prev, [item.key]: a.value }))
                     }
-                    className={`aos-press flex h-9 items-center rounded-full px-4 text-[13px] font-semibold ${
+                    className={`aos-press flex h-9 items-center rounded-full px-4 text-[0.8125rem] font-semibold ${
                       pressed ? "bg-black text-white" : "bg-paper shadow-outline"
                     }`}
                   >
@@ -814,7 +814,7 @@ function AssessmentPanel({
                   </button>
                 );
               })}
-              <span className="ml-auto rounded-full bg-canvas px-2.5 py-1 text-[12px] font-semibold text-muted">
+              <span className="ml-auto rounded-full bg-canvas px-2.5 py-1 text-[0.75rem] font-semibold text-muted">
                 {LayerLabel({ layer: item.layer })}
               </span>
             </div>
@@ -827,12 +827,12 @@ function AssessmentPanel({
           type="button"
           disabled={busy || answered === 0}
           onClick={() => void submit()}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? "Generating" : `Generate findings (${answered} answered)`}
         </button>
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Re-running replaces open self-assessment findings — fixed or dismissed
           ones stay as you left them.
         </p>
@@ -888,24 +888,24 @@ function ManualFindingForm({
     >
       <div className="flex items-start gap-3">
         <Pencil size={16} className="mt-0.5 shrink-0" />
-        <p className="text-[14px] text-muted">
+        <p className="text-[0.875rem] text-muted">
           Add a finding by hand — e.g. something from a report you read elsewhere.
           It will be labeled <span className="font-semibold">Added manually</span>.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1.5 md:col-span-2">
-          <span className="text-[13px] font-semibold">Title</span>
+          <span className="text-[0.8125rem] font-semibold">Title</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Login page has no rate limiting"
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
             required
           />
         </label>
         <label className="flex flex-col gap-1.5 md:col-span-2">
-          <span className="text-[13px] font-semibold">
+          <span className="text-[0.8125rem] font-semibold">
             What this means for the business (plain English)
           </span>
           <textarea
@@ -913,16 +913,16 @@ function ManualFindingForm({
             onChange={(e) => setSummary(e.target.value)}
             placeholder="Explain the risk in plain words — no scanner jargon."
             rows={3}
-            className="rounded-md border border-control bg-paper px-3 py-2 text-[15px]"
+            className="rounded-md border border-control bg-paper px-3 py-2 text-[0.9375rem]"
             required
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">Layer</span>
+          <span className="text-[0.8125rem] font-semibold">Layer</span>
           <select
             value={layer}
             onChange={(e) => setLayer(e.target.value as HullcheckLayer)}
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
           >
             {HULLCHECK_LAYERS.map((l) => (
               <option key={l.value} value={l.value}>
@@ -932,11 +932,11 @@ function ManualFindingForm({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold">Severity</span>
+          <span className="text-[0.8125rem] font-semibold">Severity</span>
           <select
             value={severity}
             onChange={(e) => setSeverity(e.target.value as DigitalFindingSeverity)}
-            className="h-11 rounded-md border border-control bg-paper px-3 text-[15px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 text-[0.9375rem]"
           >
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -945,14 +945,14 @@ function ManualFindingForm({
           </select>
         </label>
         <label className="flex flex-col gap-1.5 md:col-span-2">
-          <span className="text-[13px] font-semibold">
+          <span className="text-[0.8125rem] font-semibold">
             Related obligation key (optional, from your obligation list)
           </span>
           <input
             value={obligationKey}
             onChange={(e) => setObligationKey(e.target.value)}
             placeholder="e.g. saas-terms-and-privacy"
-            className="h-11 rounded-md border border-control bg-paper px-3 font-mono text-[14px]"
+            className="h-11 rounded-md border border-control bg-paper px-3 font-mono text-[0.875rem]"
           />
         </label>
       </div>
@@ -960,7 +960,7 @@ function ManualFindingForm({
         <button
           type="submit"
           disabled={busy}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? "Adding" : "Add finding"}
@@ -968,7 +968,7 @@ function ManualFindingForm({
         <button
           type="button"
           onClick={onCancel}
-          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[15px] font-semibold shadow-outline"
+          className="aos-press flex h-11 items-center rounded-full bg-paper px-5 text-[0.9375rem] font-semibold shadow-outline"
         >
           Cancel
         </button>

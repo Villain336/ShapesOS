@@ -145,7 +145,7 @@ export function FlagsTable() {
 
   if (state.kind === "error") {
     return (
-      <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint p-4 text-[13px] text-failed-text">
+      <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint p-4 text-[0.8125rem] text-failed-text">
         <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
         <span>
         Couldn&apos;t load flags: {state.message}{" "}
@@ -165,7 +165,7 @@ export function FlagsTable() {
             <FlaskConical className="h-5 w-5 text-ink" />
             <h2 className="text-sm font-semibold">GrowthBook is not connected</h2>
           </div>
-          <p className="mt-2 text-[13px] text-muted">
+          <p className="mt-2 text-[0.8125rem] text-muted">
             {state.message ?? "No GrowthBook sidecar configured."} Showing the
             flags ShapesOS wires natively, with their built-in defaults. Toggles
             below still work — they write a per-workspace override, no sidecar
@@ -175,7 +175,7 @@ export function FlagsTable() {
             <p className="flex items-center gap-1.5 text-xs font-medium text-ink">
               <TerminalSquare className="h-4 w-4" /> Quick start
             </p>
-            <pre className="aos-night mt-2 overflow-x-auto rounded-md p-3 font-mono text-[11px] leading-relaxed">
+            <pre className="aos-night mt-2 overflow-x-auto rounded-md p-3 font-mono text-[0.6875rem] leading-relaxed">
 {`docker compose -f docker-compose.yml \\
   -f docker/profiles/growthbook.yml \\
   --profile growthbook up -d`}
@@ -191,7 +191,7 @@ export function FlagsTable() {
       )}
 
       <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line bg-canvas text-xs text-muted">
               <th className="px-4 py-2.5 font-semibold">Flag</th>
@@ -244,7 +244,7 @@ export function FlagsTable() {
                         aria-pressed={f.effectiveValue === true}
                         className={`inline-flex h-8 min-w-12 items-center justify-center rounded-full px-3 text-xs font-semibold ${
                           f.effectiveValue === true
-                            ? "bg-ink text-paper hover:bg-night-hover"
+                            ? "bg-ink text-paper hover:bg-ink-hover"
                             : "bg-paper text-ink shadow-control hover:shadow-outline"
                         } disabled:opacity-40`}
                       >
@@ -268,7 +268,7 @@ export function FlagsTable() {
         </table>
       </div>
 
-      <div className="rounded-md border border-line bg-canvas p-4 text-[13px] text-muted">
+      <div className="rounded-md border border-line bg-canvas p-4 text-[0.8125rem] text-muted">
         <p className="font-semibold text-ink">How the toggle works</p>
         <p className="mt-1">
           The switch writes a <strong>per-workspace override</strong> — only

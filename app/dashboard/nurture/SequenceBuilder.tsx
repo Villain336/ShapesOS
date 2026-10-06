@@ -172,7 +172,7 @@ export function SequenceBuilder({
                     <button
                       key={value}
                       onClick={() => updateStep(i, { channel: value })}
-                      className={`flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium ${
+                      className={`flex items-center gap-1 rounded-full px-2 py-1 text-[0.75rem] font-medium ${
                         step.channel === value ? "bg-ink text-white" : "text-muted hover:bg-hover-paper"
                       }`}
                     >
@@ -181,26 +181,26 @@ export function SequenceBuilder({
                   ))}
                 </div>
                 {isMailChannelValue(step.channel) ? (
-                  <label className="flex items-center gap-1.5 text-[12px] text-muted">
+                  <label className="flex items-center gap-1.5 text-[0.75rem] text-muted">
                     Delay
                     <input
                       type="number"
                       min={0}
                       value={step.delayDays ?? 1}
                       onChange={(e) => updateStep(i, { delayDays: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink focus:border-focus focus:outline-none"
+                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[0.75rem] text-ink focus:border-focus focus:outline-none"
                     />
                     days
                   </label>
                 ) : (
-                  <label className="flex items-center gap-1.5 text-[12px] text-muted">
+                  <label className="flex items-center gap-1.5 text-[0.75rem] text-muted">
                     Delay
                     <input
                       type="number"
                       min={0}
                       value={step.delayMinutes}
                       onChange={(e) => updateStep(i, { delayMinutes: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink focus:border-focus focus:outline-none"
+                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[0.75rem] text-ink focus:border-focus focus:outline-none"
                     />
                     min
                   </label>
@@ -248,7 +248,7 @@ export function SequenceBuilder({
                         </option>
                       ))}
                     </select>
-                    <span className="text-[12px] text-muted">
+                    <span className="text-[0.75rem] text-muted">
                       {inHomePreview(step.delayDays ?? 1)}
                       <span className="text-subtle"> · USPS transit 2–7 days · approval binds creative + spend</span>
                     </span>
@@ -267,7 +267,7 @@ export function SequenceBuilder({
                 />
               ) : null}
               <textarea
-                className={`${inputCls} aos-mono min-h-[76px] text-[12px]`}
+                className={`${inputCls} aos-mono min-h-[76px] text-[0.75rem]`}
                 value={step.template}
                 onChange={(e) => updateStep(i, { template: e.target.value })}
                 placeholder={
@@ -291,7 +291,7 @@ export function SequenceBuilder({
         </div>
       </div>
 
-      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+      {error ? <p className="text-[0.8125rem] text-failed-text">{error}</p> : null}
       <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
         <button className={btnSecondary} onClick={onCancel}>Cancel</button>
         <button

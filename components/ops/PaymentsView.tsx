@@ -105,7 +105,7 @@ export function PaymentsView() {
                     <span className={chipCls}>{sentence(p.status)}</span>
                   </td>
                   <td className={`${tdCls} text-muted`}>{p.orderId ? `SO-${shortId(p.orderId)}` : "—"}</td>
-                  <td className={`${tdCls} font-mono text-[12px] text-muted`}>
+                  <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>
                     {p.provider}
                     {p.providerRef ? ` · ${p.providerRef}` : ""}
                   </td>

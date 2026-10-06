@@ -66,7 +66,7 @@ function StrengthMeter({ strength }: { strength: number }) {
       <span className="h-2 w-24 overflow-hidden rounded-full bg-canvas">
         <span className="block h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
       </span>
-      <span className="text-[13px] font-semibold text-ink">{pct}%</span>
+      <span className="text-[0.8125rem] font-semibold text-ink">{pct}%</span>
     </span>
   );
 }
@@ -75,8 +75,8 @@ function PathCard({ path, rank }: { path: ComputedIntroPath; rank: number }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-paper p-5 shadow-hairline">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[12px] text-white">
+        <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-ink">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[0.75rem] text-white">
             {rank}
           </span>
           {path.hops.map((h, i) => (
@@ -89,9 +89,9 @@ function PathCard({ path, rank }: { path: ComputedIntroPath; rank: number }) {
         <StrengthMeter strength={path.strength} />
       </div>
 
-      <p className="text-[14px] leading-relaxed text-ink">{path.explanation.text}</p>
+      <p className="text-[0.875rem] leading-relaxed text-ink">{path.explanation.text}</p>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem] text-muted">
         <span>
           Your warmth with {path.mutual.name}:{" "}
           <span className="font-semibold text-ink">{path.components.tenantWarmth}/100</span>
@@ -228,11 +228,11 @@ export function FindPathsTab({
       <div className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <div className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Target person</span>
+            <span className="text-[0.75rem] font-semibold text-muted">Target person</span>
             <select
               value={targetPersonId}
               onChange={(e) => pickPerson(e.target.value)}
-              className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
+              className="h-control rounded-md border border-control bg-paper px-3 text-[0.9375rem] text-ink"
             >
               <option value="">— choose a person —</option>
               {persons.map((p) => (
@@ -244,13 +244,13 @@ export function FindPathsTab({
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">
+            <span className="text-[0.75rem] font-semibold text-muted">
               Target company{mode === "funding" ? " (investors)" : " (customers / partners)"}
             </span>
             <select
               value={targetCompanyId}
               onChange={(e) => pickCompany(e.target.value)}
-              className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
+              className="h-control rounded-md border border-control bg-paper px-3 text-[0.9375rem] text-ink"
             >
               <option value="">— choose a company —</option>
               {modeCompanies.map((c) => (
@@ -261,13 +261,13 @@ export function FindPathsTab({
             </select>
           </label>
         </div>
-        {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+        {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             disabled={loading || refreshing || (!targetPersonId && !targetCompanyId)}
             onClick={() => findPaths(false)}
-            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
           >
             {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
             {loading ? "Finding" : "Find a path"}
@@ -276,7 +276,7 @@ export function FindPathsTab({
             type="button"
             disabled={loading || refreshing || (!targetPersonId && !targetCompanyId)}
             onClick={() => findPaths(true)}
-            className="aos-press flex h-11 items-center gap-2 rounded-full bg-paper px-5 text-[15px] font-semibold text-ink shadow-outline disabled:opacity-50"
+            className="aos-press flex h-11 items-center gap-2 rounded-full bg-paper px-5 text-[0.9375rem] font-semibold text-ink shadow-outline disabled:opacity-50"
             title="Recompute paths fresh instead of using the cache"
           >
             {refreshing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
@@ -296,11 +296,11 @@ export function FindPathsTab({
             <p className="aos-subheading">Investor targets — your raise CRM</p>
           </div>
           {investors == null ? (
-            <p className="flex items-center gap-2 text-[13px] text-muted">
+            <p className="flex items-center gap-2 text-[0.8125rem] text-muted">
               <Loader2 size={14} className="animate-spin" /> Loading investor targets
             </p>
           ) : investors.length === 0 ? (
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               No investors in the CRM yet. Add them in the Funding module, then
               target them here.
             </p>
@@ -314,11 +314,11 @@ export function FindPathsTab({
                     className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-canvas px-4 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-ink">
+                      <p className="text-[0.875rem] font-semibold text-ink">
                         {inv.name}
                         {inv.firm ? <span className="font-normal text-muted"> · {inv.firm}</span> : null}
                       </p>
-                      <p className="mt-0.5 text-[12px] text-muted">
+                      <p className="mt-0.5 text-[0.75rem] text-muted">
                         {inv.stage} · check {formatCheckSize(inv.checkSizeMin, inv.checkSizeMax)}
                         {inv.stages.length > 0 ? ` · ${inv.stages.join(", ")}` : ""}
                         {inv.thesisFit ? ` · ${inv.thesisFit}` : ""}
@@ -331,14 +331,14 @@ export function FindPathsTab({
                           pickPerson(match.id);
                           setTargetCompanyId("");
                         }}
-                        className="aos-press flex h-9 shrink-0 items-center gap-2 rounded-full bg-black px-4 text-[13px] font-semibold text-white"
+                        className="aos-press flex h-9 shrink-0 items-center gap-2 rounded-full bg-black px-4 text-[0.8125rem] font-semibold text-white"
                         title={`Find a warm path to ${match.name} (matched by email)`}
                       >
                         <Route size={14} />
                         Path to {match.name}
                       </button>
                     ) : (
-                      <span className="shrink-0 text-[12px] text-muted">
+                      <span className="shrink-0 text-[0.75rem] text-muted">
                         No network contact yet — add them to find a path
                       </span>
                     )}
@@ -351,7 +351,7 @@ export function FindPathsTab({
       )}
 
       {result && result.blocked === "target_excluded" && (
-        <div className="flex items-start gap-2 rounded-lg bg-paper p-5 text-[14px] text-muted shadow-hairline">
+        <div className="flex items-start gap-2 rounded-lg bg-paper p-5 text-[0.875rem] text-muted shadow-hairline">
           <ShieldAlert size={16} className="mt-0.5 shrink-0" />
           This target is on your exclusion list — no paths are computed through or
           to excluded contacts.
@@ -359,7 +359,7 @@ export function FindPathsTab({
       )}
 
       {result && !result.blocked && result.paths.length === 0 && (
-        <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           No warm path to <span className="font-semibold text-ink">{result.target.name}</span>{" "}
           yet. Paths need a mutual contact who shares a company with the target —
           and no boundary blocks on the way. Import more of your network or link
@@ -369,7 +369,7 @@ export function FindPathsTab({
 
       {result && result.paths.length > 0 && (
         <div className="flex flex-col gap-3">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             {result.paths.length} {result.paths.length === 1 ? "path" : "paths"} to{" "}
             <span className="font-semibold text-ink">{result.target.name}</span>
             {result.cached ? " · from cache" : " · freshly computed"} — ranked by
@@ -382,7 +382,7 @@ export function FindPathsTab({
       )}
 
       {!result && !loading && (
-        <div className="flex items-center gap-2 rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="flex items-center gap-2 rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           <Route size={16} className="shrink-0" />
           Your connector finds the warmest route: who you know, how well you know
           them, and how they connect to the person or company you want to reach.

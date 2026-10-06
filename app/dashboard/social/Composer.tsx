@@ -201,7 +201,7 @@ export function Composer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 pt-[6vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-night/40 p-4 pt-[6vh]"
       role="presentation"
       onClick={onClose}
       onKeyDown={closeOnEscape(onClose)}
@@ -227,10 +227,10 @@ export function Composer({
         </div>
 
         {post?.decisionNote && post.status === "draft" ? (
-          <p className="mx-5 mt-4 rounded-md bg-needs-tint px-3 py-2 text-[13px] text-ink">Reviewer note: {post.decisionNote}</p>
+          <p className="mx-5 mt-4 rounded-md bg-needs-tint px-3 py-2 text-[0.8125rem] text-ink">Reviewer note: {post.decisionNote}</p>
         ) : null}
         {post?.error ? (
-          <p className="mx-5 mt-4 flex items-start gap-2 rounded-md bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+          <p className="mx-5 mt-4 flex items-start gap-2 rounded-md bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
             <span className="aos-shape aos-shape--failed mt-1" aria-hidden /> {post.error}
           </p>
         ) : null}
@@ -239,7 +239,7 @@ export function Composer({
           {/* Left: fields */}
           <div className="flex min-w-0 flex-col gap-4">
             <div>
-              <label htmlFor="social-text" className="mb-1 block text-[13px] font-semibold text-ink">Post text</label>
+              <label htmlFor="social-text" className="mb-1 block text-[0.8125rem] font-semibold text-ink">Post text</label>
               <textarea
                 id="social-text"
                 className={`${textareaCls} min-h-[140px]`}
@@ -249,7 +249,7 @@ export function Composer({
                 maxLength={10_000}
                 disabled={!editable}
               />
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.75rem] text-muted">
                 {bodies.length === 0 ? <span>{[...content].length} characters</span> : null}
                 {bodies.map(({ channel, body }) => {
                   const r = rulesFor(channel.identifier);
@@ -265,8 +265,8 @@ export function Composer({
 
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-ink">Media</span>
-                <span className="text-[12px] text-muted">Images or video, up to {fmtBytes(maxUploadBytes)} each</span>
+                <span className="text-[0.8125rem] font-semibold text-ink">Media</span>
+                <span className="text-[0.75rem] text-muted">Images or video, up to {fmtBytes(maxUploadBytes)} each</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {media.map((m) => (
@@ -288,7 +288,7 @@ export function Composer({
                 {editable ? (
                   <button
                     type="button"
-                    className="flex h-[88px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-control text-[12px] font-semibold text-muted hover:bg-hover-paper"
+                    className="flex h-[88px] w-[88px] flex-col items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-control text-[0.75rem] font-semibold text-muted hover:bg-hover-paper"
                     onClick={() => fileRef.current?.click()}
                     disabled={!!busy?.startsWith("upload:")}
                   >
@@ -309,9 +309,9 @@ export function Composer({
             </div>
 
             <div>
-              <span className="mb-1 block text-[13px] font-semibold text-ink">Channels ({picked.length} selected)</span>
+              <span className="mb-1 block text-[0.8125rem] font-semibold text-ink">Channels ({picked.length} selected)</span>
               {allChannels.length === 0 ? (
-                <p className="rounded-md bg-canvas px-3 py-2 text-[13px] text-muted">
+                <p className="rounded-md bg-canvas px-3 py-2 text-[0.8125rem] text-muted">
                   {mode === "none"
                     ? "Connect Postiz to pick channels."
                     : mode === "zernio"
@@ -327,7 +327,7 @@ export function Composer({
                       aria-pressed={pickedIds.has(c.id)}
                       disabled={!editable}
                       onClick={() => toggle(c)}
-                      className={`inline-flex h-chip items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold aos-press ${
+                      className={`inline-flex h-chip items-center gap-1.5 rounded-full px-3 text-[0.8125rem] font-semibold aos-press ${
                         pickedIds.has(c.id) ? "bg-ink text-paper" : "bg-paper text-ink shadow-control hover:shadow-outline"
                       }`}
                     >
@@ -341,13 +341,13 @@ export function Composer({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label htmlFor="social-link" className="mb-1 flex items-center gap-1 text-[13px] font-semibold text-ink">
+                <label htmlFor="social-link" className="mb-1 flex items-center gap-1 text-[0.8125rem] font-semibold text-ink">
                   <Link2 className="h-3.5 w-3.5" /> Link
                 </label>
                 <input id="social-link" className={inputCls} value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" disabled={!editable} />
               </div>
               <div>
-                <label htmlFor="social-campaign" className="mb-1 block text-[13px] font-semibold text-ink">Campaign</label>
+                <label htmlFor="social-campaign" className="mb-1 block text-[0.8125rem] font-semibold text-ink">Campaign</label>
                 <input
                   id="social-campaign"
                   className={inputCls}
@@ -357,14 +357,14 @@ export function Composer({
                   disabled={!editable}
                 />
               </div>
-              <p className="text-[12px] text-muted sm:col-span-2">
+              <p className="text-[0.75rem] text-muted sm:col-span-2">
                 Links in the post get utm_source (the platform), utm_medium=social, utm_campaign and utm_content (this post), so
                 leads from them show up under Social in Attribution.
               </p>
             </div>
 
             <div>
-              <span className="mb-1 block text-[13px] font-semibold text-ink">When</span>
+              <span className="mb-1 block text-[0.8125rem] font-semibold text-ink">When</span>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex rounded-full bg-control p-1" role="group" aria-label="Publish timing">
                   {(["now", "schedule"] as const).map((m) => (
@@ -374,7 +374,7 @@ export function Composer({
                       aria-pressed={publishMode === m}
                       disabled={!editable}
                       onClick={() => setPublishMode(m)}
-                      className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold ${publishMode === m ? "bg-ink text-paper" : "text-ink"}`}
+                      className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-[0.8125rem] font-semibold ${publishMode === m ? "bg-ink text-paper" : "text-ink"}`}
                     >
                       {m === "now" ? <Send className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
                       {m === "now" ? "On approval" : "Schedule"}
@@ -395,7 +395,7 @@ export function Composer({
             </div>
 
             {editable && (uniqueIssues.length > 0 || timingIssue) ? (
-              <ul className="flex flex-col gap-1 rounded-md bg-failed-tint px-3 py-2 text-[13px] text-failed-text" aria-live="polite">
+              <ul className="flex flex-col gap-1 rounded-md bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text" aria-live="polite">
                 {[...uniqueIssues, ...(timingIssue ? [timingIssue] : [])].map((m) => (
                   <li key={m} className="flex items-start gap-2">
                     <span className="aos-shape aos-shape--failed mt-1" aria-hidden />
@@ -406,7 +406,7 @@ export function Composer({
             ) : null}
 
             {post?.metrics ? (
-              <div className="rounded-md bg-canvas px-3 py-2 text-[13px] text-ink">
+              <div className="rounded-md bg-canvas px-3 py-2 text-[0.8125rem] text-ink">
                 <span className="font-semibold">Engagement{post.metrics.mock ? " (sample data)" : ""}: </span>
                 {fmtInt(post.metrics.impressions)} impressions · {fmtInt(post.metrics.likes)} likes · {fmtInt(post.metrics.comments)} comments ·{" "}
                 {fmtInt(post.metrics.shares)} shares · {fmtInt(post.metrics.clicks)} clicks
@@ -417,7 +417,7 @@ export function Composer({
           {/* Right: preview */}
           <aside className="flex min-w-0 flex-col gap-2" aria-label="Preview">
             <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-ink">Preview</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Preview</span>
               {picked.length > 1 ? (
                 <select
                   aria-label="Preview channel"
@@ -435,15 +435,15 @@ export function Composer({
             </div>
             <div className="rounded-lg bg-paper p-3 shadow-hairline">
               <div className="mb-2 flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-ink text-[13px] font-bold text-paper">
+                <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-ink text-[0.8125rem] font-bold text-paper">
                   {(previewChannel ? platformLabel(previewChannel.identifier) : "S").charAt(0)}
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold text-ink">{previewChannel?.name ?? "Pick a channel"}</div>
-                  <div className="text-[12px] text-muted">{previewChannel ? platformLabel(previewChannel.identifier) : "—"}</div>
+                  <div className="truncate text-[0.8125rem] font-semibold text-ink">{previewChannel?.name ?? "Pick a channel"}</div>
+                  <div className="text-[0.75rem] text-muted">{previewChannel ? platformLabel(previewChannel.identifier) : "—"}</div>
                 </div>
               </div>
-              <p className="whitespace-pre-wrap break-words text-[13px] text-ink">{previewBody || <span className="text-subtle">Post text appears here.</span>}</p>
+              <p className="whitespace-pre-wrap break-words text-[0.8125rem] text-ink">{previewBody || <span className="text-subtle">Post text appears here.</span>}</p>
               {media.length > 0 ? (
                 <div className={`mt-2 grid gap-1 ${media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                   {media.slice(0, 4).map((m) =>
@@ -458,7 +458,7 @@ export function Composer({
               ) : null}
             </div>
             {mode === "mock" ? (
-              <p className="text-[12px] text-muted">Sample mode: no Postiz credentials, so publishing is simulated.</p>
+              <p className="text-[0.75rem] text-muted">Sample mode: no Postiz credentials, so publishing is simulated.</p>
             ) : null}
           </aside>
         </div>

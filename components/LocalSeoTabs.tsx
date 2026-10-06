@@ -118,15 +118,15 @@ interface Props {
 const inputCls =
   "h-control w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const btnPrimary =
-  "inline-flex h-control-sm items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-control-sm items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40";
 const btnSecondary =
   "inline-flex h-control-sm items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
 const btnDanger =
   "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:cursor-not-allowed disabled:opacity-40";
 const btnSmall =
-  "inline-flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-control hover:shadow-outline disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-control hover:shadow-outline disabled:cursor-not-allowed disabled:opacity-40";
 const btnSmallDanger =
-  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint disabled:cursor-not-allowed disabled:opacity-40";
 const cardCls = "rounded-lg bg-paper p-4 shadow-hairline";
 const labelCls = "text-xs font-semibold text-muted";
 
@@ -152,7 +152,7 @@ function ErrorBanner({ message }: { message: string | null }) {
 function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4"
       role="presentation"
       onClick={onClose}
       onKeyDown={closeOnEscape(onClose)}
@@ -1177,7 +1177,7 @@ export default function LocalSeoTabs(props: Props) {
             key={t.key}
             onClick={() => setTab(t.key)}
             aria-pressed={tab === t.key}
-            className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors ${
+            className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[0.8125rem] font-semibold transition-colors ${
               tab === t.key
                 ? "bg-ink text-paper"
                 : "text-muted hover:bg-hover-paper hover:text-ink"

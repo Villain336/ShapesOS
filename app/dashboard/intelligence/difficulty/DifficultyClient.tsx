@@ -25,7 +25,7 @@ import {
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
   void tone;
   return (
-    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
@@ -34,11 +34,11 @@ function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: 
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
-const thCls = "px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted";
-const tdCls = "px-2.5 py-1.5 text-[13px] text-ink";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const thCls = "px-2.5 py-1.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-muted";
+const tdCls = "px-2.5 py-1.5 text-[0.8125rem] text-ink";
 const rowCls = "border-t border-line hover:bg-hover-paper";
-const noteCls = "rounded-md border border-line bg-canvas px-3 py-2 text-[12px] text-muted";
+const noteCls = "rounded-md border border-line bg-canvas px-3 py-2 text-[0.75rem] text-muted";
 
 // ── Types (mirror lib/intelligence/difficulty wire shapes) ──────────────────
 
@@ -251,7 +251,7 @@ function EstimatesTab({
       </div>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[12px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[0.75rem] text-failed-text">
           <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
         </div>
@@ -300,7 +300,7 @@ function EstimatesTab({
                     <ProvenanceCell p={e.inputsProvenance} />
                   </td>
                   <td className={tdCls}>
-                    <span className="font-mono text-[12px]">{e.inputsProvenance.serpVendor}</span>
+                    <span className="font-mono text-[0.75rem]">{e.inputsProvenance.serpVendor}</span>
                   </td>
                   <td className={tdCls}>
                     {isExperimental ? (
@@ -366,39 +366,39 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-md border border-line bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Gate</div>
+          <div className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted">Gate</div>
           <div className="mt-1 flex items-center gap-1.5">
             {gate == null ? (
-              <span className="text-[13px] text-subtle">loading…</span>
+              <span className="text-[0.8125rem] text-subtle">loading…</span>
             ) : gate.replaceVendor ? (
-              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
+              <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-ink">
                 <CircleCheck className="h-4 w-4" /> open — model replaces vendor
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted">
+              <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-muted">
                 <CircleX className="h-4 w-4" /> closed — vendor stays
               </span>
             )}
           </div>
         </div>
         <div className="rounded-md border border-line bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Model version</div>
-          <div className="mt-1 font-mono text-[15px] font-bold text-ink">{modelVersion}</div>
-          <div className="mt-0.5 text-[11px] text-muted">a bump closes the gate until re-evaluated</div>
+          <div className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted">Model version</div>
+          <div className="mt-1 font-mono text-[0.9375rem] font-bold text-ink">{modelVersion}</div>
+          <div className="mt-0.5 text-[0.6875rem] text-muted">a bump closes the gate until re-evaluated</div>
         </div>
         <div className="rounded-md border border-line bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Last live eval</div>
-          <div className="mt-1 text-[13px] font-semibold text-ink">
+          <div className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted">Last live eval</div>
+          <div className="mt-1 text-[0.8125rem] font-semibold text-ink">
             {state?.evaluatedAt ? new Date(state.evaluatedAt).toLocaleString() : "never"}
           </div>
-          <div className="mt-0.5 text-[11px] text-muted">paid reference: DataForSEO bulk difficulty</div>
+          <div className="mt-0.5 text-[0.6875rem] text-muted">paid reference: DataForSEO bulk difficulty</div>
         </div>
         <div className="rounded-md border border-line bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Verdict</div>
-          <div className="mt-1 text-[13px] font-semibold text-ink">
+          <div className="text-[0.6875rem] font-medium uppercase tracking-wide text-muted">Verdict</div>
+          <div className="mt-1 text-[0.8125rem] font-semibold text-ink">
             {state == null ? "—" : state.passed ? "PASS" : "not passed"}
           </div>
-          <div className="mt-0.5 text-[11px] text-muted">all four criteria must hold</div>
+          <div className="mt-0.5 text-[0.6875rem] text-muted">all four criteria must hold</div>
         </div>
       </div>
 
@@ -443,18 +443,18 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
       <div className={noteCls}>
         <span className="font-medium text-muted">How to evaluate.</span> The bar is checked on a held-out
         set of ≥ 50 keywords spanning the difficulty deciles, against DataForSEO{" "}
-        <span className="font-mono text-[12px]">labs/bulk_keyword_difficulty</span> ($0.132/1K — ~$0.01 for the
+        <span className="font-mono text-[0.75rem]">labs/bulk_keyword_difficulty</span> ($0.132/1K — ~$0.01 for the
         60-keyword set) as the paid reference. Ordering matters most: keyword research shows rankings, and a
         misordering model is worse than useless — hence the Spearman ≥ 0.70 bar.
       </div>
 
       <div className={noteCls}>
         <span className="font-medium text-muted">Run it.</span>{" "}
-        <span className="font-mono text-[12px]">npx tsx scripts/eval-difficulty.mts</span> runs the CI-safe
+        <span className="font-mono text-[0.75rem]">npx tsx scripts/eval-difficulty.mts</span> runs the CI-safe
         fixture eval (no keys, no network — guards model math, not the gate).{" "}
-        <span className="font-mono text-[12px]">npx tsx scripts/eval-difficulty.mts --live --workspace &lt;id&gt; --write-state</span>{" "}
-        runs the paid reference eval; <span className="font-mono text-[12px]">--write-state</span> is the only
-        writer of <span className="font-mono text-[12px]">eval-state.json</span>. The gate opens only on a
+        <span className="font-mono text-[0.75rem]">npx tsx scripts/eval-difficulty.mts --live --workspace &lt;id&gt; --write-state</span>{" "}
+        runs the paid reference eval; <span className="font-mono text-[0.75rem]">--write-state</span> is the only
+        writer of <span className="font-mono text-[0.75rem]">eval-state.json</span>. The gate opens only on a
         recorded PASS for the current model version.
       </div>
 
@@ -505,7 +505,7 @@ export function DifficultyClient() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium ${
                 active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
@@ -516,7 +516,7 @@ export function DifficultyClient() {
         })}
       </div>
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 className="h-4 w-4 aos-spin" /> Loading estimates…
         </div>
       ) : (

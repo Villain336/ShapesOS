@@ -59,7 +59,7 @@ export default async function ScheduledJobsStatus() {
                 <tr key={j.key} className="border-b border-line last:border-0 hover:bg-hover">
                   <td className="py-2 pr-3">
                     <span className="block font-mono text-xs text-ink">{j.key}</span>
-                    <span className="block font-mono text-[11px] text-subtle">{j.path}</span>
+                    <span className="block font-mono text-[0.6875rem] text-subtle">{j.path}</span>
                   </td>
                   <td className="py-2 pr-3 font-mono text-xs text-muted">{j.cron}</td>
                   <td className="py-2 pr-3 text-xs text-muted">{j.last ? when(j.last.startedAt) : "never"}</td>

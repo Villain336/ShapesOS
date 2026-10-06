@@ -170,7 +170,7 @@ export function WorkflowsTab() {
         <Workflow className="h-5 w-5 text-ink" />
         <h1 className="text-xl font-bold tracking-tight text-ink">Workflows</h1>
       </div>
-      <p className="mb-4 text-[13px] text-muted">
+      <p className="mb-4 text-[0.8125rem] text-muted">
         Long-running operations run as workflows with transactional semantics: steps execute in
         order, and when a step fails the completed steps are compensated (rolled back) in reverse
         order. Money-moving runs are pre-authorized once — the approval binds the full step plan
@@ -179,10 +179,10 @@ export function WorkflowsTab() {
 
       {/* Launcher */}
       <div className="mb-6 rounded-md border border-line bg-paper p-4">
-        <h2 className="mb-1 text-[14px] font-semibold text-ink">
+        <h2 className="mb-1 text-[0.875rem] font-semibold text-ink">
           Run: Order → payment → fulfillment
         </h2>
-        <p className="mb-3 text-[13px] text-muted">
+        <p className="mb-3 text-[0.8125rem] text-muted">
           Confirms a draft order, records the Stripe charge, then fulfills the order. If a step
           fails, the charge is refunded and the order cancelled automatically — no new approval
           needed mid-rollback.
@@ -246,13 +246,13 @@ export function WorkflowsTab() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="py-6 text-center text-[0.8125rem] text-subtle">
                   Loading runs…
                 </td>
               </tr>
             ) : runs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="py-6 text-center text-[0.8125rem] text-subtle">
                   No workflow runs yet.
                 </td>
               </tr>
@@ -270,7 +270,7 @@ export function WorkflowsTab() {
                     className={trClickableCls}
                   >
                     <td className="font-semibold text-ink">{run.workflowName}</td>
-                    <td className="font-mono text-[12px] text-muted">
+                    <td className="font-mono text-[0.75rem] text-muted">
                       {run.runKey ? run.runKey.slice(0, 8) : "—"}
                     </td>
                     <td>
@@ -301,8 +301,8 @@ export function WorkflowsTab() {
           <div className="relative flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div>
-                <h3 className="text-[15px] font-bold text-ink">{selected.workflowName}</h3>
-                <p className="text-[12px] text-muted">
+                <h3 className="text-[0.9375rem] font-bold text-ink">{selected.workflowName}</h3>
+                <p className="text-[0.75rem] text-muted">
                   Run key {selected.runKey ? selected.runKey.slice(0, 8) : "—"} ·{" "}
                   {fmtDate(selected.createdAt)}
                 </p>
@@ -318,10 +318,10 @@ export function WorkflowsTab() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4">
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-ink">Status</span>
+                <span className="text-[0.8125rem] font-semibold text-ink">Status</span>
                 <RunStatusChip status={selected.status} />
               </div>
-              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-ink">Steps</h4>
+              <h4 className="mb-2 mt-4 text-[0.8125rem] font-semibold text-ink">Steps</h4>
               <ol className="space-y-2">
                 {(selected.steps ?? []).map((s, i) => {
                   return (
@@ -330,21 +330,21 @@ export function WorkflowsTab() {
                       className="rounded-md border border-line bg-canvas px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[12px] font-semibold text-ink">
+                        <span className="font-mono text-[0.75rem] font-semibold text-ink">
                           {i + 1}. {s.name}
                         </span>
                         <StepStatusChip status={s.status} />
                       </div>
-                      {s.at && <div className="mt-1 text-[11px] text-subtle">{fmtDate(s.at)}</div>}
+                      {s.at && <div className="mt-1 text-[0.6875rem] text-subtle">{fmtDate(s.at)}</div>}
                     </li>
                   );
                 })}
               </ol>
-              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-ink">
+              <h4 className="mb-2 mt-4 text-[0.8125rem] font-semibold text-ink">
                 Compensation log
               </h4>
               {(selected.compensationLog ?? []).length === 0 ? (
-                <p className="text-[13px] text-subtle">No compensations — every step succeeded.</p>
+                <p className="text-[0.8125rem] text-subtle">No compensations — every step succeeded.</p>
               ) : (
                 <ol className="space-y-2">
                   {(selected.compensationLog ?? []).map((c, i) => (
@@ -352,10 +352,10 @@ export function WorkflowsTab() {
                       key={i}
                       className="rounded-md border border-line bg-canvas px-3 py-2"
                     >
-                      <div className="text-[12px] font-semibold text-ink">{c.step}</div>
-                      <div className="text-[12px] text-ink">{c.action}</div>
+                      <div className="text-[0.75rem] font-semibold text-ink">{c.step}</div>
+                      <div className="text-[0.75rem] text-ink">{c.action}</div>
                       {c.at && (
-                        <div className="mt-1 text-[11px] text-ink/70">{fmtDate(c.at)}</div>
+                        <div className="mt-1 text-[0.6875rem] text-ink/70">{fmtDate(c.at)}</div>
                       )}
                     </li>
                   ))}

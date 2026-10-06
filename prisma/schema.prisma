@@ -1037,6 +1037,10 @@ model Workspace {
   outreachWebhookEvents       OutreachWebhookEvent[]
   // Phase 3 (J): in-app notification center (per-user rows + read state).
   notifications               Notification[]
+  // Phase 18.1 (WS=desk): per-user desktop layout + dock, recents, Today briefings.
+  userDesktopLayouts          UserDesktopLayout[]
+  userRecentItems             UserRecentItem[]
+  desktopBriefings            DesktopBriefing[]
   // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
   scimTokens                ScimToken[]
   scimGroups                ScimGroup[]
@@ -1122,6 +1126,9 @@ model Workspace {
   opsSites                    OpsSite[]
   opsSiteObjects              OpsSiteObject[]
   opsDockBookings             OpsDockBooking[]
+  // Phase 18.1 (WS=find): Spotlight's text index (file contents, docs).
+  searchTexts                 SearchText[]
+  searchTextChunks            SearchTextChunk[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -3757,6 +3764,8 @@ model WorkspaceFile {
   fundingDataRoomDocVersions FundingDataRoomDocVersion[]
   // CAD + Hardware slice 1: model versions referencing this file.
   cadModelVersions           CadModelVersion[]
+  // Phase 18.1 (WS=find): the text extracted from this file for Spotlight.
+  searchText                 SearchText?
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
@@ -9336,6 +9345,8 @@ model UniverDoc {
   shareState  String    @default("private") @map("share_state")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+  // Phase 18.1 (WS=find): the doc's text for Spotlight.
+  searchText  SearchText?
 
   @@index([workspaceId, kind, updatedAt])
   @@map("univer_docs")
@@ -15095,9 +15106,15 @@ model Notification {
   sourceId    String?          @map("source_id")
   dedupKey    String?          @map("dedup_key")
   readAt      DateTime?        @map("read_at")
+  // Phase 18.1 (WS=desk): set while the recipient was in focus / do not
+  // disturb when the row was written — the row waits (hidden from the bell,
+  // no push) and is released (heldAt cleared, push sent) when focus ends.
+  // Queued, never dropped (lib/desktop/focus.ts).
+  heldAt      DateTime?        @map("held_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, dedupKey])
+  @@index([userId, heldAt])
   @@index([userId, workspaceId, readAt])
   @@index([userId, workspaceId, createdAt])
   @@index([workspaceId, createdAt])
@@ -17046,4 +17063,199 @@ model CorpusRetrievalUsage {
   lastHitAt DateTime @map("last_hit_at")
 
   @@map("corpus_retrieval_usage")
+}
+
+// ============================================================
+// Phase 18.1 (WS=desk): Home as a desktop, the dock, the Today briefing and
+// the Control Center's per-user state.
+//
+// user_desktop_layouts, user_recent_items and desktop_briefings are FORCE RLS
+// on BOTH the tenant GUC (app.workspace_id) and the person GUC (app.user_id):
+// a row is visible only inside its workspace AND only to the member it
+// belongs to (lib/desktop/scope.ts withUserScope). Sessions without both
+// GUCs see zero rows (fail-closed). They cascade from the workspace.
+// ============================================================
+
+// One row per (workspace, member): the widget grid (zod-validated JSON,
+// lib/desktop/layout.ts), the dock overlay on lib/nav/config.ts (pinned nav
+// hrefs in the member's order — never a second nav list) and the Today
+// briefing opt-in.
+model UserDesktopLayout {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId          String    @map("user_id")
+  // { version: 1, widgets: [{ id, widget, x, y, w, h }] } — null = role default.
+  layout          Json?
+  // { pinned: ["/dashboard/crm", …] } — ordered; unknown hrefs dropped on read.
+  nav             Json?
+  briefingEnabled Boolean   @default(false) @map("briefing_enabled")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@map("user_desktop_layouts")
+}
+
+// The dock's "Recent" section and the ⌃Tab switcher: the last pages and
+// records a member opened (one row per href, visitedAt bumped; pruned to the
+// newest RECENTS_KEEP per member).
+model UserRecentItem {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  href        String
+  title       String
+  // "app" (a nav destination) | "record" (a page below one, with an id)
+  kind        String    @default("app")
+  visitedAt   DateTime  @default(now()) @map("visited_at")
+
+  @@unique([workspaceId, userId, href])
+  @@index([workspaceId, userId, visitedAt])
+  @@map("user_recent_items")
+}
+
+// The agent-written "Today" briefing: one row per member per local day,
+// written once on the background/batch workload (never on page load).
+model DesktopBriefing {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  // The member's local calendar day, YYYY-MM-DD.
+  day         String
+  // pending | ready | failed
+  status      String    @default("pending")
+  body        String?   @db.Text
+  // What it was written from (counts only, never secrets): calendar, needs
+  // you, overnight runs, metrics.
+  sources     Json?
+  model       String?
+  // llm_batch_jobs.idempotency_key when it went through the Batch API.
+  batchKey    String?   @map("batch_key")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  readyAt     DateTime? @map("ready_at")
+
+  @@unique([workspaceId, userId, day])
+  @@index([workspaceId, status])
+  @@map("desktop_briefings")
+}
+
+// Per-person Control Center state, across workspaces (no workspace_id, so no
+// tenant RLS — like user_security; only ever read/written for the session
+// subject). Focus / do not disturb is a person's STATE, so it lives here;
+// voice and shortcut overrides are PREFERENCES and live in UserPreference
+// ("voice", "shortcuts" — lib/desktop/prefs.ts adapts them for the desk;
+// moved there by migration 20261020300000_p18_integrate_desk_prefs).
+model UserDeskState {
+  userId         String    @id @map("user_id")
+  // Focus is on while focusUntil is in the future (always has an end time).
+  focusUntil     DateTime? @map("focus_until")
+  focusStartedAt DateTime? @map("focus_started_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_desk_state")
+}
+
+// ============================================================================
+// Phase 18.1 (WS=find): per-user preferences (lib/preferences). One row per
+// person (the Auth.js subject), global across workspaces: theme, contrast,
+// language, time zone, density, motion and font size are about the human at
+// the keyboard, so there are no per-workspace overrides. Like user_security
+// and notifications this is keyed by the subject id with no workspace_id and
+// no tenant RLS; every read and write is keyed to the SESSION's own subject
+// (lib/preferences/index.ts, app/api/preferences — requireSelfService), and
+// account deletion removes the row (lib/gdpr/account-delete.ts). Enum-like
+// text columns carry CHECK constraints in the migration; the JSON columns
+// are validated by lib/preferences/schema.ts on every write.
+// ============================================================================
+
+model UserPreference {
+  userId        String   @id @map("user_id")
+  theme         String   @default("system")
+  contrast      String   @default("standard")
+  // NULL = match the browser (Accept-Language), negotiated per request.
+  language      String?
+  // NULL = not set yet; the shell saves the device zone on first visit.
+  timeZone      String?  @map("time_zone")
+  hourCycle     String   @default("auto") @map("hour_cycle")
+  density       String   @default("comfortable")
+  motion        String   @default("system")
+  fontScale     Int      @default(100) @map("font_scale")
+  // { inApp, push, mutedKinds[] }
+  notifications Json     @default("{}")
+  // { "<action.id>": "mod+k" | "g i" } — WS=desk's rebinding UI writes it.
+  shortcuts     Json     @default("{}")
+  // Placeholders for WS=desk (Home desktop/dock) and 19A (voice).
+  desktop       Json     @default("{}")
+  voice         Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("user_preferences")
+}
+
+// ============================================================================
+// Phase 18.1 (WS=find): Spotlight's text index (lib/search/text-index.ts).
+// The text inside a workspace file (PDF, DOCX, XLSX, CSV, Markdown, plain
+// text — extracted on upload by the existing extractors) or an Office doc,
+// split into chunks; each chunk carries a GENERATED full-text vector
+// ('simple' || 'english') and a 384-d MiniLM embedding (NULL until embedded,
+// and for chunks past the embedding cap). One row per source record:
+// keyed by the WorkspaceFile id (file_id) or the UniverDoc id; cascades with
+// it. contentSha256 makes re-indexing idempotent (a new version re-extracts).
+// Both tables are FORCE RLS on app.workspace_id. Notes and mail (18.2) add a
+// key column here and a source file in lib/search/sources.
+// ============================================================================
+
+model SearchText {
+  id            String         @id @default(cuid())
+  workspaceId   String         @map("workspace_id")
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // "file" | "doc"
+  source        String
+  fileId        String?        @unique @map("file_id")
+  file          WorkspaceFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  univerDocId   String?        @unique @map("univer_doc_id")
+  univerDoc     UniverDoc?     @relation(fields: [univerDocId], references: [id], onDelete: Cascade)
+  // indexed | empty | unsupported | failed | too_large
+  status        String
+  extractor     String?
+  contentSha256 String?        @map("content_sha256")
+  // The extracted text (capped; see TEXT_INDEX_LIMITS) for agents to read.
+  content       String?        @db.Text
+  charCount     Int            @default(0) @map("char_count")
+  chunkCount    Int            @default(0) @map("chunk_count")
+  embeddedCount Int            @default(0) @map("embedded_count")
+  truncated     Boolean        @default(false)
+  error         String?
+  indexedAt     DateTime       @default(now()) @map("indexed_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  chunks SearchTextChunk[]
+
+  @@index([workspaceId, source, status])
+  @@map("search_texts")
+}
+
+model SearchTextChunk {
+  id           String                      @id @default(cuid())
+  workspaceId  String                      @map("workspace_id")
+  workspace    Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  searchTextId String                      @map("search_text_id")
+  searchText   SearchText                  @relation(fields: [searchTextId], references: [id], onDelete: Cascade)
+  idx          Int
+  body         String                      @db.Text
+  // GENERATED ALWAYS (migration 20261020200100); Unsupported so Prisma never manages it.
+  search_tsv   Unsupported("tsvector")?    @map("search_tsv")
+  // 384-d MiniLM (lib/substrate/memory/embed.ts), written via raw SQL.
+  embedding    Unsupported("vector(384)")? @map("embedding")
+
+  @@unique([searchTextId, idx])
+  @@index([workspaceId])
+  @@map("search_text_chunks")
 }

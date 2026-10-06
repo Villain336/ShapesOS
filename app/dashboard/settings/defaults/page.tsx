@@ -21,7 +21,7 @@ export default async function DefaultsSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Defaults</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — the baseline every project inherits: model,
           approval mode, and which tool namespaces the agent may use.
         </p>

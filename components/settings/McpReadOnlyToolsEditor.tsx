@@ -18,7 +18,7 @@ const labelCls = "mb-1 block text-xs font-medium text-muted";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const ALLOW_LIST_OPTIONS: readonly Permission[] = ["ask", "auto"];
@@ -96,7 +96,7 @@ export default function McpReadOnlyToolsEditor({
   return (
     <div className="mt-2 rounded-lg border border-line bg-paper p-4" data-testid={`mcp-readonly-editor-${connectorId}`}>
       <h3 className="text-sm font-semibold text-ink">Read-only tools</h3>
-      <p className="mt-1 text-[13px] text-muted">
+      <p className="mt-1 text-[0.8125rem] text-muted">
         The agent asks before running any tool on {connectorName}. Tools listed here only read
         data, so it may run them without asking. List a tool only if it never changes anything.
       </p>

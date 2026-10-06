@@ -48,7 +48,7 @@ export function NewAppButton() {
         New app
       </button>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4" onMouseDown={(e) => e.target === e.currentTarget && !busy && setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 px-4" onMouseDown={(e) => e.target === e.currentTarget && !busy && setOpen(false)}>
           <form
             role="dialog"
             aria-modal="true"

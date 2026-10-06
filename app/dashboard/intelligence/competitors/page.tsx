@@ -40,7 +40,7 @@ export default async function CompetitorsPage() {
         <h1 className="aos-heading">
           Competitor change fleet
         </h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+        <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
           Semantic competitor intelligence — what changed, why it matters for
           your tracked keywords, and the proposed response. Polite, robots-
           respecting self-fetch only; reviews via licensed APIs only.

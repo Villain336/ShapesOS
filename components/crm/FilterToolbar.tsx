@@ -36,13 +36,13 @@ export function FilterToolbar({
 }) {
   const set = (k: keyof LeadFilters, v: string | boolean) =>
     setFilters({ ...filters, [k]: v });
-  const selectSm = `${selectCls} max-w-[150px] py-[6px]! text-[12.5px]!`;
+  const selectSm = `${selectCls} max-w-[150px] py-[6px]! text-[0.78125rem]!`;
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative">
         <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
         <input
-          className={`${inputCls} pl-8 w-[220px] py-[6px]! text-[12.5px]!`}
+          className={`${inputCls} pl-8 w-[220px] py-[6px]! text-[0.78125rem]!`}
           placeholder="Search name, email, company…"
           value={filters.q}
           onChange={(e) => set("q", e.target.value)}

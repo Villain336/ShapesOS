@@ -174,7 +174,7 @@ export default async function GraphExplorerPage({
                 href={viewHref(v)}
                 role="tab"
                 aria-selected={view === v}
-                className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1.5 text-[12.5px] font-medium transition active:scale-[0.97] ${
+                className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1.5 text-[0.78125rem] font-medium transition active:scale-[0.97] ${
                   view === v
                     ? "bg-ink text-white shadow-hairline"
                     : "text-muted hover:text-ink"
@@ -219,7 +219,7 @@ export default async function GraphExplorerPage({
       <div className="grid gap-4 lg:grid-cols-2">
         {view === "table" ? (
           <div className={tableShell}>
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className={theadCls}>
                   <th className={thCls}>Name</th>
@@ -254,7 +254,7 @@ export default async function GraphExplorerPage({
                 })}
                 {nodes.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-subtle">
+                    <td colSpan={4} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                       No entities yet. Seed the graph from the onboarding bootstrap or connect a
                       source — every fact lands here with provenance.
                     </td>
@@ -282,7 +282,7 @@ export default async function GraphExplorerPage({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="aos-subheading">{detail.node.displayName}</h2>
-                    <div className="mt-1 font-mono text-[11px] text-muted">{detail.node.canonicalKey}</div>
+                    <div className="mt-1 font-mono text-[0.6875rem] text-muted">{detail.node.canonicalKey}</div>
                   </div>
                   <Chip tone={bucketTone(freshnessLabel(detail.node.asOf, detail.node.asOfSource).bucket)}>
                     {freshnessLabel(detail.node.asOf, detail.node.asOfSource).label}

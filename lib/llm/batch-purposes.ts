@@ -22,3 +22,9 @@ registerBatchPurpose("learning_pass", async ({ workspaceId, context, results, mo
   });
   console.log(`[learning-pass] workspace ${workspaceId}: batch delivered — ${report.learningsExtracted} lessons, status ${report.status}.`);
 });
+
+/** Phase 18.1 (WS=desk): a member's "Today" briefing (lib/desktop/briefing.server.ts). */
+registerBatchPurpose("desktop_briefing", async ({ workspaceId, context, results, model }) => {
+  const { deliverBriefingResult } = await import("@/lib/desktop/briefing.server");
+  await deliverBriefingResult(workspaceId, context, results.briefing, model);
+});

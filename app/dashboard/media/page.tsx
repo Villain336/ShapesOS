@@ -13,7 +13,7 @@ import EmergencyStopButton from "./_components/EmergencyStopButton";
 import SeedRulesButton from "./_components/SeedRulesButton";
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight";
 const chipSlate = `${chip} bg-canvas text-muted border-line`;
 const chipGreen = `${chip} bg-canvas text-muted border-line`;
 const chipRed = `${chip} bg-canvas text-muted border-line`;
@@ -61,7 +61,7 @@ export default async function MediaPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading text-ink">Media</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Supervised-always buying rails: budget pools, per-buy approval bindings, and kill
             switches. Autopilot never buys media — enforced structurally, not by config. Guards
             against the €7,937/day failure class: no automation can compound spend without a
@@ -74,7 +74,7 @@ export default async function MediaPage() {
       {!ready && (
         <div className="rounded-lg bg-needs-tint p-4 text-sm text-ink shadow-hairline">
           <p className="flex items-start gap-2 font-semibold"><TriangleAlert size={16} className="mt-0.5 shrink-0" />Media safety tables are not provisioned yet</p>
-          <p className="mt-1 text-[13px]">Merge <code className="font-mono">prisma/fragments/phase5-safety.prisma</code> and migrate. This page renders in read-only preview until then.</p>
+          <p className="mt-1 text-[0.8125rem]">Merge <code className="font-mono">prisma/fragments/phase5-safety.prisma</code> and migrate. This page renders in read-only preview until then.</p>
         </div>
       )}
 
@@ -82,7 +82,7 @@ export default async function MediaPage() {
         {/* Phase 18: Advertising — one home for paid platforms */}
         <section className="rounded-lg border border-line bg-paper p-4 lg:col-span-2">
           <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Advertising <span className="ml-1 rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-muted">Phase 18</span></h2>
+            <h2 className="text-sm font-semibold text-ink">Advertising <span className="ml-1 rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[0.625rem] font-medium text-muted">Phase 18</span></h2>
             <Link href="/dashboard/media/advertising" className="text-xs font-medium text-muted hover:text-ink">
               Open →
             </Link>
@@ -105,9 +105,9 @@ export default async function MediaPage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                  <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Pool</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Remaining</th>
@@ -134,7 +134,7 @@ export default async function MediaPage() {
                                 style={{ width: `${Math.min(100, util).toFixed(1)}%` }}
                               />
                             </span>
-                            <span className="text-[11px] text-muted">{util.toFixed(0)}%</span>
+                            <span className="text-[0.6875rem] text-muted">{util.toFixed(0)}%</span>
                           </span>
                         </td>
                       </tr>
@@ -158,9 +158,9 @@ export default async function MediaPage() {
             <p className="text-sm text-muted">Nothing awaiting approval.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                  <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Platform · type</th>
                     <th className="px-3 py-2 font-medium">Max spend</th>
                     <th className="px-3 py-2 font-medium">Binding</th>
@@ -175,7 +175,7 @@ export default async function MediaPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2 font-semibold text-ink">{money(a.maxSpendCents, a.currency)}</td>
-                      <td className="px-3 py-2 font-mono text-[11px] text-muted">binding {a.bindingHash.slice(0, 16)}…</td>
+                      <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">binding {a.bindingHash.slice(0, 16)}…</td>
                     </tr>
                   ))}
                 </tbody>
@@ -202,7 +202,7 @@ export default async function MediaPage() {
                   <span className="text-ink">{r.name}</span>
                   <span className="flex items-center gap-1.5">
                     <span className={r.enabled ? chipGreen : chipSlate}>{r.enabled ? "armed" : "off"}</span>
-                    <span className="text-[11px] text-muted">{r.action}</span>
+                    <span className="text-[0.6875rem] text-muted">{r.action}</span>
                   </span>
                 </li>
               ))}
@@ -220,9 +220,9 @@ export default async function MediaPage() {
             <p className="text-sm text-muted">No executed buys yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                  <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Platform</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Actual spend</th>

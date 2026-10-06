@@ -38,6 +38,10 @@ export E2E_MOCK_OAUTH=1
 export ALLOW_FAKE_PROVIDERS="${ALLOW_FAKE_PROVIDERS:-1}"
 export E2E_MOCK_OAUTH_CLIENT_ID="${E2E_MOCK_OAUTH_CLIENT_ID:-e2e-mock-client}"
 export E2E_MOCK_OAUTH_CLIENT_SECRET="${E2E_MOCK_OAUTH_CLIENT_SECRET:-e2e-mock-secret}"
+# One signed-in user drives the whole suite at machine speed (the shell's
+# axe pass alone loads ~10 pages in ~25 s), which outruns the default
+# 120 reads/min a person gets. Raise only the read tier for the suite.
+export RATE_LIMIT_READ_PER_MIN="${RATE_LIMIT_READ_PER_MIN:-600}"
 export LLM_API_KEY="${LLM_API_KEY:-e2e-no-llm}"
 export LLM_MODEL="${LLM_MODEL:-e2e-no-model}"
 

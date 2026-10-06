@@ -59,13 +59,13 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
           ["Lost", total.lostCents, "text-ink"],
         ].map(([k, v, cls]) => (
           <div key={k as string} className="rounded-md border border-line bg-paper p-4">
-            <div className={`text-[20px] font-bold tabular-nums ${cls}`}>{formatMoney(v as number)}</div>
-            <div className="mt-0.5 text-[12px] text-muted">{k as string}</div>
+            <div className={`text-[1.25rem] font-bold tabular-nums ${cls}`}>{formatMoney(v as number)}</div>
+            <div className="mt-0.5 text-[0.75rem] text-muted">{k as string}</div>
           </div>
         ))}
       </div>
       <div className="overflow-hidden rounded-md border border-line bg-paper">
-        <div className="border-b border-line bg-canvas px-4 py-2.5 text-[12px] font-semibold text-muted">
+        <div className="border-b border-line bg-canvas px-4 py-2.5 text-[0.75rem] font-semibold text-muted">
           Weighted forecast by stage (value × score ÷ 100)
         </div>
         {stages.map((s) => (
@@ -73,9 +73,9 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <StageBadge label={s.label} color={colorOf(s.stage)} />
-                <span className="text-[12px] text-muted tabular-nums">{s.count} open</span>
+                <span className="text-[0.75rem] text-muted tabular-nums">{s.count} open</span>
               </div>
-              <div className="flex items-center gap-4 text-[13px]">
+              <div className="flex items-center gap-4 text-[0.8125rem]">
                 <span className="tabular-nums text-muted">{formatMoney(s.openValueCents)}</span>
                 <span className="w-24 text-right font-bold tabular-nums text-ink">
                   {formatMoney(s.weightedCents)}
@@ -91,7 +91,7 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
           </div>
         ))}
       </div>
-      <p className="text-[12px] text-subtle">
+      <p className="text-[0.75rem] text-subtle">
         Forecast weights each open lead by its AI score (probability proxy). Won and lost stages are excluded from the weighted total.
       </p>
     </div>

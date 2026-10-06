@@ -45,10 +45,14 @@ const tokenCache = new Map<string, string>();
 /** A CSS custom property's computed value (client); a neutral fallback elsewhere. */
 export function resolveToken(name: string): string {
   if (typeof document === "undefined") return "gray";
-  let v = tokenCache.get(name);
+  // Phase 18.1: keyed by the <html> classes so a theme / contrast change
+  // (light ↔ dark) re-resolves instead of serving the old colours.
+  const osDark = typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+  const key = `${document.documentElement.className}|${osDark}|${name}`;
+  let v = tokenCache.get(key);
   if (!v) {
     v = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "gray";
-    tokenCache.set(name, v);
+    tokenCache.set(key, v);
   }
   return v;
 }

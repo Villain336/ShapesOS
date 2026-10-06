@@ -7,6 +7,10 @@
 
 import type { AgentTree } from "./agents";
 import type { AosStatus } from "./status";
+// Phase 18.1 (integration): banners in the person's language (English by default).
+import { createTranslator, type Translator } from "@/lib/i18n";
+
+const EN: Translator = createTranslator("en");
 
 export interface BannerSpec {
   key: string;
@@ -41,14 +45,14 @@ export function needsReconnect(detail: string): boolean {
   return RECONNECT_RE.test(detail);
 }
 
-export function listJoin(items: readonly string[], max = 3): string {
+export function listJoin(items: readonly string[], max = 3, t: Translator = EN): string {
   const uniq = [...new Set(items.filter(Boolean))];
   if (uniq.length === 0) return "";
   const shown = uniq.slice(0, max);
   const rest = uniq.length - shown.length;
-  if (rest > 0) return `${shown.join(", ")} and ${rest} more`;
+  if (rest > 0) return t("home.banners.listMore", { list: shown.join(", "), count: rest });
   if (shown.length === 1) return shown[0]!;
-  return `${shown.slice(0, -1).join(", ")} and ${shown.at(-1)}`;
+  return t("home.banners.listTwo", { first: shown.slice(0, -1).join(", "), last: shown.at(-1)! });
 }
 
 /** Failed missions, sub-agents and standalone runs from the tree, newest first. */
@@ -79,21 +83,24 @@ export function failedWorkFromTree(tree: AgentTree | null): FailedWork[] {
  * Banner list, in the order they stack: needs-you first, then failures. More
  * than `maxFailures` failures collapse into one "N runs stopped" banner.
  */
-export function deriveBanners(input: {
-  approvals: ApprovalsSummary;
-  failed: readonly FailedWork[];
-  maxFailures?: number;
-}): BannerSpec[] {
+export function deriveBanners(
+  input: {
+    approvals: ApprovalsSummary;
+    failed: readonly FailedWork[];
+    maxFailures?: number;
+  },
+  t: Translator = EN,
+): BannerSpec[] {
   const out: BannerSpec[] = [];
   const n = input.approvals.actionable;
   if (n > 0) {
-    const from = listJoin(input.approvals.sources);
+    const from = listJoin(input.approvals.sources, 3, t);
     out.push({
       key: "approvals",
       status: "needs",
-      title: `${n} ${n === 1 ? "approval is" : "approvals are"} waiting on you`,
-      description: from ? `${from} paused for your approval. Nothing goes out until you decide.` : "Nothing goes out until you decide.",
-      action: { label: "Review all", href: "/dashboard/approvals" },
+      title: t("home.banners.approvalsTitle", { count: n }),
+      description: from ? t("home.banners.approvalsFrom", { from }) : t("home.banners.approvalsBody"),
+      action: { label: t("home.reviewAll"), href: "/dashboard/approvals" },
     });
   }
   const max = input.maxFailures ?? 2;
@@ -101,9 +108,9 @@ export function deriveBanners(input: {
     out.push({
       key: "failed",
       status: "failed",
-      title: `${input.failed.length} runs stopped on errors`,
-      description: `${sentence(listJoin(input.failed.map((f) => f.name)))} Open each run to see what failed and fix it.`,
-      action: { label: "Open runs", href: "/dashboard/runs" },
+      title: t("home.banners.runsStoppedTitle", { count: input.failed.length }),
+      description: t("home.banners.runsStoppedBody", { names: sentence(listJoin(input.failed.map((f) => f.name), 3, t)) }),
+      action: { label: t("home.banners.openRuns"), href: "/dashboard/runs" },
     });
   } else {
     for (const f of input.failed) {
@@ -111,11 +118,11 @@ export function deriveBanners(input: {
       out.push({
         key: `failed:${f.key}`,
         status: "failed",
-        title: `${f.name} stopped`,
-        description: reconnect ? `${sentence(f.detail)} Reconnect to resume.` : sentence(f.detail),
+        title: t("home.banners.stoppedTitle", { name: f.name }),
+        description: reconnect ? t("home.banners.reconnectBody", { detail: sentence(f.detail) }) : sentence(f.detail),
         action: reconnect
-          ? { label: "Reconnect", href: "/dashboard/settings/connectors" }
-          : { label: "Open", href: f.href },
+          ? { label: t("home.banners.reconnect"), href: "/dashboard/settings/connectors" }
+          : { label: t("home.banners.open"), href: f.href },
       });
     }
   }

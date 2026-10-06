@@ -88,7 +88,7 @@ export default async function CampaignsPage() {
       </div>
 
       <div className={`${tableShell} mt-4`}>
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className={theadCls}>
               <th className={thCls}>Name</th>
@@ -109,7 +109,7 @@ export default async function CampaignsPage() {
                     {row.name}
                   </Link>
                   {(row.childCount > 0 || row.parentCampaign) && (
-                    <div className="text-[11px] text-muted">
+                    <div className="text-[0.6875rem] text-muted">
                       {row.childCount > 0
                         ? `${row.childCount} sub-campaign${row.childCount === 1 ? "" : "s"}`
                         : ""}
@@ -130,7 +130,7 @@ export default async function CampaignsPage() {
             ))}
             {tree.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={5} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No campaigns yet. Create one on the New campaign tab, then attach fragments —
                   or run the backfill proposer on the Link proposals tab to link historical fragments.
                 </td>
@@ -140,7 +140,7 @@ export default async function CampaignsPage() {
         </table>
       </div>
 
-      <p className="mt-3 text-[12px] text-muted">
+      <p className="mt-3 text-[0.75rem] text-muted">
         Hierarchy-aware: parents indent above their sub-campaigns (≤3 levels).
       </p>
     </div>

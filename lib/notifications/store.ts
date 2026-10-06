@@ -51,8 +51,18 @@ function clip(s: string | null | undefined, n: number): string | null {
   return t ? t.slice(0, n) : null;
 }
 
-/** Insert notifications; duplicates (same user + dedupKey) are skipped. Returns rows created. */
-export async function createNotifications(db: NotificationDb, inputs: NotificationInput[]): Promise<number> {
+/**
+ * Insert notifications; duplicates (same user + dedupKey) are skipped. Returns rows created.
+ * Phase 18.1 (WS=desk): recipients in `heldUserIds` are in focus / do not
+ * disturb — their rows are written with held_at set (queued, never dropped;
+ * lib/desktop/focus.server.ts releases them when focus ends).
+ */
+export async function createNotifications(
+  db: NotificationDb,
+  inputs: NotificationInput[],
+  opts: { heldUserIds?: ReadonlySet<string>; now?: Date } = {},
+): Promise<number> {
+  const heldAt = opts.now ?? new Date();
   const data = inputs
     .filter((n) => n.workspaceId && n.userId && n.title?.trim())
     .map((n) => ({
@@ -65,6 +75,7 @@ export async function createNotifications(db: NotificationDb, inputs: Notificati
       sourceType: clip(n.sourceType, 64),
       sourceId: clip(n.sourceId, 128),
       dedupKey: clip(n.dedupKey, 200),
+      ...(opts.heldUserIds?.has(n.userId) ? { heldAt } : {}),
     }));
   if (data.length === 0) return 0;
   const res = await db.notification.createMany({ data, skipDuplicates: true });
@@ -111,6 +122,8 @@ export async function listNotifications(db: NotificationDb, opts: ListOptions): 
     where: {
       userId: opts.userId,
       workspaceId: opts.workspaceId,
+      // Phase 18.1: queued by focus mode — not delivered yet.
+      heldAt: null,
       ...(opts.unreadOnly ? { readAt: null } : {}),
       ...(before && !Number.isNaN(before.getTime()) ? { createdAt: { lt: before } } : {}),
     },
@@ -122,7 +135,7 @@ export async function listNotifications(db: NotificationDb, opts: ListOptions): 
 
 export async function unreadCount(db: NotificationDb, opts: { userId: string; workspaceId: string }): Promise<number> {
   return db.notification.count({
-    where: { userId: opts.userId, workspaceId: opts.workspaceId, readAt: null },
+    where: { userId: opts.userId, workspaceId: opts.workspaceId, readAt: null, heldAt: null },
   });
 }
 
@@ -143,7 +156,8 @@ export async function markRead(
 /** "Mark all read" for the caller in this workspace. */
 export async function markAllRead(db: NotificationDb, opts: { userId: string; workspaceId: string }): Promise<number> {
   const res = await db.notification.updateMany({
-    where: { userId: opts.userId, workspaceId: opts.workspaceId, readAt: null },
+    // Phase 18.1: rows still queued by focus mode are not "seen" yet.
+    where: { userId: opts.userId, workspaceId: opts.workspaceId, readAt: null, heldAt: null },
     data: { readAt: new Date() },
   });
   return res.count;

@@ -45,7 +45,7 @@ function ActionNote({ note }: { note: string | null }) {
 // Agentic OS pressables. Black = primary, white = secondary, done = approve/complete,
 // running = agent-run verbs. Compact xs variants for table-density rows.
 const btnP =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnS =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnD =
@@ -53,7 +53,7 @@ const btnD =
 const btnR =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40";
 const btnPXs =
-  "inline-flex h-7 items-center gap-1 rounded-full bg-ink px-2.5 text-xs font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-7 items-center gap-1 rounded-full bg-ink px-2.5 text-xs font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnSXs =
   "inline-flex h-7 items-center gap-1 rounded-full bg-paper px-2.5 text-xs font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
@@ -113,13 +113,13 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Campaign name</Label>
-          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
+          <Label className="text-[0.8125rem] font-medium text-muted">Campaign name</Label>
+          <Input className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Ladder depth</Label>
+          <Label className="text-[0.8125rem] font-medium text-muted">Ladder depth</Label>
           <Select value={depth} onValueChange={(v) => setDepth(v ?? "1")}>
-            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">1 — Prospecting only (no sending)</SelectItem>
               <SelectItem value="2">2 — Drafts for human send</SelectItem>
@@ -128,20 +128,20 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Sending domain</Label>
+          <Label className="text-[0.8125rem] font-medium text-muted">Sending domain</Label>
           <Select value={sendingDomainId} onValueChange={(v) => setSendingDomainId(v ?? "")}>
-            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
             <SelectContent>
               {domains.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.domain}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-[11px] text-muted">Depth 3 requires a secondary domain. Primary domains never cold-send.</p>
+          <p className="text-[0.6875rem] text-muted">Depth 3 requires a secondary domain. Primary domains never cold-send.</p>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Daily cap (1–50)</Label>
-          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
+          <Label className="text-[0.8125rem] font-medium text-muted">Daily cap (1–50)</Label>
+          <Input className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -197,7 +197,7 @@ export function Depth3ActivationPanel({
         <p className="text-xs font-semibold text-ink">
           Depth-3 activation pending — {pendingApproval.approvers.length}/2 approvers
         </p>
-        <p className="mt-1 text-[11px] text-ink">
+        <p className="mt-1 text-[0.6875rem] text-ink">
           Two distinct humans must approve before activation completes. Each approver signs from
           their own session.
         </p>
@@ -334,13 +334,13 @@ export function CreateDomainForm() {
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Domain</Label>
-          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
+          <Label className="text-[0.8125rem] font-medium text-muted">Domain</Label>
+          <Input className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">DMARC policy</Label>
+          <Label className="text-[0.8125rem] font-medium text-muted">DMARC policy</Label>
           <Select value={dmarcPolicy} onValueChange={(v) => setDmarcPolicy(v ?? "")}>
-            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="None yet" /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="None yet" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">p=none</SelectItem>
               <SelectItem value="quarantine">p=quarantine</SelectItem>
@@ -349,9 +349,9 @@ export function CreateDomainForm() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Warmup started</Label>
-          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
-          <p className="text-[11px] text-muted">Depth 3 needs 30+ days of warmup with ramp history.</p>
+          <Label className="text-[0.8125rem] font-medium text-muted">Warmup started</Label>
+          <Input className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
+          <p className="text-[0.6875rem] text-muted">Depth 3 needs 30+ days of warmup with ramp history.</p>
         </div>
         <div className="space-y-2 pt-1">
           <label className="flex items-center gap-2 text-xs text-muted">
@@ -399,13 +399,13 @@ export function UpdateDomainChecks({ domainId }: { domainId: string }) {
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-paper p-2">
-      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+      <label className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
         <Checkbox checked={spfOk} onCheckedChange={(v) => setSpfOk(v === true)} /> SPF
       </label>
-      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+      <label className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
         <Checkbox checked={dkimOk} onCheckedChange={(v) => setDkimOk(v === true)} /> DKIM
       </label>
-      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+      <label className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
         <Checkbox checked={trackingCnameOk} onCheckedChange={(v) => setTrackingCnameOk(v === true)} /> CNAME
       </label>
       <button
@@ -437,8 +437,8 @@ export function DiscoverButton({ campaignId }: { campaignId: string }) {
   const [niche, setNiche] = useState("");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Input className="h-8 w-56 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
-      <Input className="h-8 w-40 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
+      <Input className="h-8 w-56 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
+      <Input className="h-8 w-40 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
       <button
         className={btnR}
         disabled={busy || !query.trim() || !niche.trim()}
@@ -517,21 +517,21 @@ export function DraftSequenceForm({ campaignId, prospectId, depth }: { campaignI
       }}
     >
       <div className="space-y-1.5">
-        <Label className="text-[13px] font-medium text-muted">Subject</Label>
-        <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+        <Label className="text-[0.8125rem] font-medium text-muted">Subject</Label>
+        <Input className="h-8 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={subject} onChange={(e) => setSubject(e.target.value)} required />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[13px] font-medium text-muted">Pitch body (first-line + angle personalization)</Label>
-        <Textarea className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
+        <Label className="text-[0.8125rem] font-medium text-muted">Pitch body (first-line + angle personalization)</Label>
+        <Textarea className="border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">One-click unsubscribe URL (CAN-SPAM)</Label>
-          <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
+          <Label className="text-[0.8125rem] font-medium text-muted">One-click unsubscribe URL (CAN-SPAM)</Label>
+          <Input className="h-8 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-muted">Physical mailing address (CAN-SPAM)</Label>
-          <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
+          <Label className="text-[0.8125rem] font-medium text-muted">Physical mailing address (CAN-SPAM)</Label>
+          <Input className="h-8 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
         </div>
       </div>
       <div className="flex items-center gap-3">

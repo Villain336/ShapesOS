@@ -5,8 +5,8 @@
 // House pattern (Creative Studio diff, class-by-class): page shell handled
 // by the voice layout (bg-canvas p-4 md:p-6); title
 // text-xl font-bold tracking-tight text-ink; subtitle
-// text-[13px] text-muted; primary buttons
-// bg-ink hover:bg-night-hover; DENSE TABLE, rows
+// text-[0.8125rem] text-muted; primary buttons
+// bg-ink hover:bg-ink-hover; DENSE TABLE, rows
 // hover:bg-hover-paper; info notes border-line bg-paper.
 // Lucide icons only. RareUI/BeautifulUI/shadcn components only.
 
@@ -28,11 +28,11 @@ import {
 import { confirmAction } from "@/lib/ui/feedback";
 
 const inputCls =
-  "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
+  "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-[13px] font-medium text-white hover:bg-night-hover disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-muted hover:bg-hover-paper disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-muted hover:bg-hover-paper disabled:opacity-40";
 
 interface Voice {
   voice_id: string;
@@ -75,7 +75,7 @@ interface Clip {
 // Job statuses are workflow states, not agent states — always a neutral chip.
 function statusChip(status: string) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {status}
     </span>
   );
@@ -188,13 +188,13 @@ export function VoiceoverStudio() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Voiceover Studio</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           TTS narration via the local VoiceStudio backend — paste a script, pick a voice, render, attach to a clip.
         </p>
       </div>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -204,8 +204,8 @@ export function VoiceoverStudio() {
         {/* ── Compose ── */}
         <div className="rounded-lg border border-line bg-paper p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold text-ink">Script</h2>
-            <span className="text-[11px] text-subtle">{script.length} / 20,000 chars</span>
+            <h2 className="text-[0.8125rem] font-semibold text-ink">Script</h2>
+            <span className="text-[0.6875rem] text-subtle">{script.length} / 20,000 chars</span>
           </div>
           <textarea
             value={script}
@@ -238,7 +238,7 @@ export function VoiceoverStudio() {
             </button>
           </div>
           {voicesDown && (
-            <div className="mt-3 flex items-start gap-2 rounded-md border border-line bg-needs-tint px-3 py-2 text-[12px] text-ink">
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-line bg-needs-tint px-3 py-2 text-[0.75rem] text-ink">
               <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" />
               <span>
                 VoiceStudio backend is not reachable: {voicesDown}. Start it (~/workspace/voicestudio)
@@ -250,18 +250,18 @@ export function VoiceoverStudio() {
 
         {/* ── Pronunciation snapshot ── */}
         <div className="rounded-lg border border-line bg-paper p-4">
-          <h2 className="mb-1 text-[13px] font-semibold text-ink">Pronunciation snapshot</h2>
-          <p className="mb-3 text-[12px] text-muted">
+          <h2 className="mb-1 text-[0.8125rem] font-semibold text-ink">Pronunciation snapshot</h2>
+          <p className="mb-3 text-[0.75rem] text-muted">
             Applied to every render, longest-term-first. Manage the dictionary on the Pronunciation tab.
           </p>
           {pron.length === 0 ? (
-            <p className="text-[12px] text-subtle">No entries yet — terms render as written.</p>
+            <p className="text-[0.75rem] text-subtle">No entries yet — terms render as written.</p>
           ) : (
             <ul className="max-h-56 space-y-1 overflow-y-auto">
               {pron.slice(0, 40).map((e) => (
                 <li
                   key={e.id}
-                  className="flex items-baseline justify-between gap-2 rounded border border-line px-2 py-1 text-[12px]"
+                  className="flex items-baseline justify-between gap-2 rounded border border-line px-2 py-1 text-[0.75rem]"
                 >
                   <span className="font-medium text-ink">{e.term}</span>
                   <span className="text-muted">→ {e.phonetic}</span>
@@ -270,7 +270,7 @@ export function VoiceoverStudio() {
             </ul>
           )}
           {pron.length > 40 && (
-            <p className="mt-1 text-[11px] text-subtle">+{pron.length - 40} more in the dictionary…</p>
+            <p className="mt-1 text-[0.6875rem] text-subtle">+{pron.length - 40} more in the dictionary…</p>
           )}
         </div>
       </div>
@@ -278,16 +278,16 @@ export function VoiceoverStudio() {
       {/* ── Jobs table ── */}
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <div className="border-b border-line px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-ink">Voiceover jobs</h2>
+          <h2 className="text-[0.8125rem] font-semibold text-ink">Voiceover jobs</h2>
         </div>
         {jobs.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-subtle">
+          <p className="px-4 py-6 text-center text-[0.8125rem] text-subtle">
             No voiceovers yet — render your first one above.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Script</th>
                 <th className="px-3 py-2 font-medium">Voice</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -310,7 +310,7 @@ export function VoiceoverStudio() {
                   <td className="px-3 py-2">
                     {statusChip(j.status)}
                     {j.status === "failed" && j.error && (
-                      <p className="mt-1 max-w-[220px] text-[11px] text-failed-text" title={j.error}>
+                      <p className="mt-1 max-w-[220px] text-[0.6875rem] text-failed-text" title={j.error}>
                         {j.error.slice(0, 90)}
                         {j.error.length > 90 ? "…" : ""}
                       </p>
@@ -324,31 +324,31 @@ export function VoiceoverStudio() {
                           style={{ width: `${Math.round(j.progress * 100)}%` }}
                         />
                       </div>
-                      <span className="text-[11px] text-muted">{Math.round(j.progress * 100)}%</span>
+                      <span className="text-[0.6875rem] text-muted">{Math.round(j.progress * 100)}%</span>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-muted">{fmtDuration(j.durationSec)}</td>
                   <td className="px-3 py-2 text-muted">
                     {j.pronunciation?.length > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-[12px]">
+                      <span className="inline-flex items-center gap-1 text-[0.75rem]">
                         <CheckCircle2 size={13} className="text-ink" />
                         {j.pronunciation.length} applied
                       </span>
                     ) : (
-                      <span className="text-[12px] text-subtle">—</span>
+                      <span className="text-[0.75rem] text-subtle">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-muted">
                     {j.clipId ? (
-                      <span className="inline-flex items-center gap-1 text-[12px]">
+                      <span className="inline-flex items-center gap-1 text-[0.75rem]">
                         <Link2 size={13} className="text-ink" />
                         {j.clipId.slice(0, 8)}…
                       </span>
                     ) : (
-                      <span className="text-[12px] text-subtle">—</span>
+                      <span className="text-[0.75rem] text-subtle">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-[12px] text-muted">
+                  <td className="px-3 py-2 text-[0.75rem] text-muted">
                     {new Date(j.createdAt).toLocaleDateString()} {new Date(j.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </td>
                   <td className="px-3 py-2">
@@ -411,7 +411,7 @@ export function VoiceoverStudio() {
         )}
       </div>
 
-      <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-[12px] text-muted">
+      <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
         <Clock size={14} className="mt-0.5 shrink-0" />
         <span>
           Audio is rendered by the local VoiceStudio backend (no per-minute cost, no keys) and stored in

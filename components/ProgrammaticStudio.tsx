@@ -148,7 +148,7 @@ function tiptapToSimple(doc: unknown): SimpleBlock[] {
 const inputCls =
   "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const btnPrimary =
-  "rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
+  "rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const btnSecondary =
   "rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50";
 const btnDanger =
@@ -1325,7 +1325,7 @@ export default function ProgrammaticStudio({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-semibold transition-colors ${tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-semibold transition-colors ${tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
             <t.icon size={15} />
             {t.label}

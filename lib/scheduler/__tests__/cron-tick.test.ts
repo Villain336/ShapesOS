@@ -204,9 +204,14 @@ interface Row {
   timezone?: string;
 }
 
-function fakeDb(rows: Row[]) {
+function fakeDb(rows: Row[], frozenWorkspaces: readonly string[] = []) {
   const audits: { action: string; summary: string; workspaceId: string }[] = [];
   const db = {
+    // Phase 18.1: the tick skips workspaces paused from Control Center (frozenAt).
+    workspace: {
+      findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
+        where.id.in.filter((id) => frozenWorkspaces.includes(id)).map((id) => ({ id })),
+    },
     scheduledSkill: {
       findMany: async () => rows.filter((r) => r.status === "active").map((r) => ({ ...r })),
       updateMany: async ({ where, data }: { where: Partial<Row>; data: Partial<Row> }) => {
@@ -230,6 +235,22 @@ function fakeDb(rows: Row[]) {
 
 describe("runSchedulerTick containment", () => {
   const now = new Date("2028-02-29T00:00:30Z");
+
+  it("Phase 18.1: a paused workspace's schedule is not fired and stays due (catch-up after resume)", async () => {
+    const due = new Date("2028-02-29T00:00:00Z");
+    const rows: Row[] = [
+      { id: "paused-ws", workspaceId: "w-paused", projectId: null, status: "active", triggerType: "cron", cronExpr: "0 0 * * *", nextRunAt: due },
+      { id: "live-ws", workspaceId: "w-live", projectId: null, status: "active", triggerType: "cron", cronExpr: "0 0 * * *", nextRunAt: due },
+    ];
+    const { db } = fakeDb(rows, ["w-paused"]);
+    const fired: string[] = [];
+    const r = await runSchedulerTick(db, now, { fire: async (_db, s) => (fired.push(s.id), { fired: true }) as never });
+    assert.deepEqual(fired, ["live-ws"]);
+    assert.equal(r.fired, 1);
+    assert.deepEqual(r.blocked, [{ scheduleId: "paused-ws", reason: "agents paused in this workspace" }]);
+    assert.equal(rows[0]!.nextRunAt?.getTime(), due.getTime(), "still due: not advanced, not parked");
+    assert.equal(rows[0]!.status, "active");
+  });
 
   it("a leap-day schedule fires and advances to 2032 instead of throwing", async () => {
     const rows: Row[] = [

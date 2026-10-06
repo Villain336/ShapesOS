@@ -87,16 +87,16 @@ type ChannelFilter = "all" | "sms" | "email";
 type AssignedFilter = "any" | "me" | "unassigned";
 
 const textareaCls =
-  "min-h-24 w-full resize-y rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+  "min-h-24 w-full resize-y rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 function chipToggleCls(pressed: boolean): string {
-  return `inline-flex h-control-sm items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold aos-press ${
+  return `inline-flex h-control-sm items-center gap-1.5 rounded-full px-3 text-[0.8125rem] font-semibold aos-press ${
     pressed ? "bg-ink text-white" : "bg-paper text-ink shadow-control hover:shadow-outline"
   }`;
 }
 
 function segmentCls(active: boolean): string {
-  return `inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-semibold ${
+  return `inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.78125rem] font-semibold ${
     active ? "bg-ink text-white" : "text-muted hover:text-ink"
   } disabled:cursor-not-allowed disabled:opacity-40`;
 }
@@ -116,7 +116,7 @@ function StatusMark({ m }: { m: ThreadMessage }) {
   const { mark, label } = messageMark(m);
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11.5px] font-semibold ${mark === "failed" ? "text-failed-text" : "text-muted"}`}
+      className={`inline-flex items-center gap-1 text-[0.71875rem] font-semibold ${mark === "failed" ? "text-failed-text" : "text-muted"}`}
     >
       {mark === "needs" ? (
         <span aria-hidden className="aos-shape aos-shape--needs aos-shape--edged" style={{ ["--aos-shape-size" as string]: "9px" }} />
@@ -292,7 +292,7 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
         <button type="button" aria-pressed={unreadOnly} className={chipToggleCls(unreadOnly)} onClick={() => setUnreadOnly((v) => !v)}>
           <MailOpen size={14} /> Unread
           {list && list.unreadThreads > 0 ? (
-            <span className={`rounded-full px-1.5 text-[11px] ${unreadOnly ? "bg-paper text-ink" : "bg-ink text-white"}`}>{list.unreadThreads}</span>
+            <span className={`rounded-full px-1.5 text-[0.6875rem] ${unreadOnly ? "bg-paper text-ink" : "bg-ink text-white"}`}>{list.unreadThreads}</span>
           ) : null}
         </button>
         <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
@@ -317,17 +317,17 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
         <div className={`min-h-0 overflow-y-auto border-line md:border-r ${selected ? "hidden md:block" : ""}`}>
           {listError ? <div className={`${errorBoxCls} m-3`}>{listError}</div> : null}
           {!list && !listError ? (
-            <div className="flex items-center gap-2 p-4 text-[13px] text-muted">
+            <div className="flex items-center gap-2 p-4 text-[0.8125rem] text-muted">
               <Loader2 size={14} className="animate-spin" /> Loading conversations
             </div>
           ) : null}
           {list && threads.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
               <Inbox size={22} className="text-subtle" />
-              <p className="text-[13px] font-semibold text-ink">
+              <p className="text-[0.8125rem] font-semibold text-ink">
                 {listParams.toString() ? "No conversations match these filters." : "No conversations yet."}
               </p>
-              <p className="text-[12.5px] text-muted">
+              <p className="text-[0.78125rem] text-muted">
                 {listParams.toString()
                   ? "Clear a filter to see more."
                   : "Text or email a lead from the CRM and the thread shows up here, with their replies."}
@@ -348,24 +348,24 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      <span className={`min-w-0 flex-1 truncate text-[13.5px] ${t.unreadCount ? "font-bold text-ink" : "font-semibold text-ink"}`}>
+                      <span className={`min-w-0 flex-1 truncate text-[0.84375rem] ${t.unreadCount ? "font-bold text-ink" : "font-semibold text-ink"}`}>
                         {t.leadName}
                       </span>
-                      <span className="shrink-0 text-[11.5px] text-subtle">{shortAge(t.lastMessageAt)}</span>
+                      <span className="shrink-0 text-[0.71875rem] text-subtle">{shortAge(t.lastMessageAt)}</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <ChannelIcon channel={t.lastChannel} />
-                      <span className={`min-w-0 flex-1 truncate text-[12.5px] ${t.unreadCount ? "text-ink" : "text-muted"}`}>
+                      <span className={`min-w-0 flex-1 truncate text-[0.78125rem] ${t.unreadCount ? "text-ink" : "text-muted"}`}>
                         {t.lastDirection === "outbound" ? "You: " : ""}
                         {t.lastSnippet || "(no text)"}
                       </span>
                       {t.unreadCount > 0 ? (
-                        <span className="shrink-0 rounded-full bg-ink px-1.5 text-[11px] font-semibold text-white" aria-label={`${t.unreadCount} unread`}>
+                        <span className="shrink-0 rounded-full bg-ink px-1.5 text-[0.6875rem] font-semibold text-white" aria-label={`${t.unreadCount} unread`}>
                           {t.unreadCount}
                         </span>
                       ) : null}
                     </span>
-                    {t.ownerName ? <span className="truncate text-[11.5px] text-subtle">Owner: {t.ownerName}</span> : null}
+                    {t.ownerName ? <span className="truncate text-[0.71875rem] text-subtle">Owner: {t.ownerName}</span> : null}
                   </button>
                 </li>
               );
@@ -379,7 +379,7 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
             </div>
           ) : null}
           {list && list.unmatchedInbound > 0 ? (
-            <p className="px-4 py-3 text-[12px] text-muted">
+            <p className="px-4 py-3 text-[0.75rem] text-muted">
               {list.unmatchedInbound} inbound {list.unmatchedInbound === 1 ? "text" : "texts"} came from numbers that match no lead.
             </p>
           ) : null}
@@ -403,7 +403,7 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
               <MessageSquareText size={22} className="text-subtle" />
-              <p className="text-[13px] text-muted">Pick a conversation to read it and reply.</p>
+              <p className="text-[0.8125rem] text-muted">Pick a conversation to read it and reply.</p>
             </div>
           )}
         </div>
@@ -592,7 +592,7 @@ function ThreadPane({
   }
   if (!detail) {
     return (
-      <div className="flex items-center gap-2 p-4 text-[13px] text-muted">
+      <div className="flex items-center gap-2 p-4 text-[0.8125rem] text-muted">
         <Loader2 size={14} className="animate-spin" /> Loading conversation
       </div>
     );
@@ -607,8 +607,8 @@ function ThreadPane({
           <ArrowLeft size={16} />
         </button>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-bold text-ink">{detail.lead.name}</h2>
-          <p className="truncate text-[12.5px] text-muted">
+          <h2 className="truncate text-[0.9375rem] font-bold text-ink">{detail.lead.name}</h2>
+          <p className="truncate text-[0.78125rem] text-muted">
             {[detail.lead.phone, detail.lead.email, detail.lead.company].filter(Boolean).join(" · ") || "No contact details"}
           </p>
         </div>
@@ -622,21 +622,21 @@ function ThreadPane({
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-canvas px-4 py-4" aria-live="polite">
         {detail.messages.length === 0 ? (
-          <p className="text-center text-[13px] text-muted">No messages{channelFilter ? ` on ${CHANNEL_LABEL[channelFilter]}` : ""} yet.</p>
+          <p className="text-center text-[0.8125rem] text-muted">No messages{channelFilter ? ` on ${CHANNEL_LABEL[channelFilter]}` : ""} yet.</p>
         ) : null}
         {detail.messages.map((m) => {
           const inbound = m.direction === "inbound";
           return (
             <div key={m.id} className={`flex ${inbound ? "justify-start" : "justify-end"}`}>
               <div className={`max-w-[80%] rounded-lg px-3 py-2 ${inbound ? "bg-paper shadow-hairline" : "bg-paper shadow-outline"}`}>
-                <div className="mb-1 flex items-center gap-1.5 text-[11.5px] text-subtle">
+                <div className="mb-1 flex items-center gap-1.5 text-[0.71875rem] text-subtle">
                   <ChannelIcon channel={m.channel} size={12} />
                   <span>{inbound ? detail.lead.name : "You"}</span>
                   <span aria-hidden>·</span>
                   <time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString()}</time>
                 </div>
-                {m.subject ? <p className="mb-0.5 text-[13px] font-semibold text-ink">{m.subject}</p> : null}
-                <p className="whitespace-pre-wrap break-words text-[13.5px] text-ink">{m.body}</p>
+                {m.subject ? <p className="mb-0.5 text-[0.8125rem] font-semibold text-ink">{m.subject}</p> : null}
+                <p className="whitespace-pre-wrap break-words text-[0.84375rem] text-ink">{m.body}</p>
                 {!inbound ? (
                   <div className="mt-1.5 flex justify-end">
                     <StatusMark m={m} />
@@ -664,7 +664,7 @@ function ThreadPane({
                   <Mail size={13} /> Email
                 </button>
               </div>
-              <span className="text-[12px] text-muted">Replies wait for approval before they go out.</span>
+              <span className="text-[0.75rem] text-muted">Replies wait for approval before they go out.</span>
             </div>
             {replyChannel === "email" ? (
               <div>
@@ -691,18 +691,18 @@ function ThreadPane({
               aria-describedby={formError ? "inbox-error" : hint ? "inbox-hint" : undefined}
             />
             {hint ? (
-              <p id="inbox-hint" className="text-[12.5px] text-muted">
+              <p id="inbox-hint" className="text-[0.78125rem] text-muted">
                 {hint}
               </p>
             ) : null}
             {formError ? (
-              <p id="inbox-error" className="flex items-center gap-1.5 text-[12.5px] text-failed-text">
+              <p id="inbox-error" className="flex items-center gap-1.5 text-[0.78125rem] text-failed-text">
                 <span className="aos-shape aos-shape--failed" aria-hidden style={{ ["--aos-shape-size" as string]: "8px" }} />
                 {formError}
               </p>
             ) : null}
             <div className="flex items-center justify-end gap-2">
-              {replyChannel === "sms" ? <span className="text-[12px] text-subtle">{body.length}/1600</span> : null}
+              {replyChannel === "sms" ? <span className="text-[0.75rem] text-subtle">{body.length}/1600</span> : null}
               <button type="button" className={btnPrimary} onClick={() => void send()} disabled={sending || !body.trim()}>
                 {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 {sending ? "Queuing" : "Queue reply"}

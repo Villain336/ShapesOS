@@ -195,18 +195,18 @@ export function ShareModal({
 
         <div className="space-y-6 px-5 py-4">
           {error && (
-            <p className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <p className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               {error}
             </p>
           )}
           {loading ? (
-            <p className="flex items-center gap-2 text-[13px] text-muted">
+            <p className="flex items-center gap-2 text-[0.8125rem] text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading…
             </p>
           ) : (
             <>
               <section>
-                <h3 className="mb-2 text-[12px] font-semibold text-muted">
+                <h3 className="mb-2 text-[0.75rem] font-semibold text-muted">
                   Approval status
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
@@ -215,7 +215,7 @@ export function ShareModal({
                       key={s.key}
                       disabled={saving}
                       onClick={() => void setStatus(s.key)}
-                      className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
+                      className={`rounded-md px-3 py-1.5 text-[0.8125rem] font-medium ${
                         approval?.status === s.key
                           ? "bg-ink text-white"
                           : "border border-line bg-paper text-ink hover:bg-hover-paper"
@@ -232,27 +232,27 @@ export function ShareModal({
                     onBlur={() => void setStatus("changes_requested")}
                     rows={3}
                     placeholder="What needs to change?"
-                    className="mt-2 w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+                    className="mt-2 w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   />
                 )}
               </section>
 
               <section>
-                <h3 className="mb-2 text-[12px] font-semibold text-muted">
+                <h3 className="mb-2 text-[0.75rem] font-semibold text-muted">
                   Public share links
                 </h3>
                 {newToken && (
                   <div className="mb-3 rounded-md border border-line bg-needs-tint p-3">
-                    <p className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+                    <p className="mb-1.5 flex items-center gap-1.5 text-[0.75rem] font-semibold text-ink">
                       <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" />Copy this link now — the token is shown once and never again.
                     </p>
                     <div className="flex items-center gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1.5 font-mono text-[12px] text-ink shadow-hairline">
+                      <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1.5 font-mono text-[0.75rem] text-ink shadow-hairline">
                         {newToken.url}
                       </code>
                       <button
                         onClick={() => void copy(newToken.url)}
-                        className="flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white aos-press"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[0.75rem] font-semibold text-white aos-press"
                       >
                         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         {copied ? "Copied" : "Copy"}
@@ -266,10 +266,10 @@ export function ShareModal({
                     onChange={(e) => setExpiryDays(e.target.value.replace(/\D/g, ""))}
                     placeholder="Expires in days (optional)"
                     inputMode="numeric"
-                    className="w-48 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+                    className="w-48 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   />
                   <label
-                    className="flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] text-ink shadow-outline hover:bg-hover-paper"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.8125rem] text-ink shadow-outline hover:bg-hover-paper"
                     title="Record visitor sessions (rrweb). Inputs are masked; recordings are workspace-visible only."
                   >
                     <input
@@ -283,13 +283,13 @@ export function ShareModal({
                   <button
                     onClick={() => void createShare()}
                     disabled={saving}
-                    className="flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
+                    className="flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-[0.8125rem] font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
                   >
                     <Plus className="h-4 w-4" /> New link
                   </button>
                 </div>
                 {shares.length === 0 ? (
-                  <p className="text-[13px] text-muted">
+                  <p className="text-[0.8125rem] text-muted">
                     No share links yet. Links open a read-only preview for anyone with the URL.
                   </p>
                 ) : (
@@ -303,26 +303,26 @@ export function ShareModal({
                           className={`h-4 w-4 shrink-0 ${s.active ? "text-ink" : "text-subtle"}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-medium text-ink">
+                          <p className="text-[0.75rem] font-medium text-ink">
                             Created {new Date(s.createdAt).toLocaleDateString()}
                             {s.expiresAt &&
                               ` · expires ${new Date(s.expiresAt).toLocaleDateString()}`}
                           </p>
                           <p
-                            className={`text-[11px] ${s.active ? "text-ink" : "text-subtle"}`}
+                            className={`text-[0.6875rem] ${s.active ? "text-ink" : "text-subtle"}`}
                           >
                             {s.active ? "Active" : "Revoked"}
                             {s.replayOptIn && s.active && (
                               <Link
                                 href={`/dashboard/studio/designs/${encodeURIComponent(designId)}/replay/${encodeURIComponent(s.id)}`}
-                                className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink hover:bg-hover-paper"
+                                className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink hover:bg-hover-paper"
                                 title="Watch session recordings for this link"
                               >
                                 <MonitorPlay className="h-3 w-3" /> replay · watch
                               </Link>
                             )}
                             {s.replayOptIn && !s.active && (
-                              <span className="ml-1.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-subtle">
+                              <span className="ml-1.5 rounded-full bg-canvas px-1.5 py-0.5 text-[0.625rem] font-semibold text-subtle">
                                 replay on
                               </span>
                             )}
@@ -331,7 +331,7 @@ export function ShareModal({
                         {s.active && (
                           <button
                             onClick={() => void revokeShare(s.id)}
-                            className="flex items-center gap-1 rounded-full bg-paper px-2 py-1 text-[12px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)]"
+                            className="flex items-center gap-1 rounded-full bg-paper px-2 py-1 text-[0.75rem] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)]"
                             title="Revoke this link"
                           >
                             <Trash2 className="h-3.5 w-3.5" /> Revoke
@@ -341,7 +341,7 @@ export function ShareModal({
                     ))}
                   </ul>
                 )}
-                <p className="mt-2 text-[11px] leading-snug text-subtle">
+                <p className="mt-2 text-[0.6875rem] leading-snug text-subtle">
                   Public previews show the design, approval status, and comments only — never
                   workspace details. Revoked, expired, and unknown links all return the same
                   404.

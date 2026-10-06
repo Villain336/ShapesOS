@@ -38,7 +38,7 @@ const URGENCY_META = {
 
 function chip(text: React.ReactNode, cls: string) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );
@@ -79,7 +79,7 @@ export default async function PrPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Digital PR</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Journalist queries aggregated and matched — then a draft workspace with research
             brief, pitch-the-gap, and a de-AI pass. <strong>Humans send everything.</strong>{" "}
             ShapesOS records sends against a pr_send approval; it never sends on your identity.
@@ -120,9 +120,9 @@ export default async function PrPage() {
                       {o.journalist} · {o.outlet}
                     </span>
                   </div>
-                  <p className="mt-1.5 text-[13px] leading-snug text-muted">{o.queryText}</p>
+                  <p className="mt-1.5 text-[0.8125rem] leading-snug text-muted">{o.queryText}</p>
                   {o.expertiseTags.length > 0 && (
-                    <p className="mt-1 font-mono text-[11px] text-subtle">{o.expertiseTags.join(" · ")}</p>
+                    <p className="mt-1 font-mono text-[0.6875rem] text-subtle">{o.expertiseTags.join(" · ")}</p>
                   )}
                   {(o.status === "new" || o.status === "matched") && <CreateDraftForm opportunityId={o.id} />}
                 </li>
@@ -166,7 +166,7 @@ export default async function PrPage() {
                   {/* Research brief */}
                   <details className="mt-2 text-sm">
                     <summary className="cursor-pointer font-medium text-ink">Research brief</summary>
-                    <div className="mt-1 space-y-1 text-[13px] text-muted">
+                    <div className="mt-1 space-y-1 text-[0.8125rem] text-muted">
                       {(b.recentBeats?.length ?? 0) > 0 && <p><strong>Beats:</strong> {b.recentBeats!.join(", ")}</p>}
                       {(b.recentArticles?.length ?? 0) > 0 && (
                         <p><strong>Recent:</strong> {b.recentArticles!.map((a) => a.title).join(" · ")}</p>
@@ -185,7 +185,7 @@ export default async function PrPage() {
                   {/* Quote skeleton */}
                   <details className="mt-1 text-sm">
                     <summary className="cursor-pointer font-medium text-ink">Quote skeleton (working scaffold — never send-ready)</summary>
-                    <pre className="mt-1 whitespace-pre-wrap rounded bg-paper p-2 font-mono text-[12px] text-muted">{d.quoteSkeleton}</pre>
+                    <pre className="mt-1 whitespace-pre-wrap rounded bg-paper p-2 font-mono text-[0.75rem] text-muted">{d.quoteSkeleton}</pre>
                   </details>
 
                   {/* Pre-send checklist */}
@@ -193,7 +193,7 @@ export default async function PrPage() {
                     <p className="text-xs font-semibold text-muted">Pre-send checklist</p>
                     <ul className="mt-1 space-y-0.5">
                       {checklist.map((c) => (
-                        <li key={c.id} className="flex items-start gap-1.5 text-[13px]">
+                        <li key={c.id} className="flex items-start gap-1.5 text-[0.8125rem]">
                           {c.passed ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-failed-text" />}
                           <span className={c.passed ? "text-muted" : "text-ink font-medium"}>{c.label}</span>
                         </li>
@@ -203,7 +203,7 @@ export default async function PrPage() {
 
                   {/* de-AI flags */}
                   {!d.deAiPassed && deAi.flags.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-failed bg-failed-tint p-2 text-[12px] text-failed-text">
+                    <div className="mt-2 rounded-lg border border-failed bg-failed-tint p-2 text-[0.75rem] text-failed-text">
                       <p className="font-semibold">De-AI pass flagged AI signals — rework before approval:</p>
                       <ul className="mt-1 list-disc pl-4">
                         {deAi.flags.map((f, i) => <li key={i}>{f}</li>)}
@@ -260,15 +260,15 @@ export default async function PrPage() {
                       eligible ? "border-line bg-paper text-muted shadow-control" : "border-line bg-paper text-muted shadow-control")}
                   </div>
                   {r.declinationReasons.length > 0 && (
-                    <p className="mt-1 text-[12px] text-muted">
+                    <p className="mt-1 text-[0.75rem] text-muted">
                       Declinations: {r.declinationReasons.join(" · ")}
                     </p>
                   )}
                   {r.history.length > 0 && (
-                    <ul className="mt-1 space-y-0.5 text-[12px] text-muted">
+                    <ul className="mt-1 space-y-0.5 text-[0.75rem] text-muted">
                       {r.history.slice(-4).reverse().map((h, i) => (
                         <li key={i}>
-                          <span className="font-mono text-[11px]">{h.ts.toISOString().slice(0, 10)}</span>{" "}
+                          <span className="font-mono text-[0.6875rem]">{h.ts.toISOString().slice(0, 10)}</span>{" "}
                           <span className="font-medium">{h.kind.replace("_", " ")}</span> — {h.detail}
                         </li>
                       ))}
@@ -304,7 +304,7 @@ export default async function PrPage() {
                     <Link href={p.url} target="_blank" className="truncate text-sm font-medium text-ink hover:underline">
                       {p.outlet}
                     </Link>
-                    <p className="truncate font-mono text-[11px] text-subtle">{p.url}</p>
+                    <p className="truncate font-mono text-[0.6875rem] text-subtle">{p.url}</p>
                   </div>
                   {chip(`impact ${impact?.score ?? "—"}/100`, "border-line bg-paper text-muted")}
                 </li>
@@ -319,7 +319,7 @@ export default async function PrPage() {
             </p>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {aeoDomains.map((d) => (
-                <span key={d.domain} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] font-medium leading-tight text-muted">
+                <span key={d.domain} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line bg-paper px-1.5 py-0.5 font-mono text-[0.625rem] font-medium leading-tight text-muted">
                   {d.domain} ×{d.placements}
                 </span>
               ))}

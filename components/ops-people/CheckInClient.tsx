@@ -129,7 +129,7 @@ export function CheckInScreen({ eventId, initialCount, total }: { eventId: strin
           <div className={`flex items-start gap-3 rounded-lg px-5 py-4 shadow-hairline ${ok ? "bg-paper" : "bg-canvas"}`}>
             {result.status === "invalid" || result.status === "not_confirmed" ? <span aria-hidden className="mt-2 size-3 shrink-0 bg-failed" /> : null}
             <div>
-              <p className="text-[22px] font-bold leading-tight">{ok ? result.attendee?.name ?? "Checked in" : result.status === "already_checked_in" ? "Already checked in" : "Not admitted"}</p>
+              <p className="text-[1.375rem] font-bold leading-tight">{ok ? result.attendee?.name ?? "Checked in" : result.status === "already_checked_in" ? "Already checked in" : "Not admitted"}</p>
               <p className="text-md text-muted">
                 {result.message}
                 {result.attendee ? ` · ${result.attendee.ticketType}` : ""}

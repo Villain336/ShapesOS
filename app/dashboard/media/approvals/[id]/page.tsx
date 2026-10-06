@@ -49,7 +49,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
           <h1 className="aos-heading mt-1 text-ink">
             {b.platform} — {money(approval.maxSpendCents, approval.currency)} max
           </h1>
-          <p className="mt-1 font-mono text-[11px] text-muted">
+          <p className="mt-1 font-mono text-[0.6875rem] text-muted">
             binding sha256: {approval.bindingHash}
           </p>
         </div>
@@ -72,9 +72,9 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
           </dl>
           <h3 className="mb-2 mt-4 text-xs font-semibold text-muted">Line items</h3>
           <div className="overflow-x-auto rounded-lg border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Inventory</th>
                   <th className="px-3 py-2 font-medium">Pricing</th>
                   <th className="px-3 py-2 font-medium">Flight</th>
@@ -86,12 +86,12 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
                   <tr key={i} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">
                       {li.inventory}
-                      <span className="block font-mono text-[10px] font-normal text-muted">
+                      <span className="block font-mono text-[0.625rem] font-normal text-muted">
                         creatives {li.creativeHashes.map((h) => h.slice(0, 8)).join(", ")}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted">{li.pricingModel}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{li.flightStart.slice(0, 10)} → {li.flightEnd.slice(0, 10)}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{li.flightStart.slice(0, 10)} → {li.flightEnd.slice(0, 10)}</td>
                     <td className="px-3 py-2 font-medium text-ink">{money(li.maxAllowedCents, b.currency)}</td>
                   </tr>
                 ))}
@@ -107,9 +107,9 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
               <p className="text-sm text-muted">No approvals recorded yet.</p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
-                    <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                    <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                       <th className="px-3 py-2 font-medium">Approver</th>
                       <th className="px-3 py-2 font-medium">Method</th>
                       <th className="px-3 py-2 font-medium">Decided</th>
@@ -120,7 +120,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
                       <tr key={i} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className="px-3 py-2 font-medium text-ink">{r.userId}</td>
                         <td className="px-3 py-2 text-muted">{r.method}</td>
-                        <td className="px-3 py-2 text-[12px] text-muted">{r.decidedAt.slice(0, 16)}</td>
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">{r.decidedAt.slice(0, 16)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -136,9 +136,9 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
           <section className="rounded-lg border border-line bg-paper p-4">
             <h2 className="mb-3 text-sm font-semibold text-ink">Event log (hash-chained)</h2>
             <div className="max-h-80 overflow-y-auto rounded-lg border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead className="sticky top-0">
-                  <tr className="border-b border-line bg-canvas text-[11px] text-muted">
+                  <tr className="border-b border-line bg-canvas text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Time</th>
                     <th className="px-3 py-2 font-medium">Action</th>
                     <th className="px-3 py-2 font-medium">Actor</th>
@@ -148,10 +148,10 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
                 <tbody>
                   {events.map((e) => (
                     <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                      <td className="px-3 py-2 font-mono text-[11px] text-muted">{e.ts.toISOString().slice(0, 19)}</td>
+                      <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">{e.ts.toISOString().slice(0, 19)}</td>
                       <td className="px-3 py-2 font-semibold text-ink">{e.action}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{e.actor}</td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-muted">{e.eventHash.slice(0, 16)}…</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{e.actor}</td>
+                      <td className="px-3 py-2 font-mono text-[0.625rem] text-muted">{e.eventHash.slice(0, 16)}…</td>
                     </tr>
                   ))}
                 </tbody>

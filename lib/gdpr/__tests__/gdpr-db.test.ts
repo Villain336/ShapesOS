@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { withUserScope } from "@/lib/desktop/scope";
 
 const RUN = randomUUID().slice(0, 8);
 const OWNER = `p4-gdpr-owner-${RUN}`;
@@ -94,6 +95,21 @@ before(async () => {
   await withWorkspaceScope(SHARED, (tx) =>
     tx.pushDevice.create({ data: { workspaceId: SHARED, userId: OWNER, expoToken: `ExponentPushToken[${RUN}]`, platform: "ios" } }),
   );
+  // Phase 18.1 (WS=desk): owner-only desk rows (workspace AND person GUC) + per-person desk state.
+  for (const user of [OWNER, ADMIN]) {
+    await withUserScope(SHARED, user, async (tx) => {
+      await tx.userDesktopLayout.create({ data: { id: `desk-${user}`, workspaceId: SHARED, userId: user, layout: { version: 1, widgets: [] }, briefingEnabled: true } });
+      await tx.userRecentItem.create({ data: { id: `rec-${user}`, workspaceId: SHARED, userId: user, href: "/dashboard/crm", title: "CRM" } });
+      await tx.desktopBriefing.create({ data: { id: `brief-${user}`, workspaceId: SHARED, userId: user, day: "2026-10-06", status: "ready", body: `Briefing ${user}` } });
+    });
+  }
+  await prisma.userDeskState.create({ data: { userId: OWNER, focusUntil: new Date(Date.now() + 3600_000), focusStartedAt: new Date() } });
+  // Phase 18.1 (integration): the person's preferences (incl. the desk's voice + shortcuts keys).
+  await prisma.userPreference.upsert({
+    where: { userId: OWNER },
+    create: { userId: OWNER, theme: "dark", voice: { enabled: true }, shortcuts: { "control.open": "alt+shift+x" } },
+    update: { theme: "dark", voice: { enabled: true }, shortcuts: { "control.open": "alt+shift+x" } },
+  });
   wsExport = await import("@/app/api/workspaces/[id]/export/route");
   accExport = await import("@/app/api/account/export/route");
   account = await import("@/app/api/account/route");
@@ -103,6 +119,8 @@ after(async () => {
   await prisma.workspace.deleteMany({ where: { id: { in: [SHARED, SOLO, OTHER] } } });
   await prisma.workspaceLifecycleEvent.deleteMany({ where: { workspaceId: { in: [SHARED, SOLO, OTHER] } } });
   await prisma.userSecurity.deleteMany({ where: { userId: OWNER } });
+  await prisma.userDeskState.deleteMany({ where: { userId: { in: [OWNER, ADMIN] } } });
+  await prisma.userPreference.deleteMany({ where: { userId: { in: [OWNER, ADMIN] } } });
   await prisma.$disconnect();
 });
 
@@ -175,6 +193,13 @@ describe("user export", () => {
     assert.ok(doc.authored.command_audit?.some((r) => r.id === `ca-solo-${RUN}`), "RLS table read under each workspace's scope");
     assert.ok(doc.authored.file_change_log?.every((r) => r.approved_by === OWNER));
     assert.doesNotMatch(text, new RegExp(`admin-${RUN}|${OTHER}|CIPHERTEXT-|KEYHASH-`));
+    // Phase 18.1: the member's own desk (owner-only RLS) is in their export; another member's is not.
+    assert.ok(doc.authored.user_desktop_layouts?.some((r) => r.id === `desk-${OWNER}`));
+    assert.ok(doc.authored.user_recent_items?.some((r) => r.id === `rec-${OWNER}`));
+    assert.ok(doc.authored.desktop_briefings?.some((r) => r.id === `brief-${OWNER}`));
+    assert.ok(doc.authored.user_desk_state?.some((r) => r.user_id === OWNER));
+    assert.ok(doc.authored.user_preferences?.some((r) => r.user_id === OWNER && (r.voice as { enabled?: boolean })?.enabled === true));
+    assert.doesNotMatch(text, new RegExp(`desk-${ADMIN}|Briefing ${ADMIN}`));
   });
 });
 
@@ -242,6 +267,16 @@ describe("account deletion", () => {
 
     // Per-user rows in RLS tables of the workspace they left are gone too.
     assert.equal(await withWorkspaceScope(SHARED, (tx) => tx.pushDevice.count({ where: { workspaceId: SHARED, userId: OWNER } })), 0);
+    // Phase 18.1: the owner-only desk rows too (the delete pass sets the person GUC); the other member's stay.
+    const deskLeft = await withUserScope(SHARED, OWNER, async (tx) => [
+      await tx.userDesktopLayout.count(),
+      await tx.userRecentItem.count(),
+      await tx.desktopBriefing.count(),
+    ]);
+    assert.deepEqual(deskLeft, [0, 0, 0]);
+    assert.equal(await withUserScope(SHARED, ADMIN, (tx) => tx.userDesktopLayout.count()), 1);
+    assert.equal(await prisma.userDeskState.count({ where: { userId: OWNER } }), 0);
+    assert.equal(await prisma.userPreference.count({ where: { userId: OWNER } }), 0);
 
     // Sign-in factors gone; user_security is a bare tombstone.
     assert.equal(await prisma.userRecoveryCode.count({ where: { userId: OWNER } }), 0);

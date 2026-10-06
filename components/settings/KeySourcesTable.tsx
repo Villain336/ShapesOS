@@ -28,7 +28,7 @@ export default function KeySourcesTable() {
       <h2 id="providers-key-sources" className="aos-subheading">
         Where each key comes from
       </h2>
-      <dl className="mt-2 grid gap-1.5 text-[12px] md:grid-cols-2">
+      <dl className="mt-2 grid gap-1.5 text-[0.75rem] md:grid-cols-2">
         {ORDER.map((cls) => (
           <div key={cls} className="flex items-start gap-2">
             <dt className="shrink-0">
@@ -69,7 +69,7 @@ export default function KeySourcesTable() {
                       e.byok.where
                     )}
                   </td>
-                  <td className="py-2 pr-3 font-mono text-[11px] text-ink">{e.envVars.length ? e.envVars.join(", ") : "—"}</td>
+                  <td className="py-2 pr-3 font-mono text-[0.6875rem] text-ink">{e.envVars.length ? e.envVars.join(", ") : "—"}</td>
                   <td className="py-2 text-xs text-muted">{e.note}</td>
                 </tr>
               )),

@@ -229,7 +229,7 @@ export function SigningPanel({ configured }: { configured: boolean }) {
         <button
           type="submit"
           disabled={submitting || !configured}
-          className="mt-4 inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
+          className="mt-4 inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40"
         >
           {submitting ? "Sending…" : "Create & send signing request"}
         </button>

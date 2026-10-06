@@ -8,9 +8,12 @@ import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { Field } from "@/components/vault/Field";
 import { Button } from "@/components/vault/atoms/Button";
 import { Input } from "@/components/vault/shadcn/input";
+// Phase 18.1 (integration): on Home (the Projects widget) in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export default function ProjectCreateForm() {
   const router = useRouter();
+  const { t } = useI18n();
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +30,7 @@ export default function ProjectCreateForm() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "Could not create project.");
+        setError(json.error ?? t("kit.projectForm.failed"));
         return;
       }
       setDomain("");
@@ -40,8 +43,8 @@ export default function ProjectCreateForm() {
   return (
     <Card>
       <CardHeader
-        title="New project"
-        description="Add a domain to start keyword research"
+        title={t("kit.projectForm.title")}
+        description={t("kit.projectForm.description")}
       />
       <CardBody>
         <form
@@ -49,7 +52,7 @@ export default function ProjectCreateForm() {
           className="flex flex-col gap-3 sm:flex-row sm:items-end"
         >
           <Field
-            label="Domain"
+            label={t("kit.projectForm.domain")}
             htmlFor="domain"
             error={error ?? undefined}
             className="flex-1"
@@ -63,7 +66,7 @@ export default function ProjectCreateForm() {
             />
           </Field>
           <Button type="submit" variant="accent" size="md" disabled={busy}>
-            {busy ? "Creating…" : "Add domain"}
+            {busy ? t("kit.projectForm.adding") : t("kit.projectForm.add")}
           </Button>
         </form>
       </CardBody>

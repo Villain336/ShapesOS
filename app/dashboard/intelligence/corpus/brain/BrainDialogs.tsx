@@ -29,7 +29,7 @@ function DialogShell({
   footer: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="w-full max-w-lg rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
@@ -184,7 +184,7 @@ export function AddSourceDialog({ onClose, onAdded }: { onClose: () => void; onA
           className={`${inputCls} w-full resize-y py-2.5`}
         />
       )}
-      <div className="flex items-start gap-2 rounded-md border border-line bg-canvas p-2.5 text-[11px] leading-snug text-muted">
+      <div className="flex items-start gap-2 rounded-md border border-line bg-canvas p-2.5 text-[0.6875rem] leading-snug text-muted">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
         Proposed sources appear as dotted nodes immediately, but nothing is ingested until you run a
         corpus rebuild — and pasted text must be yours to give (no scraped or pirated material).

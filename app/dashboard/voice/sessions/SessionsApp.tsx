@@ -69,7 +69,7 @@ export function SessionsApp() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Call Sessions</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Every session — live, rehearsal, or blocked — with its consent proof and audit trail.
         </p>
       </div>
@@ -137,7 +137,7 @@ export function SessionsApp() {
                 <td className={tdCls}>
                   <Link
                     href={`/dashboard/voice/sessions/${s.id}`}
-                    className="font-mono text-[12px] text-ink hover:text-ink"
+                    className="font-mono text-[0.75rem] text-ink hover:text-ink"
                   >
                     {s.id.slice(-8)}
                   </Link>
@@ -147,7 +147,7 @@ export function SessionsApp() {
                 <td className={tdCls}><Chip tone="slate">{s.channel}</Chip></td>
                 <td className={tdCls}><Chip tone={statusTone(s.status)}>{s.status}</Chip></td>
                 <td className={tdCls}>{s.outcome ?? "—"}</td>
-                <td className={`${tdCls} font-mono text-[12px]`}>
+                <td className={`${tdCls} font-mono text-[0.75rem]`}>
                   {s.blockReason ? <Chip tone="red">{s.blockReason}</Chip> : "—"}
                 </td>
                 <td className={tdCls}>

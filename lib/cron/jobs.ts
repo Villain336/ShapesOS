@@ -100,6 +100,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     secretEnv: "REMINDERS_CRON_SECRET",
   },
   {
+    // Phase 18.1 (WS=desk): focus ends → queued notifications delivered; the morning "Today" briefings.
+    key: "desk",
+    path: "/api/cron/desk",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. Releases what focus / do not disturb queued once focus ends (within 15 minutes even with the app closed) and writes each opted-in member's briefing once their local morning (06:00) has come; idempotent per member per day.",
+    timeoutMs: SHORT,
+  },
+  {
     // Phase 9 (repos): webhook fallback for agent PR feedback; a no-op unless GITHUB_PR_POLL=on.
     key: "github-prs",
     path: "/api/cron/github-prs",
@@ -125,6 +134,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     cron: "*/15 * * * *",
     source: "picked",
     note: "New in Phase 6. The shortest monitor cadence is hourly; a 15-minute sweep checks each due monitor within 15 minutes of its slot. Each check is budget-gated before the vendor is hit.",
+    timeoutMs: LONG,
+  },
+  // Phase 18.1 (find): Spotlight's text index — files/docs the write hook missed, and chunk embeddings.
+  {
+    key: "search-index",
+    path: "/api/cron/search-index",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. The write hook indexes text at once and embeds only when the model is already loaded; a 15-minute sweep makes a new upload meaning-searchable within 15 minutes. Idempotent by content hash, batch-capped (SEARCH_INDEX_BATCH).",
     timeoutMs: LONG,
   },
 

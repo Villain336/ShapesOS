@@ -134,11 +134,11 @@ export function PurchaseOrdersTab() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Purchase orders</h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Draft → approve → send → received. Sending is a money commitment and needs your approval.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-muted">
+        <div className="flex items-center gap-4 text-[0.8125rem] text-muted">
           <span>
             Open orders{" "}
             <span className="font-bold text-ink tabular-nums">{formatMoney(totals.open)}</span>
@@ -185,14 +185,14 @@ export function PurchaseOrdersTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading purchase orders…
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
           <ClipboardList size={28} className="mx-auto text-subtle" />
-          <p className="mt-2 text-[13px] font-semibold text-ink">No purchase orders yet</p>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-2 text-[0.8125rem] font-semibold text-ink">No purchase orders yet</p>
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Create a draft — it stays a draft until you approve the send.
           </p>
         </div>

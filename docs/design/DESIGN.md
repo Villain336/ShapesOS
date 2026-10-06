@@ -95,6 +95,8 @@ Headings get **wider**, not just bolder; that width is the brand's signature. Se
 
 **Menus, popovers, palette.** White, `radius-lg`. Menus use `shadow-raised`; the command palette and dialogs use `shadow-overlay`. Rows are 44px, `radius-sm`; the active row is solid black with white text. Destructive rows use `failed-text` and a `failed-tint` hover.
 
+**Spotlight (⌘K Records, Phase 18.1).** Results are grouped by kind under a 11px `subtle` kind label, best group first. A row may carry a second line, the snippet around the match: matched words are **bold and underlined** in `ink` (never highlighted yellow: yellow means Needs you). How it matched (Name · Text · Meaning) sits on the right in 12px `subtle`. Inside the active (ink) row, secondary text uses `on-ink-muted` and tiles `ink-raised`, so the row reads in both themes. ↵ opens, ⌘↵ asks the lead agent about the record, → lists its agent actions (the tools keep their tiers).
+
 **Sidebar.** Black (`aos-night`), 288px expanded, 80px collapsed rail. Nav items 40–44px, `radius-sm`; inactive text `night-soft`, hover `night-hover`, current page is a **white** row with black text (`aria-current="page"`). Counts sit in small pills.
 
 **Toasts.** Black, `radius-lg`, `shadow-toast`, enter with `animate-toast-in`. Lead with the status shape in its `-night` color. Exactly one action per toast; the action's name matches the result ("Approve" becomes "Approved").
@@ -106,6 +108,44 @@ Headings get **wider**, not just bolder; that width is the brand's signature. Se
 **Switches.** 44×26 pill track, white 20px knob. On: `ink` track. Off: #8A8A86 track. Always `role="switch"` with `aria-checked`, and a visible label to the left.
 
 **Permission segmented control.** Pill group on #F0F0EE. Selected option takes its meaning: Ask first = `needs` with black text, Auto-run = `running`, Off = `ink`.
+
+## Dark mode, high contrast, text size, density, motion (Phase 18.1)
+
+Each person picks these in Settings → You (stored per user in `UserPreference`, `lib/preferences`). The root layout puts classes on `<html>` **server-side** from the preference, so the first paint is already right (no flash, no script): `theme-light` / `theme-dark` (+ `.dark`) / `theme-system` (follows `prefers-color-scheme` in CSS), `contrast-high`, `density-compact`, `motion-reduce`, `font-scale-112|125|150`. The token sets live in `tokens.css`; never style a mode with raw colours or one-off `dark:` classes.
+
+**Dark tokens.** Every light colour token has a dark value (`lib/design/__tests__/tokens.test.ts` fails otherwise, and checks contrast):
+
+| Token | Light | Dark |
+|---|---|---|
+| `canvas` | #F3F3F1 | #121211 |
+| `paper` | #FFFFFF | #1C1C1A |
+| `ink` / `text` (text **and** the primary fill) | #000000 | #F2F2EF |
+| `ink-hover` (primary button hover) | #1C1C1B | #D6D6D2 |
+| `line` / `line-strong` / `control` | #E2E2DF / #D6D6D2 / #CFCFCB | #2E2E2B / #3C3C38 / #5A5A55 |
+| `hover` / `hover-on-paper` | #E6E6E3 / #F3F3F1 | #262624 / #2A2A27 |
+| `muted` / `subtle` | #5E5E5B / #76766F | #ABABA5 / #93938D |
+| `disabled` / `disabled-fg` | #E2E2DF / #8A8A86 | #2A2A27 / #7A7A74 |
+| `running` (marks, text) | #2450E0 | #7090FF |
+| `needs` | #F7C21B | #F7C21B |
+| `done` | #0F7F45 | #2BB36D |
+| `failed` / `failed-text` | #D92D20 / #C42A1E | #F46A5E / #FF7A6E |
+| `running-tint` / `needs-tint` / `failed-tint` | #EAF0FF / #FFF6D6 / #FCECEA | #1A2240 / #3A2F0C / #3B1714 |
+| `focus` | #2450E0 | #6F8FFF |
+| `clay-0…4`, `clay-grid` | light clay | darker clay (the twin keeps its clay look) |
+
+- **Status keeps its meaning.** The same four colours and shapes; on dark they are lifted so marks and text are at least 4.5:1 on paper and canvas.
+- **Mode-invariant surfaces.** Night surfaces (`aos-night`, `bg-night`: sidebar, toasts, code) stay black in both modes, and status **fills** (`bg-running`, `bg-done`, `bg-failed`, `bg-needs`) keep their light fill and text: inside them the light values apply, so white on blue stays 6.4:1 and black on yellow stays black. Night tokens and `on-*` / `*-on-night` colours are the same in both modes.
+- **Primary actions invert.** `bg-ink text-paper` is a light button with dark text in dark mode; its hover is `hover:bg-ink-hover` (never `hover:bg-night-hover`, which is for night surfaces).
+- **Scrims** behind dialogs use `bg-night/30`–`/40` (black in both modes), never `bg-ink/…`.
+- Canvas/WebGL code reads tokens with `getComputedStyle(document.documentElement)`; cache by the `<html>` class list (and the OS scheme) so a theme change re-resolves.
+
+**High contrast** (`contrast-high`): stronger `line`, `line-strong`, `control`, darker `muted` / `subtle` (≥ 7:1), a 1.5px hairline and a 3px focus ring (`--aos-focus-width`), in light and dark.
+
+**Text size.** Type and control-height tokens are `rem`; the preference sets the root font size (100 / 112 / 125 / 150%). Write sizes as tokens (`text-sm`) or rem (`text-[0.8125rem]`), never `text-[13px]`, so they scale.
+
+**Density.** `density-compact` tightens `--aos-row-h` (44 → 36px), `--aos-gutter` and the control heights; use `min-h-row`, `h-row`, `px-gutter` for shell rows and gutters.
+
+**Motion.** `motion-reduce` applies the reduced-motion rules even when the OS doesn't ask; the twin camera jumps, pulses stop.
 
 ## Agents: one lead, many sub-agents (owner rule, 2026-10-04)
 
@@ -137,7 +177,8 @@ The digital twin (`/dashboard/ops/twin`) draws a warehouse, factory or store as 
 ## Accessibility floor
 
 - Status is always color + shape + text label. Never color alone.
-- Visible focus on everything interactive (2px blue outline, 2px offset; brighter blue on black).
+- Visible focus on everything interactive (2px blue outline, 2px offset; brighter blue on black; 3px with high contrast).
+- Every dashboard page has a skip link to `#main-content` and the landmarks `banner` (top bar), `navigation` (sidebar) and `main` (layout-level). Icon-only buttons carry an `aria-label`; images carry `alt`; never a positive `tabindex` (`lib/a11y/jsx-scan.ts` enforces these).
 - Minimum 44px targets for primary controls; 32px chips need 44px spacing or a larger hit area on touch.
 - Respect `prefers-reduced-motion` (already handled in `tokens.css`). Pulsing stops; nothing else animates by itself.
 - Contrast: white on blue 6.4:1, white on green 5.1:1, white on red 4.8:1, black on yellow 12.7:1. Never put white text on yellow or yellow text on white.

@@ -54,7 +54,7 @@ const REPLY_STATE_CHIP: Record<string, string> = {
 
 function chip(text: React.ReactNode, cls: string) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );
@@ -95,17 +95,17 @@ export default async function ReviewsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Reviews</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             AI-drafted GBP replies in an approval queue — v1 is drafts-only, nothing posts
             without a two-person approved review_reply_post. Google moderates every reply
             pre-publication; the queue tracks PENDING → APPROVED / REJECTED via polling.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] font-medium text-muted">
+          <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[0.6875rem] font-medium text-muted">
             <ShieldCheck className="h-3 w-3" /> v1: drafts only
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] font-medium text-muted">
+          <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[0.6875rem] font-medium text-muted">
             <Clock3 className="h-3 w-3" /> {pending.length} awaiting approval
           </span>
         </div>
@@ -161,9 +161,9 @@ export default async function ReviewsPage() {
             <p className="text-sm text-muted">No posted replies yet.</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                  <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Reviewer</th>
                     <th className="px-3 py-2 font-medium">State</th>
                     <th className="px-3 py-2 font-medium">Rejections</th>
@@ -177,7 +177,7 @@ export default async function ReviewsPage() {
                         <span className="ml-1.5 text-ink">{"★".repeat(Math.min(5, q.rating))}</span>
                       </td>
                       <td className="px-3 py-2">{chip(<ReplyStateLabel state={q.replyState} />, REPLY_STATE_CHIP[q.replyState] ?? REPLY_STATE_CHIP.none)}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">
                         {q.rejectionCount > 0 ? `${q.rejectionCount} rejection${q.rejectionCount > 1 ? "s" : ""}` : "—"}
                       </td>
                     </tr>
@@ -203,9 +203,9 @@ export default async function ReviewsPage() {
             </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                  <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Location</th>
                     <th className="px-3 py-2 font-medium">7d velocity</th>
                     <th className="px-3 py-2 font-medium">30d velocity</th>
@@ -254,9 +254,9 @@ export default async function ReviewsPage() {
             <span className="text-xs text-muted">true tier labels</span>
           </div>
           <div className="overflow-x-auto rounded-lg border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Channel</th>
                   <th className="px-3 py-2 font-medium">Tier</th>
                   <th className="px-3 py-2 font-medium">Replies</th>
@@ -267,7 +267,7 @@ export default async function ReviewsPage() {
                   <tr key={channel} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium capitalize text-ink">{channel}</td>
                     <td className="px-3 py-2">{chip(c.tier, "border-line bg-paper text-muted")}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{c.reviewReplies}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{c.reviewReplies}</td>
                   </tr>
                 ))}
               </tbody>
@@ -282,9 +282,9 @@ export default async function ReviewsPage() {
 function QueueTable({ rows }: { rows: Awaited<ReturnType<typeof listQueue>> }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-      <table className="w-full text-left text-[13px]">
+      <table className="w-full text-left text-[0.8125rem]">
         <thead>
-          <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+          <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
             <th className="px-3 py-2 font-medium">Reviewer</th>
             <th className="px-3 py-2 font-medium">Review</th>
             <th className="px-3 py-2 font-medium">Sentiment</th>
@@ -301,17 +301,17 @@ function QueueTable({ rows }: { rows: Awaited<ReturnType<typeof listQueue>> }) {
                     {q.reviewerName ?? "Anonymous"}
                     <span className="ml-1.5 text-ink">{"★".repeat(Math.min(5, q.rating))}</span>
                   </span>
-                  <span className="block text-[11px] text-muted">{q.locationRef}</span>
+                  <span className="block text-[0.6875rem] text-muted">{q.locationRef}</span>
                 </td>
                 <td className="max-w-xs px-3 py-2">
-                  {q.reviewText && <p className="line-clamp-2 text-[12px] text-muted">{q.reviewText}</p>}
+                  {q.reviewText && <p className="line-clamp-2 text-[0.75rem] text-muted">{q.reviewText}</p>}
                   {q.guardrailFlags.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {q.guardrailFlags.map((f) => (
                         <span
                           key={f}
                           title={GUARDRAIL_EXPLANATIONS[f] ?? f}
-                          className="inline-flex items-center gap-1 rounded-full bg-failed-tint px-1.5 py-0.5 text-[10px] font-medium text-failed-text"
+                          className="inline-flex items-center gap-1 rounded-full bg-failed-tint px-1.5 py-0.5 text-[0.625rem] font-medium text-failed-text"
                         >
                           <XCircle className="h-3 w-3" /> {f}
                         </span>
@@ -336,11 +336,11 @@ function QueueTable({ rows }: { rows: Awaited<ReturnType<typeof listQueue>> }) {
               <tr key={`${q.id}-draft`} className="border-b border-line bg-paper/40">
                 <td colSpan={5} className="px-3 py-2">
                   {q.draftReply ? (
-                    <p className="rounded-md bg-paper p-2 text-[13px] italic text-muted">
+                    <p className="rounded-md bg-paper p-2 text-[0.8125rem] italic text-muted">
                       Draft: {q.draftReply}
                     </p>
                   ) : (
-                    <p className="text-[13px] text-failed-text">
+                    <p className="text-[0.8125rem] text-failed-text">
                       Draft blocked by guardrails — write the reply manually, then approve.
                     </p>
                   )}

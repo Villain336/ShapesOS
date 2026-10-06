@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
  * import from HERE — calling an export of a "use client" module from the
  * server throws at render time. */
 
-const filledShadow = "shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]";
+const filledShadow = "shadow-[inset_0_1px_0_color-mix(in_srgb,var(--aos-paper)_14%,transparent)]";
 
 /* Pill-shaped by default — the app's core button style. Explicit symmetric
  * padding (not a fixed height) so the top/bottom spacing is always equal. */
@@ -26,9 +26,9 @@ export const buttonVariants = cva(
       },
       size: {
         /* compact toolbar pill — fixed height, lighter weight */
-        xs: "h-7 rounded-full px-2.5 text-[12px] font-normal leading-none gap-1",
+        xs: "h-7 rounded-full px-2.5 text-[0.75rem] font-normal leading-none gap-1",
         /* canonical action pill — 27px tall, roomy sides */
-        sm: "h-[27px] px-3 text-[13px] leading-none rounded-full gap-1.5",
+        sm: "h-[27px] px-3 text-[0.8125rem] leading-none rounded-full gap-1.5",
         md: "px-4 py-[9px] text-sm leading-none rounded-full gap-2",
       },
     },

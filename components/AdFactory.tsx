@@ -389,14 +389,14 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   ];
 
   const btnPrimary =
-    "inline-flex h-control-sm shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-control-sm shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40";
   const btnGhost =
-    "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
   const field =
     "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle transition-colors duration-150 focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
   const label = "mb-1 block text-xs font-semibold text-muted";
   const chip = (on: boolean) =>
-    `inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
+    `inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-[0.8125rem] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
       on ? "bg-ink text-paper" : "bg-paper text-ink shadow-control hover:shadow-outline"
     }`;
   const note = "mb-4 flex items-start gap-2 rounded-md bg-paper px-4 py-3 text-sm text-ink shadow-hairline";
@@ -412,7 +412,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
             key={t.key}
             onClick={() => setTab(t.key)}
             aria-pressed={tab === t.key}
-            className={`flex h-8 items-center gap-2 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150 ${
+            className={`flex h-8 items-center gap-2 rounded-full px-3 text-[0.8125rem] font-semibold transition-colors duration-150 ${
               tab === t.key
                 ? "bg-ink text-paper"
                 : "text-muted hover:bg-hover-paper hover:text-ink"
@@ -904,7 +904,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
       {/* Regenerate modal */}
       {regenId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
           <div className="w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay">
             <h3 className="text-sm font-semibold text-ink">Regenerate with edited prompt</h3>
             <p className="mt-1 text-xs text-muted">The current prompt is preserved in history.</p>
@@ -928,7 +928,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
       {/* Send-to-social modal */}
       {sendTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
           <div className="w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay">
             <h3 className="text-sm font-semibold text-ink">Send to social</h3>
             <p className="mt-1 text-xs text-muted">Creates a Postiz draft with this creative — publish it from the Social tab.</p>

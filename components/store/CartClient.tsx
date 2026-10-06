@@ -100,7 +100,7 @@ export function CartClient({
     return (
       <div className={`${shopCard} flex flex-col items-center gap-3 px-6 py-16 text-center`}>
         <Package size={28} className="text-subtle" aria-hidden />
-        <p className="text-[15px] font-semibold">Your cart is empty</p>
+        <p className="text-[0.9375rem] font-semibold">Your cart is empty</p>
         <Link href={`/shop/${storeSlug}`} className={shopBtnSecondary}>
           Browse products
         </Link>
@@ -112,9 +112,9 @@ export function CartClient({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
       <div className={`${shopCard} overflow-x-auto`}>
-        <table className="w-full min-w-[520px] text-left text-[15px]">
+        <table className="w-full min-w-[520px] text-left text-[0.9375rem]">
           <thead>
-            <tr className="border-b border-line text-[13px] text-muted">
+            <tr className="border-b border-line text-[0.8125rem] text-muted">
               <th className="px-4 py-3 font-semibold">Item</th>
               <th className="px-4 py-3 font-semibold">Qty</th>
               <th className="px-4 py-3 text-right font-semibold">Amount</th>
@@ -136,7 +136,7 @@ export function CartClient({
                     ) : (
                       <span className="font-semibold">{l.name}</span>
                     )}
-                    {l.unitPriceCents !== null && <div className="text-[13px] text-muted tabular-nums">{money(l.unitPriceCents, cur)} each</div>}
+                    {l.unitPriceCents !== null && <div className="text-[0.8125rem] text-muted tabular-nums">{money(l.unitPriceCents, cur)} each</div>}
                     {l.issue && <ErrorLine>{l.issue}</ErrorLine>}
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -181,7 +181,7 @@ export function CartClient({
             void cartAction("promo", { action: "promo", code: code.trim() });
           }}
         >
-          <label htmlFor="promo" className="text-[13px] font-semibold text-muted">
+          <label htmlFor="promo" className="text-[0.8125rem] font-semibold text-muted">
             Discount code
           </label>
           <div className="flex gap-2">
@@ -191,10 +191,10 @@ export function CartClient({
             </button>
           </div>
           {view.promo && !view.promo.ok && <ErrorLine>{view.promo.reason ?? "That code isn't valid"}</ErrorLine>}
-          {view.promo?.ok && <p className="text-[13px] font-medium text-ink">Code {view.promo.code} applied.</p>}
+          {view.promo?.ok && <p className="text-[0.8125rem] font-medium text-ink">Code {view.promo.code} applied.</p>}
         </form>
 
-        <dl className="grid grid-cols-[1fr_auto] gap-y-1.5 border-t border-line pt-4 text-[15px]">
+        <dl className="grid grid-cols-[1fr_auto] gap-y-1.5 border-t border-line pt-4 text-[0.9375rem]">
           <dt className="text-muted">Subtotal</dt>
           <dd className="text-right tabular-nums">{money(view.subtotalCents, cur)}</dd>
           {view.discountCents > 0 && (
@@ -209,8 +209,8 @@ export function CartClient({
               <dd className="text-right tabular-nums">{money(view.taxCents, cur)}</dd>
             </>
           )}
-          <dt className="pt-1 text-[18px] font-bold">Total</dt>
-          <dd className="pt-1 text-right text-[18px] font-bold tabular-nums">{money(view.totalCents, cur)}</dd>
+          <dt className="pt-1 text-[1.125rem] font-bold">Total</dt>
+          <dd className="pt-1 text-right text-[1.125rem] font-bold tabular-nums">{money(view.totalCents, cur)}</dd>
         </dl>
 
         {needCaptcha && captcha && <CaptchaWidget config={captcha} onToken={setCaptchaToken} resetKey={captchaKey} />}
@@ -226,7 +226,7 @@ export function CartClient({
           {busy === "checkout" ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Lock size={16} aria-hidden />}
           {busy === "checkout" ? "Going to checkout" : "Check out"}
         </button>
-        <p className="text-[13px] text-muted">You&apos;ll pay on a secure Stripe page. Prices and stock are confirmed at checkout.</p>
+        <p className="text-[0.8125rem] text-muted">You&apos;ll pay on a secure Stripe page. Prices and stock are confirmed at checkout.</p>
       </aside>
     </div>
   );

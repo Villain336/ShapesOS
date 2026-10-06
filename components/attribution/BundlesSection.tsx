@@ -45,9 +45,9 @@ interface Bundle {
 }
 
 const cardCls = "rounded-[10px] border border-line bg-white p-4";
-const btnPrimary = "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnPrimary = "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost = "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
-const btnGhostSm = "inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-full bg-paper px-3 py-1 text-[12px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnGhostSm = "inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-full bg-paper px-3 py-1 text-[0.75rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const inputCls = "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -74,8 +74,8 @@ function ArtifactRow({ icon, label, value, mono }: { icon: React.ReactNode; labe
   return (
     <div className="flex items-center gap-2 rounded-[8px] bg-canvas px-2.5 py-1.5">
       <span className="shrink-0 text-subtle">{icon}</span>
-      <span className="w-[86px] shrink-0 text-[11px] font-semibold text-muted">{label}</span>
-      <span className={`min-w-0 flex-1 truncate text-[12.5px] text-ink ${mono ? "font-mono" : ""}`} title={value}>
+      <span className="w-[86px] shrink-0 text-[0.6875rem] font-semibold text-muted">{label}</span>
+      <span className={`min-w-0 flex-1 truncate text-[0.78125rem] text-ink ${mono ? "font-mono" : ""}`} title={value}>
         {value}
       </span>
       <CopyButton value={value} label={label} />
@@ -142,14 +142,14 @@ export function BundlesSection() {
   return (
     <section className={cardCls}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+        <h2 className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
           <QrCode size={16} className="text-ink" /> Measurement bundles
         </h2>
         <button className={btnPrimary} onClick={() => setShowForm(true)}>
           <Plus size={14} /> New bundle
         </button>
       </div>
-      <p className="mb-4 text-[12.5px] text-muted">
+      <p className="mb-4 text-[0.78125rem] text-muted">
         One click provisions a tracking number, QR code, vanity URL, and promo code per campaign —
         every identified scan, call, and redemption attributes revenue through your chosen model.
       </p>
@@ -157,7 +157,7 @@ export function BundlesSection() {
       {loading ? (
         <p className="py-6 text-center text-sm text-subtle">Loading bundles…</p>
       ) : bundles.length === 0 ? (
-        <p className="rounded-[8px] border border-dashed border-line px-4 py-8 text-center text-[13px] text-subtle">
+        <p className="rounded-[8px] border border-dashed border-line px-4 py-8 text-center text-[0.8125rem] text-subtle">
           No measurement bundles yet. Create one for your next mailer, billboard, or event.
         </p>
       ) : (
@@ -167,12 +167,12 @@ export function BundlesSection() {
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="truncate text-[14px] font-semibold text-ink">{b.name}</h3>
-                    <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold text-muted">
+                    <h3 className="truncate text-[0.875rem] font-semibold text-ink">{b.name}</h3>
+                    <span className="rounded-full bg-hover px-2 py-0.5 text-[0.6875rem] font-semibold text-muted">
                       {b.status}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate text-[12px] text-muted">Campaign: {b.campaignName}</p>
+                  <p className="mt-0.5 truncate text-[0.75rem] text-muted">Campaign: {b.campaignName}</p>
                 </div>
                 <img src={b.qrPreview} alt={`QR code for ${b.name}`} className="h-[72px] w-[72px] shrink-0 rounded-[6px] border border-line" />
               </div>
@@ -197,8 +197,8 @@ export function BundlesSection() {
                   { label: "Revenue", value: formatMoney(b.stats.revenueCents.linear ?? 0) },
                 ].map((s) => (
                   <div key={s.label}>
-                    <div className="text-[15px] font-semibold tabular-nums text-ink">{s.value}</div>
-                    <div className="text-[10.5px] font-medium text-subtle">{s.label}</div>
+                    <div className="text-[0.9375rem] font-semibold tabular-nums text-ink">{s.value}</div>
+                    <div className="text-[0.65625rem] font-medium text-subtle">{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -238,10 +238,10 @@ export function BundlesSection() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={() => setShowForm(false)} onKeyDown={closeOnEscape(() => setShowForm(false))}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={() => setShowForm(false)} onKeyDown={closeOnEscape(() => setShowForm(false))}>
           <div className="w-full max-w-[480px] rounded-[12px] bg-white p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold text-ink">New measurement bundle</h3>
+              <h3 className="text-[0.9375rem] font-semibold text-ink">New measurement bundle</h3>
               <button className={btnGhost} onClick={() => setShowForm(false)} aria-label="Close">
                 <X size={16} />
               </button>
@@ -255,7 +255,7 @@ export function BundlesSection() {
                 { key: "areaCode", label: "Number area code (optional)", ph: "336", req: false },
               ].map((f) => (
                 <label key={f.key} className="block">
-                  <span className="mb-1 block text-[12px] font-semibold text-muted">
+                  <span className="mb-1 block text-[0.75rem] font-semibold text-muted">
                     {f.label}{f.req && <span className="text-failed-text"> *</span>}
                   </span>
                   <input
@@ -266,7 +266,7 @@ export function BundlesSection() {
                   />
                 </label>
               ))}
-              {error && <p className="text-[12.5px] text-failed-text">{error}</p>}
+              {error && <p className="text-[0.78125rem] text-failed-text">{error}</p>}
               <div className="flex justify-end gap-2">
                 <button className={btnGhost} onClick={() => setShowForm(false)}>Cancel</button>
                 <button

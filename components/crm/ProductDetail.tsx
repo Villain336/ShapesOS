@@ -120,7 +120,7 @@ export function ProductDetail({
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <p className="mt-0.5 text-[0.8125rem] text-muted">
                 {product.sku} · {formatMoney(product.priceCents)} ·{" "}
                 {product.trackInventory ? `${product.stockQty} in stock` : "not tracked"}
               </p>
@@ -166,19 +166,19 @@ export function ProductDetail({
               >
                 <ArrowLeftRight size={15} /> Record stock move
               </button>
-              <p className="w-full text-[12px] text-muted">
+              <p className="w-full text-[0.75rem] text-muted">
                 Alerts when stock is at or below the threshold. Stock quantity itself can only
                 change through inventory transactions — never edited directly.
               </p>
             </div>
 
-            <h4 className="mb-2 text-[13px] font-bold text-ink">Stock history</h4>
+            <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">Stock history</h4>
             {loading ? (
-              <div className="flex items-center gap-2 text-[13px] text-muted">
+              <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
                 <Loader2 size={16} className="animate-spin" /> Loading history…
               </div>
             ) : txns.length === 0 ? (
-              <p className="text-[13px] text-muted">No stock moves recorded yet.</p>
+              <p className="text-[0.8125rem] text-muted">No stock moves recorded yet.</p>
             ) : (
               <div className={tableWrapCls}>
                 <table className={`${tableCls}`}>

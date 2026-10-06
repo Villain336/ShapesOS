@@ -25,7 +25,7 @@ export function AnalyticsTabs() {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] font-semibold ${
+            className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.875rem] font-semibold ${
               tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
           >

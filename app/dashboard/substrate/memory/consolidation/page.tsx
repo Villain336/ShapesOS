@@ -10,7 +10,7 @@ import ConsolidationTrigger from "./consolidation-trigger";
 
 // Run statuses are worker-job states -> neutral chips (voice JobsApp precedent).
 const chipNeutral =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control";
 
 export const dynamic = "force-dynamic";
 

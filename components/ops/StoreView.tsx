@@ -102,8 +102,8 @@ function SetupStore({ defaultCurrency }: { defaultCurrency: string }) {
 
   return (
     <div className="max-w-xl rounded-lg bg-paper p-5 shadow-hairline">
-      <h2 className="text-[15px] font-bold text-ink">Set up your online store</h2>
-      <p className="mt-1 text-[13px] text-muted">It stays unpublished until you switch it on.</p>
+      <h2 className="text-[0.9375rem] font-bold text-ink">Set up your online store</h2>
+      <p className="mt-1 text-[0.8125rem] text-muted">It stays unpublished until you switch it on.</p>
       <div className="mt-4 flex flex-col gap-3">
         <label className="block">
           <span className={labelCls}>Store name</span>
@@ -111,7 +111,7 @@ function SetupStore({ defaultCurrency }: { defaultCurrency: string }) {
         </label>
         <label className="block">
           <span className={labelCls}>Address</span>
-          <span className="flex items-center gap-1 font-mono text-[13px] text-muted">
+          <span className="flex items-center gap-1 font-mono text-[0.8125rem] text-muted">
             /shop/
             <input
               className={`${inputCls} min-w-0 flex-1 font-mono`}
@@ -172,7 +172,7 @@ function StoreAdmin({
       {error && <div className={errorBoxCls}>{error}</div>}
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-paper px-4 py-3 shadow-hairline">
         <div className="flex items-center gap-3">
-          <span id="publish-label" className="text-[14px] font-semibold text-ink">
+          <span id="publish-label" className="text-[0.875rem] font-semibold text-ink">
             Published
           </span>
           <Switch
@@ -181,14 +181,14 @@ function StoreAdmin({
             disabled={busy !== null}
             onChange={(v) => run("publish", () => opsJson("/api/ops/stores", "PATCH", { id: store.id, published: v }))}
           />
-          <span className="font-mono text-[13px] text-muted">/shop/{store.slug}</span>
+          <span className="font-mono text-[0.8125rem] text-muted">/shop/{store.slug}</span>
         </div>
         {store.published ? (
           <a href={shopUrl} target="_blank" rel="noreferrer" className={btnGhostSm}>
             <ExternalLink size={13} /> Open store
           </a>
         ) : (
-          <span className="text-[13px] text-muted">Unpublished stores aren&apos;t visible to anyone.</span>
+          <span className="text-[0.8125rem] text-muted">Unpublished stores aren&apos;t visible to anyone.</span>
         )}
       </section>
 
@@ -212,7 +212,7 @@ function StoreAdmin({
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[15px] font-bold text-ink">Products in the store</h2>
+          <h2 className="text-[0.9375rem] font-bold text-ink">Products in the store</h2>
           <div className="flex items-center gap-2">
             <select className={selectCls} value={addId} onChange={(e) => setAddId(e.target.value)} aria-label="Product to add">
               <option value="">{addable.length ? "Choose a product…" : "Every active product is listed"}</option>
@@ -257,11 +257,11 @@ function StoreAdmin({
                   <tr key={l.id}>
                     <td className={tdCls}>
                       <span className="font-semibold">{l.title || l.productName}</span>
-                      <span className="ml-1 font-mono text-[12px] text-muted">{l.sku}</span>
+                      <span className="ml-1 font-mono text-[0.75rem] text-muted">{l.sku}</span>
                       {!l.productActive && <span className={`${chipCls} ml-1.5`}>Product inactive</span>}
                       {l.imageFileId && <span className={`${chipCls} ml-1.5`}>Image</span>}
                     </td>
-                    <td className={`${tdCls} font-mono text-[12px] text-muted`}>/p/{l.slug}</td>
+                    <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>/p/{l.slug}</td>
                     <td className={`${tdCls} text-right tabular-nums`}>{fmtCents(l.priceCents)}</td>
                     <td className={`${tdCls} text-right tabular-nums`}>{l.trackInventory ? l.stockQty : "—"}</td>
                     <td className={tdCls}>
@@ -287,13 +287,13 @@ function StoreAdmin({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-ink">Recent web orders</h2>
+          <h2 className="text-[0.9375rem] font-bold text-ink">Recent web orders</h2>
           <Link href="/dashboard/ops/orders" className={btnGhostSm}>
             All orders
           </Link>
         </div>
         {orders.length === 0 ? (
-          <p className="text-[13px] text-muted">No web orders yet.</p>
+          <p className="text-[0.8125rem] text-muted">No web orders yet.</p>
         ) : (
           <div className={tableWrapCls}>
             <table className={`${tableCls} min-w-[680px]`}>
@@ -311,7 +311,7 @@ function StoreAdmin({
                   <tr key={o.id}>
                     <td className={`${tdCls} font-semibold`}>
                       SO-{shortId(o.id)}
-                      {o.promotionCode && <span className="ml-1 font-mono text-[12px] text-muted">{o.promotionCode}</span>}
+                      {o.promotionCode && <span className="ml-1 font-mono text-[0.75rem] text-muted">{o.promotionCode}</span>}
                     </td>
                     <td className={tdCls}>
                       <span className={chipCls}>{o.status === "draft" ? "Awaiting payment" : sentence(o.status)}</span>
@@ -358,7 +358,7 @@ function StoreSettings({
 
   return (
     <section className="rounded-lg bg-paper p-4 shadow-hairline">
-      <h2 className="mb-3 text-[15px] font-bold text-ink">Store settings</h2>
+      <h2 className="mb-3 text-[0.9375rem] font-bold text-ink">Store settings</h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="block">
           <span className={labelCls}>Store name</span>
@@ -507,14 +507,14 @@ function ListingModal({ workspaceId, listing, onClose, onSaved }: { workspaceId:
               }}
             />
           </label>
-          {imageName && <span className="text-[13px] text-muted">{imageName}</span>}
+          {imageName && <span className="text-[0.8125rem] text-muted">{imageName}</span>}
           {imageFileId && (
             <button type="button" className={btnGhostSm} onClick={() => { setImageFileId(null); setImageName(null); }}>
               Remove image
             </button>
           )}
         </div>
-        <p className="text-[13px] text-muted">Price and stock come from the product ({listing.sku}) in Products &amp; inventory.</p>
+        <p className="text-[0.8125rem] text-muted">Price and stock come from the product ({listing.sku}) in Products &amp; inventory.</p>
         {error && <div className={errorBoxCls}>{error}</div>}
         <div className="flex justify-end gap-2">
           <button type="button" className={btnGhost} onClick={onClose}>

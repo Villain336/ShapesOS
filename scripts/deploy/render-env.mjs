@@ -103,6 +103,7 @@ export const TABLE = [
   ["KEEP_ALIVE_TIMEOUT", { cls: "value", group: W, value: "310000", why: "above every load balancer idle timeout in front of the app" }],
   ["NODE_OPTIONS", { cls: "exclude", notInEnvExample: "Node runtime flag, set per service in render.yaml", why: "set per service in render.yaml (heap sized to the plan)" }],
   ["RATE_LIMIT_STORE", { cls: "value", group: S, value: "postgres" }],
+  ["RATE_LIMIT_READ_PER_MIN", { cls: "exclude", why: "default 120 reads/min per person per web instance; set it in shapesos-web only if many people share one IP" }],
   ["MARKETR_STORAGE", { cls: "value", group: S, value: "s3" }],
   ["MARKETR_S3_REGION", { cls: "value", group: S, value: "auto", why: "R2's region (https://developers.cloudflare.com/r2/api/s3/api/)" }],
   ["MARKETR_S3_BUCKET", { cls: "value", group: S, value: "shapesos-files" }],
@@ -345,6 +346,10 @@ export const TABLE = [
   ["NEMO_DATA_DESIGNER_ENDPOINT", { cls: "exclude", why: "not used on hosted" }],
   ["MEMORY_WORKER_ROLE", { cls: "exclude", why: "the memory pass runs as the app role with in-session budgets (no extra DB login on Render)" }],
   ["MEMORY_MODEL_CACHE", { cls: "exclude", why: "default cache dir" }],
+  // Phase 18.1 (find): Spotlight (lib/search). Defaults are right on hosted.
+  ["SPOTLIGHT_SEMANTIC", { cls: "exclude", why: "default on: meaning-search uses the cached local MiniLM" }],
+  ["SPOTLIGHT_INDEX_ON_WRITE", { cls: "exclude", why: "default on: uploads index their text in the background" }],
+  ["SEARCH_INDEX_BATCH", { cls: "exclude", why: "default 200 per search-index cron run is right" }],
   ["MARKETR_MAX_BROWSER_RECORDINGS", { cls: "exclude", why: "default is right" }],
   ["POS_TERMINAL_MOCK", { cls: "exclude", why: "demo/test only" }],
   ["VIBE_CLIENT_ID", { cls: "exclude", why: "bring-your-own media buying" }],
@@ -404,7 +409,7 @@ export const TABLE = [
   // --- agent loop and memory tuning: defaults are right -------------------
   ...["AGENT_INLINE_BUDGET_SECONDS", "AGENT_WORKER_POLL_MS", "AGENT_JOB_LEASE_SECONDS", "AGENT_JOB_HEARTBEAT_SECONDS", "AGENT_JOB_MAX_ATTEMPTS", "AGENT_MAX_STEPS", "AGENT_MAX_RUN_MINUTES", "AGENT_MAX_RUN_COST_MICRO_USD", "AGENT_COMPACT_AT_TOKENS", "AGENT_TOOL_RESULT_MAX_CHARS", "AGENT_FIX_CYCLES",
     "LLM_MODEL_COPY", "LLM_MODEL_BULK", "LLM_MODEL_BACKGROUND", "LLM_MODEL_LEAD", "LLM_MODEL_SUBAGENT", "LLM_MODEL_CODE", "LLM_MODEL_CODE_MAX",
-    "LEARNING_LOOKBACK_DAYS", "LEARNING_MAX_EPISODES", "LEARNING_SIMILARITY_THRESHOLD", "LEARNING_DECAY_DAYS", "LEARNING_DECAY_CONFIDENCE", "LEARNING_CONSOLIDATE_MAX_WORKSPACES",
+    "LEARNING_LOOKBACK_DAYS", "LEARNING_MAX_EPISODES", "LEARNING_SIMILARITY_THRESHOLD", "LEARNING_DECAY_DAYS", "LEARNING_DECAY_CONFIDENCE", "LEARNING_CONSOLIDATE_MAX_WORKSPACES", "DESK_BRIEFING_MAX_MEMBERS",
     // Phase 17 (model): context-editing trigger and the Message Batches switch.
     "AGENT_CONTEXT_EDIT_AT_TOKENS", "LLM_BATCH"].map(
     (k) => [k, { cls: "exclude", why: "default is right (change in the dashboard only to tune)" }],

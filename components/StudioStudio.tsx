@@ -333,7 +333,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${press} ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors ${press} ${
               tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
           >
@@ -649,6 +649,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                           <Send className="h-3 w-3" /> Use in social post
                         </button>
                         <button
+                          aria-label="Delete asset"
                           onClick={() => deleteAsset(a.id)}
                           className={`rounded-full bg-paper px-3 py-1.5 text-xs text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint aos-press`}
                         >

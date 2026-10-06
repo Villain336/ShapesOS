@@ -90,7 +90,7 @@ export default function LoadingState({
 
   const labelEl = (
     <span
-      className="bg-clip-text text-[13px] font-medium text-transparent"
+      className="bg-clip-text text-[0.8125rem] font-medium text-transparent"
       style={{
         backgroundImage:
           "linear-gradient(90deg, var(--ink-3) 35%, var(--ink) 50%, var(--ink-3) 65%)",
@@ -101,7 +101,7 @@ export default function LoadingState({
       {resolvedLabel}
     </span>
   );
-  const elapsedEl = <span className="font-mono text-[12px] text-ink-3 tabular-nums">{elapsed}</span>;
+  const elapsedEl = <span className="font-mono text-[0.75rem] text-ink-3 tabular-nums">{elapsed}</span>;
 
   if (surfer) {
     return (
@@ -131,7 +131,7 @@ export default function LoadingState({
             ) : (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1.5">
                 <LoaderGrid {...PATTERNS.Drive} />
-                <span className="px-3 text-center font-mono text-[10px]" style={{ color: "var(--tooltip-muted)" }}>
+                <span className="px-3 text-center font-mono text-[0.625rem]" style={{ color: "var(--tooltip-muted)" }}>
                   Video unavailable
                 </span>
               </div>

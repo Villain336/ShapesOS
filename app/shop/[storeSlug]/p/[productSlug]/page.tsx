@@ -69,7 +69,7 @@ export default async function ProductPage({ params }: Props) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <Link href={base} className="mb-6 inline-flex items-center gap-1.5 text-[14px] font-semibold text-muted hover:text-ink">
+      <Link href={base} className="mb-6 inline-flex items-center gap-1.5 text-[0.875rem] font-semibold text-muted hover:text-ink">
         <ArrowLeft size={16} aria-hidden /> All products
       </Link>
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
@@ -84,16 +84,16 @@ export default async function ProductPage({ params }: Props) {
         <div className="flex flex-col gap-5">
           <div>
             <h1 className="aos-heading">{listing.title}</h1>
-            <p className="mt-2 text-[18px] font-semibold tabular-nums">{priceText}</p>
-            {store.taxRateId && <p className="mt-1 text-[13px] text-muted">Tax is added at checkout.</p>}
+            <p className="mt-2 text-[1.125rem] font-semibold tabular-nums">{priceText}</p>
+            {store.taxRateId && <p className="mt-1 text-[0.8125rem] text-muted">Tax is added at checkout.</p>}
           </div>
           <AddToCart
             storeSlug={store.slug}
             productId={listing.productId}
             variants={listing.variants.map((v) => ({ id: v.id, name: v.name, priceLabel: fmtPrice(v.priceCents, store.currency), available: v.available }))}
           />
-          {listing.description && <div className="whitespace-pre-line border-t border-line pt-5 text-[15px] leading-relaxed text-ink">{listing.description}</div>}
-          <p className="font-mono text-[12px] text-subtle">SKU {listing.sku}</p>
+          {listing.description && <div className="whitespace-pre-line border-t border-line pt-5 text-[0.9375rem] leading-relaxed text-ink">{listing.description}</div>}
+          <p className="font-mono text-[0.75rem] text-subtle">SKU {listing.sku}</p>
         </div>
       </div>
     </>

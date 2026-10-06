@@ -123,7 +123,7 @@ export function NewProductModal({
               <input className={`${inputCls} w-full`} type="number" min={0} step={1} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-[13px] text-ink">
+          <label className="flex items-center gap-2 text-[0.8125rem] text-ink">
             <input type="checkbox" checked={track} onChange={(e) => setTrack(e.target.checked)} />
             Track inventory for this product
           </label>

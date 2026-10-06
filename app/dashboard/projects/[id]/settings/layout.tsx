@@ -38,7 +38,7 @@ export default async function ProjectSettingsLayout({
     <div className="flex flex-col gap-6">
       <Link
         href={`/dashboard/projects/${project.id}`}
-        className="inline-flex items-center gap-1.5 self-start text-[13px] text-ink-2 transition-colors hover:text-ink"
+        className="inline-flex items-center gap-1.5 self-start text-[0.8125rem] text-ink-2 transition-colors hover:text-ink"
       >
         <ArrowLeft className="size-3.5" />
         {project.domain}
@@ -52,7 +52,7 @@ export default async function ProjectSettingsLayout({
       <SettingsTabs projectId={project.id} />
 
       {!canEdit && (
-        <p className="rounded-control bg-inset px-3 py-2 text-[12.5px] text-ink-2">
+        <p className="rounded-control bg-inset px-3 py-2 text-[0.78125rem] text-ink-2">
           You have viewer access — settings are read-only. Ask an editor to make
           changes.
         </p>

@@ -18,11 +18,11 @@ import {
 import { confirmAction } from "@/lib/ui/feedback";
 
 const inputCls =
-  "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
+  "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-[13px] font-medium text-white hover:bg-night-hover disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-muted hover:bg-hover-paper disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-muted hover:bg-hover-paper disabled:opacity-40";
 
 interface Entry {
   id: string;
@@ -36,7 +36,7 @@ function sourceChip(source: string) {
   const isKg = source === "knowledge_graph";
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${
+      className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${
         isKg
           ? "border-ink/20 bg-canvas text-ink"
           : "border-line bg-paper text-muted"
@@ -160,19 +160,19 @@ export function PronunciationApp() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Pronunciation</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           How brand terms are spoken in voiceovers — seeded from the company knowledge graph, editable by you.
         </p>
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {seedNote && (
-        <div className="rounded-md border border-line bg-paper px-3 py-2 text-[13px] text-muted">
+        <div className="rounded-md border border-line bg-paper px-3 py-2 text-[0.8125rem] text-muted">
           {seedNote}
         </div>
       )}
@@ -202,21 +202,21 @@ export function PronunciationApp() {
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <div className="border-b border-line px-4 py-2.5">
-          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+          <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
             <BookOpenText size={14} />
             Dictionary ({entries.length})
           </h2>
         </div>
         {loading ? (
-          <p className="px-4 py-6 text-center text-[13px] text-subtle">Loading…</p>
+          <p className="px-4 py-6 text-center text-[0.8125rem] text-subtle">Loading…</p>
         ) : entries.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-subtle">
+          <p className="px-4 py-6 text-center text-[0.8125rem] text-subtle">
             Empty dictionary — seed from company knowledge or add entries manually.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Term</th>
                 <th className="px-3 py-2 font-medium">Phonetic</th>
                 <th className="px-3 py-2 font-medium">Source</th>
@@ -241,7 +241,7 @@ export function PronunciationApp() {
                     )}
                   </td>
                   <td className="px-3 py-2">{sourceChip(e.source)}</td>
-                  <td className="px-3 py-2 text-[12px] text-muted">
+                  <td className="px-3 py-2 text-[0.75rem] text-muted">
                     {new Date(e.updatedAt).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-2">
@@ -281,7 +281,7 @@ export function PronunciationApp() {
         )}
       </div>
 
-      <div className="rounded-md border border-line bg-paper px-3 py-2 text-[12px] text-muted">
+      <div className="rounded-md border border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
         Substitutions are longest-term-first, case-insensitive, and word-boundary matched — respellings never
         corrupt surrounding text. Each rendered voiceover records the exact snapshot applied.
       </div>

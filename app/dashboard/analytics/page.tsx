@@ -27,7 +27,7 @@ export default async function AnalyticsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="aos-heading">Analytics</h1>
-          <p className="mt-0.5 text-[13px] text-muted">Traffic, social engagement, attribution and spend for one date range.</p>
+          <p className="mt-0.5 text-[0.8125rem] text-muted">Traffic, social engagement, attribution and spend for one date range.</p>
         </div>
         <Link
           href="/dashboard/settings/connectors"
