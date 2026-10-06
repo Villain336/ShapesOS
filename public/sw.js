@@ -25,7 +25,7 @@
  *      same-origin link on click.
  */
 
-const VERSION = "2026-10-06.1";
+const VERSION = "2026-10-06.2";
 const STATIC_CACHE = "shapes-static-" + VERSION;
 const META_CACHE = "shapes-meta";
 const DATA_PREFIX = "shapes-data-";
@@ -211,7 +211,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(dataNetworkFirst(req));
     return;
   }
-  if (!DEV && isStaticRoute(url)) {
+  // The offline page's own files are always served from the precache (dev too:
+  // they are what answers when the network is gone).
+  if (PRECACHE.includes(url.pathname) || (!DEV && isStaticRoute(url))) {
     event.respondWith(staticFirst(req));
   }
 });

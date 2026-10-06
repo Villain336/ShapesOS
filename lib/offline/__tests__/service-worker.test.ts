@@ -192,6 +192,10 @@ describe("service worker (public/sw.js)", () => {
     const dev = boot({ dev: true });
     await dev.dispatch("install", {});
     assert.equal(await dev.fetchVia("/_next/static/chunks/app.js"), null, "dev: not intercepted");
+    await dev.dispatch("install", {});
+    dev.network.online = false;
+    const js = await dev.fetchVia("/offline.js");
+    assert.ok(js && js.ok, "dev: the offline page's own script is still served from the precache");
   });
 
   it("push shows the notification with a same-origin link only", async () => {
