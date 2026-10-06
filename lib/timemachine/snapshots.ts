@@ -188,7 +188,7 @@ export async function createSnapshot(opts: { workspaceId: string; userId: string
     const rowCount = Object.values(tables).reduce((a, b) => a + b, 0);
     const done = await withWorkspaceScope(workspaceId, (tx) =>
       tx.workspaceSnapshot.update({
-        where: { id: row.id },
+        where: { id: row.id, workspaceId },
         data: { status: "ready", blobPath: path, sizeBytes: gz.length, tables, tableCount: Object.keys(tables).length, rowCount, finishedAt: new Date() },
       }),
     );
@@ -203,7 +203,7 @@ export async function createSnapshot(opts: { workspaceId: string; userId: string
     return toSnapshotView(done);
   } catch (err) {
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 480);
-    await withWorkspaceScope(workspaceId, (tx) => tx.workspaceSnapshot.update({ where: { id: row.id }, data: { status: "failed", error: message, finishedAt: new Date() } })).catch(() => undefined);
+    await withWorkspaceScope(workspaceId, (tx) => tx.workspaceSnapshot.update({ where: { id: row.id, workspaceId }, data: { status: "failed", error: message, finishedAt: new Date() } })).catch(() => undefined);
     throw err;
   }
 }
@@ -238,7 +238,7 @@ export async function deleteSnapshot(workspaceId: string, id: string, userId: st
   if (!row) throw new SnapshotError(404, "Snapshot not found.");
   if (row.status === "pending" && row.createdAt.getTime() > Date.now() - STALE_PENDING_MS) throw new SnapshotError(409, "This snapshot is still being taken.");
   if (row.blobPath) await blobDelete("snapshots", row.blobPath).catch(() => undefined);
-  await withWorkspaceScope(workspaceId, (tx) => tx.workspaceSnapshot.delete({ where: { id: row.id } }));
+  await withWorkspaceScope(workspaceId, (tx) => tx.workspaceSnapshot.delete({ where: { id: row.id, workspaceId } }));
   await timeMachineAudit(workspaceId, "snapshot_deleted", `Time Machine snapshot ${row.id} deleted${userId ? "" : " (retention)"}`, userId);
 }
 

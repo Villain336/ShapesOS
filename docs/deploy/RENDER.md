@@ -178,6 +178,12 @@ GITHUB_APP_PRIVATE_KEY=
 EXPO_ACCESS_TOKEN=
 # expo, once the mobile app ships
 PUSH_PROVIDER=
+# generateVapidKeys() in lib/push/vapid.ts (see .env.example)
+VAPID_PUBLIC_KEY=
+# the pair's private half
+VAPID_PRIVATE_KEY=
+# mailto: or https: contact for the push services
+VAPID_SUBJECT=
 LIVEKIT_URL=
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
@@ -294,7 +300,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (255 keys)</summary>
+<details><summary>Not set on Render, on purpose (258 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -316,6 +322,8 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | OpenAI-compatible override; OPENAI_API_KEY is used on hosted | `LLM_API_KEY` |
 | default https://api.openai.com/v1 | `LLM_BASE_URL` |
 | default OpenAI endpoint | `OPENAI_BASE_URL` |
+| only for a self-hosted push service | `WEB_PUSH_EXTRA_HOSTS` |
+| default 256 is right | `SNAPSHOT_MAX_MB` |
 | default gpt-image-2 is right | `LLM_IMAGE_MODEL` |
 | default vendor price is right | `DATAFORSEO_PRICE_PER_1K`, `SERPER_PRICE_PER_1K`, `TALORDATA_PRICE_PER_1K` |
 | default production is right | `QUICKBOOKS_ENVIRONMENT` |
@@ -382,7 +390,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | default 3600 is right | `BACKUP_EXPORT_TIMEOUT_SECONDS` |
 | default 15 is right | `BACKUP_EXPORT_POLL_SECONDS` |
 | tests only (backup.sh against a fake Render API) | `RENDER_API_BASE` |
-| local disk path; on hosted, files live in shared object storage (MARKETR_STORAGE=s3) | `FIX_SNAPSHOT_DIR`, `REPORT_STORAGE_DIR`, `SITE_STORAGE_DIR`, `AUDIO_BRIEF_STORAGE_DIR`, `EDDM_BRIEF_STORAGE_DIR`, `IO_BRIEF_STORAGE_DIR`, `LAUNCH_PACKET_STORAGE_DIR`, `SITEMAP_STORAGE_DIR`, `SANDBOX_SNAPSHOT_DIR`, `CORPUS_DIR`, `CC_GRAPH_DIR` |
+| local disk path; on hosted, files live in shared object storage (MARKETR_STORAGE=s3) | `FIX_SNAPSHOT_DIR`, `SNAPSHOT_STORAGE_DIR`, `REPORT_STORAGE_DIR`, `SITE_STORAGE_DIR`, `AUDIO_BRIEF_STORAGE_DIR`, `EDDM_BRIEF_STORAGE_DIR`, `IO_BRIEF_STORAGE_DIR`, `LAUNCH_PACKET_STORAGE_DIR`, `SITEMAP_STORAGE_DIR`, `SANDBOX_SNAPSHOT_DIR`, `CORPUS_DIR`, `CC_GRAPH_DIR` |
 | Docker sandbox settings; hosted sandboxes run on E2B | `SANDBOX_IMAGE`, `SANDBOX_CPUS`, `SANDBOX_MEMORY_MB`, `SANDBOX_PIDS`, `SANDBOX_DISK_MB`, `SANDBOX_IDLE_MINUTES`, `SANDBOX_EGRESS_ALLOW`, `SANDBOX_PREVIEW_BIND`, `SANDBOX_PREVIEW_HOST`, `SANDBOX_SNAPSHOT_MAX_MB` |
 | default is right (change in the dashboard only to tune) | `AGENT_INLINE_BUDGET_SECONDS`, `AGENT_WORKER_POLL_MS`, `AGENT_JOB_LEASE_SECONDS`, `AGENT_JOB_HEARTBEAT_SECONDS`, `AGENT_JOB_MAX_ATTEMPTS`, `AGENT_MAX_STEPS`, `AGENT_MAX_RUN_MINUTES`, `AGENT_MAX_RUN_COST_MICRO_USD`, `AGENT_COMPACT_AT_TOKENS`, `AGENT_TOOL_RESULT_MAX_CHARS`, `AGENT_FIX_CYCLES`, `LLM_MODEL_COPY`, `LLM_MODEL_BULK`, `LLM_MODEL_BACKGROUND`, `LLM_MODEL_LEAD`, `LLM_MODEL_SUBAGENT`, `LLM_MODEL_CODE`, `LLM_MODEL_CODE_MAX`, `LEARNING_LOOKBACK_DAYS`, `LEARNING_MAX_EPISODES`, `LEARNING_SIMILARITY_THRESHOLD`, `LEARNING_DECAY_DAYS`, `LEARNING_DECAY_CONFIDENCE`, `LEARNING_CONSOLIDATE_MAX_WORKSPACES`, `DESK_BRIEFING_MAX_MEMBERS`, `AGENT_CONTEXT_EDIT_AT_TOKENS`, `LLM_BATCH` |
 | evaluation knobs (scripts/eval); unset = the measured defaults | `LLM_EFFORT_LEAD`, `LLM_EFFORT_SUBAGENT`, `LLM_EFFORT_CODE`, `LLM_EFFORT_CODE_MAX`, `LLM_EFFORT_COPY`, `LLM_EFFORT_BULK`, `LLM_EFFORT_BACKGROUND`, `CHAT_CACHE_LAYOUT` |

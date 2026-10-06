@@ -187,7 +187,7 @@ export async function executeUndo(actor: UndoActor, runId: string, opts: { confi
   const plan = await loadUndoPlan(actor, runId);
   if (!plan.canUndo) throw new UndoError(403, "Only the person who started this run, or an admin, can undo it.");
   if (plan.running) throw new UndoError(409, "Stop the run before undoing it.");
-  const run = await prisma.agentRun.findFirst({ where: { id: runId }, select: { startedBy: true } }).catch(() => null);
+  const run = await withWorkspaceScope(actor.workspaceId, (tx) => tx.agentRun.findFirst({ where: { id: runId, workspaceId: actor.workspaceId }, select: { startedBy: true } })).catch(() => null);
   const owner = run?.startedBy ?? actor.userId;
   const wanted = opts.itemIds?.length ? new Set(opts.itemIds) : null;
   const outcomes: UndoOutcome[] = [];
