@@ -231,7 +231,7 @@ export function MessagesApp({
           ) : (
             groups.map((g) => (
               <div key={g.id}>
-                <h2 className="px-3 pb-1 text-xs font-semibold text-subtle">{g.label}</h2>
+                <h2 className="px-3 pb-1 text-xs font-semibold text-muted">{g.label}</h2>
                 {g.items.length === 0 ? (
                   <p className="px-3 text-sm text-muted">—</p>
                 ) : (
@@ -595,7 +595,7 @@ function Conversation({
                   {newDay ? (
                     <div className="my-3 flex items-center gap-3" role="separator">
                       <span className="h-px flex-1 bg-line" />
-                      <span className="text-xs font-semibold text-subtle">{format.date(m.createdAt, "date")}</span>
+                      <span className="text-xs font-semibold text-muted">{format.date(m.createdAt, "date")}</span>
                       <span className="h-px flex-1 bg-line" />
                     </div>
                   ) : null}
@@ -1111,13 +1111,13 @@ function PeoplePicker({ people, value, onChange, exclude = [] }: { people: Peopl
       <div className="max-h-72 overflow-y-auto">
         {persons.length ? (
           <>
-            <h3 className="px-2 pt-1 text-xs font-semibold text-subtle">{t("comms.messages.people")}</h3>
+            <h3 className="px-2 pt-1 text-xs font-semibold text-muted">{t("comms.messages.people")}</h3>
             <ul>{persons.map((p) => row(p.key, p.label, p.email, <PersonTile name={p.label} size={24} />))}</ul>
           </>
         ) : null}
         {agents.length ? (
           <>
-            <h3 className="px-2 pt-2 text-xs font-semibold text-subtle">{t("comms.messages.agents")}</h3>
+            <h3 className="px-2 pt-2 text-xs font-semibold text-muted">{t("comms.messages.agents")}</h3>
             <ul>{agents.map((a) => row(a.key, a.label, null, <AgentAvatar name={a.label} size="sm" />))}</ul>
           </>
         ) : null}

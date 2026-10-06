@@ -273,7 +273,7 @@ export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: b
             ))}
           </ul>
           <div>
-            <h2 className="px-3 pb-1 text-xs font-semibold text-subtle">{t("comms.mail.sourcesLabel")}</h2>
+            <h2 className="px-3 pb-1 text-xs font-semibold text-muted">{t("comms.mail.sourcesLabel")}</h2>
             <ul className="flex flex-row flex-wrap gap-1 lg:flex-col">
               <li>
                 <button type="button" onClick={() => setSource(null)} aria-pressed={source === null} className={cn("flex h-9 w-full items-center gap-2 rounded-sm px-3 text-sm font-semibold", source === null ? "bg-hover text-ink" : "text-muted hover:bg-hover")}>
@@ -292,7 +292,7 @@ export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: b
                     >
                       <Icon className="size-4" aria-hidden />
                       <span className="truncate">{t(`comms.mail.sources.${s.source}`)}</span>
-                      {!s.connected ? <span className="ml-auto text-xs font-medium text-subtle">{t("comms.common.notConnected")}</span> : null}
+                      {!s.connected ? <span className="ml-auto text-xs font-medium text-muted">{t("comms.common.notConnected")}</span> : null}
                     </button>
                   </li>
                 );
@@ -301,7 +301,7 @@ export function MailApp({ canEdit, initialThread, initialCompose }: { canEdit: b
           </div>
           {allTags.length || tag ? (
             <div>
-              <h2 className="px-3 pb-1 text-xs font-semibold text-subtle">{t("comms.mail.labelsLabel")}</h2>
+              <h2 className="px-3 pb-1 text-xs font-semibold text-muted">{t("comms.mail.labelsLabel")}</h2>
               <ul className="flex flex-row flex-wrap gap-1 lg:flex-col">
                 {[...new Set([...(tag ? [tag] : []), ...allTags])].map((g) => (
                   <li key={g}>
@@ -508,7 +508,7 @@ function ThreadPane({ threadKey, canEdit, onBack, onChanged }: { threadKey: stri
       </header>
       {summary ? (
         <section aria-label={t("comms.mail.summary")} className="border-b border-line bg-canvas px-4 py-3">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-subtle">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
             <Sparkles className="size-3.5" aria-hidden />
             {t("comms.mail.summary")}
             {summary.mock ? <MockChip label={t("comms.common.mock")} title={t("comms.mail.summaryMock")} /> : null}

@@ -186,6 +186,11 @@ describe("transcripts and the meeting agent", () => {
   it("a mock summary saves nothing; a live one saves the notes doc and the chosen items once", async () => {
     const mock = await meet.summarizeMeeting(benC(), ids.private!, { generate: async () => ({ text: '{"notes":"MOCK","decisions":[],"actionItems":[{"title":"x"}]}', live: false }) });
     assert.equal(mock.summary?.mock, true);
+    const prose = await meet.summarizeMeeting(benC(), ids.private!, { generate: async () => ({ text: "[mock] I would summarize this meeting.", live: false }) });
+    assert.equal(prose.summary?.mock, true, "a mock model's prose becomes a labelled mock summary, not an error");
+    assert.equal(prose.summary?.actionItems.length, 0);
+    const bad = await meet.summarizeMeeting(benC(), ids.private!, { generate: async () => ({ text: "not json", live: true }) }).catch((e) => e);
+    assert.equal(bad.status, 502, "a live model's unreadable answer is an error, never invented");
     assert.equal(await status(meet.applySummary(benC(), ids.private!, { saveDoc: true, items: [{ index: 0, target: "reminder" }] })), 409, "never saved from a mock");
 
     const answer = JSON.stringify({

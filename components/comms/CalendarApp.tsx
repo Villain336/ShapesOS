@@ -258,7 +258,7 @@ export function CalendarApp({ initialView = "week", canCall = true }: { initialV
         <Card className="overflow-hidden">
           <div className="grid grid-cols-7 border-b border-line" aria-hidden>
             {days.slice(0, 7).map((d) => (
-              <div key={d} className="px-2 py-1.5 text-xs font-semibold text-subtle">
+              <div key={d} className="px-2 py-1.5 text-xs font-semibold text-muted">
                 {dayLabel(d, { weekday: "short" })}
               </div>
             ))}
@@ -275,7 +275,7 @@ export function CalendarApp({ initialView = "week", canCall = true }: { initialV
                       setAnchor(d);
                       setView("day");
                     }}
-                    className={cn("mb-1 inline-flex size-7 items-center justify-center rounded-full text-xs font-semibold tabular-nums hover:bg-hover", d === today ? "bg-ink text-paper hover:bg-ink-hover" : inMonth ? "text-ink" : "text-subtle")}
+                    className={cn("mb-1 inline-flex size-7 items-center justify-center rounded-full text-xs font-semibold tabular-nums hover:bg-hover", d === today ? "bg-ink text-paper hover:bg-ink-hover" : inMonth ? "text-ink" : "text-muted")}
                     aria-label={dayLabel(d, { weekday: "long", month: "long", day: "numeric" })}
                   >
                     {Number(d.slice(8))}
@@ -306,7 +306,7 @@ export function CalendarApp({ initialView = "week", canCall = true }: { initialV
             <div />
             {days.map((d) => (
               <div key={d} className="min-w-0 border-l border-line px-2 py-1.5">
-                <p className={cn("text-xs font-semibold", d === today ? "text-ink" : "text-subtle")}>{dayLabel(d, { weekday: "short", day: "numeric" })}</p>
+                <p className={cn("text-xs font-semibold", d === today ? "text-ink" : "text-muted")}>{dayLabel(d, { weekday: "short", day: "numeric" })}</p>
                 <div className="mt-1 flex flex-col gap-0.5">
                   {events
                     .filter((e) => (e.allDay || (e.end && new Date(e.end).getTime() - new Date(e.start).getTime() >= 86_400_000)) && localYmd(e.start, tz) <= d && localYmd(e.end ?? e.start, tz) >= d && !(e.allDay && e.end && localYmd(e.end, tz) === d && d !== localYmd(e.start, tz)))
@@ -324,7 +324,7 @@ export function CalendarApp({ initialView = "week", canCall = true }: { initialV
             <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))`, height: 24 * HOUR_PX }}>
               <div className="relative">
                 {Array.from({ length: 24 }, (_, h) => (
-                  <span key={h} className="absolute right-2 -translate-y-1/2 text-xs text-subtle tabular-nums" style={{ top: h * HOUR_PX }}>
+                  <span key={h} className="absolute right-2 -translate-y-1/2 text-xs text-muted tabular-nums" style={{ top: h * HOUR_PX }}>
                     {h === 0 ? "" : fmt({ hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, h)))}
                   </span>
                 ))}
@@ -358,7 +358,7 @@ export function CalendarApp({ initialView = "week", canCall = true }: { initialV
                           key={e.id}
                           type="button"
                           onClick={() => setSelected(e)}
-                          className={cn("absolute overflow-hidden rounded-sm px-1.5 py-0.5 text-left text-xs hover:z-10", blockCls(e))}
+                          className={cn("absolute min-h-6 overflow-hidden rounded-sm px-1.5 py-0.5 text-left text-xs hover:z-10", blockCls(e))}
                           style={{ top: (e.top / 60) * HOUR_PX, height: Math.max(18, (e.height / 60) * HOUR_PX - 2), left: `calc(${(e.lane / e.lanes) * 100}% + 2px)`, width: `calc(${100 / e.lanes}% - 4px)` }}
                           aria-label={`${e.title || t("comms.common.noTitle")}, ${time(e.start)}${e.end ? `–${time(e.end)}` : ""}, ${sourceName(e.source)}`}
                         >

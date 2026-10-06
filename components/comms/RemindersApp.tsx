@@ -187,7 +187,7 @@ export function RemindersApp({ highlightId }: { highlightId?: string | null }) {
   const section = (key: string, label: string, list: Reminder[]) =>
     list.length ? (
       <section key={key} aria-label={label}>
-        <h2 className="px-4 pt-4 pb-1 text-xs font-semibold text-subtle">{label}</h2>
+        <h2 className="px-4 pt-4 pb-1 text-xs font-semibold text-muted">{label}</h2>
         <ul className="divide-y divide-line">{list.map(row)}</ul>
       </section>
     ) : null;

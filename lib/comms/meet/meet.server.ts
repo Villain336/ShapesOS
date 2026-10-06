@@ -312,7 +312,9 @@ export async function summarizeMeeting(ctx: MeetCtx, id: string, deps: SummaryDe
   if (!row.transcript?.trim()) throw new HttpError(400, "Add the transcript first (upload the recording or paste it).");
   if ((row.summary as StoredSummary | null)?.applied) throw new HttpError(409, "The notes were already saved.");
   const out = await deps.generate(ctx, summaryPrompt(row.title, row.transcript));
-  const parsed = parseMeetingSummary(out.text);
+  // Without a live model the provider's mock answers in prose: keep it as a
+  // labelled mock summary (never saveable) instead of failing.
+  const parsed = parseMeetingSummary(out.text) ?? (out.live ? null : { notes: out.text.trim().slice(0, 6000) || "Mock summary.", decisions: [], actionItems: [] });
   if (!parsed) throw new HttpError(502, "The meeting agent's answer couldn't be read. Try again.");
   const stored: StoredSummary = { ...parsed, mock: !out.live, at: new Date().toISOString(), by: ctx.userId, applied: null };
   await scoped(ctx, (tx) => tx.meetingSession.update({ where: { id: row.id }, data: { summary: stored as unknown as Prisma.InputJsonValue } }));
