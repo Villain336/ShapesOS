@@ -285,6 +285,15 @@ export const CRON_JOBS: readonly CronJob[] = [
   { key: "zernio-accounts", path: "/api/cron/zernio-accounts", cron: "30 2 1 * *", source: "deploy", timeoutMs: LONG },
   // Phase 15.4 (zernio): daily ad-report pull (last 7 days) into ad_reports.
   { key: "zernio-ads-reports", path: "/api/cron/zernio-ads-reports", cron: "40 5 * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 18.3 (WS=flow): Time Machine — scheduled workspace snapshots.
+  {
+    key: "snapshots",
+    path: "/api/cron/snapshots",
+    cron: "17 * * * *",
+    source: "picked",
+    note: "Hourly: a workspace's daily / weekly snapshot is taken within the hour it falls due (lib/timemachine/snapshots.ts snapshotDue). Off the :00 rush.",
+    timeoutMs: LONG,
+  },
 ];
 
 const parsed = new Map<string, CronSchedule>();
