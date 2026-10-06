@@ -44,13 +44,17 @@ export interface NewPdfAnnotation {
   body?: string;
 }
 
-type PdfjsModule = typeof import("pdfjs-dist");
+// The LEGACY build: pdf.js 6's modern build calls Map/WeakMap
+// getOrInsertComputed, which only the newest browsers have (Chrome 140 and
+// Safari 18 throw "getOrInsertComputed is not a function"); the legacy build
+// ships the polyfills and is otherwise the same API.
+type PdfjsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 let pdfjsPromise: Promise<PdfjsModule> | null = null;
 
 function loadPdfjs(): Promise<PdfjsModule> {
-  pdfjsPromise ??= import("pdfjs-dist").then((m) => {
+  pdfjsPromise ??= import("pdfjs-dist/legacy/build/pdf.mjs").then((m) => {
     if (!m.GlobalWorkerOptions.workerPort) {
-      m.GlobalWorkerOptions.workerPort = new Worker(new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url), { type: "module" });
+      m.GlobalWorkerOptions.workerPort = new Worker(new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url), { type: "module" });
     }
     return m;
   });

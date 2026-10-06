@@ -15,7 +15,7 @@
 // When the server says the document was replaced (a version restore), the
 // parent remounts this editor with a fresh yjs document (onReset).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -114,7 +114,11 @@ function CollabNoteEditor({ collab, editable, placeholder, onCollabStatus, onPee
   }, [onCollabStatus, onPeers, onReset, collab.fetchToken]);
 
   // One yjs document + provider per mount (the parent remounts on reset).
-  const { ydoc, provider } = useMemo(() => {
+  // Created in an effect, never during render: the provider connects at once
+  // and reports its status to the parent (a state update), and React's
+  // StrictMode double render must not open a second connection.
+  const [session, setSession] = useState<{ ydoc: Y.Doc; provider: HocuspocusProvider } | null>(null);
+  useEffect(() => {
     const ydoc = new Y.Doc();
     const provider = new HocuspocusProvider({
       url: collab.url,
@@ -131,8 +135,51 @@ function CollabNoteEditor({ collab, editable, placeholder, onCollabStatus, onPee
         }
       },
     });
-    return { ydoc, provider };
+    setSession({ ydoc, provider });
+    return () => {
+      setSession(null);
+      provider.destroy();
+      ydoc.destroy();
+    };
   }, [collab.url, collab.docName]);
+
+  if (!session) return <p className="min-h-[360px] py-2 text-md text-muted">{t("notes.editor.loading")}</p>;
+  return (
+    <CollabEditorBody
+      key={session.ydoc.guid}
+      ydoc={session.ydoc}
+      provider={session.provider}
+      user={collab.user}
+      writable={editable && !collab.readOnly}
+      placeholder={placeholder}
+      ariaLabel={ariaLabel}
+      onPeers={(names) => cbs.current.onPeers?.(names)}
+    />
+  );
+}
+
+function CollabEditorBody({
+  ydoc,
+  provider,
+  user,
+  writable,
+  placeholder,
+  ariaLabel,
+  onPeers,
+}: {
+  ydoc: Y.Doc;
+  provider: HocuspocusProvider;
+  user: CollabConfig["user"];
+  writable: boolean;
+  placeholder: string;
+  ariaLabel: string;
+  onPeers: (names: string[]) => void;
+}) {
+  const t = useT();
+  const peersCb = useRef(onPeers);
+  useEffect(() => {
+    peersCb.current = onPeers;
+  }, [onPeers]);
 
   useEffect(() => {
     const awareness = provider.awareness;
@@ -144,7 +191,7 @@ function CollabNoteEditor({ collab, editable, placeholder, onCollabStatus, onPee
         const name = (state as { user?: { name?: string } }).user?.name;
         if (name && !names.includes(name)) names.push(name);
       });
-      cbs.current.onPeers?.(names);
+      peersCb.current(names);
     };
     awareness.on("change", update);
     update();
@@ -153,15 +200,6 @@ function CollabNoteEditor({ collab, editable, placeholder, onCollabStatus, onPee
     };
   }, [provider, ydoc]);
 
-  useEffect(
-    () => () => {
-      provider.destroy();
-      ydoc.destroy();
-    },
-    [provider, ydoc],
-  );
-
-  const writable = editable && !collab.readOnly;
   const editor = useEditor(
     {
       immediatelyRender: false,
@@ -171,7 +209,7 @@ function CollabNoteEditor({ collab, editable, placeholder, onCollabStatus, onPee
         Placeholder.configure({ placeholder }),
         SlashCommand.configure({ suggestion: getSlashCommandSuggestion() }),
         Collaboration.configure({ document: ydoc, field: NOTE_YJS_FIELD }),
-        CollaborationCaret.configure({ provider, user: collab.user, render: renderCaret }),
+        CollaborationCaret.configure({ provider, user, render: renderCaret }),
       ],
       editorProps: { attributes: editorAttributes(ariaLabel) },
     },

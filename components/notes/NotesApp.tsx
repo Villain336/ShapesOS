@@ -232,7 +232,8 @@ export function NotesApp({ initialNotes, initialFacets, initialNote }: NotesAppP
                         <span className="truncate text-md font-semibold">{n.title}</span>
                       </span>
                       {n.preview ? <span className={`line-clamp-2 text-sm ${active ? "text-on-ink-muted" : "text-muted"}`}>{n.preview}</span> : null}
-                      <span className={`text-xs ${active ? "text-on-ink-muted" : "text-subtle"}`}>
+                      {/* Relative time: the server's "now" and the browser's differ by the render gap. */}
+                      <span suppressHydrationWarning className={`text-xs ${active ? "text-on-ink-muted" : "text-subtle"}`}>
                         {format.relative(n.updatedAt)}
                         {n.shareState === "workspace" ? ` · ${t("notes.sharedShort")}` : ""}
                         {n.links.length ? ` · ${t("notes.linkCount", { count: n.links.length })}` : ""}
@@ -605,7 +606,7 @@ function NotePane({
           />
         )}
       </div>
-      <p className="text-xs text-subtle">
+      <p suppressHydrationWarning className="text-xs text-subtle">
         {t("notes.meta", { updated: format.relative(note.updatedAt), created: format.date(note.createdAt, "date") })}
         {note.sourceRef === "voice" ? ` · ${t("notes.fromVoice")}` : note.sourceRef?.startsWith("agent") ? ` · ${t("notes.fromAgent")}` : note.sourceRef?.startsWith("meet") ? ` · ${t("notes.fromMeeting")}` : ""}
       </p>

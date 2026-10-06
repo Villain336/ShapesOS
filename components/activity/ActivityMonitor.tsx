@@ -43,7 +43,8 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
   const [show, setShow] = useState<Show>("live");
   const [type, setType] = useState<TypeFilter>("all");
   const [stream, setStream] = useState<LiveStreamState>("connecting");
-  const [now, setNow] = useState(() => Date.now());
+  // Start from the snapshot's own clock so the server and the browser render the same times.
+  const [now, setNow] = useState(() => Date.parse(initial.health.generatedAt) || Date.now());
   const [stopping, setStopping] = useState<Set<string>>(new Set());
 
   const apply = useCallback((snap: Partial<ProcessSnapshot> | null) => {
@@ -236,19 +237,19 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
                         <td className="px-3 py-2 align-top whitespace-nowrap text-muted">{t(`activityApp.typeLabels.${row.type}` as MessageKey)}</td>
                         <td className="px-3 py-2 align-top">{stateBadge(row)}</td>
                         <td className="max-w-[10rem] truncate px-3 py-2 align-top text-muted">{who}</td>
-                        <td className="px-3 py-2 text-right align-top whitespace-nowrap tabular-nums text-ink">{formatElapsed(elapsedMs(row, now))}</td>
+                        <td suppressHydrationWarning className="px-3 py-2 text-right align-top whitespace-nowrap tabular-nums text-ink">{formatElapsed(elapsedMs(row, now))}</td>
                         <td className="px-3 py-2 text-right align-top whitespace-nowrap tabular-nums text-ink">{formatCost(row.costMicroUsd)}</td>
                         <td className="px-3 py-2 align-top">
                           {used === null ? (
                             <span className="text-xs text-subtle">{t("activityApp.noBudget")}</span>
                           ) : (
-                            <div className="flex items-center gap-2" title={t("activityApp.budgetUsed", { pct: Math.round(used * 100) })}>
+                            <div suppressHydrationWarning className="flex items-center gap-2" title={t("activityApp.budgetUsed", { pct: Math.round(used * 100) })}>
                               <div className="h-1.5 w-20 overflow-hidden rounded-full bg-line" aria-hidden>
-                                <div className="h-full rounded-full bg-ink" style={{ width: `${Math.round(used * 100)}%` }} />
+                                <div suppressHydrationWarning className="h-full rounded-full bg-ink" style={{ width: `${Math.round(used * 100)}%` }} />
                               </div>
                               <span className="text-xs tabular-nums text-muted">
-                                <span className="sr-only">{t("activityApp.budgetUsed", { pct: Math.round(used * 100) })}</span>
-                                <span aria-hidden>{Math.round(used * 100)}%</span>
+                                <span suppressHydrationWarning className="sr-only">{t("activityApp.budgetUsed", { pct: Math.round(used * 100) })}</span>
+                                <span suppressHydrationWarning aria-hidden>{Math.round(used * 100)}%</span>
                               </span>
                             </div>
                           )}
@@ -305,7 +306,7 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
         <h2 id="activity-health" className="aos-subheading">
           {t("activityApp.health.title")}
         </h2>
-        <span className="text-xs text-subtle">{t("activityApp.health.updated", { time: formatTime(health.generatedAt) })}</span>
+        <span suppressHydrationWarning className="text-xs text-subtle">{t("activityApp.health.updated", { time: formatTime(health.generatedAt) })}</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
         {stats.map((s) => (
@@ -337,7 +338,7 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
                         {c.status}
                         {c.durationMs !== null ? ` · ${formatElapsed(c.durationMs)}` : ""}
                       </td>
-                      <td className="px-1 py-1.5 text-right whitespace-nowrap text-muted">{formatTime(c.startedAt)}</td>
+                      <td suppressHydrationWarning className="px-1 py-1.5 text-right whitespace-nowrap text-muted">{formatTime(c.startedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
