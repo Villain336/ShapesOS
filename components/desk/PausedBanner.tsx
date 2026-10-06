@@ -41,7 +41,7 @@ export function PausedBanner({ since, canResume }: { since: string; canResume: b
       <div className="min-w-0 flex-1">
         <p className="text-base leading-5 font-semibold text-paper">Agents paused</p>
         <p className="text-sm text-night-soft">
-          Since {at}. Every run was stopped and nothing new starts{canResume ? " until you resume." : " until an admin resumes."}
+          Since {at}. Every live run was told to stop (each ends at its next step) and nothing new starts{canResume ? " until you resume." : " until an admin resumes."}
         </p>
       </div>
       {canResume ? (

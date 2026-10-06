@@ -366,19 +366,22 @@ export function Desktop({
                   <Icon className="size-4 shrink-0 text-muted" aria-hidden />
                 )}
                 <h2 className="min-w-0 flex-1 truncate text-base font-bold stretch-heading tracking-heading text-ink">{def.title}</h2>
-                {editing ? (
+                {editing ? null : (
+                  <Link href={def.href} className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold text-ink hover:bg-hover">
+                    Open
+                  </Link>
+                )}
+              </header>
+              {editing ? (
+                <div className="shrink-0 border-b border-line px-3 pb-2">
                   <WidgetEditButtons
                     title={def.title}
                     onMove={(dx, dy) => move(p.id, dx, dy)}
                     onResize={(dw, dh) => resize(p.id, dw, dh)}
                     onRemove={() => remove(p.id)}
                   />
-                ) : (
-                  <Link href={def.href} className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold text-ink hover:bg-hover">
-                    Open
-                  </Link>
-                )}
-              </header>
+                </div>
+              ) : null}
               <div className={cn("min-h-0 flex-1 overflow-auto px-4 pb-4", editing && "pointer-events-none select-none opacity-70")} aria-hidden={editing || undefined}>
                 {content ?? <p className="text-sm text-muted">{editing ? "Loads when you're done editing." : "Loading…"}</p>}
               </div>
@@ -419,7 +422,7 @@ function WidgetEditButtons({
 }) {
   const btn = "flex size-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-hover";
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5" role="group" aria-label={`Arrange ${title}`}>
+    <div className="flex flex-wrap items-center gap-0.5" role="group" aria-label={`Arrange ${title}`}>
       <button type="button" className={btn} aria-label={`Move ${title} left`} onClick={() => onMove(-1, 0)}>
         <ArrowLeft className="size-3.5" aria-hidden />
       </button>

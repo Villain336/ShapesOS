@@ -185,7 +185,7 @@ export function AppSwitcher({ role, initialDock }: { role?: string | null; initi
             tabIndex={-1}
             aria-label="Recent apps and records"
             aria-activedescendant={activeId}
-            className="max-h-[60vh] overflow-y-auto p-1.5 outline-none"
+            className="max-h-[60vh] overflow-y-auto p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset"
           >
             {entries.map((e, i) => {
               const app = appForHref(e.href);

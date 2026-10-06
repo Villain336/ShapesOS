@@ -180,7 +180,7 @@ export function ShortcutsDialog({
                           {s.hint ? <span className="block text-xs text-muted">{s.hint}</span> : null}
                         </span>
                         {isEditing ? (
-                          <div ref={captureRef} tabIndex={-1} className="flex items-center gap-2 outline-none" aria-live="polite">
+                          <div ref={captureRef} tabIndex={-1} className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus" aria-live="polite">
                             <span className={cn("rounded-md px-2 py-1 text-sm", captured ? "bg-canvas" : "text-muted")}>
                               {captured ? <Caps combo={captured} mac={mac} /> : "Press the new keys…"}
                             </span>

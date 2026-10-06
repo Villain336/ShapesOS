@@ -70,6 +70,9 @@ describe("recents", () => {
 
   it("titles strip the product suffix and fall back to the app name", () => {
     assert.equal(recentTitle("/dashboard/crm", "CRM — ShapesOS"), "CRM");
+    assert.equal(recentTitle("/dashboard/files", "ShapesOS — marketing & SEO workspace"), "Files", "an app is its nav label");
+    assert.equal(recentTitle("/dashboard", "Something else"), "Overview");
+    assert.equal(recentTitle("/dashboard/ops/invoices/inv-9", "ShapesOS — marketing & SEO workspace"), "Operations · Inv 9", "generic title → app + segment");
     assert.equal(recentTitle("/dashboard/crm", ""), "CRM");
     assert.equal(recentTitle("/dashboard/projects/cmabc0000000000000000000", "ShapesOS"), "SEO projects · record cmabc000");
     assert.equal(recentTitle("/dashboard/ops/invoices/inv-42", "Invoice INV-42 — ShapesOS"), "Invoice INV-42");

@@ -55,7 +55,7 @@ import { BriefingBody } from "./BriefingBody";
 
 function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex h-full min-h-24 flex-col items-start justify-center gap-1 px-1 py-2">
+    <div className="flex flex-col items-start gap-1 px-1 py-1">
       <p className="text-base font-semibold text-ink">{title}</p>
       {children ? <p className="max-w-[46ch] text-sm text-muted">{children}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}

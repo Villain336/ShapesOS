@@ -27,7 +27,6 @@ export function RecentsTracker() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ href, title: document.title }),
-          keepalive: true,
         });
         if (res.ok) notifyDockChanged();
       } catch {

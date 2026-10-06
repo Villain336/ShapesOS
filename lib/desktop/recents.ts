@@ -57,15 +57,21 @@ export function classifyRecent(href: string): RecentKind {
 }
 
 const SUFFIX = /\s*[—–|-]\s*(ShapesOS|Marketr)\s*$/i;
+/** The product's own (generic) title — a page that never set one. */
+const GENERIC = /^(ShapesOS|Marketr)(\s*[—–|-].*)?$/i;
 
 /**
- * A short label: the page's own <title> without the product suffix; else the
- * app name, plus the last path segment for a record.
+ * A short label. An app (a nav destination) is always called by its nav
+ * label — the name the member knows it by. A record uses the page's own
+ * <title> without the product suffix; a page with only the generic product
+ * title falls back to the app name plus the last path segment.
  */
 export function recentTitle(href: string, documentTitle?: unknown): string {
-  const t = typeof documentTitle === "string" ? documentTitle.replace(SUFFIX, "").trim() : "";
+  const raw = typeof documentTitle === "string" ? documentTitle.trim() : "";
+  const t = GENERIC.test(raw) ? "" : raw.replace(SUFFIX, "").trim();
   const app = appForHref(href);
-  if (t && !/^(ShapesOS|Marketr)$/i.test(t)) {
+  if (app && classifyRecent(href) === "app") return app.label;
+  if (t) {
     // A record page often keeps its app's generic title: add the record hint.
     if (app && classifyRecent(href) === "record" && t.toLowerCase() === app.label.toLowerCase()) {
       return `${app.label} · ${lastSegmentLabel(href)}`.slice(0, 120);

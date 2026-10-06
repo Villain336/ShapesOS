@@ -141,7 +141,7 @@ export function ControlCenter() {
   async function pauseAll() {
     const ok = await confirmAction({
       title: "Pause all agents?",
-      description: `Every agent in this workspace stops now${state?.liveRuns ? ` (${state.liveRuns} live)` : ""}, and none can start until someone resumes them. Work waiting for approval is dropped. This is recorded in the audit trail.`,
+      description: `Every live run in this workspace${state?.liveRuns ? ` (${state.liveRuns})` : ""} is told to stop now and ends at its next step, and no agent can start until someone resumes. Proposals waiting for approval are dropped. This is recorded in the audit trail.`,
       confirmLabel: "Pause all agents",
       destructive: true,
     });
@@ -224,7 +224,7 @@ export function ControlCenter() {
           aria-label="Control Center"
           tabIndex={-1}
           data-testid="control-center"
-          className="absolute top-full right-0 z-50 mt-2 w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg bg-paper text-ink shadow-raised outline-none"
+          className="absolute top-full right-0 z-50 mt-2 w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg bg-paper text-ink shadow-raised outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <span className="text-base font-bold stretch-heading">Control Center</span>
@@ -259,7 +259,7 @@ export function ControlCenter() {
                   {paused
                     ? `Since ${clock(state.paused!.at)}. Nothing new starts until ${state.canPause ? "you resume" : "an admin resumes"}.`
                     : state.canPause
-                      ? "Stops every run now and blocks new ones until you resume."
+                      ? "Tells every run to stop now and blocks new ones until you resume."
                       : "Only admins can pause every agent."}
                 </p>
               </section>

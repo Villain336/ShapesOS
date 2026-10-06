@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { aosButton } from "@/components/aos/button";
 import { allNavItems, navItemVisible } from "@/lib/nav/config";
 import { RATIO_MAX, RATIO_MIN, RATIO_STEP, clampRatio, nudgeRatio, sanitizePaneHref, splitUrl, swapPanes, type SplitState } from "@/lib/desktop/split";
-import type { RecentItem } from "@/lib/desktop/recents";
+import { recentTitle, type RecentItem } from "@/lib/desktop/recents";
 
 export const SPLIT_COMMAND_EVENT = "shapes:split-command";
 export type SplitCommand = "swap" | "close" | "focus-left" | "focus-right" | "shrink-left" | "grow-left";
@@ -133,8 +133,9 @@ export function SplitView({ initial, recents, role }: { initial: SplitState; rec
     try {
       const loc = frame?.contentWindow?.location;
       const doc = frame?.contentDocument;
-      if (doc) setTitles((t) => ({ ...t, [side]: doc.title.replace(/\s*[—–|-]\s*ShapesOS\s*$/i, "") }));
       if (!loc) return;
+      // The same naming rule as recents: an app by its nav label, a record by its own title.
+      if (doc) setTitles((t) => ({ ...t, [side]: recentTitle(loc.pathname, doc.title) }));
       const href = sanitizePaneHref(`${loc.pathname}${loc.search}`);
       if (href && href !== stateRef.current[side]) sync({ ...stateRef.current, [side]: href });
     } catch {
