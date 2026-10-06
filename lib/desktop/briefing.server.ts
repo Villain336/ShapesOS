@@ -170,7 +170,10 @@ export async function gatherBriefingInput(workspaceId: string, userId: string, n
 // Writing (once per member per day)
 // ---------------------------------------------------------------------------
 
-async function defaultGenerate(workspaceId: string, userId: string, prompt: string) {
+// Phase 18.3 (WS=trust): exported so the daily notification summary
+// (lib/notifications/summary.server.ts) writes through the same metered
+// background workload and batch path — one way agents write for a person.
+export async function defaultGenerate(workspaceId: string, userId: string, prompt: string) {
   const { getLlmProviderForWorkspace } = await import("@/lib/llm/workspace");
   const provider = await getLlmProviderForWorkspace("background", { workspaceId, actorId: userId });
   if (!provider.isLive) return { text: "", model: provider.name, live: false };
@@ -178,7 +181,7 @@ async function defaultGenerate(workspaceId: string, userId: string, prompt: stri
   return { text, model: provider.name, live: true };
 }
 
-async function shouldBatch(workspaceId: string, deps: BriefingDeps): Promise<boolean> {
+export async function shouldBatch(workspaceId: string, deps: BriefingDeps): Promise<boolean> {
   if (deps.batch !== undefined) return deps.batch;
   const { batchEnabled, batchProviderOf } = await import("@/lib/llm/batch");
   const { agentWorkerMode } = await import("@/lib/agents/queue/config");
@@ -188,7 +191,7 @@ async function shouldBatch(workspaceId: string, deps: BriefingDeps): Promise<boo
   return provider.isLive && batchProviderOf(provider) !== null;
 }
 
-async function defaultSubmitBatch(input: { workspaceId: string; key: string; prompt: string; userId: string; day: string }) {
+export async function defaultSubmitBatch(input: { workspaceId: string; key: string; prompt: string; userId: string; day: string }) {
   const { submitLlmBatch } = await import("@/lib/llm/batch");
   await import("@/lib/llm/batch-purposes");
   await submitLlmBatch({

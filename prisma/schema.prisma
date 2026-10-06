@@ -383,6 +383,14 @@ enum FileChangeAction {
   // Phase 18.2 (WS=content): a run / job / sandbox / terminal stopped from the
   // Activity Monitor.
   process_stopped
+  // Phase 18.3 (WS=trust): the Privacy & Security center — agent app access
+  // changed, a sign-in session revoked, a memory forgotten, a phone removed,
+  // the audit timeline exported.
+  agent_app_access_changed
+  session_revoked
+  memory_forgotten
+  push_device_removed
+  audit_timeline_exported
 }
 
 // ---------------------------------------------------------------------------
@@ -3793,6 +3801,10 @@ model WorkspaceSettings {
   // slug → "low" | "medium" | "high". Overrides win over verb-derived
   // classification (spec §3).
   toolTierOverrides    Json?     @map("tool_tier_overrides")
+  // Phase 18.3 (WS=trust): agent app permissions — tool groups (lib/agents/
+  // grants.ts TOOL_GROUPS) agents may NOT use in this workspace. Empty = every
+  // app allowed (the behaviour before 18.3). Enforced inside computeGrant().
+  agentBlockedGroups   String[]  @default([]) @map("agent_blocked_groups")
   updatedBy            String?   @map("updated_by")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -15225,6 +15237,11 @@ enum NotificationKind {
   mention
   direct_message
   reminder_due
+  // Phase 18.3 (WS=trust): Notifications 2.0.
+  run_finished
+  invoice_paid
+  ticket_assigned
+  meeting_starting
 }
 
 model Notification {
@@ -15248,6 +15265,9 @@ model Notification {
   // no push) and is released (heldAt cleared, push sent) when focus ends.
   // Queued, never dropped (lib/desktop/focus.ts).
   heldAt      DateTime?        @map("held_at")
+  // Phase 18.3 (WS=trust): when the row went out in the person's email
+  // digest (lib/notifications/digest.ts) — each row is mailed at most once.
+  digestedAt  DateTime?        @map("digested_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, dedupKey])
@@ -17895,4 +17915,37 @@ model StorePublication {
   @@index([workspaceId, status])
   @@index([agencyWorkspaceId, createdAt])
   @@map("store_publications")
+}
+
+// ============================================================================
+// Phase 18.3 (WS=trust): the per-person session registry. Auth stays JWT
+// (auth.ts, strategy "jwt"): each completed sign-in writes one row and puts its
+// id in the token (token.sid); the jwt callback refuses a token whose row is
+// revoked. Device label + IP prefix only (never the full IP, never the token).
+// Owner-only: FORCE RLS on app.user_id (no workspace — a session belongs to
+// the person). Covered by GDPR export (user_id) and account delete.
+// ============================================================================
+
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  // How the session signed in ("google", "credentials", "email-password" …).
+  provider    String?   @db.VarChar(64)
+  userAgent   String?   @map("user_agent") @db.VarChar(400)
+  // "Chrome on macOS" — derived from the user agent (lib/auth/sessions.ts).
+  deviceLabel String?   @map("device_label") @db.VarChar(120)
+  // "203.0.113.0/24" / "2001:db8:1::/48" — never the full address.
+  ipPrefix    String?   @map("ip_prefix") @db.VarChar(64)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  // Touched at most every few minutes (SESSION_TOUCH_MS).
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  // When the absolute JWT lifetime ends (auth.ts maxAge).
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // Who revoked it: the person themselves ("self") or "admin:<userId>".
+  revokedBy   String?   @map("revoked_by") @db.VarChar(200)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }

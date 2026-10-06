@@ -52,8 +52,36 @@ export const NOTIFICATION_KINDS = [
   "mention",
   "direct_message",
   "reminder_due",
+  // Phase 18.3 (WS=trust): Notifications 2.0.
+  "run_finished",
+  "invoice_paid",
+  "ticket_assigned",
+  "meeting_starting",
 ] as const;
 export type NotificationKindPref = (typeof NOTIFICATION_KINDS)[number];
+
+/**
+ * Phase 18.3 (WS=trust): where a notification can go. "inApp" is the bell
+ * (the row itself); the others deliver a row that was written: "push" =
+ * the mobile app (Expo), "webPush" = this browser (Web Push), "email" = the
+ * daily email digest, "slack" = a Slack direct message.
+ */
+export const NOTIFICATION_CHANNELS = ["inApp", "push", "webPush", "email", "slack"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const EMAIL_DIGESTS = ["off", "daily"] as const;
+export type EmailDigest = (typeof EMAIL_DIGESTS)[number];
+
+/** One kind's per-channel choices (unset = the default for that kind). */
+const KindChannelsSchema = z
+  .object({
+    inApp: z.boolean().optional(),
+    push: z.boolean().optional(),
+    webPush: z.boolean().optional(),
+    email: z.boolean().optional(),
+    slack: z.boolean().optional(),
+  })
+  .strict();
 
 /** True when `tz` is an IANA time zone this runtime knows. */
 export function isValidTimeZone(tz: string): boolean {
@@ -167,6 +195,22 @@ export const NotificationPrefsSchema = z
     push: z.boolean(),
     /** Kinds muted on every channel. */
     mutedKinds: z.array(z.enum(NOTIFICATION_KINDS)).max(NOTIFICATION_KINDS.length),
+    // Phase 18.3 (WS=trust): Notifications 2.0 — still this ONE store. Each
+    // new field has a default, so a row saved before 18.3 reads unchanged.
+    /**
+     * Web Push to the browsers the person connected (lib/push/web.ts). On by
+     * default: connecting a browser (its push subscription) is the opt-in;
+     * this switch pauses browser notifications without disconnecting them.
+     */
+    webPush: z.boolean().default(true),
+    /** The daily email digest of unread notifications (lib/notifications/digest.ts). */
+    emailDigest: z.enum(EMAIL_DIGESTS).default("off"),
+    /** Slack direct messages (workspace Slack app installed + the person found by email). */
+    slack: z.boolean().default(false),
+    /** The lead agent's daily "what happened" summary (opt-in, metered, background). */
+    summary: z.boolean().default(false),
+    /** Per kind × channel choices; unset cells use DEFAULT_KIND_CHANNELS (lib/notifications/channels.ts). */
+    channels: z.partialRecord(z.enum(NOTIFICATION_KINDS), KindChannelsSchema).default({}),
   })
   .strict();
 export type NotificationPrefs = z.infer<typeof NotificationPrefsSchema>;
@@ -194,6 +238,8 @@ export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
 export const PREFERENCE_KEYS = Object.keys(PREFERENCE_SCHEMAS) as PreferenceKey[];
 
 export type UserPreferences = { [K in PreferenceKey]: z.output<(typeof PREFERENCE_SCHEMAS)[K]> };
+/** Phase 18.3: what a caller may send (fields with defaults may be left out). */
+export type UserPreferencesInput = { [K in PreferenceKey]: z.input<(typeof PREFERENCE_SCHEMAS)[K]> };
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "system",
@@ -204,7 +250,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   density: "comfortable",
   motion: "system",
   fontScale: 100,
-  notifications: { inApp: true, push: true, mutedKinds: [] },
+  notifications: { inApp: true, push: true, mutedKinds: [], webPush: true, emailDigest: "off", slack: false, summary: false, channels: {} },
   shortcuts: {},
   desktop: {},
   voice: {},

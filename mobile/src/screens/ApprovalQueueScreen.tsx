@@ -1,129 +1,148 @@
-// Marketr mobile — approval queue screen.
+// ShapesOS mobile — the unified approvals queue (Phase 18.3, WS=trust).
 //
-// The gate's pending items as a native list; each item renders the
-// NativeApprovalCard in-flow (approve/deny/edit execute through the same
-// Phase 14 gate routes as the web card). No separate mobile approval logic.
+// The same feed as the web's Needs you inbox (GET /api/approvals/inbox, all
+// 17 sources: missions, ad spend, outreach, messaging, … autopilot and
+// workflow approval gates). Approve / deny POST the item's OWN action — its
+// source's existing decide route, which re-checks every rule — and an item
+// this person can't decide here says why and opens on the web.
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSession } from "../session-context";
-import { fetchApprovalQueue, GateApiError, type GateItem } from "../api/gate";
-import { NativeApprovalCard } from "../components/NativeApprovalCard";
-import { color } from "../theme";
+import { decideInboxItem, decisionRequest, fetchInbox, groupInbox, OsApiError, type InboxItem, type InboxResult } from "../api/os";
+import { color, CONTROL_HEIGHT, font, radius } from "../theme";
 
-const STATUSES = ["pending", "approved", "rejected"] as const;
-
-export function ApprovalQueueScreen({ projectId }: { projectId: string | null }) {
-  const { gate } = useSession();
-  const [status, setStatus] = useState<(typeof STATUSES)[number]>("pending");
-  const [items, setItems] = useState<GateItem[]>([]);
+export function ApprovalQueueScreen() {
+  const { gate, baseUrl } = useSession();
+  const opts = { baseUrl: gate.baseUrl, authHeaders: gate.authHeaders };
+  const [result, setResult] = useState<InboxResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!projectId) {
-      setLoading(false);
-      return;
-    }
     try {
-      const list = await fetchApprovalQueue({ baseUrl: gate.baseUrl, authHeaders: gate.authHeaders }, projectId, status);
-      setItems(list);
+      setResult(await fetchInbox({ baseUrl: gate.baseUrl, authHeaders: gate.authHeaders }));
       setError(null);
     } catch (err) {
-      setError(err instanceof GateApiError ? `(${err.status}) ${err.message}` : "Failed to load the queue");
+      setError(err instanceof OsApiError ? `(${err.status}) ${err.message}` : "Couldn't load approvals.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [gate, projectId, status]);
+  }, [gate]);
 
   useEffect(() => {
-    setLoading(true);
     void load();
   }, [load]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    void load();
-  }, [load]);
+  const decide = async (item: InboxItem, decision: "approve" | "deny") => {
+    setBusy(item.key);
+    try {
+      await decideInboxItem(opts, item, decision);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't decide that.");
+    } finally {
+      setBusy(null);
+    }
+  };
 
-  // A decision on one card refreshes the list (the item left the pending set).
-  const onResolved = useCallback(() => {
-    void load();
-  }, [load]);
-
-  return (
-    <View style={styles.root}>
-      <View style={styles.tabs}>
-        {STATUSES.map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[styles.tab, status === s && styles.tabActive]}
-            onPress={() => {
-              setStatus(s);
-              setLoading(true);
-            }}
-          >
-            <Text style={[styles.tabText, status === s && styles.tabTextActive]}>
-              {s[0]?.toUpperCase() + s.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={color.ink} />
+        <Text style={styles.muted}>Loading approvals…</Text>
       </View>
-      {!projectId ? (
-        <View style={styles.center}>
-          <Text style={styles.muted}>No project available — create one on the web dashboard first.</Text>
+    );
+  }
+  const groups = result ? groupInbox(result) : [];
+  return (
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}
+    >
+      <Text style={styles.heading} accessibilityRole="header">
+        Needs you
+      </Text>
+      <Text style={styles.muted}>
+        {result ? `${result.actionable} you can decide · ${result.total} waiting` : ""}
+      </Text>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {groups.length === 0 && !error ? <Text style={styles.empty}>Nothing is waiting on you.</Text> : null}
+      {groups.map((g) => (
+        <View key={g.source} style={styles.group}>
+          <Text style={styles.groupLabel}>{g.label}</Text>
+          {g.items.map((item) => (
+            <View key={item.key} style={styles.card}>
+              <View style={styles.cardHead}>
+                <View style={styles.needsMark} accessibilityLabel="Needs you" />
+                <Text style={styles.type}>{item.typeLabel}</Text>
+              </View>
+              <Text style={styles.title}>{item.title}</Text>
+              {item.detail ? <Text style={styles.detail}>{item.detail}</Text> : null}
+              {item.requester ? <Text style={styles.meta}>Asked by {item.requester}</Text> : null}
+              {decisionRequest(item, "approve") ? (
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    style={[styles.approve, busy === item.key && styles.disabled]}
+                    disabled={busy !== null}
+                    onPress={() => void decide(item, "approve")}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Approve ${item.title}`}
+                  >
+                    <Text style={styles.approveText}>{busy === item.key ? "Approving" : "Approve"}</Text>
+                  </TouchableOpacity>
+                  {decisionRequest(item, "deny") ? (
+                    <TouchableOpacity
+                      style={styles.deny}
+                      disabled={busy !== null}
+                      onPress={() => void decide(item, "deny")}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Deny ${item.title}`}
+                    >
+                      <Text style={styles.denyText}>Deny</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => void Linking.openURL(`${baseUrl}${item.href}`)} accessibilityRole="link">
+                  <Text style={styles.link}>{item.blockedReason ?? "Review on the web"}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
         </View>
-      ) : loading && !refreshing ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={color.ink} />
-          <Text style={styles.muted}>Loading approvals…</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-          <TouchableOpacity style={styles.retry} onPress={() => { setLoading(true); void load(); }}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {items.length === 0 ? (
-            <Text style={styles.muted}>No {status} items.</Text>
-          ) : (
-            items.map((item) => (
-              <NativeApprovalCard
-                key={item.id}
-                itemId={item.id}
-                projectId={projectId}
-                gate={gate}
-                onResolved={onResolved}
-              />
-            ))
-          )}
-        </ScrollView>
-      )}
-    </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.canvas },
-  tabs: { flexDirection: "row", padding: 12, gap: 8, backgroundColor: color.paper, borderBottomWidth: 1, borderBottomColor: color.line },
-  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: color.canvas },
-  tabActive: { backgroundColor: color.ink },
-  tabText: { fontSize: 13, fontWeight: "600", color: color.muted, textTransform: "capitalize" },
-  tabTextActive: { color: color.paper },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 12 },
+  content: { padding: 16, gap: 8 },
+  heading: { fontSize: font.xl, fontWeight: "800", color: color.ink, letterSpacing: -0.3 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
-  muted: { fontSize: 13, color: color.subtle, textAlign: "center" },
-  error: { fontSize: 13, color: color.failedText, textAlign: "center" },
-  retry: { marginTop: 8, backgroundColor: color.canvas, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { color: color.muted, fontWeight: "600", fontSize: 13 },
+  muted: { fontSize: font.sm, color: color.subtle },
+  empty: { fontSize: font.base, color: color.muted, marginTop: 16 },
+  error: { fontSize: font.sm, color: color.failedText },
+  group: { marginTop: 12, gap: 8 },
+  groupLabel: { fontSize: font.xs, fontWeight: "600", color: color.muted },
+  card: { backgroundColor: color.paper, borderRadius: radius.lg, padding: 14, gap: 6 },
+  cardHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Needs-you triangle stand-in: the status colour with its black edge.
+  needsMark: { width: 10, height: 10, backgroundColor: color.needs, borderWidth: 1, borderColor: color.ink, transform: [{ rotate: "45deg" }] },
+  type: { fontSize: font.xs, fontWeight: "600", color: color.muted },
+  title: { fontSize: font.base, fontWeight: "600", color: color.ink },
+  detail: { fontSize: font.md, color: color.muted },
+  meta: { fontSize: font.xs, color: color.subtle },
+  actions: { flexDirection: "row", gap: 8, marginTop: 6 },
+  approve: { minHeight: CONTROL_HEIGHT, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: color.done, alignItems: "center", justifyContent: "center" },
+  approveText: { color: color.paper, fontWeight: "600", fontSize: font.base },
+  deny: { minHeight: CONTROL_HEIGHT, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: color.paper, borderWidth: 1.5, borderColor: color.failed, alignItems: "center", justifyContent: "center" },
+  denyText: { color: color.failedText, fontWeight: "600", fontSize: font.base },
+  disabled: { opacity: 0.6 },
+  link: { fontSize: font.sm, fontWeight: "600", color: color.ink, textDecorationLine: "underline", marginTop: 4 },
 });

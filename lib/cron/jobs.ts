@@ -72,6 +72,15 @@ export const CRON_JOBS: readonly CronJob[] = [
   },
 
   // --- Every 5–15 minutes -------------------------------------------------
+  {
+    // Phase 18.3 (WS=trust): meetings starting, the email digest, the agent-written summary.
+    key: "notifications",
+    path: "/api/cron/notifications",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "New in Phase 18.3. Meeting reminders look 10 minutes ahead, so a 5-minute sweep reaches every meeting at least once before it starts (each occurrence notifies once by dedup key); the digest and summary are once-a-day per person and skip until the person's morning.",
+    timeoutMs: SHORT,
+  },
   { key: "newsletter", path: "/api/cron/newsletter", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "social", path: "/api/cron/social", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "ads", path: "/api/cron/ads", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },

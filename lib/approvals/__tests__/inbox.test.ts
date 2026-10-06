@@ -78,6 +78,15 @@ function fixtures() {
       { id: `${ws}_social`, workspaceId: ws, status: "pending_approval", content: "Launch post", media: [{ fileId: "f1" }], channels: [{ id: "c1", name: "Our X" }], publishMode: "now", scheduledFor: null, requestedBy: "u_editor", requestedAt: at(21), createdAt: at(21) },
       { id: `${ws}_social_draft`, workspaceId: ws, status: "draft", content: "Not yet", media: [], channels: [], publishMode: "now", scheduledFor: null, requestedBy: null, requestedAt: null, createdAt: at(22) },
     ]),
+    // Phase 18.3 (WS=trust): autopilot drafts and workflow approval gates.
+    autopilotItem: both((ws) => [
+      { id: `${ws}_ap`, status: "pending", kind: "decay_refresh", sourceRef: "finding_1", title: "Refresh the pricing page", reviewNote: null, createdAt: at(23), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
+      { id: `${ws}_ap_done`, status: "approved", kind: "decay_refresh", sourceRef: "finding_2", title: "Done already", reviewNote: null, createdAt: at(24), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
+      { id: `${ws}_gate`, status: "pending", kind: "keyword_brief", sourceRef: `workflow_run:${ws}_wr:node_9`, title: "Workflow approval: Launch — Approve copy", reviewNote: "Check the copy", createdAt: at(25), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Workflow approvals" }, run: { createdBy: "workflow" } },
+    ]),
+    workflowRun: both((ws) => [
+      { id: `${ws}_wr`, status: "waiting_approval", createdBy: "u_owner", triggerKind: "manual", workflowId: `${ws}_wf`, workflow: { name: "Launch" }, project: { workspaceId: ws } },
+    ]),
     workspaceMember: [
       { workspaceId: A, userId: "u_editor", name: "Eddie Editor", email: "eddie@example.com" },
       { workspaceId: A, userId: "u_owner", name: null, email: "owner@example.com" },
@@ -137,7 +146,8 @@ describe("approvals inbox: workspace scoping", () => {
     assert.ok(!ids.has(`${A}_nudge2`), "approved nudge is gone");
     assert.ok(ids.has(`${A}_social`), "submitted social post");
     assert.ok(!ids.has(`${A}_social_draft`), "a draft post is not an approval");
-    assert.equal(res.total, 16);
+    assert.equal(res.total, 18, "16 + the autopilot draft and the workflow gate (Phase 18.3)");
+    assert.ok(!ids.has(`${A}_ap_done`), "a decided autopilot item is gone");
   });
 
   it("social posts: inline decision API, and no self-approval while another approver exists", async () => {
@@ -277,5 +287,44 @@ describe("approvals inbox: resilience and display", () => {
     const times = res.items.map((i) => i.createdAt);
     assert.deepEqual(times, [...times].sort().reverse());
     for (const i of res.items) assert.ok(i.href.startsWith("/dashboard/"), i.href);
+  });
+});
+
+describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17)", () => {
+  it("are the 16th and 17th sources", () => {
+    const keys = INBOX_SOURCE_DEFS.map((d) => d.key);
+    assert.equal(keys.length, 17);
+    assert.deepEqual(keys.slice(15), ["autopilot", "workflow"]);
+  });
+
+  it("autopilot lists pending drafts (not gates, not decided) and decides through the existing autopilot routes", async () => {
+    const res = await loadInbox(viewer("editor", { userId: "u_other" }), harness().opts);
+    const ap = res.items.filter((i) => i.source === "autopilot");
+    assert.deepEqual(ap.map((i) => i.id), [`${A}_ap`]);
+    assert.equal(ap[0]!.canDecide, true);
+    assert.deepEqual(ap[0]!.approve, { method: "POST", url: `/api/autopilot/items/${A}_ap/approve`, body: { projectId: `${A}_p` } });
+    assert.deepEqual(ap[0]!.deny, { method: "POST", url: `/api/autopilot/items/${A}_ap/reject`, body: { projectId: `${A}_p` } });
+    assert.equal(ap[0]!.typeLabel, "Content refresh");
+    assert.match(ap[0]!.href, /\/autopilot$/);
+  });
+
+  it("workflow lists approval gates with their run's workflow, through the same routes", async () => {
+    const res = await loadInbox(viewer("owner", { userId: "u_third" }), harness().opts);
+    const wf = res.items.filter((i) => i.source === "workflow");
+    assert.deepEqual(wf.map((i) => i.id), [`${A}_gate`]);
+    assert.equal(wf[0]!.title, "Launch — Approve copy");
+    assert.match(wf[0]!.detail ?? "", /Launch/);
+    assert.equal(wf[0]!.requestedBy, "u_owner");
+    assert.deepEqual(wf[0]!.approve?.url, `/api/autopilot/items/${A}_gate/approve`);
+    assert.ok(wf[0]!.href.includes(`run=${A}_wr`));
+  });
+
+  it("viewers see them but can't decide", async () => {
+    const res = await loadInbox(viewer("viewer"), harness().opts);
+    for (const i of res.items.filter((x) => x.source === "autopilot" || x.source === "workflow")) {
+      assert.equal(i.canDecide, false);
+      assert.equal(i.approve, null);
+    }
+    assert.ok(res.items.some((i) => i.source === "workflow"));
   });
 });

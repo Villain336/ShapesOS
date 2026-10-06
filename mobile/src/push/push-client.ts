@@ -7,12 +7,30 @@
 //   DELETE /api/mobile/push-devices { token }               → { removed }
 // The server only ever touches the signed-in user's own devices.
 
-export type PushKind = "approval_needed" | "approval_decided" | "run_failed";
+export type PushKind =
+  | "approval_needed"
+  | "approval_decided"
+  | "run_failed"
+  // Phase 18.3 (WS=trust): the 18.2 and 18.3 kinds are pushable too.
+  | "mention"
+  | "direct_message"
+  | "reminder_due"
+  | "run_finished"
+  | "invoice_paid"
+  | "ticket_assigned"
+  | "meeting_starting";
 
 export const PUSH_KIND_LABELS: Record<PushKind, string> = {
   approval_needed: "Approvals that need you",
   approval_decided: "Your requests approved or denied",
   run_failed: "Failed agent runs",
+  mention: "Mentions of you",
+  direct_message: "Direct messages",
+  reminder_due: "Reminders due",
+  run_finished: "Agent runs finished",
+  invoice_paid: "Invoices paid",
+  ticket_assigned: "Tickets assigned to you",
+  meeting_starting: "Meetings starting",
 };
 
 export interface PushDevice {
@@ -79,13 +97,17 @@ export function removePushDevice(opts: PushClientOptions, token: string) {
   return call<{ removed: number }>(opts, "DELETE", { token });
 }
 
-/** The app tab a notification's dashboard link opens. */
-export type AppTab = "chat" | "approvals" | "missions" | "settings";
+/**
+ * The app tab a notification's dashboard link opens. Phase 18.3: Missions
+ * moved under Apps, and every other notification opens the Notifications tab.
+ */
+export type AppTab = "chat" | "approvals" | "notifications" | "apps" | "settings";
 
 export function tabForPushData(data: unknown): AppTab | null {
   const d = (data ?? {}) as { href?: unknown; kind?: unknown };
   const href = typeof d.href === "string" ? d.href : "";
   if (d.kind === "approval_needed" || d.kind === "approval_decided" || href.startsWith("/dashboard/approvals")) return "approvals";
-  if (d.kind === "run_failed" || href.startsWith("/dashboard/runs") || href.startsWith("/dashboard/missions")) return "missions";
+  if (d.kind === "run_failed" || d.kind === "run_finished" || href.startsWith("/dashboard/runs") || href.startsWith("/dashboard/missions")) return "apps";
+  if (typeof d.kind === "string" && d.kind) return "notifications";
   return null;
 }

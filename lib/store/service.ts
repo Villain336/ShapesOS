@@ -231,6 +231,15 @@ export async function loadStoreCatalogue(actor: StoreActor): Promise<StoreCatalo
       }),
     ),
   );
+  // Phase 18.3 (WS=trust): show when agents may not use a connector's app.
+  const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");
+  const { connectorGroup } = await import("@/lib/agents/grants");
+  const blocked = new Set<string>(await getAgentBlockedGroups(ws));
+  for (const item of items) {
+    if (item.kind !== "connector") continue;
+    const group = connectorGroup(item.key);
+    item.agentAccess = { group, blocked: blocked.has(group) };
+  }
   return { items: sortCatalogue(items), unavailable };
 }
 

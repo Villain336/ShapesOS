@@ -16,7 +16,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { AppWindow, Blocks, Check, ExternalLink, Package, Plug, Search, Server, Sparkles, Target } from "lucide-react";
+import { AppWindow, Blocks, Check, ExternalLink, Lock, Package, Plug, Search, Server, Sparkles, Target } from "lucide-react";
 import type { WorkspaceRole } from "@prisma/client";
 import { aosButton, FilterPill, NeutralBadge } from "@/components/aos";
 import { Segmented } from "@/components/aos/Controls";
@@ -377,6 +377,18 @@ function ItemDetail({
         <NeutralBadge size="sm" label={t(`storeApp.states.${item.state}` as MessageKey)} />
       </div>
       {item.description ? <p className="text-md text-ink">{item.description}</p> : null}
+      {/* Phase 18.3 (WS=trust): agent app access for this connector's app. */}
+      {item.agentAccess?.blocked ? (
+        <p className="flex items-center gap-2 rounded-md bg-canvas px-3 py-2 text-sm text-ink" data-agent-blocked={item.agentAccess.group}>
+          <Lock className="size-4 shrink-0" aria-hidden />
+          <span>
+            {t("trust.apps.blockedNote")} ·{" "}
+            <Link href="/dashboard/settings/security-center/apps" className="font-semibold underline underline-offset-2">
+              {t(`trust.apps.groups.${item.agentAccess.group}.label` as MessageKey)}
+            </Link>
+          </span>
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         {item.install.mode === "link" ? (

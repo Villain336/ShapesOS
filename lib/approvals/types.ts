@@ -22,6 +22,9 @@ export const INBOX_SOURCES = [
   "media",
   "mail",
   "social",
+  // Phase 18.3 (WS=trust): the 16th and 17th sources — one approvals queue.
+  "autopilot",
+  "workflow",
 ] as const;
 
 export type InboxSourceKey = (typeof INBOX_SOURCES)[number];
@@ -43,6 +46,9 @@ export const INBOX_SOURCE_LABELS: Record<InboxSourceKey, string> = {
   media: "Media buy",
   mail: "Direct mail",
   social: "Social post",
+  // Phase 18.3 (WS=trust)
+  autopilot: "Autopilot",
+  workflow: "Workflow",
 };
 
 export function isInboxSource(value: unknown): value is InboxSourceKey {
