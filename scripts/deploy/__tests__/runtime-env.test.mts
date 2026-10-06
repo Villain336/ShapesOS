@@ -99,12 +99,12 @@ describe("with-runtime-env.sh", () => {
   const SCRIPT = join(process.cwd(), "scripts/deploy/with-runtime-env.sh");
   const run = (env: Record<string, string>, args: string[]) =>
     // A deliberately minimal environment (cast: the repo's ProcessEnv type requires NODE_ENV).
-    spawnSync("sh", [SCRIPT, ...args], { encoding: "utf8", env: { PATH: process.env.PATH ?? "", ...env } as unknown as NodeJS.ProcessEnv });
+    spawnSync("sh", [SCRIPT, ...args], { encoding: "utf8", env: { PATH: process.env["PATH"] ?? "" /* the OS search path, not app config */, ...env } as unknown as NodeJS.ProcessEnv });
 
   it("exports the composed URL and blob values, then exec's the command", () => {
     const r = run(
       { ...PARTS, SHAPESOS_ENV_JSON_SHARED: JSON.stringify({ PEM: "-----BEGIN-----\nabc\n-----END-----" }) },
-      ["node", "-e", "process.stdout.write(JSON.stringify({u: process.env.DATABASE_URL, p: process.env.PEM}))"],
+      ["node", "-e", "process.stdout.write(JSON.stringify({u: process.env.DATABASE_URL, p: process.env['PEM']}))"],
     );
     assert.equal(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
