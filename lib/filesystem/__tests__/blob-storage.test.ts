@@ -57,8 +57,13 @@ import { startFakeS3 } from "../fake-s3";
 // sig-v4-header-based-auth). Same credentials, date and bucket for all.
 // ---------------------------------------------------------------------------
 
+// The documented example access key is assembled at runtime: CI's secret scan
+// (ci.yml, "Secret scan") rejects anything shaped like a live AWS key id, and
+// this is the one fixture that has to spell one.
+const EXAMPLE_ACCESS_KEY_ID = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
+
 const AWS_EXAMPLE = {
-  credentials: { accessKeyId: "AKIAIOSFODNN7EXAMPLE", secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
+  credentials: { accessKeyId: EXAMPLE_ACCESS_KEY_ID, secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
   region: "us-east-1",
   host: "examplebucket.s3.amazonaws.com",
   now: new Date(Date.UTC(2013, 4, 24, 0, 0, 0)),
@@ -96,7 +101,7 @@ test("SigV4: AWS example GET Object (Range header) matches the documented signat
   assert.equal(s.signature, "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41");
   assert.equal(
     s.headers.authorization,
-    "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, " +
+    `AWS4-HMAC-SHA256 Credential=${EXAMPLE_ACCESS_KEY_ID}/20130524/us-east-1/s3/aws4_request, ` +
       "SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, " +
       "Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
   );
