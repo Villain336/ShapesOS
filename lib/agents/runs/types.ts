@@ -5,7 +5,7 @@
 
 /** Agent run kinds (spec §4). "follow_up" = follow-up run linked to a thread;
  *  "chat" (Phase 5) = one assistant / task turn by the lead or a sub-agent. */
-export type AgentRunKind = "mission" | "playbook" | "browser" | "follow_up" | "chat";
+export type AgentRunKind = "mission" | "playbook" | "browser" | "follow_up" | "chat" | "cursor"; // Phase 19A: + cursor
 
 /**
  * Run lifecycle status. Terminal: succeeded | failed | cancelled.
