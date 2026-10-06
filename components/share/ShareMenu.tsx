@@ -32,7 +32,7 @@ import {
 } from "@/components/aos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { useOptionalChat } from "@/components/chat/ChatContext";
-import { pickTaskProject } from "@/components/command-bar/lib";
+import { pickTaskProject } from "@/lib/aos/composer";
 import { toast, toastError } from "@/lib/ui/feedback";
 import {
   absoluteLink,

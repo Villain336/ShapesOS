@@ -123,13 +123,13 @@ describe("VAPID (RFC 8292)", () => {
 
   it("reads keys from env: off with a reason when missing or mismatched, on when valid", () => {
     const keys = generateVapidKeys();
-    assert.deepEqual(vapidConfigFromEnv({}), { configured: false, reason: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not set." });
-    const bad = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "ops" });
+    assert.deepEqual(vapidConfigFromEnv({} as NodeJS.ProcessEnv), { configured: false, reason: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not set." });
+    const bad = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "ops" } as unknown as NodeJS.ProcessEnv);
     assert.equal(bad.configured, false);
-    const mismatch = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: generateVapidKeys().publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "mailto:o@x.test" });
+    const mismatch = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: generateVapidKeys().publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "mailto:o@x.test" } as unknown as NodeJS.ProcessEnv);
     assert.equal(mismatch.configured, false);
     assert.match((mismatch as { reason: string }).reason, /does not match/);
-    const ok = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "https://shapes.example" });
+    const ok = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "https://shapes.example" } as unknown as NodeJS.ProcessEnv);
     assert.equal(ok.configured, true);
   });
 });

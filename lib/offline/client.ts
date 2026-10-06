@@ -97,11 +97,13 @@ export function replayAppQueue(): Promise<ReplayReport | null> {
     announce(store);
     return report;
   };
-  const locks = (navigator as Navigator & { locks?: { request<T>(name: string, cb: () => Promise<T>): Promise<T> } }).locks;
-  replaying = (locks ? locks.request("shapes-offline-replay", run) : run()).finally(() => {
+  // One tab at a time (the Web Locks API resolves with the callback's own result).
+  const locks = (navigator as { locks?: { request(name: string, cb: () => unknown): Promise<unknown> } }).locks;
+  const p: Promise<ReplayReport | null> = (locks ? (locks.request("shapes-offline-replay", run) as Promise<ReplayReport | null>) : run()).finally(() => {
     replaying = null;
   });
-  return replaying;
+  replaying = p;
+  return p;
 }
 
 /** A different person on this browser: their predecessor's queue is dropped, never replayed. */

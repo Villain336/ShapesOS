@@ -192,7 +192,7 @@ export interface WebPushDeps {
 }
 
 const defaultFetch: FetchLike = async (url, init) => {
-  const res = await fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: init.signal, redirect: "manual" });
+  const res = await fetch(url, { method: init.method, headers: init.headers, body: init.body as unknown as BodyInit, signal: init.signal, redirect: "manual" });
   return { status: res.status, text: () => res.text() };
 };
 

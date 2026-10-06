@@ -126,6 +126,7 @@ import { localizeNavGroups, localizeNavItem } from "@/lib/nav/i18n";
 import { NAV_GROUPS, NAV_SYSTEM_ACTIONS } from "@/lib/nav/config";
 // Phase 18.3 (WS=flow): ⌘K "Share" opens the share sheet dialog (components/share).
 import { openShareSheet } from "@/components/share/ShareMenu";
+import type { RecordKind } from "@/lib/search/kinds";
 import type { Translator } from "@/lib/i18n";
 
 // Budgets from docs/specs/SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
@@ -782,7 +783,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
           const r = item.record;
           if (!r) break;
           close();
-          openShareSheet({ kind: r.kind, id: r.id, title: r.title, href: r.href, snippet: r.snippet ?? null });
+          openShareSheet({ kind: r.kind as RecordKind, id: r.id, title: r.title, href: r.href, snippet: r.snippet ?? null });
           break;
         }
         case "record-ask": {

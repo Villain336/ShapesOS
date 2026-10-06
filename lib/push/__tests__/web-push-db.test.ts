@@ -33,7 +33,7 @@ const RUN = randomUUID().slice(0, 8);
 const ANA = `p183push-ana-${RUN}`;
 const BEN = `p183push-ben-${RUN}`;
 const KEYS = generateVapidKeys();
-const ENV = { VAPID_PUBLIC_KEY: KEYS.publicKey, VAPID_PRIVATE_KEY: KEYS.privateKey, VAPID_SUBJECT: "mailto:ops@example.test" } as NodeJS.ProcessEnv;
+const ENV = { VAPID_PUBLIC_KEY: KEYS.publicKey, VAPID_PRIVATE_KEY: KEYS.privateKey, VAPID_SUBJECT: "mailto:ops@example.test" } as unknown as NodeJS.ProcessEnv;
 
 function browser() {
   const ecdh = createECDH("prime256v1");
@@ -99,7 +99,7 @@ describe("Web Push (DB)", () => {
 
   it("without VAPID keys nothing is sent and it says why", async () => {
     const stub = stubPushService(() => 201);
-    const r = await sendWebPush(ANA, { title: "Hi" }, { env: {}, fetchImpl: stub.fetchImpl });
+    const r = await sendWebPush(ANA, { title: "Hi" }, { env: {} as NodeJS.ProcessEnv, fetchImpl: stub.fetchImpl });
     assert.equal(r.skipped, "not_configured");
     assert.match(r.reason ?? "", /VAPID_PUBLIC_KEY/);
     assert.equal(stub.calls.length, 0);
