@@ -86,6 +86,7 @@ export const es: Catalogue = {
       // Phase 18.2 (WS=comms)
       "/dashboard/mail": { label: "Correo", description: "Una bandeja: correo, conversaciones con leads, mensajes sociales" },
       "/dashboard/messages": { label: "Mensajes", description: "Canales del equipo, mensajes directos y tus agentes" },
+      "/dashboard/meet": { label: "Reuniones", description: "Videollamadas, con notas del agente de reuniones" },
       "/dashboard/calendar": { label: "Calendario", description: "Tus calendarios, reservas y eventos" },
       "/dashboard/contacts": { label: "Contactos", description: "Una libreta de direcciones para todas las personas que conoces" },
       "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },

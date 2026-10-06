@@ -25,5 +25,5 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const me = await getMembership(user.id, workspace.id);
   if (!me) redirect("/dashboard");
   const sp = await searchParams;
-  return <MessagesApp userId={user.id} role={me.role} initialChannel={id(sp.c)} initialThread={id(sp.c) ? id(sp.t) : null} callsEnabled={false} />;
+  return <MessagesApp userId={user.id} role={me.role} initialChannel={id(sp.c)} initialThread={id(sp.c) ? id(sp.t) : null} callsEnabled />;
 }

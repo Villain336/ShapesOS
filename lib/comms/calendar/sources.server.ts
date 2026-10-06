@@ -212,7 +212,10 @@ export async function loadCalendarEvents(ctx: CalendarCtx, from: Date, to: Date,
         : [],
       want.has("meeting")
         ? tx.meetingSession.findMany({
-            where: { workspaceId: ws, startedAt: { gte: from, lt: to } },
+            // Meet: a call started in a channel shows only for the person who
+            // started it (a private channel's call title never leaks here);
+            // other meetings are the workspace's.
+            where: { workspaceId: ws, startedAt: { gte: from, lt: to }, OR: [{ startedBy: ctx.userId }, { origin: { not: "channel" } }] },
             orderBy: { startedAt: "asc" },
             take: 200,
             select: { id: true, title: true, startedAt: true, endedAt: true },

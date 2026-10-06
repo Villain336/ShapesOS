@@ -39,6 +39,7 @@ import {
   MessageSquare,
   MessagesSquare,
   MessageSquareText, // Phase 18.2 (comms): Messages
+  Video, // Phase 18.2 (comms): Meet
   Mic,
   Network,
   Paintbrush,
@@ -110,6 +111,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // Phase 18.2 (WS=comms): the everyday communication apps.
       { href: "/dashboard/mail", label: "Mail", icon: Mail, description: "One inbox: mail, lead conversations, social DMs", keywords: "email inbox gmail outlook messages dms compose reply unread" },
       { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText, description: "Team channels, direct messages and your agents", keywords: "chat channels dm direct message threads team slack mention agents", badge: "unread-messages" },
+      { href: "/dashboard/meet", label: "Meet", icon: Video, description: "Video calls, with notes from the meeting agent", keywords: "video call meeting conference room livekit transcript notes action items zoom" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, description: "Your calendars, bookings and events", keywords: "schedule agenda meetings events google outlook ics find time availability" },
       { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, description: "One address book for everyone you know", keywords: "people address book person contact cards duplicates merge leads network investors" },
       { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },

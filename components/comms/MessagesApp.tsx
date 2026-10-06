@@ -721,6 +721,12 @@ function MessageItem({
         ) : (
           <Body text={m.body} targets={targets} me={me} />
         )}
+        {m.call ? (
+          <Link href={`/dashboard/meet?m=${encodeURIComponent(m.call.meetingId)}`} className={aosButton({ variant: "secondary", size: "xs", className: "mt-1.5 self-start" })}>
+            <Video className="size-3.5" aria-hidden />
+            {t("comms.messages.joinCall")}
+          </Link>
+        ) : null}
         {m.meta ? <AgentBlock m={m} me={me} canEdit={canEdit} isAdmin={isAdmin} people={people} onChanged={onChanged} /> : null}
         {confirmRemove ? (
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink">

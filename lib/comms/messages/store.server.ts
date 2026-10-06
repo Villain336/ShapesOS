@@ -418,6 +418,8 @@ export interface MessageView {
   body: string;
   mentions: string[];
   meta: AgentMeta | null;
+  /** Meet: "Started a call" messages carry the meeting to join. */
+  call: { meetingId: string; title: string } | null;
   removed: boolean;
   createdAt: string;
   editedAt: string | null;
@@ -434,6 +436,8 @@ export function asAgentMeta(meta: unknown): AgentMeta | null {
 
 export function messageView(m: MessageRow, replies?: { count: number; last: Date | null }): MessageView {
   const removed = (m.meta as { removed?: boolean } | null)?.removed === true;
+  const callMeta = m.meta as { kind?: string; meetingId?: unknown; title?: unknown } | null;
+  const call = !removed && callMeta?.kind === "meeting" && typeof callMeta.meetingId === "string" ? { meetingId: callMeta.meetingId, title: String(callMeta.title ?? "Meeting") } : null;
   return {
     id: m.id,
     channelId: m.channelId,
@@ -445,6 +449,7 @@ export function messageView(m: MessageRow, replies?: { count: number; last: Date
     body: removed ? "" : m.body,
     mentions: m.mentions,
     meta: removed ? null : asAgentMeta(m.meta),
+    call,
     removed,
     createdAt: m.createdAt.toISOString(),
     editedAt: m.editedAt ? m.editedAt.toISOString() : null,

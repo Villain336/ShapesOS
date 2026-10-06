@@ -90,6 +90,7 @@ export const en = {
       // Phase 18.2 (WS=comms)
       "/dashboard/mail": { label: "Mail", description: "One inbox: mail, lead conversations, social DMs" },
       "/dashboard/messages": { label: "Messages", description: "Team channels, direct messages and your agents" },
+      "/dashboard/meet": { label: "Meet", description: "Video calls, with notes from the meeting agent" },
       "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
       "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
