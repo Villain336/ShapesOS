@@ -70,7 +70,14 @@ export interface OpsListQuery {
 
 export type OpsWriteResult =
   /** Phase 14: autoApproved = a rule approved the gated write (names the rule). */
-  | { outcome: "done"; row: Record<string, unknown>; action: string; autoApproved?: string }
+  | {
+      outcome: "done";
+      row: Record<string, unknown>;
+      action: string;
+      autoApproved?: string;
+      /** Phase 18.3 (WS=flow): a free update's changed fields, as they were (for undo). */
+      before?: Record<string, unknown>;
+    }
   | {
       outcome: "approval_required";
       approval: OpsGateProposal;
@@ -615,12 +622,16 @@ export async function opsPatch(
     return { outcome: "done", row, action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
-  const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
+  const prepared = await preparePatch(tx, def, actor, patch, existing);
+  const row = await applyPatch(tx, def, actor, id, prepared, existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   // Phase 11 (conncore): outbound webhook events (invoice sent/paid, deal
   // moved/won/lost, ticket solved…) in this transaction.
   await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row, actor.userId);
-  return { outcome: "done", row, action: "update" };
+  // Phase 18.3 (WS=flow): the prior values of exactly the fields this update changed.
+  const before: Record<string, unknown> = {};
+  for (const k of Object.keys(patch)) if (k !== "id") before[k] = existing[k] instanceof Date ? (existing[k] as Date).toISOString() : (existing[k] ?? null);
+  return { outcome: "done", row, action: "update", before };
 }
 
 /** Phase 10 (finance): run the entity's prepare hook on a validated patch. */

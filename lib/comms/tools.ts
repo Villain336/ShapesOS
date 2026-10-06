@@ -104,7 +104,12 @@ const create_reminder: ToolDef = {
         sourceRef: str(args.sourceRef) ?? null,
       }),
     );
-    return { summary: `Reminder added: "${r.title}"${r.dueAt ? ` (due ${r.dueAt})` : ""}`, details: { reminder: r, href: `/dashboard/reminders?reminder=${r.id}` } };
+    return {
+      summary: `Reminder added: "${r.title}"${r.dueAt ? ` (due ${r.dueAt})` : ""}`,
+      details: { reminder: r, href: `/dashboard/reminders?reminder=${r.id}` },
+      // Phase 18.3 (WS=flow): for "Undo this agent run".
+      touched: [{ kind: "reminder", id: r.id, op: "create" }],
+    };
   },
 };
 

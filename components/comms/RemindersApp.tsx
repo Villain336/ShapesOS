@@ -11,6 +11,8 @@ import { AlarmClock, Check, Loader2, Plus, Repeat, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { aosButton } from "@/components/aos/button";
 import { cn } from "@/lib/utils";
+import { sendSafeWrite } from "@/lib/offline/client";
+import { toast } from "@/lib/ui/feedback";
 import { dueGroup, isoToWall, wallToIso } from "@/lib/comms/time";
 import { Card, Chip, EmptyState, ErrorLine, iconBtnCls, inputCls, labelCls, PageHeader } from "./ui";
 
@@ -80,12 +82,11 @@ export function RemindersApp({ highlightId }: { highlightId?: string | null }) {
     setError(null);
     try {
       const dueAt = due ? wallToIso(due, tz) : null;
-      const res = await fetch("/api/comms/reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), dueAt, repeat: repeat || null }),
-      });
-      if (!res.ok) throw new Error(await readError(res));
+      // Phase 18.3 (WS=flow): offline, the reminder is queued with a client id
+      // and sent once when the connection returns (lib/offline/queue.ts).
+      const out = await sendSafeWrite("reminder_create", { title: title.trim(), dueAt, repeat: repeat || null });
+      if (out.status === "error") throw new Error(out.error);
+      if (out.status === "queued") toast({ title: t("flow.offline.queuedReminder") });
       setTitle("");
       setDue("");
       setRepeat("");

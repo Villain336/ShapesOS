@@ -269,6 +269,11 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
                             </button>
                           ) : row.live ? (
                             <span className="text-xs text-muted">{t(`activityApp.stopReasons.${row.stop.reason}` as MessageKey)}</span>
+                          ) : row.type === "run" && depth === 0 && row.href ? (
+                            // Phase 18.3 (WS=flow): a finished run can be undone from its page.
+                            <Link href={`${row.href}#undo`} className={aosButton({ variant: "quiet", size: "xs" })}>
+                              {t("flow.undo.linkFromMonitor")}
+                            </Link>
                           ) : null}
                         </td>
                       </tr>

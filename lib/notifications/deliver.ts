@@ -13,6 +13,10 @@
 
 import { filterByNotificationPrefs } from "@/lib/preferences";
 import { queuePushForNotifications } from "@/lib/push/notify";
+// Phase 18.3 integration: WS=flow's real Web Push sender (VAPID + aes128gcm,
+// push_subscriptions) — the typed stub WS=trust left is gone. Static import so
+// a test that mocks lib/push/web reaches it (Node 22.23 mock.module rule).
+import { sendWebPush } from "@/lib/push/web";
 import type { NotificationInput } from "./store";
 
 export interface DeliverDeps {
@@ -44,10 +48,8 @@ export async function deliverNow(inputs: readonly NotificationInput[], deps: Del
   if (webPushable.length) {
     const send =
       deps.webPush ??
-      (async (userId: string, n: NotificationInput) => {
-        const { sendWebPush } = await import("@/lib/push/web");
-        return sendWebPush(userId, { kind: n.kind, title: n.title, body: n.body ?? null, href: n.href ?? null, tag: n.dedupKey ?? null });
-      });
+      ((userId: string, n: NotificationInput) =>
+        sendWebPush(userId, { kind: n.kind, title: n.title, body: n.body ?? null, href: n.href ?? null, tag: n.dedupKey ?? null }));
     for (const n of webPushable) track(send(n.userId, n));
   }
   if (slackable.length) {

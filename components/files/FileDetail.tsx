@@ -17,6 +17,7 @@ import { defaultFileRole, fileCan, type FileRole } from "@/lib/files/acl";
 import type { MessageKey } from "@/lib/i18n";
 import { FilePreview } from "./FilePreview";
 import { fmtBytes } from "./format";
+import { ShareMenu } from "@/components/share/ShareMenu";
 
 export { fmtBytes };
 import type { NewPdfAnnotation, PdfAnnotation } from "./PdfViewer";
@@ -262,6 +263,8 @@ export function FileDetail({ workspaceId, fileId, onClose, onChanged }: { worksp
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {/* Phase 18.3 (WS=flow): the share sheet (Send to… / Open with). */}
+              {file ? <ShareMenu record={{ kind: "file", id: file.id, title: file.filename, href: `/dashboard/files?file=${encodeURIComponent(file.id)}` }} role={role === "viewer" ? "viewer" : "editor"} workspaceId={workspaceId} /> : null}
               {file ? (
                 <a href={`${base}/versions/${file.version}?workspaceId=${ws}&download=1`} className={aosButton({ variant: "secondary", size: "xs" })}>
                   <Download className="size-3.5" aria-hidden />

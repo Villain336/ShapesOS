@@ -9,6 +9,8 @@ import { commsEs } from "./comms.es";
 import { contentEs } from "./content.es";
 // Phase 18.3 (WS=trust)
 import { trustEs } from "./trust.es";
+// Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
+import { flowEs } from "./flow.es";
 
 export const es: Catalogue = {
   common: {
@@ -120,6 +122,9 @@ export const es: Catalogue = {
       "/dashboard/activity": { label: "Monitor de actividad", description: "Cada ejecución, tarea y entorno aislado: coste, tiempo, Detener" },
       "/dashboard/terminal": { label: "Consola", description: "Una consola en un entorno aislado del espacio de trabajo" },
       "/dashboard/store": { label: "Tienda", description: "Instala apps, habilidades, plantillas y conectores" },
+      // Phase 18.3 (WS=flow)
+      "/dashboard/automations": { label: "Automatizaciones", description: "Todas las programaciones, flujos y reglas en una lista" },
+      "/dashboard/time-machine": { label: "Máquina del tiempo", description: "Instantáneas, versiones y deshacer una ejecución" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
@@ -979,4 +984,6 @@ export const es: Catalogue = {
 
   // Phase 18.3 (WS=trust): Ajustes → Tú (Teclado, Privacidad), el centro de privacidad y seguridad, Notificaciones 2.0.
   trust: trustEs,
+  // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
+  flow: flowEs,
 };

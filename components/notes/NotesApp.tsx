@@ -25,6 +25,7 @@ import { VoiceNoteButton } from "./VoiceNoteButton";
 import type { CollabConfig, CollabStatus } from "./NoteEditor";
 import { recordHref } from "@/lib/notes/links";
 import { NOTES_CHANGED_EVENT, notifyNotesChanged } from "./events";
+import { ShareMenu } from "@/components/share/ShareMenu";
 
 const NoteEditor = dynamic(() => import("./NoteEditor"), { ssr: false });
 
@@ -498,6 +499,8 @@ function NotePane({
             <History className="size-3.5" aria-hidden />
             {t("notes.history")}
           </button>
+          {/* Phase 18.3 (WS=flow): the share sheet (Send to… / Open with). */}
+          <ShareMenu record={{ kind: "note", id: note.id, title: note.title || t("notes.untitled"), href: `/dashboard/notes?note=${encodeURIComponent(note.id)}` }} role={note.canEdit ? "editor" : "viewer"} />
           {note.canDelete ? (
             <button type="button" onClick={() => void remove()} className={aosButton({ variant: "deny", size: "xs" })}>
               <Trash2 className="size-3.5" aria-hidden />

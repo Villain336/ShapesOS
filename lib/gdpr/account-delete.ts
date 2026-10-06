@@ -164,12 +164,14 @@ export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] =
 ];
 
 /**
- * Phase 18.3 (WS=trust): per-person rows in FORCE-RLS tables keyed on the
- * person GUC alone (no workspace): deleted once the subject is the GUC.
+ * Phase 18.3: per-person rows in FORCE-RLS tables keyed on the person GUC
+ * alone (no workspace): deleted once the subject is the GUC.
  */
 export const PERSONAL_USER_RLS_TABLES: readonly { table: string; column: string }[] = [
-  // The session registry (lib/auth/sessions.ts): every sign-in of the person.
+  // WS=trust — the session registry (lib/auth/sessions.ts): every sign-in of the person.
   { table: "user_sessions", column: "user_id" },
+  // WS=flow — Web Push subscriptions (lib/push/web.ts).
+  { table: "push_subscriptions", column: "user_id" },
 ];
 
 /**
@@ -317,7 +319,8 @@ export async function deleteAccount(opts: {
       }
       // Phase 18.1: owner-only tables answer only to their member (app.user_id).
       await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
-      // Phase 18.3: person-only RLS tables (the session registry).
+      // Phase 18.3: person-only FORCE-RLS tables (no workspace): the session
+      // registry and Web Push subscriptions, deleted once with the person GUC set.
       for (const p of PERSONAL_USER_RLS_TABLES) {
         if (!catalog.has(p.table)) continue;
         personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);

@@ -13,6 +13,8 @@ import { commsEn } from "./comms.en";
 import { contentEn } from "./content.en";
 // Phase 18.3 (WS=trust): system services strings live in their own file.
 import { trustEn } from "./trust.en";
+// Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
+import { flowEn } from "./flow.en";
 
 export const en = {
   common: {
@@ -124,6 +126,9 @@ export const en = {
       "/dashboard/activity": { label: "Activity monitor", description: "Every run, job and sandbox: cost, time, Stop" },
       "/dashboard/terminal": { label: "Terminal", description: "A shell on a workspace sandbox" },
       "/dashboard/store": { label: "Store", description: "Install apps, skills, templates and connectors" },
+      // Phase 18.3 (WS=flow)
+      "/dashboard/automations": { label: "Automations", description: "Every schedule, workflow and rule in one list" },
+      "/dashboard/time-machine": { label: "Time machine", description: "Snapshots, versions and undoing an agent run" },
       // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
       "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
       "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },
@@ -991,6 +996,8 @@ export const en = {
 
   // Phase 18.3 (WS=trust): Settings → You (Keyboard, Privacy), the Privacy & Security center, Notifications 2.0.
   trust: trustEn,
+  // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
+  flow: flowEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

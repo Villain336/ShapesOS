@@ -108,6 +108,24 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
     },
   ],
   action: [
+    // Phase 18.3 (WS=flow): any agent tool, through the SAME gate as chat
+    // (lib/chat/tool-exec.ts executeTool, confirmed=false): read-only tools
+    // run; Tier 0–2 writes run only when an auto-approve rule covers them;
+    // Tier 3 (money, deleting) and destructive tools never run here — the
+    // step stops and says so (a workflow has no chat to say "yes" in).
+    {
+      type: "run_agent_tool",
+      label: "Run an agent tool",
+      description:
+        "Run any agent tool with its approval tier, exactly as in chat: read-only tools run; writes run only when an auto-approve rule covers them; money and deleting never run here.",
+      icon: "Rocket",
+      defaultLabel: "Run agent tool",
+      defaultConfig: { tool: "", args: "{}" },
+      fields: [
+        { key: "tool", label: "Tool name", type: "text", placeholder: "search_workspace", required: true, hint: "Any agent tool (Automations → Actions lists them with their tiers)." },
+        { key: "args", label: "Arguments (JSON)", type: "textarea", placeholder: '{"query": "open tickets"}' },
+      ],
+    },
     {
       type: "generate_draft",
       label: "Generate content draft",

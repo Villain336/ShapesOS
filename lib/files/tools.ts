@@ -67,6 +67,8 @@ export const share_file_link: ToolDef = {
       return {
         summary: `Share link (${res.link.access === "download" ? "view and download" : "view only"}, until ${res.link.expiresAt?.slice(0, 10)}${res.link.hasPassword ? ", password-protected" : ""}): ${origin}${res.path}`,
         details: { link: res.link, url: `${origin}${res.path}` },
+        // Phase 18.3 (WS=flow): for "Undo this agent run" (revokes the link).
+        touched: [{ kind: "file_share", id: res.link.id, fileId: id, op: "share" }],
       };
     } catch (err) {
       return { summary: `Couldn't create the link: ${err instanceof Error ? err.message : String(err)}` };

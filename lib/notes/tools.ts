@@ -103,6 +103,7 @@ export const create_note: ToolDef = {
       return {
         summary: `Saved the note "${note.title}"${note.links.length ? ` (linked to ${note.links.length} record${note.links.length === 1 ? "" : "s"})` : ""}: /dashboard/notes?note=${note.id}`,
         details: { note: { id: note.id, title: note.title, href: `/dashboard/notes?note=${note.id}`, shareState: note.shareState, links: note.links } },
+        touched: [{ kind: "note", id: note.id, op: "create" }],
       };
     } catch (err) {
       return { summary: `Could not save the note: ${err instanceof Error ? err.message : String(err)}` };

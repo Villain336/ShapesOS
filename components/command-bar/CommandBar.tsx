@@ -61,6 +61,7 @@ import {
   Plus,
   ReceiptText,
   Rocket,
+  Share2, // Phase 18.3 (WS=flow): Share
   Scale,
   Search,
   Sparkles,
@@ -123,6 +124,9 @@ import {
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { localizeNavGroups, localizeNavItem } from "@/lib/nav/i18n";
 import { NAV_GROUPS, NAV_SYSTEM_ACTIONS } from "@/lib/nav/config";
+// Phase 18.3 (WS=flow): ⌘K "Share" opens the share sheet dialog (components/share).
+import { openShareSheet } from "@/components/share/ShareMenu";
+import type { RecordKind } from "@/lib/search/kinds";
 import type { Translator } from "@/lib/i18n";
 
 // Budgets from docs/specs/SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
@@ -525,6 +529,8 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       const recordItems: UICommand[] = [
         { id: `open:${r.kind}:${r.id}`, section: "do", title: t("commandBar.spotlight.openRecord"), subtitle: r.title, action: "go", href: r.href, icon: ArrowRight },
         { id: `ask-about:${r.kind}:${r.id}`, section: "do", title: t("commandBar.spotlight.askAbout"), subtitle: r.title, hotkey: "⌘↵", action: "record-ask", record: r, icon: Sparkles },
+        // Phase 18.3 (WS=flow): the share sheet, next to Open / Ask / Act.
+        { id: `share:${r.kind}:${r.id}`, section: "do", title: t("flow.share.button"), subtitle: r.title, action: "record-share", record: r, icon: Share2 },
         ...(r.actions ?? []).map<UICommand>((a) => ({
           id: `act:${r.kind}:${r.id}:${a.id}`,
           section: "ask",
@@ -773,6 +779,13 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         case "record-actions":
           if (item.record) openRecordPage(item.record);
           break;
+        case "record-share": {
+          const r = item.record;
+          if (!r) break;
+          close();
+          openShareSheet({ kind: r.kind as RecordKind, id: r.id, title: r.title, href: r.href, snippet: r.snippet ?? null });
+          break;
+        }
         case "record-ask": {
           const r = item.record;
           if (!r) break;

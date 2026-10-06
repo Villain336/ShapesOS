@@ -62,7 +62,9 @@ export interface CommandItem {
     | "record-actions"
     /** Phase 18.1: hand the record to the lead agent with a question / an action. */
     | "record-ask"
-    | "record-act";
+    | "record-act"
+    /** Phase 18.3 (WS=flow): open the share sheet for the record (Send to… / Open with). */
+    | "record-share";
   href?: string;
   templateId?: string;
   goal?: string;

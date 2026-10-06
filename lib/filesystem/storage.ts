@@ -535,6 +535,8 @@ export const BLOB_NAMESPACES = {
   corpus: { localDir: () => envDir("CORPUS_DIR") ?? cwdJoin("data", "corpus"), workspaceScoped: false },
   /** Smoke tests and health probes. */
   system: { localDir: () => join(localBlobRoot(), "system"), workspaceScoped: false },
+  /** Phase 18.3 (WS=flow): Time Machine workspace snapshots: <workspaceId>/<snapshotId>.json.gz. */
+  snapshots: { localDir: () => envDir("SNAPSHOT_STORAGE_DIR") ?? join(localBlobRoot(), "snapshots"), workspaceScoped: true },
 } as const satisfies Record<string, { localDir: () => string; workspaceScoped: boolean }>;
 
 export type BlobNamespace = keyof typeof BLOB_NAMESPACES;
