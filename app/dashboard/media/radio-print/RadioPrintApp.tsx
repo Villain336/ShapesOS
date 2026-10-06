@@ -200,7 +200,7 @@ export function RadioPrintApp() {
                 <input value={r.market} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, market: e.target.value } : o)))} placeholder="Market" className={inputCls} />
                 <input value={r.callSign} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, callSign: e.target.value } : o)))} placeholder="WXYZ" className={`${inputCls} w-20`} />
                 <input value={r.daypartMix} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, daypartMix: e.target.value } : o)))} placeholder="Dayparts" className={inputCls} />
-                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
               </div>
             ))}
             <button onClick={() => setInventory((x) => [...x, { name: "", market: "", callSign: "", daypartMix: "", placement: "" }])} className="mt-1 text-xs text-muted underline">+ inventory</button>
@@ -221,7 +221,7 @@ export function RadioPrintApp() {
               <div key={i} className="mt-1 rounded-md border border-line p-2">
                 <div className="flex gap-1">
                   <input value={d.description} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, description: e.target.value } : o)))} placeholder="30s drive-time spots (400×)" className={inputCls} />
-                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
                 </div>
                 <div className="mt-1 grid grid-cols-3 gap-1">
                   <div><label className="block text-[0.6875rem] text-muted">Qty</label><input type="number" value={d.quantity} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, quantity: Number(e.target.value) } : o)))} className={inputCls} /></div>

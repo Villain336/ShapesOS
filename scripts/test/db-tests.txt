@@ -204,3 +204,5 @@ lib/metering/__tests__/ai-health-db.test.ts
 scripts/eval/__tests__/eval-dry-run-db.test.ts
 # Phase 18.1 (find): per-user preferences — defaults, one-key upserts, ownership (one person's write never touches another; the route reads the subject from the session only), all-or-nothing validation, CHECK constraints against raw SQL, PATCH /api/preferences + shell cookie + 401, notification channel filter (bell/push/muted, fail-open), account deletion lists the table.
 lib/preferences/__tests__/preferences-db.test.ts
+# Phase 18.1 (find): Spotlight — words inside an uploaded PDF (real upload → existing PDF extractor → chunks → GIN) and an Office doc, meaning-search through pgvector (deterministic MOCK embedder), tickets by message, inbox, contacts/companies/deals/people/apps, personal chats (never a teammate's), draft apps hidden from viewers, other workspace never, trashed files gone, FORCE RLS on the chunks, ranking + websearch syntax, idempotent backfill + re-index on change, search_workspace returns the same hits and reads a file by id.
+lib/search/__tests__/spotlight-db.test.ts

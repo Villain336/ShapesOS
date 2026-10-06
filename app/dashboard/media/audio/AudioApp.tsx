@@ -166,7 +166,7 @@ export function AudioApp() {
                   <option value="streaming">streaming</option><option value="podcast">podcast</option>
                 </select>
                 <input value={s.market} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, market: e.target.value } : r)))} placeholder="Market" className={`${inputCls} w-28`} />
-                <button onClick={() => setStations((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setStations((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
               </div>
             ))}
             <button onClick={() => setStations((x) => [...x, { name: "", type: "streaming", market: "" }])} className="mt-1 text-xs text-muted underline">+ station</button>
@@ -181,7 +181,7 @@ export function AudioApp() {
                   <option value={15}>:15</option><option value={30}>:30</option><option value={60}>:60</option>
                 </select>
                 <input type="number" value={s.spotsPerDay} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, spotsPerDay: Number(e.target.value) } : r)))} min={1} placeholder="/day" className={`${inputCls} w-24`} />
-                <button onClick={() => setSpotMix((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setSpotMix((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
               </div>
             ))}
             <button onClick={() => setSpotMix((x) => [...x, { lengthSec: 30, spotsPerDay: 10, label: "30s" }])} className="mt-1 text-xs text-muted underline">+ spot</button>
@@ -191,7 +191,7 @@ export function AudioApp() {
                 <input value={p.stationRef} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, stationRef: e.target.value } : r)))} placeholder="Station" className={inputCls} />
                 <input value={p.code} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, code: e.target.value } : r)))} placeholder="CODE20" className={`${inputCls} w-28`} />
                 <input value={p.vanityUrl} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, vanityUrl: e.target.value } : r)))} placeholder="brand.link/wxyz" className={inputCls} />
-                <button onClick={() => setPromoCodes((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setPromoCodes((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
               </div>
             ))}
             <button onClick={() => setPromoCodes((x) => [...x, { stationRef: "", code: "", vanityUrl: "" }])} className="mt-1 text-xs text-muted underline">+ promo code</button>

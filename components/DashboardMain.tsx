@@ -24,14 +24,14 @@ export function DashboardMain({
   if (fullBleed) {
     return (
       // 57px = the mobile top bar (MobileNav) and, on desktop, AppTopBar.
-      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="h-[calc(100dvh-57px)] focus:outline-none">
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="h-[calc(100dvh-57px)]">
         {children}
       </main>
     );
   }
 
   return (
-    <main id={MAIN_CONTENT_ID} tabIndex={-1} className="w-full px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-gutter">
+    <main id={MAIN_CONTENT_ID} tabIndex={-1} className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-gutter">
       {banner}
       {children}
     </main>

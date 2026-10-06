@@ -649,6 +649,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                           <Send className="h-3 w-3" /> Use in social post
                         </button>
                         <button
+                          aria-label="Delete asset"
                           onClick={() => deleteAsset(a.id)}
                           className={`rounded-full bg-paper px-3 py-1.5 text-xs text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint aos-press`}
                         >

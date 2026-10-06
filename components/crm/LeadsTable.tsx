@@ -92,7 +92,7 @@ export function LeadsTable({
                   <span className="text-[0.78125rem] text-muted">{timeAgo(l.lastActivityAt)}</span>
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <button className="text-subtle hover:text-ink" onClick={() => onOpen(l.id)}>
+                  <button className="text-subtle hover:text-ink" onClick={() => onOpen(l.id)} aria-label={`Open ${l.name}`}>
                     <EllipsisVertical size={16} strokeWidth={2.5} />
                   </button>
                 </td>

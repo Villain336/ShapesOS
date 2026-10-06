@@ -127,6 +127,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 6. The shortest monitor cadence is hourly; a 15-minute sweep checks each due monitor within 15 minutes of its slot. Each check is budget-gated before the vendor is hit.",
     timeoutMs: LONG,
   },
+  // Phase 18.1 (find): Spotlight's text index — files/docs the write hook missed, and chunk embeddings.
+  {
+    key: "search-index",
+    path: "/api/cron/search-index",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. The write hook indexes text at once and embeds only when the model is already loaded; a 15-minute sweep makes a new upload meaning-searchable within 15 minutes. Idempotent by content hash, batch-capped (SEARCH_INDEX_BATCH).",
+    timeoutMs: LONG,
+  },
 
   // --- Hourly -------------------------------------------------------------
   { key: "gsc-pull", path: "/api/cron/gsc-pull", cron: "5 * * * *", source: "deploy", timeoutMs: LONG },

@@ -91,7 +91,7 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
             <code className="flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-[0.78125rem] text-ink">
               {newToken}
             </code>
-            <button className={btnGhostSm} onClick={() => copy(newToken)}>
+            <button className={btnGhostSm} onClick={() => copy(newToken)} aria-label={copied ? "Copied" : "Copy token"}>
               {copied ? <Check size={15} className="text-ink" /> : <Copy size={15} />}
             </button>
           </div>

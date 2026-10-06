@@ -205,7 +205,7 @@ export function CadApp({ deepLink }: { deepLink?: CadDeepLink } = {}) {
                   <span className="truncate">{p.name}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 font-mono text-xs ${
-                      p.id === selectedProjectId ? "bg-night-raised text-night-text" : "bg-canvas text-muted"
+                      p.id === selectedProjectId ? "bg-ink-raised text-paper" : "bg-canvas text-muted"
                     }`}
                   >
                     {p._count?.models ?? 0}

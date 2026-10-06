@@ -41,6 +41,7 @@ export default function AssistantClient({
   memberCount,
   currentUserId,
   initialTab,
+  initialThreadId = null,
   workspaceId,
 }: {
   project: AssistantProject;
@@ -50,9 +51,11 @@ export default function AssistantClient({
   memberCount: number;
   currentUserId: string;
   initialTab: ChatTab;
+  /** Phase 18.1: open this thread first (a Spotlight chat hit). */
+  initialThreadId?: string | null;
   workspaceId: string;
 }) {
-  const { setSession, tab, setTab } = useChat();
+  const { setSession, tab, setTab, openThread } = useChat();
   const router = useRouter();
   const [showThreads, setShowThreads] = useState(false);
 
@@ -71,6 +74,12 @@ export default function AssistantClient({
     // Mount-only: the tab is user-controlled afterwards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (initialThreadId) void openThread(initialThreadId).catch(() => {});
+    // Once per thread id (the session effect above has set the project).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialThreadId]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

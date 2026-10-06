@@ -6,6 +6,8 @@
 // fail-closed RLS pattern as the Composio tables.
 
 import { prisma } from "@/lib/prisma";
+// Phase 18.1 (WS=find): Spotlight indexes each doc's text on create / save.
+import { scheduleUniverDocTextIndex } from "@/lib/search/text-index";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   isUniverDocKind,
@@ -86,6 +88,7 @@ export async function createUniverDoc(
       },
     }),
   );
+  scheduleUniverDocTextIndex(workspaceId, row.id);
   return toRecord(row);
 }
 
@@ -153,6 +156,7 @@ export async function saveUniverDocSnapshot(
       data: { snapshot: snapshot as object, version: { increment: 1 } },
     }),
   );
+  scheduleUniverDocTextIndex(workspaceId, row.id);
   return toRecord(row);
 }
 

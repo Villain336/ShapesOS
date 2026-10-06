@@ -876,8 +876,8 @@ function AutomationModal({
           <h3 className="aos-subheading flex items-center gap-2">
             <Zap size={15} /> Run automation
           </h3>
-          <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink">
-            <X size={15} />
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink">
+            <X size={15} aria-hidden />
           </button>
         </div>
 

@@ -71,6 +71,10 @@
      The hover of a black primary button. A token of its own so dark mode,
      where the primary fill turns light, can hover lighter instead of black. */
   --aos-ink-hover: #1C1C1B;
+  /* Inside an ink fill (the active palette / menu row, a pressed chip):
+     secondary text and raised tiles. */
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
 
   /* ---------- Type ---------- */
   --aos-font-sans: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -195,6 +199,8 @@
   --aos-disabled-bg: #2A2A27;
   --aos-disabled-fg: #7A7A74;
   --aos-ink-hover: #D6D6D2;
+  --aos-on-ink-muted: #5E5E5B;
+  --aos-ink-raised: #DADAD6;
   /* Status: the same four meanings and shapes, lifted so marks and text read
      on dark (>= 4.5:1 on paper and canvas). Filled badges and buttons keep
      the light fills (mode-invariant surfaces below): white on blue stays 6.4:1. */
@@ -240,6 +246,8 @@
     --aos-disabled-bg: #2A2A27;
     --aos-disabled-fg: #7A7A74;
     --aos-ink-hover: #D6D6D2;
+    --aos-on-ink-muted: #5E5E5B;
+    --aos-ink-raised: #DADAD6;
     /* Status: the same four meanings and shapes, lifted so marks and text read
        on dark (>= 4.5:1 on paper and canvas). Filled badges and buttons keep
        the light fills (mode-invariant surfaces below): white on blue stays 6.4:1. */
@@ -324,6 +332,8 @@
   --aos-disabled-bg: #E2E2DF;
   --aos-disabled-fg: #8A8A86;
   --aos-ink-hover: #1C1C1B;
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
   --aos-focus: #2450E0;
   --aos-focus-halo: rgba(36, 80, 224, 0.22);
 }
@@ -344,6 +354,8 @@
     --aos-disabled-bg: #E2E2DF;
     --aos-disabled-fg: #8A8A86;
     --aos-ink-hover: #1C1C1B;
+    --aos-on-ink-muted: #BDBDB8;
+    --aos-ink-raised: #2A2A28;
     --aos-focus: #2450E0;
     --aos-focus-halo: rgba(36, 80, 224, 0.22);
   }
@@ -364,6 +376,8 @@
   --aos-disabled-bg: #E2E2DF;
   --aos-disabled-fg: #8A8A86;
   --aos-ink-hover: #1C1C1B;
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
   --aos-focus: #2450E0;
   --aos-focus-halo: rgba(36, 80, 224, 0.22);
   --aos-running: #2450E0;
@@ -393,6 +407,8 @@
     --aos-disabled-bg: #E2E2DF;
     --aos-disabled-fg: #8A8A86;
     --aos-ink-hover: #1C1C1B;
+    --aos-on-ink-muted: #BDBDB8;
+    --aos-ink-raised: #2A2A28;
     --aos-focus: #2450E0;
     --aos-focus-halo: rgba(36, 80, 224, 0.22);
     --aos-running: #2450E0;

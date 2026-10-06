@@ -55,7 +55,14 @@ export interface CommandItem {
     | "playbook-run"
     | "ask"
     /** Open the New task composer (agentKey picks the agent). */
-    | "new-task";
+    | "new-task"
+    /** Phase 18.1: show every Spotlight result (more per kind). */
+    | "search-everything"
+    /** Phase 18.1: a record's actions page (Open / Ask about this / Act on it). */
+    | "record-actions"
+    /** Phase 18.1: hand the record to the lead agent with a question / an action. */
+    | "record-ask"
+    | "record-act";
   href?: string;
   templateId?: string;
   goal?: string;
@@ -66,6 +73,14 @@ export interface CommandItem {
   agentKey?: string;
   /** Tools rows: connection state shown on the right. */
   toolState?: "connected" | "reconnect";
+  /** Phase 18.1 (Spotlight): the record behind a Records row. */
+  record?: RecordResult;
+  /** Records rows: an excerpt around the match (⟦marks⟧ = matched words). */
+  snippet?: string | null;
+  /** Records rows: how it matched (name / text / meaning). */
+  match?: string[];
+  /** record-act rows: the action. */
+  recordAction?: RecordActionResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,12 +439,24 @@ export function shouldSearchRecords(query: string, isRootPage: boolean): boolean
   return isRootPage && query.trim().length >= RECORD_MIN_QUERY;
 }
 
+export interface RecordActionResult {
+  id: string;
+  tool: string;
+  instruction: string;
+}
+
 export interface RecordResult {
   kind: string;
   id: string;
   title: string;
   subtitle: string | null;
   href: string;
+  /** Phase 18.1 (Spotlight) — present from /api/search/records. */
+  score?: number;
+  match?: string[];
+  snippet?: string | null;
+  ref?: { fileId?: string; docId?: string; leadId?: string; threadId?: string };
+  actions?: RecordActionResult[];
 }
 
 /** Same-app dashboard links only (results come from our API, but be strict). */
@@ -452,9 +479,59 @@ export function recordCommandItems(results: RecordResult[], kindLabels: Record<s
       keywords: label,
       action: "go",
       href,
+      record: { ...r, href },
+      ...(r.snippet ? { snippet: r.snippet } : {}),
+      ...(r.match?.length ? { match: r.match } : {}),
     });
   }
   return out;
+}
+
+/**
+ * Phase 18.1: the kind runs inside an (already grouped) Records list, for
+ * the per-kind sub-headings: [{ kind, start, count }] in display order.
+ */
+export function recordKindRuns(items: readonly CommandItem[]): Array<{ kind: string; start: number; count: number }> {
+  const runs: Array<{ kind: string; start: number; count: number }> = [];
+  items.forEach((item, i) => {
+    const kind = item.record?.kind ?? "";
+    const last = runs[runs.length - 1];
+    if (last && last.kind === kind) last.count++;
+    else runs.push({ kind, start: i, count: 1 });
+  });
+  return runs;
+}
+
+/** A snippet with ⟦marks⟧ → text segments ({ text, hit }) for rendering emphasis. */
+export function snippetSegments(snippet: string | null | undefined): Array<{ text: string; hit: boolean }> {
+  if (!snippet) return [];
+  const out: Array<{ text: string; hit: boolean }> = [];
+  const re = /⟦([^⟧]*)⟧/g;
+  let at = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(snippet))) {
+    if (m.index > at) out.push({ text: snippet.slice(at, m.index), hit: false });
+    if (m[1]) out.push({ text: m[1], hit: true });
+    at = m.index + m[0].length;
+  }
+  if (at < snippet.length) out.push({ text: snippet.slice(at), hit: false });
+  return out.filter((s) => s.text.length > 0);
+}
+
+/** Per-kind result count: the default, and with "Search everything". */
+export const RECORD_LIMIT = 5;
+export const RECORD_LIMIT_EVERYTHING = 20;
+
+/**
+ * The message handed to the lead agent for "Ask about this" / "Act on it":
+ * the person's words, then the record reference the agent reads with
+ * search_workspace({ record: "<kind>:<id>" }).
+ */
+export function recordTaskMessage(lead: string, r: Pick<RecordResult, "kind" | "id" | "title" | "href" | "snippet">): string {
+  const lines = [lead.trim(), "", `Record: ${r.kind}:${r.id} — ${r.title} (${r.href})`];
+  if (r.snippet) lines.push(`Matched: ${r.snippet.replace(/[⟦⟧]/g, "")}`);
+  lines.push("Read it with search_workspace before answering.");
+  return lines.join("\n");
 }
 
 /**

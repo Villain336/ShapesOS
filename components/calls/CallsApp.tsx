@@ -263,7 +263,7 @@ function NumbersPanel() {
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[0.9375rem] font-semibold text-ink">Buy tracking number</h3>
-              <button onClick={() => setShowPurchase(false)} className={iconBtn}><X size={16} /></button>
+              <button onClick={() => setShowPurchase(false)} className={iconBtn} aria-label="Close"><X size={16} aria-hidden /></button>
             </div>
             <label className="mb-3 block">
               <span className="mb-1 block text-xs font-semibold text-muted">Area code (optional)</span>
@@ -445,7 +445,7 @@ function PagesPanel() {
             <button onClick={() => { navigator.clipboard.writeText(newToken); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className={btnGhost}>
               {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy"}
             </button>
-            <button onClick={() => setNewToken(null)} className={iconBtn}><X size={14} /></button>
+            <button onClick={() => setNewToken(null)} className={iconBtn} aria-label="Dismiss"><X size={14} aria-hidden /></button>
           </div>
           <p className="mt-2 text-[0.75rem] text-muted">Public page: <code className="rounded bg-paper px-1">{origin}/book/{newToken}</code></p>
         </div>
@@ -499,7 +499,7 @@ function PagesPanel() {
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[0.9375rem] font-semibold text-ink">New booking page</h3>
-              <button onClick={() => setShowCreate(false)} className={iconBtn}><X size={16} /></button>
+              <button onClick={() => setShowCreate(false)} className={iconBtn} aria-label="Close"><X size={16} aria-hidden /></button>
             </div>
             <label className="mb-3 block">
               <span className="mb-1 block text-xs font-semibold text-muted">Title</span>

@@ -59,6 +59,8 @@
 
   /* Phase 18.1: the hover of an ink (primary) fill; lighter in dark mode. */
   --color-ink-hover: var(--aos-ink-hover);
+  --color-on-ink-muted: var(--aos-on-ink-muted);
+  --color-ink-raised: var(--aos-ink-raised);
 
   /* Fonts */
   --font-*: initial;

@@ -480,8 +480,8 @@ function TemplatesTab({
               <button className={BTN_GHOST} onClick={() => duplicate(t.id)} disabled={!canEdit || busy === t.id}>
                 Duplicate
               </button>
-              <button className={BTN_DANGER} onClick={() => remove(t.id, t.name)} disabled={!canEdit || busy === t.id}>
-                <Trash size={14} />
+              <button className={BTN_DANGER} onClick={() => remove(t.id, t.name)} disabled={!canEdit || busy === t.id} aria-label={`Delete template ${t.name}`}>
+                <Trash size={14} aria-hidden />
               </button>
             </span>
           </li>
@@ -957,8 +957,8 @@ function DomainsTab({
                 <button className={BTN_GHOST} onClick={() => verify(d.id)} disabled={!canEdit || busy === d.id}>
                   {busy === d.id ? "Verifying…" : "Verify now"}
                 </button>
-                <button className={BTN_DANGER} onClick={() => remove(d.id, d.domain)} disabled={!canEdit}>
-                  <Trash size={14} />
+                <button className={BTN_DANGER} onClick={() => remove(d.id, d.domain)} disabled={!canEdit} aria-label={`Remove domain ${d.domain}`}>
+                  <Trash size={14} aria-hidden />
                 </button>
               </span>
             </div>

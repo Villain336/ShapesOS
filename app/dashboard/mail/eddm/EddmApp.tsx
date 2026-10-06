@@ -438,8 +438,8 @@ function OrderHeader({
           <button className={btnPrimary} disabled={saving} onClick={save}>
             <Check size={14} /> Save
           </button>
-          <button className={btnSecondary} onClick={() => setEditing(false)}>
-            <X size={14} />
+          <button className={btnSecondary} onClick={() => setEditing(false)} aria-label="Cancel editing">
+            <X size={14} aria-hidden />
           </button>
         </div>
       ) : (
