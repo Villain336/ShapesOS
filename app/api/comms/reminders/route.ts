@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const parsed = validateBody(CreateSchema, await req.json());
     if (!parsed.ok) return parsed.error;
     const b = parsed.data;
-    const sourceRef = b.clientId && isClientId(b.clientId) ? `offline:${b.clientId}` : null;
+    const sourceRef = b.clientId && isClientId(b.clientId) ? `client:${b.clientId}` : null;
     if (b.clientId && !sourceRef) return Response.json({ error: "Invalid clientId." }, { status: 400 });
     if (sourceRef) {
       const prior = await withWorkspaceScope(ctx.workspaceId, (tx) => findOwnReminderBySourceRef(tx, { workspaceId: ctx.workspaceId, userId: ctx.userId, sourceRef }));

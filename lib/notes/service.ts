@@ -321,7 +321,7 @@ export async function getNote(actor: NoteActor, id: string): Promise<NoteDetail 
 
 /**
  * Phase 18.3 (WS=flow): the note this person already made from one offline
- * write (sourceRef "offline:<clientId>"), so a replayed create returns it
+ * write carrying a client id (sourceRef "client:<clientId>"), so a replayed create returns it
  * instead of writing a second note (lib/offline/queue.ts).
  */
 export async function findOwnNoteBySourceRef(actor: NoteActor, sourceRef: string): Promise<NoteDetail | null> {

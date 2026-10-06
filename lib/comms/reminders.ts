@@ -187,7 +187,7 @@ export async function getReminder(db: Db, opts: { workspaceId: string; userId: s
 
 /**
  * Phase 18.3 (WS=flow): the reminder this person already made from one
- * offline write (sourceRef "offline:<clientId>"), so a replayed create
+ * write carrying a client id (sourceRef "client:<clientId>"), so a replayed create
  * returns it instead of adding a second one (lib/offline/queue.ts).
  */
 export async function findOwnReminderBySourceRef(db: Db, opts: { workspaceId: string; userId: string; sourceRef: string; now?: Date }): Promise<ReminderView | null> {

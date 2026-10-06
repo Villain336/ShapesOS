@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     if (body.shareState === "workspace" && !roleAtLeast(actor.role, "editor")) {
       throw new ForbiddenError("Sharing a note with the workspace needs the editor role.");
     }
-    const sourceRef = body.clientId && isClientId(body.clientId) ? `offline:${body.clientId}` : null;
+    const sourceRef = body.clientId && isClientId(body.clientId) ? `client:${body.clientId}` : null;
     if (body.clientId && !sourceRef) return Response.json({ error: "Invalid clientId." }, { status: 400 });
     if (sourceRef) {
       const prior = await findOwnNoteBySourceRef(actor, sourceRef);
