@@ -508,9 +508,18 @@ before(() => {
   for (const t of [slowSafe("t_slow_a", 120), slowSafe("t_slow_b", 40), slowSafe("t_slow_c", 10), t_write_slow]) registerExtraTool(t);
 });
 
+// Order in the timeline, not wall-clock time: events are pushed as they
+// happen, so their index is exact even on a slow, busy CI runner (where a
+// millisecond clock can tie or a whole step can take 3× longer).
 const overlap = (a: string, b: string) => {
-  const s = (n: string, at: "start" | "end") => timeline.find((e) => e.tool === n && e.at === at)!.t;
-  return s(a, "start") < s(b, "end") && s(b, "start") < s(a, "end");
+  const i = (n: string, at: "start" | "end") => timeline.findIndex((e) => e.tool === n && e.at === at);
+  return i(a, "start") < i(b, "end") && i(b, "start") < i(a, "end");
+};
+/** Every one of `tools` started before any of them finished (one concurrent batch). */
+const allStartedBeforeAnyEnded = (tools: string[]) => {
+  const lastStart = Math.max(...tools.map((n) => timeline.findIndex((e) => e.tool === n && e.at === "start")));
+  const firstEnd = Math.min(...tools.map((n) => timeline.findIndex((e) => e.tool === n && e.at === "end")));
+  return lastStart < firstEnd;
 };
 
 describe("Phase 17: safe tools of a step run in parallel, results stay in the model's order", () => {
@@ -551,17 +560,15 @@ describe("Phase 17: safe tools of a step run in parallel, results stay in the mo
     const store = memoryTranscriptStore();
     let saves = 0;
     const counting = { ...store, save: async (...a: Parameters<typeof store.save>) => (saves++, store.save(...a)) };
-    const t0 = Date.now();
     const res = await runAgentLoop({
       ctx: ctx({ runId: "run-par" }),
       system: "s",
       messages: [{ role: "user", content: "read three things" }],
       deps: { provider, store: counting, persistEvents: false },
     });
-    const took = Date.now() - t0;
     assert.equal(res.status, "done");
     assert.ok(overlap("t_slow_a", "t_slow_b") && overlap("t_slow_a", "t_slow_c"), `safe tools ran side by side: ${JSON.stringify(timeline)}`);
-    assert.ok(took < 120 + 40 + 10 + 60, `the step took ${took} ms, less than the serial sum (170 ms)`);
+    assert.ok(allStartedBeforeAnyEnded(["t_slow_a", "t_slow_b", "t_slow_c"]), `all three started before any finished (one batch, not a chain): ${JSON.stringify(timeline)}`);
     assert.deepEqual(res.calls.map((c) => c.tool), ["t_slow_a", "t_slow_b", "t_slow_c"], "calls recorded in the model's order");
     // Saves: after step 1's model call, once after its tools, after step 2's model call, and the finish.
     assert.equal(saves, 4, `one save per tool step (saw ${saves})`);

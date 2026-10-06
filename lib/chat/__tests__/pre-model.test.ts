@@ -10,14 +10,16 @@ import { loadTurnInputs, type TurnLoaders, type AgentTurnInput } from "../agent"
 const TURN: AgentTurnInput = { projectId: "p", workspaceId: "ws", userId: "u", role: "editor", threadId: "th", userContent: "hi", agentKey: "lead", grant: null, mode: "default" };
 
 function fakes(ms = 60) {
+  // Start/end are sequence numbers (the order things happened), not
+  // wall-clock times: exact on a slow, busy CI runner too.
   const log: Array<{ name: string; start: number; end: number }> = [];
-  const t0 = Date.now();
+  let tick = 0;
   const slow =
     <T,>(name: string, value: T) =>
     async () => {
-      const start = Date.now() - t0;
+      const start = tick++;
       await new Promise((r) => setTimeout(r, ms));
-      log.push({ name, start, end: Date.now() - t0 });
+      log.push({ name, start, end: tick++ });
       return value;
     };
   const loaders: TurnLoaders = {
@@ -34,15 +36,12 @@ function fakes(ms = 60) {
 describe("pre-model phase (Phase 17)", () => {
   it("issues every read before any of them finishes (one round, not a chain)", async () => {
     const { log, loaders } = fakes();
-    const t0 = Date.now();
     const out = await loadTurnInputs(TURN, false, loaders);
-    const took = Date.now() - t0;
     assert.equal(out.live, true);
     assert.deepEqual(log.map((l) => l.name).sort(), ["connectorTools", "declineWaiting", "delegation", "isLive", "styleRules"]);
     const lastStart = Math.max(...log.map((l) => l.start));
     const firstEnd = Math.min(...log.map((l) => l.end));
-    assert.ok(lastStart < firstEnd, `all started (last at ${lastStart} ms) before the first finished (${firstEnd} ms)`);
-    assert.ok(took < 5 * 60, `took ${took} ms — well under the 300 ms a chain of five 60 ms reads would take`);
+    assert.ok(lastStart < firstEnd, `all started (last start #${lastStart}) before the first finished (#${firstEnd}) — one round, not a chain`);
   });
 
   it("a confirming turn looks the proposal up (and never declines)", async () => {
