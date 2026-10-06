@@ -7,6 +7,8 @@ import type { Catalogue } from "./en";
 import { commsEs } from "./comms.es";
 // Phase 18.2 (WS=content): las apps de este flujo, en su propio archivo.
 import { contentEs } from "./content.es";
+// Fase 19A (WS=server): Ajustes → Tú → Cursor.
+import { cursorEs } from "./cursor.es";
 
 export const es: Catalogue = {
   common: {
@@ -392,6 +394,8 @@ export const es: Catalogue = {
       "/dashboard/settings/you/language": { label: "Idioma y región", description: "Idioma, zona horaria y reloj." },
       "/dashboard/settings/you/accessibility": { label: "Accesibilidad", description: "Movimiento, contraste, tamaño del texto y foco." },
       "/dashboard/settings/you/notifications": { label: "Notificaciones", description: "Qué notificaciones te llegan y dónde." },
+      // Fase 19A (WS=server)
+      "/dashboard/settings/you/cursor": { label: "Cursor", description: "El cursor de voz de ShapesOS Desktop: su voz, los minutos de voz y la descarga." },
       "/dashboard/settings/workspace": { label: "General", description: "Nombre, plan, configuración y creación o eliminación de espacios de trabajo." },
       "/dashboard/settings/defaults": { label: "Valores por defecto", description: "La base que hereda cada proyecto: modelo, idioma, tono." },
       "/dashboard/settings/automation": { label: "Automatización", description: "Qué pueden hacer los agentes solos, qué preguntan antes y qué nunca se ejecuta." },
@@ -943,4 +947,7 @@ export const es: Catalogue = {
 
   // Phase 18.2 (WS=content): Notas, Archivos, colaboración, Monitor de actividad, Terminal, Tienda.
   ...contentEs,
+
+  // Fase 19A (WS=server): Ajustes → Tú → Cursor.
+  ...cursorEs,
 };

@@ -11,6 +11,8 @@
 import { commsEn } from "./comms.en";
 // Phase 18.2 (WS=content): the core apps' strings live in their own file.
 import { contentEn } from "./content.en";
+// Phase 19A (WS=server): Settings → You → Cursor.
+import { cursorEn } from "./cursor.en";
 
 export const en = {
   common: {
@@ -397,6 +399,8 @@ export const en = {
       "/dashboard/settings/you/language": { label: "Language and region", description: "Language, time zone and clock." },
       "/dashboard/settings/you/accessibility": { label: "Accessibility", description: "Motion, contrast, text size and focus." },
       "/dashboard/settings/you/notifications": { label: "Notifications", description: "Which notifications reach you, and where." },
+      // Phase 19A (WS=server)
+      "/dashboard/settings/you/cursor": { label: "Cursor", description: "The voice cursor in ShapesOS Desktop: its voice, talk minutes and the download." },
       "/dashboard/settings/workspace": { label: "General", description: "Name, plan, setup, and creating or deleting workspaces." },
       "/dashboard/settings/defaults": { label: "Defaults", description: "The baseline every project inherits: model, locale, tone." },
       "/dashboard/settings/automation": { label: "Automation", description: "What agents may do on their own, what asks first, and what never runs." },
@@ -955,6 +959,9 @@ export const en = {
 
   // Phase 18.2 (WS=content): Notes, Files, collaboration, Activity Monitor, Terminal, Store.
   ...contentEn,
+
+  // Phase 19A (WS=server): Settings → You → Cursor.
+  ...cursorEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

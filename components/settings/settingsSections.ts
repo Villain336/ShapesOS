@@ -44,6 +44,7 @@ import {
   Languages,
   SunMoon,
   BellRing,
+  MousePointer2, // Phase 19A (WS=server): Settings → You → Cursor
 } from "lucide-react";
 
 export interface SettingsPage {
@@ -71,6 +72,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: "/dashboard/settings/you/language", label: "Language and region", description: "Language, time zone and clock.", icon: Languages },
       { href: "/dashboard/settings/you/accessibility", label: "Accessibility", description: "Motion, contrast, text size and focus.", icon: Accessibility },
       { href: "/dashboard/settings/you/notifications", label: "Notifications", description: "Which notifications reach you, and where.", icon: BellRing },
+      // Phase 19A (WS=server): the voice cursor (ShapesOS Desktop).
+      { href: "/dashboard/settings/you/cursor", label: "Cursor", description: "The voice cursor in ShapesOS Desktop: its voice, talk minutes and the download.", icon: MousePointer2 },
       { href: "/dashboard/settings/account-security", label: "Your security", description: "Two-factor sign-in and passkeys for your own account.", icon: Fingerprint },
       { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
     ],
