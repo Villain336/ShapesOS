@@ -20,6 +20,8 @@ import { AgentWorker } from "@/lib/agents/queue/worker";
 import { prisma } from "@/lib/prisma";
 import { installShutdownHandlers, onShutdown } from "@/lib/runtime/shutdown";
 import { drainAgentWork } from "@/lib/runtime/agent-drain";
+import { startCollabServer } from "@/lib/collab/server";
+import { workerCollabPort } from "@/lib/collab/env";
 
 if (!(process.env.DATABASE_URL ?? "").trim()) {
   console.error("[agent-worker] DATABASE_URL is not set; nothing to work on.");
@@ -28,6 +30,19 @@ if (!(process.env.DATABASE_URL ?? "").trim()) {
 
 const worker = new AgentWorker();
 worker.start();
+
+// Phase 18.2 (WS=content): the live-collaboration server, when COLLAB_PORT is
+// set (local, docker compose). On Render it runs as its own single-instance
+// web service (scripts/collab.mts): a background worker takes no inbound
+// connections. SIGTERM stores every live document before the process exits.
+const collabPort = workerCollabPort();
+if (collabPort) {
+  const collab = await startCollabServer({ port: collabPort, host: "0.0.0.0" });
+  onShutdown("collab", async (signal) => {
+    console.log(`[collab] ${signal}: storing live documents and closing connections…`);
+    await collab.close();
+  });
+}
 
 onShutdown("agent-worker", async (signal) => {
   console.log(`[agent-worker] ${signal}: handing off ${worker.busy} running job(s)…`);

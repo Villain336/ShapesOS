@@ -13,7 +13,10 @@
 //      service, then run `sh scripts/db/migrate.sh` there as a one-off job
 //      (https://render.com/docs/one-off-jobs) and wait for it. A failed
 //      migration stops the release here; web and worker are untouched.
-//   3. Deploy `worker:<sha>`, wait until live; deploy `runner:<sha>` to web,
+//   3. Deploy `worker:<sha>`, wait until live; Phase 18.2: with
+//      --collab-service, the same worker image to shapesos-collab (the
+//      live-collaboration server, scripts/collab.mts), wait until live;
+//      deploy `runner:<sha>` to web,
 //      wait until live (Render health-checks new web instances before
 //      switching traffic, https://render.com/docs/deploys#zero-downtime-deploys).
 //   4. Smoke: GET --health-url until it answers 200 {status:"ok"} with this
@@ -63,6 +66,10 @@ export function parseArgs(argv) {
   for (const k of ["web-service", "worker-service", "migrate-service"]) {
     if (!/^(srv|crn)-[a-z0-9]+$/.test(out[k])) throw new ReleaseError(`--${k} must be a Render service id (srv-… or crn-…)`);
   }
+  // Phase 18.2 (WS=content): optional — the collab service (worker image).
+  if (out["collab-service"] !== undefined && !/^srv-[a-z0-9]+$/.test(out["collab-service"])) {
+    throw new ReleaseError("--collab-service must be a Render service id (srv-…)");
+  }
   let health;
   try {
     health = new URL(out["health-url"]);
@@ -77,6 +84,7 @@ export function parseArgs(argv) {
     registry: out.registry,
     web: out["web-service"],
     worker: out["worker-service"],
+    collab: out["collab-service"] ?? null,
     migrate: out["migrate-service"],
     healthUrl: out["health-url"],
     timeoutMinutes: Number(out["timeout-minutes"] ?? 30),
@@ -225,6 +233,7 @@ export async function release(opts, deps) {
   const previous = {
     web: await latestLiveDeploy(api, opts.web),
     worker: await latestLiveDeploy(api, opts.worker),
+    ...(opts.collab ? { collab: await latestLiveDeploy(api, opts.collab) } : {}),
   };
   log(`  web: ${previous.web?.id ?? "none (first release)"}, worker: ${previous.worker?.id ?? "none (first release)"}`);
 
@@ -240,6 +249,13 @@ export async function release(opts, deps) {
     const workerDeploy = await triggerImageDeploy(api, opts.worker, imageRef(opts.registry, "worker", opts.sha), step);
     changed.push("worker");
     await waitForDeploy(api, opts.worker, workerDeploy, { ...step, label: "shapesos-worker" });
+    if (opts.collab) {
+      // Phase 18.2: the live-collaboration server runs the worker image.
+      log("3/5 collab");
+      const collabDeploy = await triggerImageDeploy(api, opts.collab, imageRef(opts.registry, "worker", opts.sha), step);
+      changed.push("collab");
+      await waitForDeploy(api, opts.collab, collabDeploy, { ...step, label: "shapesos-collab" });
+    }
     log("4/5 web");
     const webDeploy = await triggerImageDeploy(api, opts.web, imageRef(opts.registry, "runner", opts.sha), step);
     changed.push("web");
@@ -249,10 +265,10 @@ export async function release(opts, deps) {
   } catch (err) {
     log(`FAILED: ${err.message}`);
     const rolled = [];
-    for (const name of ["web", "worker"]) {
+    for (const name of ["web", "collab", "worker"]) {
       if (!changed.includes(name)) continue;
       const prev = previous[name];
-      const id = name === "web" ? opts.web : opts.worker;
+      const id = name === "web" ? opts.web : name === "collab" ? opts.collab : opts.worker;
       if (!prev) {
         log(`  ${name}: no earlier deploy to roll back to`);
         continue;
@@ -266,7 +282,7 @@ export async function release(opts, deps) {
         log(`  ${name}: ROLLBACK FAILED (${rbErr.message}) — roll back in the Render dashboard (Deploys → Rollback)`);
       }
     }
-    throw new ReleaseError(`release ${opts.sha} failed: ${err.message}${rolled.length ? `; rolled back ${rolled.join(" and ")}` : ""}`);
+    throw new ReleaseError(`release ${opts.sha} failed: ${err.message}${rolled.length ? `; rolled back ${rolled.join(" and ").replace(/ and (?=.* and )/g, ", ")}` : ""}`);
   }
   log(`released ${opts.sha}`);
   return { previous };

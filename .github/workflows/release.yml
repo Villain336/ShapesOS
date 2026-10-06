@@ -10,6 +10,7 @@
 #   secrets.RENDER_API_KEY            Render API key (Account settings → API keys)
 #   vars.RENDER_WEB_SERVICE_ID        srv-… of shapesos-web
 #   vars.RENDER_WORKER_SERVICE_ID     srv-… of shapesos-worker
+#   vars.RENDER_COLLAB_SERVICE_ID     srv-… of shapesos-collab (Phase 18.2; optional until created)
 #   vars.RENDER_MIGRATE_SERVICE_ID    crn-… of shapesos-migrate
 #   vars.APP_URL                      https://app.shapesos.com (baked into the
 #                                     runner bundle; smoke-tested at /api/health)
@@ -179,6 +180,7 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           WEB: ${{ vars.RENDER_WEB_SERVICE_ID }}
           WORKER: ${{ vars.RENDER_WORKER_SERVICE_ID }}
+          COLLAB: ${{ vars.RENDER_COLLAB_SERVICE_ID }}
           MIGRATE: ${{ vars.RENDER_MIGRATE_SERVICE_ID }}
           APP_URL: ${{ vars.APP_URL }}
           REGISTRY: ${{ needs.build.outputs.registry }}
@@ -186,4 +188,5 @@ jobs:
           node scripts/deploy/render-release.mjs
           --sha "$RELEASE_SHA" --registry "$REGISTRY"
           --web-service "$WEB" --worker-service "$WORKER" --migrate-service "$MIGRATE"
+          ${COLLAB:+--collab-service "$COLLAB"}
           --health-url "${APP_URL%/}/api/health"
