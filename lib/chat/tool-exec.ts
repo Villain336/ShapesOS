@@ -274,6 +274,8 @@ export async function executeTool(
       ...ids,
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
+      // Phase 18.3 (WS=flow): what it wrote, for "Undo this agent run".
+      ...(result.touched?.length ? { touched: result.touched.slice(0, 20) } : {}),
       ...(hit ? { cached: true } : {}),
       // Phase 8: the tool recorded its own timeline event (ship / browser
       // tools); this one only feeds the live stream (isStreamEvent hides it).

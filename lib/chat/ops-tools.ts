@@ -128,11 +128,14 @@ function approvalRequiredResult(
 }
 
 /** Handle an ops write result from a draft-creator (free writes execute; gated ones propose). */
-function draftWriteResult(label: string, r: OpsWriteResult): ToolResult {
+function draftWriteResult(label: string, r: OpsWriteResult, entity?: string): ToolResult {
   if (r.outcome === "approval_required") {
     return approvalRequiredResult(r.classification.label, r.approval);
   }
-  return { summary: `${label}: done`, details: r.row };
+  // Phase 18.3 (WS=flow): what was written, for "Undo this agent run".
+  const id = typeof r.row.id === "string" ? r.row.id : null;
+  const touched = entity && id ? [{ kind: "ops", entity, id, op: r.action === "update" ? ("update" as const) : ("create" as const), ...(r.before ? { before: r.before } : {}) }] : undefined;
+  return { summary: `${label}: done`, details: r.row, ...(touched ? { touched } : {}) };
 }
 
 /**
@@ -438,7 +441,7 @@ export async function p10CreateCore(
   port: OpsGatePort = gatePort(),
 ): Promise<ToolResult> {
   const r = await opsCreate(tx, opsEntityDef(slug), actor, body, { gatePort: port });
-  return draftWriteResult(label, r);
+  return draftWriteResult(label, r, slug);
 }
 
 export async function p10PatchCore(
@@ -450,7 +453,7 @@ export async function p10PatchCore(
   port: OpsGatePort = gatePort(),
 ): Promise<ToolResult> {
   const r = await opsPatch(tx, opsEntityDef(slug), actor, body, { gatePort: port });
-  return draftWriteResult(label, r);
+  return draftWriteResult(label, r, slug);
 }
 
 function pick(args: Record<string, unknown>, keys: string[]): Record<string, unknown> {
