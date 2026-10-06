@@ -25,11 +25,11 @@ export default async function BusinessSyncPage({ searchParams }: { searchParams:
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/dashboard/settings/connectors" className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted hover:text-ink">
+        <Link href="/dashboard/settings/connectors" className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-muted hover:text-ink">
           <ArrowLeft size={14} aria-hidden="true" /> Connectors
         </Link>
         <h1 className="aos-heading mt-1">Business sync</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — Shopify, QuickBooks, Xero and Gusto: what is mapped, when it last ran, and what needs you.
         </p>
       </div>

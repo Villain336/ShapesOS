@@ -55,7 +55,7 @@ export default function ThreadListSection() {
                 onClick={() => void openThread(t.id)}
                 aria-current={t.id === activeId ? "true" : undefined}
                 className={cn(
-                  "min-w-0 flex-1 justify-start gap-2 rounded-full px-3 py-2 text-left text-[13px] font-normal hover:bg-transparent",
+                  "min-w-0 flex-1 justify-start gap-2 rounded-full px-3 py-2 text-left text-[0.8125rem] font-normal hover:bg-transparent",
                   t.id === activeId && "bg-accent-tint font-medium",
                 )}
               >
@@ -76,7 +76,7 @@ export default function ThreadListSection() {
           ))
         )}
       </GlideMenu>
-      <div className="px-3 text-[12px] text-ink-3">
+      <div className="px-3 text-[0.75rem] text-ink-3">
         {session?.mockMode ? "Mock mode — rule-based demo" : "Live AI agent"}
       </div>
     </div>

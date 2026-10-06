@@ -220,7 +220,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={adding}
-          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {adding ? "Adding…" : "Add competitor"}
         </button>
@@ -339,7 +339,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                         <td className={`${td} font-medium text-ink`}>
                           {g.phrase}
                           {g.mock && (
-                            <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                            <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted">
                               mock
                             </span>
                           )}
@@ -400,7 +400,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 <button
                   onClick={onSave}
                   disabled={saving || selected.size === 0}
-                  className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   {saving ? "Saving…" : `Save ${selected.size} keyword(s)`}
                 </button>

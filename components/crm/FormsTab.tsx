@@ -84,18 +84,18 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
     <div className="space-y-4">
       {newToken && (
         <div className="rounded-md border border-line bg-canvas p-4">
-          <p className="text-[13px] font-semibold text-ink">
+          <p className="text-[0.8125rem] font-semibold text-ink">
             Form created. Save this token now — it is never shown again:
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-[12.5px] text-ink">
+            <code className="flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-[0.78125rem] text-ink">
               {newToken}
             </code>
-            <button className={btnGhostSm} onClick={() => copy(newToken)}>
+            <button className={btnGhostSm} onClick={() => copy(newToken)} aria-label={copied ? "Copied" : "Copy token"}>
               {copied ? <Check size={15} className="text-ink" /> : <Copy size={15} />}
             </button>
           </div>
-          <p className="mt-2 text-[12px] text-ink">
+          <p className="mt-2 text-[0.75rem] text-ink">
             Submit endpoint: <code className="font-mono">POST /api/crm/public/forms/{newToken}</code> with{" "}
             <code className="font-mono">{"{ name, email, phone, company, message }"}</code>. Include a honeypot field named{" "}
             <code className="font-mono">website</code> (leave blank).
@@ -127,8 +127,8 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
           {forms.map((f) => (
             <div key={f.id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-0">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-semibold text-ink">{f.name}</div>
-                <div className="text-[12px] text-muted">
+                <div className="truncate text-[0.84375rem] font-semibold text-ink">{f.name}</div>
+                <div className="text-[0.75rem] text-muted">
                   {f.submitCount} submission{f.submitCount === 1 ? "" : "s"} · created{" "}
                   {new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </div>
@@ -150,7 +150,7 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
           ))}
         </div>
       )}
-      <p className="text-[12px] text-subtle">
+      <p className="text-[0.75rem] text-subtle">
         Tokens are stored as SHA-256 hashes and can be revoked by deleting or disabling the form.
       </p>
     </div>

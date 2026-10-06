@@ -153,7 +153,7 @@ export function PODetail({
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <p className="mt-0.5 text-[0.8125rem] text-muted">
                 {who} · {formatMoney(po.totalCents)} · sent {fmtDate(po.sentAt)}
               </p>
             </div>
@@ -220,7 +220,7 @@ export function PODetail({
             </div>
 
             {/* Line items */}
-            <h4 className="mb-2 text-[13px] font-bold text-ink">Line items</h4>
+            <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">Line items</h4>
             <div className={tableWrapCls}>
               <table className={`${tableCls}`}>
                 <thead>
@@ -238,7 +238,7 @@ export function PODetail({
                         <span className="font-medium text-ink">{li.name}</span>
                         {li.sku && <span className="text-subtle"> · {li.sku}</span>}
                         {li.productId && (
-                          <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink">
+                          <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-canvas px-1.5 py-0.5 text-[0.625rem] font-semibold text-ink">
                             <Check size={10} /> restocks on receive
                           </span>
                         )}
@@ -251,12 +251,12 @@ export function PODetail({
                 </tbody>
               </table>
             </div>
-            <div className="mt-2 space-y-0.5 text-right text-[13px] text-muted">
+            <div className="mt-2 space-y-0.5 text-right text-[0.8125rem] text-muted">
               <p>Subtotal <span className="font-semibold text-ink tabular-nums">{formatMoney(subtotal)}</span></p>
               <p>Tax <span className="font-semibold text-ink tabular-nums">{formatMoney(po.taxCents)}</span></p>
-              <p className="text-[15px]">Total <span className="font-bold text-ink tabular-nums">{formatMoney(po.totalCents)}</span></p>
+              <p className="text-[0.9375rem]">Total <span className="font-bold text-ink tabular-nums">{formatMoney(po.totalCents)}</span></p>
             </div>
-            <p className="mt-3 text-[12px] text-muted">
+            <p className="mt-3 text-[0.75rem] text-muted">
               Receiving books a restock inventory transaction for every line linked to a catalog
               product — atomically, in the same transaction as the status change.
             </p>

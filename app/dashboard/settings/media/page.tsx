@@ -36,7 +36,7 @@ export default async function MediaSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Media safety</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — trust ladder, approval rules, virtual cards, and kill switches for
           supervised-always media buying.
         </p>

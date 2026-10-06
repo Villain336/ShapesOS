@@ -143,7 +143,7 @@ export function NewInvoiceModal({
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>
             <h3 className="text-lg font-bold tracking-tight text-ink">New invoice</h3>
-            <p className="mt-0.5 text-[13px] text-muted">
+            <p className="mt-0.5 text-[0.8125rem] text-muted">
               Created as a draft — sending it needs your approval.
             </p>
           </div>
@@ -166,7 +166,7 @@ export function NewInvoiceModal({
           <div className="relative mt-1">
             {customer ? (
               <div className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2">
-                <span className="text-[13px] font-medium text-ink">
+                <span className="text-[0.8125rem] font-medium text-ink">
                   {customer.name}
                   {customer.company && <span className="text-subtle"> · {customer.company}</span>}
                 </span>
@@ -176,7 +176,7 @@ export function NewInvoiceModal({
                     setCustomer(null);
                     setCustomerQuery("");
                   }}
-                  className="text-[12px] font-semibold text-muted hover:text-ink"
+                  className="text-[0.75rem] font-semibold text-muted hover:text-ink"
                 >
                   Change
                 </button>
@@ -204,7 +204,7 @@ export function NewInvoiceModal({
                           setCustomer(h);
                           setShowHits(false);
                         }}
-                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-canvas"
+                        className="block w-full px-3 py-2 text-left text-[0.8125rem] hover:bg-canvas"
                       >
                         <span className="font-medium text-ink">{h.name}</span>
                         {h.company && <span className="text-subtle"> · {h.company}</span>}
@@ -224,7 +224,7 @@ export function NewInvoiceModal({
             <button
               type="button"
               onClick={() => setItems([...items, { description: "", qty: "1", price: "" }])}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
+              className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink hover:underline"
             >
               <Plus size={13} /> Add line
             </button>
@@ -292,7 +292,7 @@ export function NewInvoiceModal({
             </div>
           </div>
 
-          <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-[13px]">
+          <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-[0.8125rem]">
             <div className="flex justify-between text-muted">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatMoney(totals.subtotal)}</span>
@@ -301,7 +301,7 @@ export function NewInvoiceModal({
               <span>Tax</span>
               <span className="tabular-nums">{formatMoney(totals.taxCents)}</span>
             </div>
-            <div className="flex justify-between pt-1 text-[15px] font-bold text-ink">
+            <div className="flex justify-between pt-1 text-[0.9375rem] font-bold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatMoney(totals.total)}</span>
             </div>

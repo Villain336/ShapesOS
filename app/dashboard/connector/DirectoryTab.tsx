@@ -38,10 +38,10 @@ function MatchCard({
     <div className="flex flex-col gap-2.5 rounded-lg bg-paper p-5 shadow-hairline">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-[16px] font-semibold text-ink">{p.name ?? "Unnamed"}</p>
-          {p.role && <p className="mt-0.5 text-[14px] text-muted">{p.role}</p>}
+          <p className="text-[1rem] font-semibold text-ink">{p.name ?? "Unnamed"}</p>
+          {p.role && <p className="mt-0.5 text-[0.875rem] text-muted">{p.role}</p>}
           {p.company && (
-            <p className="text-[13px] text-muted">{p.company}</p>
+            <p className="text-[0.8125rem] text-muted">{p.company}</p>
           )}
         </div>
         <span className="flex items-center gap-2" title={`Match score ${match.score}/100`}>
@@ -51,23 +51,23 @@ function MatchCard({
               style={{ width: `${match.score}%` }}
             />
           </span>
-          <span className="text-[13px] font-semibold text-ink">{match.score}</span>
+          <span className="text-[0.8125rem] font-semibold text-ink">{match.score}</span>
         </span>
       </div>
-      {p.bio && <p className="text-[14px] leading-relaxed text-ink">{p.bio}</p>}
+      {p.bio && <p className="text-[0.875rem] leading-relaxed text-ink">{p.bio}</p>}
       {p.industries.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {p.industries.map((i) => (
             <span
               key={i}
-              className="inline-flex h-7 items-center rounded-full bg-canvas px-3 text-[12px] font-semibold text-ink"
+              className="inline-flex h-7 items-center rounded-full bg-canvas px-3 text-[0.75rem] font-semibold text-ink"
             >
               {i}
             </span>
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.75rem] text-muted">
         {match.reasons.map((r) => (
           <span key={r}>{r}</span>
         ))}
@@ -224,7 +224,7 @@ export function DirectoryTab({
       <div className="flex flex-col gap-4 rounded-lg bg-paper p-5 shadow-hairline">
         <div>
           <h2 className="aos-subheading">Directory settings</h2>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[0.8125rem] text-muted">
             Opt in to be discoverable by other OS users. Only mutually-discoverable
             users can match — your private network is never exposed. Unpublish any
             time; your profile disappears from the directory instantly.
@@ -240,30 +240,30 @@ export function DirectoryTab({
 
         <div className="grid gap-3">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Name (required to publish)</span>
+            <span className="text-[0.75rem] font-semibold text-muted">Name (required to publish)</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tico Hamphill" className={inputCls} />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Role</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Role</span>
               <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Founder" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Company</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Company</span>
               <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Launchabl" className={inputCls} />
             </label>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Bio</span>
+            <span className="text-[0.75rem] font-semibold text-muted">Bio</span>
             <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="What you do, in a line or two." className={textareaCls} />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Industries (comma-separated)</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Industries (comma-separated)</span>
               <input value={industries} onChange={(e) => setIndustries(e.target.value)} placeholder="SaaS, Marketing" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Looking for</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Looking for</span>
               <select
                 value={lookingFor}
                 onChange={(e) => setLookingFor(e.target.value)}
@@ -280,7 +280,7 @@ export function DirectoryTab({
         </div>
 
         <div className="flex flex-col gap-3 rounded-md border border-line bg-canvas p-4">
-          <p className="text-[12px] font-semibold text-muted">Profile facets — what matches can see</p>
+          <p className="text-[0.75rem] font-semibold text-muted">Profile facets — what matches can see</p>
           <SwitchRow
             on={shareNameRole}
             onChange={setShareNameRole}
@@ -295,14 +295,14 @@ export function DirectoryTab({
           />
         </div>
 
-        {saveError && <p className="text-[13px] font-semibold text-failed-text">{saveError}</p>}
+        {saveError && <p className="text-[0.8125rem] font-semibold text-failed-text">{saveError}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" disabled={saving} onClick={save} className={btnPrimary}>
             {saving && <Loader2 size={15} className="animate-spin" />}
             {saving ? "Saving" : "Save directory settings"}
           </button>
           {profile && (
-            <span className="text-[13px] text-muted">
+            <span className="text-[0.8125rem] text-muted">
               {profile.discoverable ? "Published — discoverable by other users." : "Not published — invisible to the directory."}
             </span>
           )}
@@ -314,22 +314,22 @@ export function DirectoryTab({
         <div className="flex flex-col gap-3 rounded-lg bg-paper p-5 shadow-hairline">
           <div>
             <h2 className="aos-subheading">Find people</h2>
-            <p className="mt-1 text-[13px] text-muted">
+            <p className="mt-1 text-[0.8125rem] text-muted">
               Matching works only between mutually-discoverable users. Publish your
               own profile first, then search.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Role keywords</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Role keywords</span>
               <input value={critRole} onChange={(e) => setCritRole(e.target.value)} placeholder="CFO, VP Sales" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Industries</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Industries</span>
               <input value={critIndustries} onChange={(e) => setCritIndustries(e.target.value)} placeholder="SaaS, HVAC" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Looking for</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Looking for</span>
               <select value={critLookingFor} onChange={(e) => setCritLookingFor(e.target.value)} className={inputCls}>
                 {LOOKING_FOR_OPTIONS.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -347,9 +347,9 @@ export function DirectoryTab({
           </div>
           {matchError && (
             <div className="rounded-md border border-line bg-canvas p-3">
-              <p className="text-[13px] font-semibold text-failed-text">{matchError}</p>
+              <p className="text-[0.8125rem] font-semibold text-failed-text">{matchError}</p>
               {matchError.toLowerCase().includes("discoverability") && (
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-1 text-[0.8125rem] text-muted">
                   Flip “Publish me to the OS directory” on and save, then search again.
                 </p>
               )}
@@ -360,7 +360,7 @@ export function DirectoryTab({
         {matches !== null && (
           <div className="flex flex-col gap-3">
             {matches.length === 0 ? (
-              <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+              <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
                 No mutually-discoverable matches. Try broader criteria — or publish
                 more of your profile so others can find you.
               </div>

@@ -27,7 +27,7 @@ export default async function DifficultyPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading">Difficulty</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+        <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
           The owned keyword-difficulty model: KD = f(median referring domains of
           the top-10 SERP, authority gap, SERP-feature crowding). Every estimate
           ships with its ± uncertainty band and full input provenance —

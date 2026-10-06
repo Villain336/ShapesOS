@@ -64,7 +64,7 @@ export function LineItemsEditor({
         <button type="button" className={btnGhostSm} onClick={() => onChange([...lines, { name: "", qty: "1", price: "" }])}>
           <Plus size={13} /> Add line
         </button>
-        <span className="text-[13px] text-muted">
+        <span className="text-[0.8125rem] text-muted">
           Subtotal <span className="font-bold tabular-nums text-ink">{fmtCents(linesSubtotal(lines))}</span>
         </span>
       </div>
@@ -123,7 +123,7 @@ export function LeadPicker({
     <div className="relative">
       <span className={labelCls}>{label} (optional)</span>
       {value ? (
-        <div className="flex h-control-sm items-center justify-between rounded-md border-[1.5px] border-control bg-paper px-3 text-[13px] text-ink">
+        <div className="flex h-control-sm items-center justify-between rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.8125rem] text-ink">
           <span className="truncate">
             {value.name}
             {value.company ? ` · ${value.company}` : ""}
@@ -144,7 +144,7 @@ export function LeadPicker({
             <button
               key={h.id}
               type="button"
-              className="block w-full px-3 py-2 text-left text-[13px] text-ink hover:bg-hover-paper"
+              className="block w-full px-3 py-2 text-left text-[0.8125rem] text-ink hover:bg-hover-paper"
               onClick={() => {
                 onChange(h);
                 setQ("");

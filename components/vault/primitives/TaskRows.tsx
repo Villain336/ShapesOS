@@ -44,7 +44,7 @@ function SpinnerRing({ active, children }: { active?: boolean; children?: React.
           />
         )}
       </svg>
-      <span className="relative text-[10.5px] font-semibold tabular-nums text-ink">{children}</span>
+      <span className="relative text-[0.65625rem] font-semibold tabular-nums text-ink">{children}</span>
     </span>
   );
 }
@@ -166,17 +166,17 @@ export default function TaskRows({
   const pillFor = (row: TaskRow) => {
     if (row.status === "done")
       return (
-        <span className="inline-flex h-5.5 items-center rounded-full bg-green-tint px-2 text-[11.5px] font-medium text-green">
+        <span className="inline-flex h-5.5 items-center rounded-full bg-green-tint px-2 text-[0.71875rem] font-medium text-green">
           {copy.completed}
         </span>
       );
     if (row.status === "running") return null;
     return row2 === "failed" ? (
-      <span className="inline-flex h-5.5 items-center gap-1.5 rounded-full bg-red-tint px-2 text-[11.5px] font-medium text-red" style={{ animation: "fade-in 200ms ease-out both" }}>
+      <span className="inline-flex h-5.5 items-center gap-1.5 rounded-full bg-red-tint px-2 text-[0.71875rem] font-medium text-red" style={{ animation: "fade-in 200ms ease-out both" }}>
         {copy.failed} <span style={{ animation: "spin 1.2s linear infinite" }} className="flex">{RetryIcon}</span>
       </span>
     ) : row2 === "done" ? (
-      <span className="inline-flex h-5.5 items-center gap-1.5 rounded-full bg-green-tint px-2 text-[11.5px] font-medium text-green" style={{ animation: "fade-in 200ms ease-out both" }}>
+      <span className="inline-flex h-5.5 items-center gap-1.5 rounded-full bg-green-tint px-2 text-[0.71875rem] font-medium text-green" style={{ animation: "fade-in 200ms ease-out both" }}>
         {copy.completed}
       </span>
     ) : null;
@@ -214,10 +214,10 @@ export default function TaskRows({
               <span className="flex size-6 shrink-0 items-center justify-center">
                 {badgeFor(row)}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-ink">
                 {row.label}
               </span>
-              <span className="text-[12.5px] text-ink-2 tabular-nums">{row.amount}</span>
+              <span className="text-[0.78125rem] text-ink-2 tabular-nums">{row.amount}</span>
               {pillFor(row)}
               <span
                 aria-hidden="true"
@@ -256,8 +256,8 @@ export default function TaskRows({
                               : undefined
                           }
                         >
-                          <span className="text-[12px] text-ink-2">{d.label}</span>
-                          <span className="font-mono text-[11.5px] text-ink-3 tabular-nums">
+                          <span className="text-[0.75rem] text-ink-2">{d.label}</span>
+                          <span className="font-mono text-[0.71875rem] text-ink-3 tabular-nums">
                             {d.meta}
                           </span>
                         </div>

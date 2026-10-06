@@ -73,10 +73,10 @@ function UnconfiguredCard({
 }) {
   return (
     <div className="rounded-md border border-line bg-canvas px-3 py-3">
-      <p className="text-[13px] font-medium text-ink">
+      <p className="text-[0.8125rem] font-medium text-ink">
         Stock media need a free {provider} API key
       </p>
-      <p className="mt-1 text-[12px] leading-snug text-muted">
+      <p className="mt-1 text-[0.75rem] leading-snug text-muted">
         {keyHint} then add it in Settings → Providers.
       </p>
       <a href="/dashboard/settings/providers" className={`${btnGhost} mt-2 inline-flex`}>
@@ -89,7 +89,7 @@ function UnconfiguredCard({
 
 function ErrorBox({ error }: { error: string }) {
   return (
-    <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
+    <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] leading-snug text-failed-text">
       {error}
     </p>
   );
@@ -97,7 +97,7 @@ function ErrorBox({ error }: { error: string }) {
 
 function EmptySearchNote({ searched, label }: { searched: string; label: string }) {
   return (
-    <p className="flex items-start gap-1.5 text-[12px] text-muted">
+    <p className="flex items-start gap-1.5 text-[0.75rem] text-muted">
       <ImageOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>
         No {label} found for “{searched}”. Try another search.
@@ -167,7 +167,7 @@ function UnsplashTab() {
   return (
     <div className="space-y-3">
       {configured === null ? (
-        <p className="flex items-center gap-1.5 text-[12px] text-muted">
+        <p className="flex items-center gap-1.5 text-[0.75rem] text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Checking stock photo setup…
         </p>
@@ -218,7 +218,7 @@ function UnsplashTab() {
                       className="h-20 w-full object-cover"
                     />
                   </button>
-                  <div className="px-1.5 py-1 text-[10px] leading-snug text-muted">
+                  <div className="px-1.5 py-1 text-[0.625rem] leading-snug text-muted">
                     Photo by{" "}
                     <a
                       href={photo.photographerUrl}
@@ -244,14 +244,14 @@ function UnsplashTab() {
           ) : searched !== null && !busy ? (
             <EmptySearchNote searched={searched} label="photos" />
           ) : (
-            <p className="text-[12px] leading-snug text-muted">
+            <p className="text-[0.75rem] leading-snug text-muted">
               Search millions of free photos from Unsplash. Click a photo to
               place it on the canvas — photographer credit travels with it.
             </p>
           )}
         </>
       )}
-      <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+      <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
         Photos by Unsplash contributors — free to use under the Unsplash
         License, with attribution.
       </p>
@@ -389,7 +389,7 @@ function PexelsTab() {
   return (
     <div className="space-y-3">
       {configured === null ? (
-        <p className="flex items-center gap-1.5 text-[12px] text-muted">
+        <p className="flex items-center gap-1.5 text-[0.75rem] text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Checking Pexels setup…
         </p>
@@ -405,7 +405,7 @@ function PexelsTab() {
               <button
                 key={t.key}
                 onClick={() => setMediaType(t.key)}
-                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium ${
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[0.75rem] font-medium ${
                   mediaType === t.key
                     ? "border-ink text-ink"
                     : "border-line bg-paper text-muted hover:bg-hover-paper"
@@ -457,7 +457,7 @@ function PexelsTab() {
                         className="h-20 w-full object-cover"
                       />
                     </button>
-                    <div className="px-1.5 py-1 text-[10px] leading-snug text-muted">
+                    <div className="px-1.5 py-1 text-[0.625rem] leading-snug text-muted">
                       Photo by{" "}
                       <a
                         href={photo.photographerUrl}
@@ -483,7 +483,7 @@ function PexelsTab() {
             ) : searched !== null && !busy ? (
               <EmptySearchNote searched={searched} label="photos" />
             ) : (
-              <p className="text-[12px] leading-snug text-muted">
+              <p className="text-[0.75rem] leading-snug text-muted">
                 Search Pexels’ curated library of free photos and videos. Click
                 to place it on the canvas — credit travels with it.
               </p>
@@ -507,14 +507,14 @@ function PexelsTab() {
                       loading="lazy"
                       className="h-20 w-full object-cover"
                     />
-                    <span className="absolute left-1 top-1 rounded bg-night/70 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">
+                    <span className="absolute left-1 top-1 rounded bg-night/70 px-1 py-0.5 text-[0.5625rem] font-semibold uppercase text-white">
                       Video
                     </span>
-                    <span className="absolute bottom-1 right-1 rounded bg-night/70 px-1 py-0.5 text-[10px] font-medium text-white">
+                    <span className="absolute bottom-1 right-1 rounded bg-night/70 px-1 py-0.5 text-[0.625rem] font-medium text-white">
                       {formatDuration(video.duration)}
                     </span>
                   </button>
-                  <div className="px-1.5 py-1 text-[10px] leading-snug text-muted">
+                  <div className="px-1.5 py-1 text-[0.625rem] leading-snug text-muted">
                     Video by{" "}
                     <a
                       href={video.videographerUrl}
@@ -540,7 +540,7 @@ function PexelsTab() {
           ) : searched !== null && !busy ? (
             <EmptySearchNote searched={searched} label="videos" />
           ) : (
-            <p className="text-[12px] leading-snug text-muted">
+            <p className="text-[0.75rem] leading-snug text-muted">
               Videos are placed as preview posters — the canvas has no video
               element yet. The direct mp4 link and duration are stored on the
               element for reference.
@@ -549,7 +549,7 @@ function PexelsTab() {
         </>
       )}
       {/* Required by the Pexels API terms: prominent "provided by Pexels" credit. */}
-      <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+      <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
         Photos and videos provided by Pexels — free to use under the Pexels
         License, with photographer credit.
       </p>
@@ -655,7 +655,7 @@ function PixabayTab() {
   return (
     <div className="space-y-3">
       {configured === null ? (
-        <p className="flex items-center gap-1.5 text-[12px] text-muted">
+        <p className="flex items-center gap-1.5 text-[0.75rem] text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Checking Pixabay setup…
         </p>
@@ -671,7 +671,7 @@ function PixabayTab() {
               <button
                 key={t.key}
                 onClick={() => setMediaType(t.key)}
-                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium ${
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[0.75rem] font-medium ${
                   mediaType === t.key
                     ? "border-ink text-ink"
                     : "border-line bg-paper text-muted hover:bg-hover-paper"
@@ -737,16 +737,16 @@ function PixabayTab() {
                     />
                     {asset.mediaType === "video" && (
                       <>
-                        <span className="absolute left-1 top-1 rounded bg-night/70 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">
+                        <span className="absolute left-1 top-1 rounded bg-night/70 px-1 py-0.5 text-[0.5625rem] font-semibold uppercase text-white">
                           Video
                         </span>
-                        <span className="absolute bottom-1 right-1 rounded bg-night/70 px-1 py-0.5 text-[10px] font-medium text-white">
+                        <span className="absolute bottom-1 right-1 rounded bg-night/70 px-1 py-0.5 text-[0.625rem] font-medium text-white">
                           {formatDuration(asset.duration ?? 0)}
                         </span>
                       </>
                     )}
                   </button>
-                  <div className="px-1.5 py-1 text-[10px] leading-snug text-muted">
+                  <div className="px-1.5 py-1 text-[0.625rem] leading-snug text-muted">
                     By{" "}
                     <a
                       href={asset.pageUrl}
@@ -772,14 +772,14 @@ function PixabayTab() {
           ) : searched !== null && !busy ? (
             <EmptySearchNote searched={searched} label={mediaType === "video" ? "videos" : "images"} />
           ) : (
-            <p className="text-[12px] leading-snug text-muted">
+            <p className="text-[0.75rem] leading-snug text-muted">
               Search 6M+ free photos, illustrations, vectors, and videos. Placed
               assets are downloaded and served by ShapesOS (no permanent
               Pixabay hotlinking, per their API terms).
             </p>
           )}
           {/* Model/property-release disclaimer — Pixabay does not guarantee releases. */}
-          <p className="flex items-start gap-1.5 rounded-md border border-line bg-needs-tint px-2.5 py-2 text-[11px] leading-snug text-ink">
+          <p className="flex items-start gap-1.5 rounded-md border border-line bg-needs-tint px-2.5 py-2 text-[0.6875rem] leading-snug text-ink">
             <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5" />
             <span>
               Pixabay doesn’t guarantee model or property releases for people,
@@ -789,7 +789,7 @@ function PixabayTab() {
           </p>
         </>
       )}
-      <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+      <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
         Images and videos from Pixabay contributors — free to use under the
         Pixabay Content License.
       </p>
@@ -818,7 +818,7 @@ export function StockPhotosPanel() {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium ${
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[0.8125rem] font-medium ${
                 tab === t.key
                   ? "border-ink text-ink"
                   : "border-line bg-paper text-muted hover:bg-hover-paper"

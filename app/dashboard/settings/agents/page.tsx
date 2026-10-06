@@ -171,7 +171,7 @@ export default async function AgentsSettingsPage({
                 key={t.id}
                 href={`/dashboard/settings/agents?tab=${t.id}`}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
                   active
                     ? "border-ink text-ink"
                     : "border-transparent text-muted hover:text-ink"

@@ -192,7 +192,7 @@ export function FileManager({
               setTrashOpen(false);
             }}
             className={cn(
-              "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
+              "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors",
               !trashOpen && (prefix === r.path || prefix.startsWith(`${r.path}/`))
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink",
@@ -208,7 +208,7 @@ export function FileManager({
             type="button"
             onClick={() => setTrashOpen((v) => !v)}
             className={cn(
-              "ml-auto flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
+              "ml-auto flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors",
               trashOpen
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink",
@@ -330,7 +330,7 @@ export function FileManager({
                   type="button"
                   onClick={() => fileInput.current?.click()}
                   disabled={busy}
-                  className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-night-hover disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-50"
                 >
                   <Upload size={16} />
                   {busy ? "Uploading…" : "Upload"}
@@ -433,7 +433,7 @@ export function FileManager({
 
       {/* Rename / move dialog */}
       {dialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4">
           <div className="w-full max-w-sm rounded-xl border border-line bg-paper p-4 shadow-lg">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">
@@ -472,7 +472,7 @@ export function FileManager({
                     ? void mutate(dialog.file.id, "rename", { filename: dialog.value.trim() })
                     : void mutate(dialog.file.id, "move", { newPath: dialog.value.trim() })
                 }
-                className="inline-flex items-center rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-night-hover disabled:opacity-50"
+                className="inline-flex items-center rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-50"
               >
                 {dialog.type === "rename" ? "Rename" : "Move"}
               </button>

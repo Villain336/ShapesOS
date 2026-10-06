@@ -209,9 +209,9 @@ export function StockByLocationView() {
             <tbody>
               {rows.map((r) => (
                 <tr key={`${r.locationId}|${r.variantId}|${r.productId}`}>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{r.locationPath ?? <span className="text-muted">Unlocated</span>}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{r.locationPath ?? <span className="text-muted">Unlocated</span>}</td>
                   <td className={tdCls}>
-                    {r.productName} <span className="font-mono text-[12px] text-muted">{r.sku}</span>
+                    {r.productName} <span className="font-mono text-[0.75rem] text-muted">{r.sku}</span>
                   </td>
                   <td className={`${tdCls} text-muted`}>{r.variantName && r.variantSku !== r.sku ? `${r.variantName} (${r.variantSku})` : "Default"}</td>
                   <td className={`${tdCls} text-right font-semibold tabular-nums`}>{r.qty}</td>
@@ -253,7 +253,7 @@ export function WarehousesView() {
     (childrenOf.get(key) ?? []).map((l) => (
       <div key={l.id}>
         <div className="flex items-center justify-between gap-2 border-b border-line py-1.5" style={{ paddingLeft: 12 + depth * 18 }}>
-          <span className="flex items-center gap-2 text-[13px] text-ink">
+          <span className="flex items-center gap-2 text-[0.8125rem] text-ink">
             <span className={chipCls}>{sentence(l.kind)}</span>
             <span className="font-mono">{l.code}</span>
             {l.name && <span className="text-muted">{l.name}</span>}
@@ -286,10 +286,10 @@ export function WarehousesView() {
           <section key={w.id} className="rounded-lg border border-line bg-paper">
             <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
               <div>
-                <p className="text-[14px] font-bold text-ink">
+                <p className="text-[0.875rem] font-bold text-ink">
                   <span className="font-mono">{w.code}</span> · {w.name}
                 </p>
-                {w.address && <p className="text-[12px] text-muted">{w.address}</p>}
+                {w.address && <p className="text-[0.75rem] text-muted">{w.address}</p>}
               </div>
               <button type="button" className={btnGhostSm} onClick={() => setModal({ kind: "location", warehouseId: w.id })}>
                 <Plus size={12} /> Add location
@@ -297,7 +297,7 @@ export function WarehousesView() {
             </div>
             <div className="pb-1">
               {(childrenOf.get(`wh:${w.id}`) ?? []).length === 0 ? (
-                <p className="px-3 py-3 text-[13px] text-muted">No locations yet.</p>
+                <p className="px-3 py-3 text-[0.8125rem] text-muted">No locations yet.</p>
               ) : (
                 renderTree(`wh:${w.id}`, 0)
               )}
@@ -482,7 +482,7 @@ export function VariantsView() {
             <tbody>
               {variants.rows.map((v) => (
                 <tr key={v.id}>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{v.sku}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{v.sku}</td>
                   <td className={tdCls}>
                     {v.name} {v.isDefault && <span className={chipCls}>Default</span>}
                   </td>
@@ -640,8 +640,8 @@ export function TransfersView() {
               {transfers.rows.map((t) => (
                 <tr key={t.id}>
                   <td className={`${tdCls} font-semibold`}>TR-{shortId(t.id)}</td>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{L.get(t.fromLocationId)?.path ?? shortId(t.fromLocationId)}</td>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{L.get(t.toLocationId)?.path ?? shortId(t.toLocationId)}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{L.get(t.fromLocationId)?.path ?? shortId(t.fromLocationId)}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{L.get(t.toLocationId)?.path ?? shortId(t.toLocationId)}</td>
                   <td className={`${tdCls} text-muted`}>{t.lines.map((l) => `${l.qty} × ${P.get(l.productId)?.sku ?? shortId(l.productId)}`).join(", ")}</td>
                   <td className={tdCls}>
                     <span className={chipCls}>{sentence(t.status)}</span>
@@ -828,9 +828,9 @@ export function ReorderRulesView() {
               {rules.rows.map((r) => (
                 <tr key={r.id}>
                   <td className={tdCls}>
-                    {P.get(r.productId)?.name ?? shortId(r.productId)} <span className="font-mono text-[12px] text-muted">{P.get(r.productId)?.sku}</span>
+                    {P.get(r.productId)?.name ?? shortId(r.productId)} <span className="font-mono text-[0.75rem] text-muted">{P.get(r.productId)?.sku}</span>
                   </td>
-                  <td className={`${tdCls} font-mono text-[12px]`}>{W.get(r.warehouseId)?.code ?? shortId(r.warehouseId)}</td>
+                  <td className={`${tdCls} font-mono text-[0.75rem]`}>{W.get(r.warehouseId)?.code ?? shortId(r.warehouseId)}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{r.minQty}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{r.maxQty}</td>
                   <td className={`${tdCls} text-muted`}>

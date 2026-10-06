@@ -16,6 +16,8 @@ import { isInboxSource } from "@/lib/approvals/types";
 import { safeAgentActivity } from "@/lib/aos/activity.server";
 import { missionAgentIndex } from "@/lib/aos/approvals";
 import ApprovalsInbox from "./ApprovalsInbox";
+// Phase 18.1 (WS=find): the page in the person's language.
+import { getI18n } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +46,13 @@ export default async function ApprovalsPage({
   // sidebar's read for this request; best effort).
   const activity = await safeAgentActivity(workspace.id);
   const missionAgents = missionAgentIndex(activity?.tree?.missions ?? []);
+  const { t } = await getI18n();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="aos-heading">Needs you</h1>
-        <p className="mt-1 text-md text-muted">
-          Every request waiting on a person in {workspace.name}. Nothing goes out until someone decides.
-        </p>
+        <h1 className="aos-heading">{t("approvals.title")}</h1>
+        <p className="mt-1 text-md text-muted">{t("approvals.subtitle", { workspace: workspace.name })}</p>
       </div>
       <ApprovalsInbox initialSource={initialSource} missionAgents={missionAgents} />
     </div>

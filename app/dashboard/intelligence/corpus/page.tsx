@@ -44,7 +44,7 @@ export default async function CorpusPage() {
         </div>
         <Link
           href="/dashboard/intelligence/corpus/brain"
-          className="aos-press flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover"
+          className="aos-press flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-hover"
         >
           <Brain className="h-3.5 w-3.5" /> Knowledge Brain
         </Link>

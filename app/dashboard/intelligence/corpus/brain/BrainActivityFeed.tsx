@@ -72,7 +72,7 @@ export function BrainActivityFeed({ refreshKey }: { refreshKey: number }) {
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <History className="h-4 w-4 text-subtle" />
         <div className="text-sm font-semibold text-ink">Activity</div>
-        <div className="text-[11px] text-subtle">what actually happened</div>
+        <div className="text-[0.6875rem] text-subtle">what actually happened</div>
       </div>
       <div className="max-h-[420px] overflow-y-auto">
         {loading && (
@@ -110,7 +110,7 @@ export function BrainActivityFeed({ refreshKey }: { refreshKey: number }) {
                       {e.detail}
                     </div>
                   )}
-                  <div className="mt-0.5 text-[11px] text-subtle">
+                  <div className="mt-0.5 text-[0.6875rem] text-subtle">
                     {timeAgo(e.at)}
                     {e.actor ? ` · ${e.actor}` : ""}
                   </div>

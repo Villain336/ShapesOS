@@ -112,6 +112,9 @@ export function BrainCanvas2D({
     const MUTED = resolveToken("--aos-text-muted");
     const SUBTLE = resolveToken("--aos-text-subtle");
     const FAILED = resolveToken("--aos-failed");
+    // Phase 18.1: edges, pulses and label halos from tokens (they read on
+    // dark chrome too), with the transparency applied through globalAlpha.
+    const PAPER = resolveToken("--aos-paper");
 
     const toScreen = (x: number, y: number) => {
       const v = viewRef.current;
@@ -157,20 +160,24 @@ export function BrainCanvas2D({
         const pa = toScreen(a.x, a.y);
         const pb = toScreen(b.x, b.y);
         // Edges: ink at low alpha (neutral — categories never take status color).
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.14)";
+        ctx.save();
+        ctx.strokeStyle = INK;
+        ctx.globalAlpha = 0.14;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
         ctx.lineTo(pb.x, pb.y);
         ctx.stroke();
+        ctx.restore();
         // Traveling pulse — the "thinking" signal (neutral ink glow).
         const phase = (t * 0.25 + (edgePhase.get(`${e.from}→${e.to}`) ?? 0)) % 1;
         const px = pa.x + (pb.x - pa.x) * phase;
         const py = pa.y + (pb.y - pa.y) * phase;
         ctx.save();
-        ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+        ctx.shadowColor = INK;
         ctx.shadowBlur = 8;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = INK;
         ctx.beginPath();
         ctx.arc(px, py, 2.2, 0, Math.PI * 2);
         ctx.fill();
@@ -253,8 +260,10 @@ export function BrainCanvas2D({
           ctx.textAlign = "center";
           const label = n.title.length > 26 ? `${n.title.slice(0, 25)}…` : n.title;
           ctx.lineWidth = 3;
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+          ctx.strokeStyle = PAPER;
+          ctx.globalAlpha = 0.92;
           ctx.strokeText(label, s.x, s.y + r + 14);
+          ctx.globalAlpha = 1;
           ctx.fillStyle = MUTED;
           ctx.fillText(label, s.x, s.y + r + 14);
         }
@@ -358,23 +367,23 @@ export function BrainCanvas2D({
         <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
           <Brain className="h-3.5 w-3.5" /> Legend
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink" /> Tier 1 · official
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dashed border-ink" /> Tier 1S · ShapesOS synthesis
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-subtle" /> Proposed
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-ink" /> Node size ∝ chunks
         </div>
       </div>
       {hoverNode && (
         <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md bg-paper px-2.5 py-2 shadow-raised">
-          <div className="text-[12px] font-semibold text-ink">{hoverNode.title}</div>
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{hoverNode.teaches}</div>
+          <div className="text-[0.75rem] font-semibold text-ink">{hoverNode.title}</div>
+          <div className="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug text-muted">{hoverNode.teaches}</div>
         </div>
       )}
     </div>

@@ -5,6 +5,8 @@
 // automations canvas run full-bleed (edge to edge, no page header).
 
 import { usePathname } from "next/navigation";
+// Phase 18.1 (WS=find): the skip link's target and the page's main landmark.
+import { MAIN_CONTENT_ID } from "@/components/a11y/SkipLink";
 
 // Phase 18.1 (WS=desk): split view fills the frame too.
 const FULL_BLEED_SUFFIX = ["/chat", "/assistant", "/automations", "/crm", "/dashboard/split"];
@@ -26,14 +28,18 @@ export function DashboardMain({
   if (fullBleed) {
     return (
       // 57px = the mobile top bar (MobileNav) and, on desktop, AppTopBar.
-      <main className={pane ? "h-dvh" : "h-[calc(100dvh-57px)]"}>
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className={pane ? "h-dvh" : "h-[calc(100dvh-57px)]"}>
         {children}
       </main>
     );
   }
 
   return (
-    <main className={pane ? "w-full px-4 py-4" : "w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-10"}>
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className={pane ? "w-full px-4 py-4" : "w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-gutter"}
+    >
       {banner}
       {children}
     </main>

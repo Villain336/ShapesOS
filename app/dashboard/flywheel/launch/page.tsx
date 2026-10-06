@@ -10,7 +10,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -39,7 +39,7 @@ const STATUS_SHAPE = (tone: string) => (
 );
 function statusBadge(status: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   switch (status) {
     case "complete":
       return (
@@ -84,11 +84,11 @@ export default async function LaunchReadinessPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Public-launch readiness</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Repo hygiene, license, and community bar for going public — tracked with evidence, not vibes.
           </p>
         </div>
-        <span className="text-[13px] font-semibold text-muted">{progress.complete}/{progress.total} complete</span>
+        <span className="text-[0.8125rem] font-semibold text-muted">{progress.complete}/{progress.total} complete</span>
       </header>
 
       <div className="flex items-start gap-2.5 rounded-lg bg-needs p-4 text-sm text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span><strong>Readiness only.</strong> The open-core split is deferred by standing decision (SPEC-PHASE7 §12.5). Nothing here flips the repo public — this page tracks the bar, not the launch.</span></div>
@@ -100,7 +100,7 @@ export default async function LaunchReadinessPage() {
       {ready && (
         <>
           <div className="rounded-xl border border-line bg-white p-4">
-            <div className="flex items-center justify-between text-[13px]">
+            <div className="flex items-center justify-between text-[0.8125rem]">
               <span className="font-medium text-ink">Overall readiness</span>
               <span className="text-muted">{pct}%</span>
             </div>
@@ -130,10 +130,10 @@ export default async function LaunchReadinessPage() {
               <section key={c.key} className="space-y-2">
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight text-ink">{c.title}</h2>
-                  <p className="text-[13px] text-muted">{c.blurb}</p>
+                  <p className="text-[0.8125rem] text-muted">{c.blurb}</p>
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-line bg-white">
-                  <table className="w-full text-left text-[13px]">
+                  <table className="w-full text-left text-[0.8125rem]">
                     <thead>
                       <tr className="border-b border-line text-xs font-semibold text-muted">
                         <th className="px-3 py-2 font-medium">Checklist item</th>
@@ -149,10 +149,10 @@ export default async function LaunchReadinessPage() {
                           <tr key={r.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                             <td className="max-w-sm px-3 py-2">
                               <span className="font-medium text-ink">{r.item}</span>
-                              {cat && <span className="block text-[12px] text-muted">{cat.doneWhen}</span>}
-                              {r.note && <span className="block text-[12px] italic text-muted">Note: {r.note}</span>}
+                              {cat && <span className="block text-[0.75rem] text-muted">{cat.doneWhen}</span>}
+                              {r.note && <span className="block text-[0.75rem] italic text-muted">Note: {r.note}</span>}
                               {cat && (
-                                <span className="block text-[11px] text-subtle">
+                                <span className="block text-[0.6875rem] text-subtle">
                                   {cat.specRef} · hint: {cat.evidenceHint}
                                 </span>
                               )}
@@ -160,7 +160,7 @@ export default async function LaunchReadinessPage() {
                             <td className="px-3 py-2">
                               {statusBadge(r.status)}
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-muted">
+                            <td className="px-3 py-2 text-[0.75rem] text-muted">
                               {r.evidenceUrl ? (
                                 /^https?:\/\//.test(r.evidenceUrl) ? (
                                   <a
@@ -198,13 +198,13 @@ export default async function LaunchReadinessPage() {
 
           <section className="rounded-xl border border-line bg-white p-4">
             <h2 className="text-sm font-semibold tracking-tight text-ink">Decision brief: the open-core split (deferred)</h2>
-            <p className="mt-0.5 text-[13px] text-muted">
+            <p className="mt-0.5 text-[0.8125rem] text-muted">
               Four options mapped in <span className="font-mono">docs/open-core-options.md</span> — presented
               with tradeoffs, no recommendation. The split is genuinely undecided; this phase builds readiness
               and the brief, not the decision.
             </p>
             <div className="mt-2 overflow-x-auto rounded-xl border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Option</th>

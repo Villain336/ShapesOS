@@ -19,7 +19,6 @@ import { Inbox, Loader2, RefreshCw, Search } from "lucide-react";
 import { refreshNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
 import { AgentTree, ApprovalCard, Banner, FilterPill, aosButton } from "@/components/aos";
 import {
-  INBOX_SOURCE_LABELS,
   ageLabel,
   type InboxAction,
   type InboxItem,
@@ -39,6 +38,9 @@ import {
   type MissionAgentIndex,
 } from "@/lib/aos/approvals";
 import { toast, toastError } from "@/lib/ui/feedback";
+// Phase 18.1 (WS=find): the inbox chrome in the person's language. Item text
+// (titles, details, requester) is workspace data and is never translated.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type SourceFilter = InboxSourceKey | "all";
 
@@ -64,12 +66,10 @@ function cardId(item: InboxItem): string {
   return `approval-${item.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
-function ageText(iso: string): string {
+function ageText(iso: string, ago: (age: string) => string): string {
   const a = ageLabel(iso);
-  return a === "just now" || a === "—" ? a : `${a} ago`;
+  return a === "just now" || a === "—" ? a : ago(a);
 }
-
-const RISK_TEXT = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
 
 function CardFor({
   item,
@@ -83,6 +83,7 @@ function CardFor({
   onDecide: (item: InboxItem, which: "approve" | "deny") => void;
 }) {
   const mode = approvalMode(item);
+  const { t, format } = useI18n();
   return (
     <ApprovalCard
       id={cardId(item)}
@@ -92,9 +93,9 @@ function CardFor({
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="font-semibold text-ink">{item.typeLabel}</span>
           <span aria-hidden>·</span>
-          <span title={new Date(item.createdAt).toLocaleString()}>{ageText(item.createdAt)}</span>
+          <span title={format.date(item.createdAt, "dateTime")}>{ageText(item.createdAt, (age) => t("approvals.ago", { age }))}</span>
           <span aria-hidden>·</span>
-          <span className={item.risk === "high" ? "font-semibold text-ink" : undefined}>{RISK_TEXT[item.risk]}</span>
+          <span className={item.risk === "high" ? "font-semibold text-ink" : undefined}>{t(`approvals.risk.${item.risk}`)}</span>
         </span>
       }
       body={approvalBody(item, missionAgents)}
@@ -129,6 +130,7 @@ export default function ApprovalsInbox({
   const [busy, setBusy] = useState<{ key: string; which: "approve" | "deny" } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { t } = useI18n();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,14 +138,14 @@ export default function ApprovalsInbox({
     try {
       const res = await fetch("/api/approvals/inbox", { cache: "no-store" });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't load approvals.");
+      if (!res.ok) throw new Error(body.error ?? t("approvals.loadError"));
       setData(body as InboxResult);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Couldn't load approvals.");
+      setLoadError(e instanceof Error ? e.message : t("approvals.loadError"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -189,7 +191,7 @@ export default function ApprovalsInbox({
       toast({ ...decisionToast(item, which), status: "done" });
       refreshNeedsYouCount();
     } catch (e) {
-      toastError(which === "approve" ? "Couldn't approve" : "Couldn't deny", e instanceof Error ? e.message : "Decision failed.");
+      toastError(which === "approve" ? t("approvals.couldNotApprove") : t("approvals.couldNotDeny"), e instanceof Error ? e.message : t("approvals.decisionFailed"));
     } finally {
       setBusy(null);
     }
@@ -199,7 +201,7 @@ export default function ApprovalsInbox({
     return (
       <div className="flex items-center gap-2 text-md text-muted">
         <Loader2 size={16} className="aos-spin" aria-hidden />
-        Loading approvals…
+        {t("approvals.loading")}
       </div>
     );
   }
@@ -223,25 +225,25 @@ export default function ApprovalsInbox({
           status="needs"
           title={banner.title}
           description={banner.description}
-          action={firstMine ? { label: "Start with the newest", href: `#${cardId(firstMine)}` } : null}
+          action={firstMine ? { label: t("approvals.startWithNewest"), href: `#${cardId(firstMine)}` } : null}
         />
       ) : null}
 
       {/* Filters: queue pills, scope toggle, search, refresh. */}
       <div className="flex flex-col gap-3">
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter by queue">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label={t("approvals.filterByQueue")}>
           <FilterPill selected={source === "all"} count={data?.total ?? 0} onClick={() => setSource("all")}>
-            All
+            {t("approvals.all")}
           </FilterPill>
           {sourceOptions.map((s) => (
             <FilterPill key={s.source} selected={source === s.source} count={s.total} onClick={() => setSource(s.source)}>
-              {s.label}
+              {t(`approvals.sources.${s.source}`)}
             </FilterPill>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <FilterPill selected={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
-            Only what I can decide
+            {t("approvals.onlyMine")}
           </FilterPill>
           <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
             <Search size={15} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-subtle" aria-hidden />
@@ -249,8 +251,8 @@ export default function ApprovalsInbox({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search requests"
-              aria-label="Search approvals"
+              placeholder={t("approvals.searchPlaceholder")}
+              aria-label={t("approvals.searchLabel")}
               className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper pr-3 pl-9 text-md text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
             />
           </div>
@@ -261,7 +263,7 @@ export default function ApprovalsInbox({
             className={aosButton({ variant: "secondary", size: "sm", className: "ml-auto" })}
           >
             <RefreshCw size={14} className={loading ? "aos-spin" : undefined} aria-hidden />
-            {loading ? "Refreshing" : "Refresh"}
+            {loading ? t("common.refreshing") : t("common.refresh")}
           </button>
         </div>
       </div>
@@ -269,18 +271,16 @@ export default function ApprovalsInbox({
       {loadError ? (
         <p role="alert" className="flex items-center gap-2 text-md text-failed-text">
           <span className="size-2.5 shrink-0 bg-failed" aria-hidden />
-          {loadError} Refresh to try again.
+          {t("approvals.refreshToRetry", { error: loadError })}
         </p>
       ) : null}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
           <Inbox size={28} className="text-subtle" aria-hidden />
-          <h2 className="aos-subheading">{data && data.total > 0 && filtered ? "No requests match these filters" : "Nothing needs you"}</h2>
+          <h2 className="aos-subheading">{data && data.total > 0 && filtered ? t("approvals.noMatchTitle") : t("approvals.emptyTitle")}</h2>
           <p className="max-w-[44ch] text-md text-muted">
-            {data && data.total > 0 && filtered
-              ? "Clear the search or pick another queue to see the rest."
-              : "When an agent or a teammate needs a sign-off, it shows up here. Agents keep working on everything else."}
+            {data && data.total > 0 && filtered ? t("approvals.noMatchBody") : t("approvals.emptyBody")}
           </p>
           {data && data.total > 0 && filtered ? (
             <button
@@ -292,7 +292,7 @@ export default function ApprovalsInbox({
               }}
               className={aosButton({ variant: "secondary", size: "sm" })}
             >
-              Clear filters
+              {t("approvals.clearFilters")}
             </button>
           ) : null}
         </div>
@@ -301,7 +301,7 @@ export default function ApprovalsInbox({
           {grouped.lead ? (
             <section aria-labelledby="from-missions-h" className="flex flex-col gap-3">
               <h2 id="from-missions-h" className="aos-subheading">
-                From your agents
+                {t("approvals.fromAgents")}
               </h2>
               <div className="rounded-lg bg-paper p-3 shadow-hairline sm:p-4">
                 <AgentTree
@@ -319,7 +319,7 @@ export default function ApprovalsInbox({
           {grouped.other.length > 0 ? (
             <section aria-labelledby="other-requests-h" className="flex flex-col gap-3">
               <h2 id="other-requests-h" className="aos-subheading">
-                {grouped.lead ? "From your apps and team" : "Requests"}
+                {grouped.lead ? t("approvals.fromApps") : t("approvals.requests")}
               </h2>
               <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{grouped.other.map(card)}</div>
             </section>
@@ -329,14 +329,12 @@ export default function ApprovalsInbox({
 
       {data && data.errors.length > 0 ? (
         <p className="rounded-md bg-paper px-4 py-3 text-sm text-muted shadow-hairline">
-          Couldn&apos;t load {data.errors.map((e) => INBOX_SOURCE_LABELS[e.source]).join(", ")}. The rest of the inbox is up
-          to date. Refresh to try again.
+          {t("approvals.sourcesFailed", { sources: data.errors.map((e) => t(`approvals.sources.${e.source}`)).join(", ") })}
         </p>
       ) : null}
 
       <p className="text-sm text-muted">
-        Approve and Deny call each queue&apos;s own approval API, which re-checks your role, expiry and separation of duties.
-        Review opens the queue&apos;s own screen for decisions that need more context (one-time codes, send channels, edits).
+        {t("approvals.footnote")}
       </p>
     </div>
   );

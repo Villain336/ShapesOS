@@ -78,7 +78,7 @@ export const inputCls =
 export const textareaCls =
   "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 export const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
 export const btnSecondary =
   "inline-flex h-control-sm cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
 export const btnApprove =
@@ -86,14 +86,14 @@ export const btnApprove =
 export const btnDeny =
   "inline-flex h-control-sm cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
 export const btnQuiet =
-  "inline-flex h-8 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13px] font-semibold text-ink hover:bg-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[0.8125rem] font-semibold text-ink hover:bg-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
 export const cardCls = "rounded-lg bg-paper shadow-hairline";
 export const thCls = "px-3 py-2 text-left text-xs font-semibold text-muted";
 export const thNum = "px-3 py-2 text-right text-xs font-semibold text-muted";
-export const tdCls = "px-3 py-2.5 align-top text-[13px] text-ink";
-export const tdNum = "px-3 py-2.5 align-top text-right text-[13px] tabular-nums text-ink";
+export const tdCls = "px-3 py-2.5 align-top text-[0.8125rem] text-ink";
+export const tdNum = "px-3 py-2.5 align-top text-right text-[0.8125rem] tabular-nums text-ink";
 
-const chipBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold text-ink";
+const chipBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[0.75rem] font-semibold text-ink";
 
 /** Post state: needs-you triangle for approvals, done/failed shapes, queued outline when handed off. */
 /** Post state. Status shapes are reserved for agent states (DESIGN.md);
@@ -133,7 +133,7 @@ export function StatusChip({ status, scheduledFor }: { status: PostStatus; sched
 
 export function Tag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-6 items-center rounded-full bg-canvas px-2 text-[12px] font-semibold text-ink">{children}</span>
+    <span className="inline-flex h-6 items-center rounded-full bg-canvas px-2 text-[0.75rem] font-semibold text-ink">{children}</span>
   );
 }
 

@@ -63,7 +63,7 @@ export function LayersPanel() {
       <div className={panelTitle}>Layers · {page.name}</div>
       <div className="space-y-1 px-3 pb-4">
         {rows.length === 0 && (
-          <p className="text-[12px] text-muted">This page is empty — add something from the other panels.</p>
+          <p className="text-[0.75rem] text-muted">This page is empty — add something from the other panels.</p>
         )}
         {rows.map((el) => {
           const selected = selectedIds.includes(el.id);
@@ -74,7 +74,7 @@ export function LayersPanel() {
               onClick={() => select([el.id])}
               onDoubleClick={() => rename(el)}
               title="Click to select · double-click to rename"
-              className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] ${
+              className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[0.75rem] ${
                 selected
                   ? "border-ink bg-hover-paper text-ink"
                   : "border-line bg-paper text-ink hover:border-line-strong"

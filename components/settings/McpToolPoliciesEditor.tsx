@@ -15,7 +15,7 @@ import { FieldMessage } from "@/components/aos/Controls";
 const selectCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2 text-sm text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const chipCls =
@@ -103,7 +103,7 @@ export default function McpToolPoliciesEditor({
   return (
     <div className="mt-2 rounded-lg border border-line bg-paper p-4" data-testid={`mcp-policy-editor-${connectorId}`}>
       <h3 className="text-sm font-semibold text-ink">Tool groups and approvals</h3>
-      <p className="mt-1 text-[13px] text-muted">
+      <p className="mt-1 text-[0.8125rem] text-muted">
         Choose which tool group covers each tool on {connectorName} (a task can only use the groups it was
         given) and what kind of action it is (its approval tier). Unmapped tools are connected-app tools that
         always ask first.

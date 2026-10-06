@@ -38,7 +38,7 @@ import { activateOnKey } from "@/lib/ui/keyboard";
 // Clip/job/source statuses are provider states, not agent states — neutral chips.
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
@@ -46,12 +46,12 @@ function Chip({ children }: { children: React.ReactNode }) {
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
-  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
 // Spec switch (44x26 pill track, white 20px knob) with a visible label.
 function Switch({
@@ -64,7 +64,7 @@ function Switch({
   label: string;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[0.8125rem] text-muted">
       <button
         type="button"
         role="switch"
@@ -141,17 +141,17 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4">
       <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-paper shadow-overlay">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">New source</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">New source</h2>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="px-5 py-4">
           {error && (
-            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
@@ -167,7 +167,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
                 key={id}
                 type="button"
                 onClick={() => setMode(id)}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
                   mode === id
                     ? "border-ink text-ink"
                     : "border-transparent text-muted hover:text-ink"
@@ -179,7 +179,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
             ))}
           </div>
 
-          <label className="mb-1 block text-[12px] font-medium text-muted">Title</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Title</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -191,10 +191,10 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
           {mode === "upload" ? (
             <label className="block cursor-pointer rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition hover:border-ink/50">
               <UploadCloud size={20} className="mx-auto text-muted" />
-              <div className="mt-1.5 text-[13px] font-medium text-ink">
+              <div className="mt-1.5 text-[0.8125rem] font-medium text-ink">
                 {file ? file.name : "Choose a video file"}
               </div>
-              <div className="mt-0.5 text-[11px] text-muted">MP4, MOV, WebM — long-form works best</div>
+              <div className="mt-0.5 text-[0.6875rem] text-muted">MP4, MOV, WebM — long-form works best</div>
               <input
                 type="file"
                 accept="video/*"
@@ -209,7 +209,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
             </label>
           ) : (
             <>
-              <label className="mb-1 block text-[12px] font-medium text-muted">Video URL</label>
+              <label className="mb-1 block text-[0.75rem] font-medium text-muted">Video URL</label>
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -266,26 +266,26 @@ function GenerateDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4">
       <div className="w-full max-w-sm overflow-hidden rounded-lg bg-paper shadow-overlay">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">Generate clips</h2>
+          <h2 className="text-[0.9375rem] font-semibold text-ink">Generate clips</h2>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="px-5 py-4">
           {error && (
-            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
-          <p className="mb-3 text-[13px] text-muted">
+          <p className="mb-3 text-[0.8125rem] text-muted">
             Scores candidate segments from <span className="font-medium text-ink">{source.title}</span> and
             drafts the top {count}. Runs as one background job.
           </p>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Number of clips</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Number of clips</label>
           <input
             type="number"
             min={1}
@@ -345,9 +345,9 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line text-[11px] text-muted">
+            <tr className="border-b border-line text-[0.6875rem] text-muted">
               <th className="px-3 py-2 font-medium">Title</th>
               <th className="px-3 py-2 font-medium">Origin</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -387,7 +387,7 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
             ))}
             {sources.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-muted">
+                <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-muted">
                   No sources yet — add the first one with “New source”.
                 </td>
               </tr>
@@ -472,7 +472,7 @@ function CaptionEditor({
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Brand preset</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Brand preset</label>
           <select
             className={`${inputCls} w-full`}
             value={presets.find((p) => p.font === style.font && p.highlightColor === style.highlightColor && p.textColor === style.textColor)?.id ?? ""}
@@ -488,7 +488,7 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Font</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Font</label>
           <select className={`${inputCls} w-full`} value={style.font} onChange={(e) => set({ font: e.target.value })}>
             {fontOptions.map((f) => (
               <option key={f} value={f}>{f}</option>
@@ -496,7 +496,7 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Size ({style.size ?? 44}px)</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Size ({style.size ?? 44}px)</label>
           <input
             type="range"
             min={24}
@@ -507,7 +507,7 @@ function CaptionEditor({
           />
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Position</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Position</label>
           <select
             className={`${inputCls} w-full`}
             value={style.position ?? "bottom"}
@@ -519,7 +519,7 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Text color</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Text color</label>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
@@ -530,13 +530,13 @@ function CaptionEditor({
             <input
               value={style.textColor ?? "#ffffff"}
               onChange={(e) => set({ textColor: e.target.value })}
-              className={`${inputCls} w-full font-mono text-[12px]`}
+              className={`${inputCls} w-full font-mono text-[0.75rem]`}
               maxLength={7}
             />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-muted">Highlight color</label>
+          <label className="mb-1 block text-[0.75rem] font-medium text-muted">Highlight color</label>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
@@ -547,7 +547,7 @@ function CaptionEditor({
             <input
               value={style.highlightColor ?? "#7c3aed"}
               onChange={(e) => set({ highlightColor: e.target.value })}
-              className={`${inputCls} w-full font-mono text-[12px]`}
+              className={`${inputCls} w-full font-mono text-[0.75rem]`}
               maxLength={7}
             />
           </div>
@@ -559,7 +559,7 @@ function CaptionEditor({
       </div>
 
       <div>
-        <div className="mb-1 text-[12px] font-medium text-muted">Preview (9:16)</div>
+        <div className="mb-1 text-[0.75rem] font-medium text-muted">Preview (9:16)</div>
         <div className={`flex aspect-[9/16] h-56 justify-center rounded-lg bg-ink ${positionCls} px-6`}>
           <p
             className="text-center font-bold leading-snug"
@@ -695,11 +695,11 @@ function ClipDrawer({
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} aria-hidden />
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
         <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
-            <h3 className="text-[15px] font-semibold text-ink">
+            <h3 className="text-[0.9375rem] font-semibold text-ink">
               Clip {fmtTime(c.startSec)} – {fmtTime(c.endSec)}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -715,40 +715,40 @@ function ClipDrawer({
 
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {error && (
-            <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+            <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
               <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium text-muted">Hook</div>
-            <p className="text-[13.5px] font-medium leading-snug text-ink">“{hook}”</p>
+            <div className="mb-1.5 text-[0.75rem] font-medium text-muted">Hook</div>
+            <p className="text-[0.84375rem] font-medium leading-snug text-ink">“{hook}”</p>
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium text-muted">Why it scored</div>
+            <div className="mb-1.5 text-[0.75rem] font-medium text-muted">Why it scored</div>
             {(c.scoreReasons ?? []).length > 0 ? (
               <ul className="space-y-1.5">
                 {(c.scoreReasons ?? []).map((r, i) => (
                   <li key={i} className="rounded-md border border-line bg-canvas px-2.5 py-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[12.5px] font-medium text-ink">{r.label}</span>
+                      <span className="text-[0.78125rem] font-medium text-ink">{r.label}</span>
                       {r.weight != null && (
-                        <span className="font-mono text-[11px] text-muted">+{r.weight}</span>
+                        <span className="font-mono text-[0.6875rem] text-muted">+{r.weight}</span>
                       )}
                     </div>
-                    {r.detail && <div className="mt-0.5 text-[12px] text-muted">{r.detail}</div>}
+                    {r.detail && <div className="mt-0.5 text-[0.75rem] text-muted">{r.detail}</div>}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[13px] text-muted">No score reasons recorded.</p>
+              <p className="text-[0.8125rem] text-muted">No score reasons recorded.</p>
             )}
           </section>
 
           <section>
-            <div className="mb-2 text-[12px] font-medium text-muted">Caption style</div>
+            <div className="mb-2 text-[0.75rem] font-medium text-muted">Caption style</div>
             <CaptionEditor style={style} onChange={setStyle} previewText={hook === "—" ? "" : hook} />
             <button onClick={saveStyle} className={`${btnGhost} mt-2.5`} disabled={!!busy}>
               {busy === "style" ? <Loader2 size={14} className="aos-spin" /> : <CheckCircle2 size={14} />}
@@ -757,7 +757,7 @@ function ClipDrawer({
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium text-muted">
+            <div className="mb-1.5 text-[0.75rem] font-medium text-muted">
               Captions ({(c.captions?.segments ?? []).length} segments)
             </div>
             <textarea
@@ -774,7 +774,7 @@ function ClipDrawer({
           </section>
 
           <section className="border-t border-line pt-4">
-            <div className="mb-2 text-[12px] font-medium text-muted">Actions</div>
+            <div className="mb-2 text-[0.75rem] font-medium text-muted">Actions</div>
             <div className="flex flex-wrap gap-2">
               {canApprove && (
                 <button onClick={() => run("approve", () => patchClip({ action: "approve" }))} className={btnPrimary} disabled={!!busy}>
@@ -792,14 +792,14 @@ function ClipDrawer({
             {c.status === "approved" && !c.postizRef && (
               <div className="mt-3 space-y-2">
                 {c.renderStatus !== "ready" ? (
-                  <p className="text-[12.5px] text-muted">
+                  <p className="text-[0.78125rem] text-muted">
                     Render the clip first — queueing needs a rendered file.
                   </p>
                 ) : (
                   <>
-                    <div className="text-[12px] font-medium text-muted">Postiz channels</div>
+                    <div className="text-[0.75rem] font-medium text-muted">Postiz channels</div>
                     {channels.length === 0 ? (
-                      <p className="text-[12px] text-muted">
+                      <p className="text-[0.75rem] text-muted">
                         No channels connected yet. Connect them in Social → Channels, then come back.
                       </p>
                     ) : (
@@ -816,7 +816,7 @@ function ClipDrawer({
                                   on ? prev.filter((id) => id !== ch.id) : [...prev, ch.id],
                                 )
                               }
-                              className={`rounded-full px-2.5 py-1 text-[12px] font-medium aos-press transition ${
+                              className={`rounded-full px-2.5 py-1 text-[0.75rem] font-medium aos-press transition ${
                                 on
                                   ? "bg-ink text-white"
                                   : "bg-paper text-muted shadow-outline hover:text-ink"
@@ -833,7 +833,7 @@ function ClipDrawer({
                         {busy === "postiz" ? <Loader2 size={14} className="aos-spin" /> : <Send size={14} />}
                         Queue to Postiz (draft)
                       </button>
-                      <p className="mt-1.5 text-[12px] leading-snug text-muted">
+                      <p className="mt-1.5 text-[0.75rem] leading-snug text-muted">
                         Creates a <strong className="text-ink">draft</strong> in Postiz for your
                         approval — nothing publishes automatically.
                       </p>
@@ -843,7 +843,7 @@ function ClipDrawer({
               </div>
             )}
             {c.postizRef && (
-              <p className="mt-2 text-[12px] text-muted">
+              <p className="mt-2 text-[0.75rem] text-muted">
                 Postiz draft: <span className="font-mono text-ink">{c.postizRef}</span>
               </p>
             )}
@@ -962,16 +962,16 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
       </div>
 
       {error && (
-        <div role="alert" className="mb-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="mb-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line text-[11px] text-muted">
+            <tr className="border-b border-line text-[0.6875rem] text-muted">
               <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Time range</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -1045,7 +1045,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-muted">
+                <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-muted">
                   {clips.length === 0
                     ? "No clips yet — generate some from a source."
                     : "No clips match your filters."}
@@ -1135,15 +1135,15 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
         >
           <RefreshCw size={14} className={loading ? "aos-spin" : ""} /> Refresh
         </button>
-        <span className="text-[12px] text-muted">
+        <span className="text-[0.75rem] text-muted">
           “Clip this 2-hour webinar into 10 shorts” runs as one generate job — watch it here.
         </span>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
-            <tr className="border-b border-line text-[11px] text-muted">
+            <tr className="border-b border-line text-[0.6875rem] text-muted">
               <th className="px-3 py-2 font-medium">Kind</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Progress</th>
@@ -1170,17 +1170,17 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
                         style={{ width: `${j.status === "done" ? 100 : progressPct(j.progress)}%` }}
                       />
                     </div>
-                    <span className="w-9 text-right font-mono text-[11px] text-muted">
+                    <span className="w-9 text-right font-mono text-[0.6875rem] text-muted">
                       {j.status === "done" ? 100 : progressPct(j.progress)}%
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-[12.5px] text-failed-text">{j.error ?? "—"}</td>
+                <td className="px-3 py-2 text-[0.78125rem] text-failed-text">{j.error ?? "—"}</td>
               </tr>
             ))}
             {jobs.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-muted">
+                <td colSpan={4} className="px-3 py-8 text-center text-[0.8125rem] text-muted">
                   No jobs yet — generate clips from a source to start one.
                 </td>
               </tr>
@@ -1219,7 +1219,7 @@ export function ClipsApp() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -1231,7 +1231,7 @@ export function ClipsApp() {
         ))}
       </div>
 
-      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[12.5px] text-muted">
+      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Drafts until you approve. </span>
         Clips are drafts until you approve them. Queueing sends a draft to Postiz — nothing publishes automatically.
       </div>

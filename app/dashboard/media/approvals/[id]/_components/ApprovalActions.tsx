@@ -102,7 +102,7 @@ export default function ApprovalActions({
             inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="Enter the code"
-            className="mt-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
+            className="mt-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
           />
           <p className="mt-1 text-muted">It works once, for this buy and for you, and expires in 10 minutes.</p>
         </div>
@@ -114,7 +114,7 @@ export default function ApprovalActions({
             value={revokeReason}
             onChange={(e) => setRevokeReason(e.target.value)}
             placeholder="Revocation reason"
-            className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
+            className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
           />
           <Button
             variant="destructive"

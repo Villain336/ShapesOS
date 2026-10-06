@@ -37,9 +37,9 @@ const STATUS_LABEL: Record<RevisionRow["status"], string> = {
 };
 
 const PILL =
-  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
 const PILL_PRIMARY =
-  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-3 text-[13px] font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-3 text-[0.8125rem] font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40";
 
 export default function SiteDrafts({ projectId }: { projectId: string }) {
   const [sites, setSites] = useState<SiteRow[]>([]);

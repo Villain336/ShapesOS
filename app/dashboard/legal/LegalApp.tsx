@@ -156,7 +156,7 @@ export function LegalApp() {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold ${
                 active ? "bg-black text-white" : "bg-paper text-muted shadow-hairline"
               }`}
             >
@@ -164,7 +164,7 @@ export function LegalApp() {
               {t.label}
               {t.badge !== null && (
                 <span
-                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[11px] ${
+                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[0.6875rem] ${
                     active ? "bg-white text-black" : "bg-black text-white"
                   }`}
                 >

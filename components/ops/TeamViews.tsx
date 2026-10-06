@@ -452,17 +452,17 @@ export function RecruitingView() {
           renderHeader={(c, col) => (
             <span className="flex items-center gap-2">
               <span className={chipCls}>{c.label}</span>
-              <span className="text-[12px] font-semibold tabular-nums text-muted">{col.length}</span>
+              <span className="text-[0.75rem] font-semibold tabular-nums text-muted">{col.length}</span>
             </span>
           )}
           renderCard={(a) => (
             <>
               <div className="flex items-center gap-2">
                 <Avatar name={a.name} size={22} />
-                <span className="truncate text-[13px] font-semibold text-ink">{a.name}</span>
+                <span className="truncate text-[0.8125rem] font-semibold text-ink">{a.name}</span>
               </div>
-              <div className="mt-1 truncate text-[12px] text-muted">{O.get(a.openingId)?.title ?? ""}</div>
-              {a.rating != null && <div className="mt-1 text-[12px] text-muted">Rating {a.rating}/5</div>}
+              <div className="mt-1 truncate text-[0.75rem] text-muted">{O.get(a.openingId)?.title ?? ""}</div>
+              {a.rating != null && <div className="mt-1 text-[0.75rem] text-muted">Rating {a.rating}/5</div>}
             </>
           )}
         />

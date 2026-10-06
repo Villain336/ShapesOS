@@ -104,11 +104,11 @@ export function ChecklistView({
       {/* Information-not-advice label — also on every API response. */}
       <div className="flex items-start gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <Info size={16} className="mt-0.5 shrink-0" />
-        <p className="text-[14px]">{disclaimer}</p>
+        <p className="text-[0.875rem]">{disclaimer}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           {obligations.length} obligations · {openCount} open
           {verifyCount > 0 && ` · ${verifyCount} to verify`}
         </p>
@@ -116,7 +116,7 @@ export function ChecklistView({
           <button
             type="button"
             onClick={onEditProfile}
-            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline"
+            className="aos-press flex h-10 items-center gap-2 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline"
           >
             <RefreshCw size={14} />
             Edit profile
@@ -126,7 +126,7 @@ export function ChecklistView({
 
       {obligations.length === 0 ? (
         <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-          <p className="text-[15px] font-semibold">No obligations found</p>
+          <p className="text-[0.9375rem] font-semibold">No obligations found</p>
           <p className="mt-1 text-sm text-muted">
             Your profile did not match any obligation templates. Update your
             profile to regenerate the map.
@@ -139,7 +139,7 @@ export function ChecklistView({
           return (
             <section key={cat} aria-label={CATEGORY_META[cat].label}>
               <h2 className="aos-subheading mb-2">{CATEGORY_META[cat].label}</h2>
-              <p className="mb-3 text-[13px] text-muted">{CATEGORY_META[cat].hint}</p>
+              <p className="mb-3 text-[0.8125rem] text-muted">{CATEGORY_META[cat].hint}</p>
               <div className="flex flex-col gap-3">
                 {items.map((o) => {
                   const busy = busyKey === o.key;
@@ -150,10 +150,10 @@ export function ChecklistView({
                       className="rounded-lg bg-paper p-4 shadow-hairline"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="min-w-0 flex-1 text-[15px] font-semibold">
+                        <h3 className="min-w-0 flex-1 text-[0.9375rem] font-semibold">
                           {o.title}
                         </h3>
-                        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                           <StatusIcon size={13} />
                           {STATUS_META[o.status].label}
                           {o.status === "snoozed" && o.snoozedUntil && (
@@ -163,18 +163,18 @@ export function ChecklistView({
                           )}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-[14px] text-muted">{o.description}</p>
+                      <p className="mt-1.5 text-[0.875rem] text-muted">{o.description}</p>
                       <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[12px] text-subtle">
+                        <span className="font-mono text-[0.75rem] text-subtle">
                           Source: {o.sourceRef}
                         </span>
                         {o.renewalCadence && (
-                          <span className="rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                          <span className="rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                             Renews: {o.renewalCadence}
                           </span>
                         )}
                         {o.needsReview && (
-                          <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                          <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                             <TriangleAlert size={13} />
                             Verify before acting
                           </span>
@@ -186,7 +186,7 @@ export function ChecklistView({
                             type="button"
                             disabled={busy}
                             onClick={() => void setStatus(o.key, "done")}
-                            className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                            className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                           >
                             {busy ? (
                               <Loader2 size={14} className="animate-spin" />
@@ -201,7 +201,7 @@ export function ChecklistView({
                             type="button"
                             disabled={busy}
                             onClick={() => snooze30Days(o.key)}
-                            className="aos-press h-10 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline disabled:opacity-50"
+                            className="aos-press h-10 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline disabled:opacity-50"
                           >
                             Snooze 30 days
                           </button>
@@ -211,7 +211,7 @@ export function ChecklistView({
                             type="button"
                             disabled={busy}
                             onClick={() => void setStatus(o.key, "open")}
-                            className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted disabled:opacity-50"
+                            className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[0.875rem] font-semibold text-muted disabled:opacity-50"
                           >
                             <RotateCcw size={14} />
                             Reopen
@@ -222,7 +222,7 @@ export function ChecklistView({
                             type="button"
                             disabled={busy}
                             onClick={() => void setStatus(o.key, "dismissed")}
-                            className="aos-press h-10 rounded-full px-4 text-[14px] font-semibold text-failed-text disabled:opacity-50"
+                            className="aos-press h-10 rounded-full px-4 text-[0.875rem] font-semibold text-failed-text disabled:opacity-50"
                           >
                             Dismiss
                           </button>

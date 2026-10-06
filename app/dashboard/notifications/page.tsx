@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { getMembership } from "@/lib/authz";
 import NotificationsList from "./NotificationsList";
+// Phase 18.1 (WS=find): the page in the person's language.
+import { getI18n } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +22,13 @@ export default async function NotificationsPage() {
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   if (!(await getMembership(user.id, workspace.id))) redirect("/dashboard");
+  const { t } = await getI18n();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="aos-heading">Notifications</h1>
-        <p className="mt-1 text-md text-muted">
-          What your agents and team need you to know in {workspace.name}: approvals, decisions, alerts, failed runs and
-          team changes.
-        </p>
+        <h1 className="aos-heading">{t("notifications.pageTitle")}</h1>
+        <p className="mt-1 text-md text-muted">{t("notifications.pageSubtitle", { workspace: workspace.name })}</p>
       </div>
       <NotificationsList />
     </div>

@@ -121,10 +121,10 @@ function MindmapNodeView({ data, selected }: NodeProps<MindmapNode>) {
         <Icon size={15} className="text-paper" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[12px] font-semibold text-ink">
+        <span className="block truncate text-[0.75rem] font-semibold text-ink">
           {data.displayName}
         </span>
-        <span className="mt-0.5 inline-block rounded-full bg-canvas px-1.5 py-px text-[11px] font-semibold text-muted">
+        <span className="mt-0.5 inline-block rounded-full bg-canvas px-1.5 py-px text-[0.6875rem] font-semibold text-muted">
           {data.entityType}
         </span>
       </span>
@@ -480,26 +480,26 @@ function GraphCanvas({
 
       {loading && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper/70">
-          <span className="flex items-center gap-2 text-[13px] text-muted">
+          <span className="flex items-center gap-2 text-[0.8125rem] text-muted">
             <Loader2 size={15} className="animate-spin" /> Laying out the graph…
           </span>
         </div>
       )}
       {error && (
-        <div role="alert" className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md bg-failed-tint px-3 py-1.5 text-[13px] text-failed-text">
+        <div role="alert" className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md bg-failed-tint px-3 py-1.5 text-[0.8125rem] text-failed-text">
           Couldn&apos;t load the graph: {error}
         </div>
       )}
       {!loading && !error && nodeCount === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
-          <p className="max-w-sm text-center text-[13px] text-muted">
+          <p className="max-w-sm text-center text-[0.8125rem] text-muted">
             No entities yet. Seed the graph from the onboarding bootstrap or connect a source —
             every fact lands here with provenance.
           </p>
         </div>
       )}
       {!loading && !error && nodeCount > 0 && (
-        <div className="absolute left-3 top-3 z-10 rounded-full bg-paper px-2.5 py-1 text-[12px] font-semibold text-muted shadow-hairline">
+        <div className="absolute left-3 top-3 z-10 rounded-full bg-paper px-2.5 py-1 text-[0.75rem] font-semibold text-muted shadow-hairline">
           {nodeCount} nodes · {edges.length} edges · drag to move, scroll to zoom
         </div>
       )}

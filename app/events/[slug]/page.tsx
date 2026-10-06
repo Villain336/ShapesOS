@@ -45,24 +45,24 @@ export default async function EventPage({ params, searchParams }: PageProps<"/ev
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <h1 className="aos-heading text-[32px] leading-tight">{ev.title}</h1>
-        <p className="flex items-center gap-2 text-[15px]">
+        <h1 className="aos-heading text-[2rem] leading-tight">{ev.title}</h1>
+        <p className="flex items-center gap-2 text-[0.9375rem]">
           <CalendarDays size={16} aria-hidden /> {when(ev.startsAt, ev.endsAt, ev.timezone)}
         </p>
         {ev.venue ? (
-          <p className="flex items-center gap-2 text-[15px]">
+          <p className="flex items-center gap-2 text-[0.9375rem]">
             <MapPin size={16} aria-hidden /> {ev.venue}
           </p>
         ) : null}
         {ev.hasWebinar ? (
-          <p className="flex items-center gap-2 text-[15px]">
+          <p className="flex items-center gap-2 text-[0.9375rem]">
             <Video size={16} aria-hidden /> Online — the link is on your ticket
           </p>
         ) : null}
         {left !== null ? <span className={`${shopChip} self-start`}>{left === 0 ? "Sold out" : `${left} seat${left === 1 ? "" : "s"} left`}</span> : null}
       </header>
-      {sp.cancelled ? <p className={`${shopCard} p-4 text-[15px]`}>Payment was cancelled, so nothing was charged. Your seats are released shortly — you can register again below.</p> : null}
-      {ev.description ? <div className={`${shopCard} whitespace-pre-line p-6 text-[15px] leading-relaxed`}>{ev.description}</div> : null}
+      {sp.cancelled ? <p className={`${shopCard} p-4 text-[0.9375rem]`}>Payment was cancelled, so nothing was charged. Your seats are released shortly — you can register again below.</p> : null}
+      {ev.description ? <div className={`${shopCard} whitespace-pre-line p-6 text-[0.9375rem] leading-relaxed`}>{ev.description}</div> : null}
       {sessions.length ? (
         <section className={`${shopCard} p-6`}>
           <h2 className="aos-subheading mb-3">Sessions</h2>
@@ -70,7 +70,7 @@ export default async function EventPage({ params, searchParams }: PageProps<"/ev
             {sessions.map((s) => (
               <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-2 last:border-0 last:pb-0">
                 <span className="font-semibold">{s.title}</span>
-                <span className="text-[13px] text-muted">
+                <span className="text-[0.8125rem] text-muted">
                   {when(s.startsAt, s.endsAt, ev.timezone)}
                   {s.venue ? ` · ${s.venue}` : ""}
                 </span>
@@ -81,13 +81,13 @@ export default async function EventPage({ params, searchParams }: PageProps<"/ev
       ) : null}
       <section className={`${shopCard} flex flex-col gap-4 p-6`}>
         <h2 className="aos-subheading">Register</h2>
-        <ul className="flex flex-col gap-1 text-[15px]">
+        <ul className="flex flex-col gap-1 text-[0.9375rem]">
           {tickets.map((t) => (
             <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2">
               <span>
                 <span className="font-semibold">{t.name}</span>
                 {t.sessionTitle ? <span className="text-muted"> · {t.sessionTitle}</span> : null}
-                {t.description ? <span className="block text-[13px] text-muted">{t.description}</span> : null}
+                {t.description ? <span className="block text-[0.8125rem] text-muted">{t.description}</span> : null}
               </span>
               <span className="tabular-nums">
                 {t.priceCents > 0 ? fmtPrice(t.priceCents, ev.currency) : "Free"}

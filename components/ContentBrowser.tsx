@@ -196,7 +196,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
               key={t}
               onClick={() => { setTab(t); setOpenId(null); setNewItem(false); }}
               aria-pressed={tab === t}
-              className={`h-8 rounded-full px-3 text-[13px] font-semibold transition-colors ${tab === t ? "bg-ink text-paper" : "text-muted hover:bg-hover-paper hover:text-ink"}`}
+              className={`h-8 rounded-full px-3 text-[0.8125rem] font-semibold transition-colors ${tab === t ? "bg-ink text-paper" : "text-muted hover:bg-hover-paper hover:text-ink"}`}
             >
               {t === "page" ? "Pages" : "Posts"}
             </button>
@@ -206,7 +206,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
             <button
               onClick={() => { setTab("collection"); setOpenId(null); setNewItem(false); }}
               aria-pressed={tab === "collection"}
-              className={`h-8 rounded-full px-3 text-[13px] font-semibold transition-colors ${tab === "collection" ? "bg-ink text-paper" : "text-muted hover:bg-hover-paper hover:text-ink"}`}
+              className={`h-8 rounded-full px-3 text-[0.8125rem] font-semibold transition-colors ${tab === "collection" ? "bg-ink text-paper" : "text-muted hover:bg-hover-paper hover:text-ink"}`}
             >
               Collections
             </button>
@@ -312,7 +312,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
             <button
               onClick={() => void save()}
               disabled={editBusy}
-              className="inline-flex h-8 items-center rounded-full bg-ink px-4 text-xs font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-8 items-center rounded-full bg-ink px-4 text-xs font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               {editBusy ? "Saving…" : "Save"}
             </button>

@@ -37,13 +37,13 @@ export default async function CataloguePage({ params }: PageProps<"/shop/[storeS
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <div className="mb-8 max-w-2xl">
         <h1 className="aos-display">{store.name}</h1>
-        {store.description && <p className="mt-2 whitespace-pre-line text-[15px] text-muted">{store.description}</p>}
+        {store.description && <p className="mt-2 whitespace-pre-line text-[0.9375rem] text-muted">{store.description}</p>}
       </div>
       {listings.length === 0 ? (
         <div className={`${shopCard} flex flex-col items-center gap-2 px-6 py-16 text-center`}>
           <Package size={28} className="text-subtle" aria-hidden />
-          <p className="text-[15px] font-semibold">Nothing for sale yet</p>
-          <p className="text-[14px] text-muted">Check back soon.</p>
+          <p className="text-[0.9375rem] font-semibold">Nothing for sale yet</p>
+          <p className="text-[0.875rem] text-muted">Check back soon.</p>
         </div>
       ) : (
         <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -64,9 +64,9 @@ export default async function CataloguePage({ params }: PageProps<"/shop/[storeS
                     )}
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-4">
-                    <h2 className="text-[15px] font-semibold leading-snug">{l.title}</h2>
+                    <h2 className="text-[0.9375rem] font-semibold leading-snug">{l.title}</h2>
                     <div className="mt-auto flex items-center justify-between gap-2">
-                      <span className="text-[15px] font-semibold tabular-nums">
+                      <span className="text-[0.9375rem] font-semibold tabular-nums">
                         {multi ? "From " : ""}
                         {fmtPrice(l.fromPriceCents, store.currency)}
                       </span>

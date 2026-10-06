@@ -180,14 +180,14 @@ export function NurtureApp({ initialTab = "sequences" }: { initialTab?: Tab } = 
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition-colors ${
                 tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon size={15} />
               {label}
               {badge ? (
-                <span className="rounded-full bg-needs px-1.5 text-[11px] font-semibold text-ink">
+                <span className="rounded-full bg-needs px-1.5 text-[0.6875rem] font-semibold text-ink">
                   {badge}
                 </span>
               ) : null}
@@ -278,7 +278,7 @@ function SequencesTab({
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[300px_1fr]">
       <div className="rounded-lg bg-paper shadow-hairline">
         <div className="flex items-center justify-between border-b border-line px-3 py-2">
-          <span className="text-[13px] font-semibold text-ink">Sequences ({sequences.length})</span>
+          <span className="text-[0.8125rem] font-semibold text-ink">Sequences ({sequences.length})</span>
           <button className={btnPrimary} onClick={onCreate}>
             <Plus size={14} /> New
           </button>
@@ -294,10 +294,10 @@ function SequencesTab({
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-[13px] font-semibold text-ink">{s.name}</span>
+                  <span className="truncate text-[0.8125rem] font-semibold text-ink">{s.name}</span>
                   <Chip>{s.status}</Chip>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
+                <div className="mt-0.5 flex items-center gap-2 text-[0.6875rem] text-muted">
                   <span>{s.steps.length} steps</span>
                   <span>·</span>
                   <span>{s.stats?.enrolledActive ?? 0} enrolled</span>
@@ -351,12 +351,12 @@ function SequenceDetail({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-[16px] font-bold text-ink">{sequence.name}</h2>
+              <h2 className="text-[1rem] font-bold text-ink">{sequence.name}</h2>
               <Chip>{sequence.status}</Chip>
               {sequence.dailyCap ? <Chip title="Max sequence sends per day">cap {sequence.dailyCap}/day</Chip> : null}
             </div>
-            {sequence.description ? <p className="mt-1 text-[13px] text-muted">{sequence.description}</p> : null}
-            <div className="mt-2 flex gap-3 text-[12px] text-muted">
+            {sequence.description ? <p className="mt-1 text-[0.8125rem] text-muted">{sequence.description}</p> : null}
+            <div className="mt-2 flex gap-3 text-[0.75rem] text-muted">
               <span><strong className="text-ink">{sequence.stats?.enrolledActive ?? 0}</strong> enrolled</span>
               <span><strong className="text-ink">{sequence.stats?.sent ?? 0}</strong> sent</span>
               <span><strong className="text-ink">{sequence.stats?.suppressed ?? 0}</strong> suppressed</span>
@@ -381,11 +381,11 @@ function SequenceDetail({
 
       <div className="rounded-lg bg-paper shadow-hairline">
         <div className="border-b border-line px-4 py-2">
-          <span className="text-[13px] font-semibold text-ink">Steps</span>
+          <span className="text-[0.8125rem] font-semibold text-ink">Steps</span>
         </div>
         <div className="divide-y divide-line">
           {sequence.steps.length === 0 ? (
-            <div className="p-4 text-[13px] text-subtle">No steps yet — edit the sequence to add some.</div>
+            <div className="p-4 text-[0.8125rem] text-subtle">No steps yet — edit the sequence to add some.</div>
           ) : sequence.steps.map((step, i) => (
             <div key={i} className="flex gap-3 px-4 py-2.5">
               <div className="flex w-16 shrink-0 flex-col items-center gap-1">
@@ -395,9 +395,9 @@ function SequenceDetail({
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <ChannelChip channel={step.channel} />
-                  {step.subject ? <span className="truncate text-[12px] font-medium text-muted">“{step.subject}”</span> : null}
+                  {step.subject ? <span className="truncate text-[0.75rem] font-medium text-muted">“{step.subject}”</span> : null}
                 </div>
-                <p className="aos-mono whitespace-pre-wrap break-words text-[12px] leading-5 text-muted">{step.template}</p>
+                <p className="aos-mono whitespace-pre-wrap break-words text-[0.75rem] leading-5 text-muted">{step.template}</p>
               </div>
             </div>
           ))}
@@ -466,20 +466,20 @@ function EnrollModal({ sequence, onClose, onDone }: { sequence: NurtureSequence;
       </div>
       <div className="max-h-64 divide-y divide-line overflow-y-auto rounded-md border border-line">
         {leads.length === 0 ? (
-          <div className="p-4 text-[13px] text-subtle">{searching ? "Searching…" : "No leads found."}</div>
+          <div className="p-4 text-[0.8125rem] text-subtle">{searching ? "Searching…" : "No leads found."}</div>
         ) : leads.map((l) => (
           <label key={l.id} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-hover-paper">
             <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-ink" />
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-ink">{l.name}</div>
-              <div className="truncate text-[12px] text-muted">{[l.company, l.email].filter(Boolean).join(" · ") || "—"}</div>
+              <div className="truncate text-[0.8125rem] font-medium text-ink">{l.name}</div>
+              <div className="truncate text-[0.75rem] text-muted">{[l.company, l.email].filter(Boolean).join(" · ") || "—"}</div>
             </div>
           </label>
         ))}
       </div>
-      {result ? <p className="mt-2 text-[13px] text-muted">{result}</p> : null}
+      {result ? <p className="mt-2 text-[0.8125rem] text-muted">{result}</p> : null}
       <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
-        <span className="text-[12px] text-muted">{picked.size} selected</span>
+        <span className="text-[0.75rem] text-muted">{picked.size} selected</span>
         <div className="flex gap-2">
           <button className={btnSecondary} onClick={onClose}>Close</button>
           <button className={btnPrimary} disabled={picked.size === 0 || enrolling} onClick={enroll}>
@@ -527,15 +527,15 @@ function EnrollmentsTab() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search lead…" />
         </div>
-        <span className="ml-auto text-[12px] text-muted">{rows.length} enrollments</span>
+        <span className="ml-auto text-[0.75rem] text-muted">{rows.length} enrollments</span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-muted">Loading…</div>
+        <div className="p-6 text-[0.8125rem] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No enrollments" hint="Enroll leads from a sequence to get started." /></div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-[13px]">
+          <table className="w-full min-w-[760px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Lead</th>
@@ -550,7 +550,7 @@ function EnrollmentsTab() {
                 <tr key={e.id} className="hover:bg-hover-paper">
                   <td className="px-3 py-2">
                     <div className="font-medium text-ink">{e.lead.name}</div>
-                    <div className="text-[12px] text-muted">{[e.lead.company, e.lead.email].filter(Boolean).join(" · ") || "—"}</div>
+                    <div className="text-[0.75rem] text-muted">{[e.lead.company, e.lead.email].filter(Boolean).join(" · ") || "—"}</div>
                   </td>
                   <td className="px-3 py-2 text-muted">{e.sequence.name}</td>
                   <td className="px-3 py-2"><Chip>{e.status}</Chip></td>
@@ -601,12 +601,12 @@ function ApprovalsTab() {
 
   return (
     <div className="space-y-2">
-      <p className="text-[12px] text-muted">
+      <p className="text-[0.75rem] text-muted">
         Every sequence and speed-to-lead send waits here. Approving releases the message to the dispatcher
         (consent, quiet hours, caps, and dedup are enforced at dispatch).
       </p>
       {loading ? (
-        <div className="rounded-lg bg-paper p-6 text-[13px] text-muted shadow-hairline">Loading…</div>
+        <div className="rounded-lg bg-paper p-6 text-[0.8125rem] text-muted shadow-hairline">Loading…</div>
       ) : items.length === 0 ? (
         <EmptyState title="Approval queue is clear" hint="New sequence sends will appear here as the engine advances." />
       ) : items.map((item) => {
@@ -623,16 +623,16 @@ function ApprovalsTab() {
                 <Chip>{item.status}</Chip>
               )}
               <Chip>{String(item.kind).replace(/_/g, " ")}</Chip>
-              <span className="text-[13px] font-medium text-ink">
+              <span className="text-[0.8125rem] font-medium text-ink">
                 {item.lead ? `${item.lead.name}${item.lead.company ? ` — ${item.lead.company}` : ""}` : "—"}
               </span>
-              <span className="ml-auto text-[12px] text-subtle">
+              <span className="ml-auto text-[0.75rem] text-subtle">
                 step {(Number(p.stepIndex ?? 0)) + 1} · requested {timeAgo(item.createdAt)}
                 {item.requestedBy ? ` by ${item.requestedBy}` : ""}
               </span>
             </div>
-            {p.subject ? <p className="mt-2 text-[13px] font-medium text-ink">Subject: {String(p.subject)}</p> : null}
-            <p className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[12px] leading-5 text-muted">
+            {p.subject ? <p className="mt-2 text-[0.8125rem] font-medium text-ink">Subject: {String(p.subject)}</p> : null}
+            <p className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[0.75rem] leading-5 text-muted">
               {String(p.body ?? "")}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -703,15 +703,15 @@ function MessageLogTab() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search body or lead…" />
         </div>
-        <span className="ml-auto text-[12px] text-muted">{rows.length} messages</span>
+        <span className="ml-auto text-[0.75rem] text-muted">{rows.length} messages</span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-muted">Loading…</div>
+        <div className="p-6 text-[0.8125rem] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No messages yet" hint="Run the engine or approve a queued send to populate the ledger." /></div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left text-[13px]">
+          <table className="w-full min-w-[860px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2">When</th>
@@ -725,16 +725,16 @@ function MessageLogTab() {
             <tbody className="divide-y divide-line">
               {rows.map((m) => (
                 <tr key={m.id} className="hover:bg-hover-paper">
-                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-muted">{timeAgo(m.createdAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-[0.75rem] text-muted">{timeAgo(m.createdAt)}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium text-ink">{m.lead?.name ?? "—"}</div>
-                    <div className="text-[12px] text-muted">{m.lead?.company ?? ""}</div>
+                    <div className="text-[0.75rem] text-muted">{m.lead?.company ?? ""}</div>
                   </td>
                   <td className="px-3 py-2"><ChannelChip channel={m.channel} /></td>
-                  <td className="px-3 py-2 text-[12px] text-muted">{m.kind.replace(/_/g, " ")}</td>
+                  <td className="px-3 py-2 text-[0.75rem] text-muted">{m.kind.replace(/_/g, " ")}</td>
                   <td className="max-w-[280px] px-3 py-2">
                     <button
-                      className="block w-full truncate text-left text-[12px] text-muted hover:text-ink"
+                      className="block w-full truncate text-left text-[0.75rem] text-muted hover:text-ink"
                       onClick={() => setExpanded(expanded === m.id ? null : m.id)}
                       title="Click to expand"
                     >
@@ -742,7 +742,7 @@ function MessageLogTab() {
                       {m.body}
                     </button>
                     {expanded === m.id ? (
-                      <div className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[12px] text-muted">
+                      <div className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[0.75rem] text-muted">
                         {m.body}
                         {m.error ? <p className="mt-1 text-failed-text">Error: {m.error}</p> : null}
                       </div>
@@ -801,17 +801,17 @@ function ConsentTab() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search leads…" />
         </div>
-        <span className="ml-auto text-[12px] text-muted">
+        <span className="ml-auto text-[0.75rem] text-muted">
           Click a channel status to change it. The dispatcher suppresses sends without consent.
         </span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-muted">Loading…</div>
+        <div className="p-6 text-[0.8125rem] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No leads" hint="Leads appear here once added to the CRM." /></div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
+          <table className="w-full min-w-[640px] text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Lead</th>
@@ -826,12 +826,12 @@ function ConsentTab() {
                 <tr key={r.id} className="hover:bg-hover-paper">
                   <td className="px-3 py-2">
                     <div className="font-medium text-ink">{r.name}</div>
-                    <div className="text-[12px] text-muted">{[r.company, r.email].filter(Boolean).join(" · ") || "—"}</div>
+                    <div className="text-[0.75rem] text-muted">{[r.company, r.email].filter(Boolean).join(" · ") || "—"}</div>
                   </td>
                   {(["sms", "email", "voice", "mail"] as const).map((ch) => (
                     <td key={ch} className="px-3 py-2">
                       <select
-                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[0.75rem] font-medium text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
                         value={r.consent[ch] ?? "unknown"}
                         onChange={(e) => setConsent(r.id, ch, e.target.value)}
                       >

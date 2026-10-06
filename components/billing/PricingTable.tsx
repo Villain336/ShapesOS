@@ -18,7 +18,7 @@ const usd = (cents: number) =>
   `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
 const primaryCta =
-  "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover";
+  "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-ink-hover";
 const secondaryCta =
   "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-paper px-5.5 text-base font-semibold text-ink shadow-outline";
 const segBase = "aos-press inline-flex h-control-sm items-center rounded-full px-4 text-sm font-semibold";
@@ -65,10 +65,10 @@ export function PricingTable({ data }: { data: PricingPageData }) {
               </h2>
               <p className="mt-1 text-sm text-muted">{p.tagline}</p>
               <p className="mt-4">
-                <span className="text-[32px] font-heading stretch-heading text-ink">{price === null ? "" : usd(price)}</span>
+                <span className="text-[2rem] font-heading stretch-heading text-ink">{price === null ? "" : usd(price)}</span>
                 <span className="text-sm text-muted"> / {interval === "year" ? "year" : "month"}</span>
               </p>
-              <p className="mt-1 min-h-5 text-[13px] text-muted">
+              <p className="mt-1 min-h-5 text-[0.8125rem] text-muted">
                 {interval === "year" && p.annualMonthlyEquivalentCents !== null
                   ? `${usd(p.annualMonthlyEquivalentCents)} / month, billed yearly`
                   : `or ${usd(p.annualCents ?? 0)} / year`}

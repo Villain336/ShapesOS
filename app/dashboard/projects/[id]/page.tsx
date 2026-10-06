@@ -139,7 +139,7 @@ export default async function ProjectPage({
           <h1 className="text-xl font-bold tracking-tight text-ink">
             {project.domain}
           </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-2">
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] text-ink-2">
             <span>{project.locale}</span>
             <span aria-hidden className="text-ink-3">·</span>
             <ValuePill>
@@ -165,7 +165,7 @@ export default async function ProjectPage({
         <CardBody className="grid gap-6 p-4 sm:grid-cols-2">
           {EXPLORE_SECTIONS.map((section) => (
             <div key={section.title}>
-              <div className="mb-1.5 px-2 text-[12.5px] font-medium text-ink-3">
+              <div className="mb-1.5 px-2 text-[0.78125rem] font-medium text-ink-3">
                 {section.title}
               </div>
               <ul className="flex flex-col">
@@ -181,10 +181,10 @@ export default async function ProjectPage({
                           <Icon className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[13.5px] font-medium text-ink">
+                          <span className="block text-[0.84375rem] font-medium text-ink">
                             {link.label}
                           </span>
-                          <span className="block truncate text-[12px] text-ink-3">
+                          <span className="block truncate text-[0.75rem] text-ink-3">
                             {link.description}
                           </span>
                         </span>
@@ -224,7 +224,7 @@ export default async function ProjectPage({
                   key={name}
                   className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0"
                 >
-                  <span className="truncate text-[14px] font-medium text-ink">{name}</span>
+                  <span className="truncate text-[0.875rem] font-medium text-ink">{name}</span>
                   <ValuePill>
                     {count} keyword{count === 1 ? "" : "s"}
                   </ValuePill>

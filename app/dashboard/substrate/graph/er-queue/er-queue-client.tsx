@@ -10,7 +10,7 @@ import { Check, X, UserCheck, Scale } from "lucide-react";
 // Agentic OS idioms: merge = approve (done), not-the-same = deny idiom,
 // matcher signals and match scores are analytic -> neutral chips.
 const chipNeutral =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control";
 const btnApprove =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
 const btnDeny =

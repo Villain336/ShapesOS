@@ -103,12 +103,12 @@ interface DeckReview {
 }
 
 const inputCls =
-  "h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none";
-const labelCls = "text-[13px] font-semibold text-ink";
+  "h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none";
+const labelCls = "text-[0.8125rem] font-semibold text-ink";
 const primaryPill =
-  "aos-press flex h-9 items-center gap-2 rounded-full bg-black px-4 text-[13px] font-semibold text-white disabled:opacity-50";
+  "aos-press flex h-9 items-center gap-2 rounded-full bg-black px-4 text-[0.8125rem] font-semibold text-white disabled:opacity-50";
 const ghostPill =
-  "aos-press flex h-9 items-center gap-2 rounded-full bg-paper px-4 text-[13px] font-semibold text-ink shadow-hairline disabled:opacity-50";
+  "aos-press flex h-9 items-center gap-2 rounded-full bg-paper px-4 text-[0.8125rem] font-semibold text-ink shadow-hairline disabled:opacity-50";
 
 const STATUS_META: Record<ReadinessItem["status"], { label: string; cls: string }> = {
   todo: { label: "To do", cls: "bg-canvas text-muted" },
@@ -320,7 +320,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
   return (
     <div className="flex flex-col gap-5">
       {error ? (
-        <div className="flex items-center gap-2 rounded-lg bg-paper p-3 text-[13px] text-ink shadow-hairline">
+        <div className="flex items-center gap-2 rounded-lg bg-paper p-3 text-[0.8125rem] text-ink shadow-hairline">
           <AlertTriangle size={15} className="shrink-0" /> {error}
           <button type="button" onClick={() => setError("")} className="ml-auto" aria-label="Dismiss">
             <X size={14} />
@@ -332,10 +332,10 @@ export function ReadinessView({ roundId }: { roundId: string }) {
       <div className="flex items-center gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <ClipboardCheck size={18} />
         <div>
-          <div className="text-[15px] font-bold text-ink">
+          <div className="text-[0.9375rem] font-bold text-ink">
             {doneCount} of {items.length} ready
           </div>
-          <div className="text-[13px] text-muted">
+          <div className="text-[0.8125rem] text-muted">
             Incorporation, cap table, SAFE, deck, and links — everything an investor expects before the first meeting.
           </div>
         </div>
@@ -343,7 +343,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
 
       {/* Checklist */}
       <section className="rounded-lg bg-paper p-4 shadow-hairline md:p-5">
-        <h2 className="text-[16px] font-bold text-ink">Checklist</h2>
+        <h2 className="text-[1rem] font-bold text-ink">Checklist</h2>
         <div className="mt-3 flex flex-col gap-2">
           {items.map((item) => {
             const meta = STATUS_META[item.status];
@@ -351,10 +351,10 @@ export function ReadinessView({ roundId }: { roundId: string }) {
             return (
               <div key={item.id} className="rounded-md border-[1.5px] border-control p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.cls}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold ${meta.cls}`}>
                     {meta.label}
                   </span>
-                  <span className="text-[14px] font-semibold text-ink">{item.label}</span>
+                  <span className="text-[0.875rem] font-semibold text-ink">{item.label}</span>
                   <div className="ml-auto flex items-center gap-1.5">
                     {(["todo", "doing", "done"] as const).map((s) =>
                       s === item.status ? null : (
@@ -363,7 +363,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                           type="button"
                           disabled={busy === item.id}
                           onClick={() => void patchItem(item, s)}
-                          className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted hover:text-ink"
+                          className="rounded-full bg-canvas px-2.5 py-1 text-[0.6875rem] font-semibold text-muted hover:text-ink"
                         >
                           Mark {STATUS_META[s].label.toLowerCase()}
                         </button>
@@ -383,11 +383,11 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                     </button>
                   </div>
                 </div>
-                <p className="mt-1 text-[13px] text-muted">{item.description}</p>
+                <p className="mt-1 text-[0.8125rem] text-muted">{item.description}</p>
 
                 {/* Read-only Legal vault cross-link signals */}
                 {item.legalDocTypes && signals ? (
-                  <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
+                  <div className="mt-2 flex flex-wrap gap-2 text-[0.75rem]">
                     {item.legalDocTypes.includes("formation") ? (
                       signals.legalVault.formationDocs.length ? (
                         <span className="rounded-full bg-canvas px-2.5 py-1 text-muted">
@@ -415,14 +415,14 @@ export function ReadinessView({ roundId }: { roundId: string }) {
 
                 {/* Data-room signals */}
                 {item.key === "pitch_deck" && signals ? (
-                  <div className="mt-2 text-[12px] text-muted">
+                  <div className="mt-2 text-[0.75rem] text-muted">
                     {signals.dataRoom.pitchDeck
                       ? `In the data room: ${signals.dataRoom.pitchDeck.title} (v${signals.dataRoom.pitchDeck.version})`
                       : "Not in the data room yet"}
                   </div>
                 ) : null}
                 {item.key === "financials" && signals ? (
-                  <div className="mt-2 text-[12px] text-muted">
+                  <div className="mt-2 text-[0.75rem] text-muted">
                     {signals.dataRoom.financials
                       ? `In the data room: ${signals.dataRoom.financials.title} (v${signals.dataRoom.financials.version})`
                       : "Not in the data room yet"}
@@ -430,7 +430,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                 ) : null}
                 {item.key === "data_room_links" ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[12px] text-muted">
+                    <span className="text-[0.75rem] text-muted">
                       {signals
                         ? `${signals.dataRoom.shareLinks.total} link(s), ${signals.dataRoom.shareLinks.tested} opened at least once`
                         : ""}
@@ -440,12 +440,12 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                       Test links now
                     </button>
                     {item.evidence.testedAt ? (
-                      <span className="text-[12px] text-muted">Last tested {new Date(item.evidence.testedAt).toLocaleString()}</span>
+                      <span className="text-[0.75rem] text-muted">Last tested {new Date(item.evidence.testedAt).toLocaleString()}</span>
                     ) : null}
                   </div>
                 ) : null}
                 {item.key === "cap_table" && signals ? (
-                  <div className="mt-2 text-[12px] text-muted">
+                  <div className="mt-2 text-[0.75rem] text-muted">
                     {signals.capTable.rowCount
                       ? `${signals.capTable.rowCount} stakeholder(s), ${fmtShares(signals.capTable.totalShares)} fully-diluted shares, founders ${pct(signals.capTable.founderPctBp)}`
                       : "No stakeholders entered yet"}
@@ -454,7 +454,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
 
                 {/* SAFE evidence */}
                 {item.key === "safe_template" && item.evidence.safeTemplateKey ? (
-                  <div className="mt-2 text-[12px] text-muted">
+                  <div className="mt-2 text-[0.75rem] text-muted">
                     Selected: {safeTemplates.find((t) => t.key === item.evidence.safeTemplateKey)?.name ?? item.evidence.safeTemplateKey}
                     {item.evidence.note ? ` — ${item.evidence.note}` : ""}
                   </div>
@@ -463,15 +463,15 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                 {item.evidence.links.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {item.evidence.links.map((l, i) => (
-                      <span key={i} className="rounded-full bg-canvas px-2.5 py-1 text-[12px] font-medium text-ink">
+                      <span key={i} className="rounded-full bg-canvas px-2.5 py-1 text-[0.75rem] font-medium text-ink">
                         {l.label}
                       </span>
                     ))}
                   </div>
                 ) : null}
-                {item.notes ? <p className="mt-2 text-[13px] text-ink">{item.notes}</p> : null}
+                {item.notes ? <p className="mt-2 text-[0.8125rem] text-ink">{item.notes}</p> : null}
                 {item.completedAt ? (
-                  <p className="mt-1 text-[12px] text-muted">
+                  <p className="mt-1 text-[0.75rem] text-muted">
                     Done {new Date(item.completedAt).toLocaleDateString()} by {item.completedBy ?? "you"}
                   </p>
                 ) : null}
@@ -523,8 +523,8 @@ export function ReadinessView({ roundId }: { roundId: string }) {
       {/* Cap table */}
       <section className="rounded-lg bg-paper p-4 shadow-hairline md:p-5">
         <div className="flex items-center gap-2">
-          <h2 className="text-[16px] font-bold text-ink">Cap table</h2>
-          <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">Manual entry — no live Carta sync</span>
+          <h2 className="text-[1rem] font-bold text-ink">Cap table</h2>
+          <span className="rounded-full bg-canvas px-2.5 py-1 text-[0.6875rem] font-semibold text-muted">Manual entry — no live Carta sync</span>
           <button type="button" onClick={() => setAdding((a) => !a)} className={`${ghostPill} ml-auto`}>
             {adding ? <X size={13} /> : <Plus size={13} />} {adding ? "Cancel" : "Add stakeholder"}
           </button>
@@ -533,20 +533,20 @@ export function ReadinessView({ roundId }: { roundId: string }) {
         {rollup ? (
           <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
             <div className="rounded-md bg-canvas p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Fully-diluted shares</div>
-              <div className="text-[16px] font-bold text-ink">{fmtShares(rollup.totalShares)}</div>
+              <div className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">Fully-diluted shares</div>
+              <div className="text-[1rem] font-bold text-ink">{fmtShares(rollup.totalShares)}</div>
             </div>
             <div className="rounded-md bg-canvas p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Founders</div>
-              <div className="text-[16px] font-bold text-ink">{pct(rollup.pctByTypeBp.founder ?? 0)}</div>
+              <div className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">Founders</div>
+              <div className="text-[1rem] font-bold text-ink">{pct(rollup.pctByTypeBp.founder ?? 0)}</div>
             </div>
             <div className="rounded-md bg-canvas p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Investors</div>
-              <div className="text-[16px] font-bold text-ink">{pct(rollup.pctByTypeBp.investor ?? 0)}</div>
+              <div className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">Investors</div>
+              <div className="text-[1rem] font-bold text-ink">{pct(rollup.pctByTypeBp.investor ?? 0)}</div>
             </div>
             <div className="rounded-md bg-canvas p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Top holder</div>
-              <div className="text-[16px] font-bold text-ink">
+              <div className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">Top holder</div>
+              <div className="text-[1rem] font-bold text-ink">
                 {rollup.topHolder ? `${rollup.topHolder.name} · ${pct(rollup.topHolder.pctBp)}` : "—"}
               </div>
             </div>
@@ -590,7 +590,7 @@ export function ReadinessView({ roundId }: { roundId: string }) {
         ) : null}
 
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="text-muted">
                 <th className="py-2 pr-3 font-semibold">Name</th>
@@ -640,9 +640,9 @@ export function ReadinessView({ roundId }: { roundId: string }) {
       <section className="rounded-lg bg-paper p-4 shadow-hairline md:p-5">
         <div className="flex items-center gap-2">
           <Scale size={16} />
-          <h2 className="text-[16px] font-bold text-ink">SAFE templates</h2>
+          <h2 className="text-[1rem] font-bold text-ink">SAFE templates</h2>
         </div>
-        <p className="mt-1 text-[13px] text-muted">{notAdviceLabel}</p>
+        <p className="mt-1 text-[0.8125rem] text-muted">{notAdviceLabel}</p>
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
           {safeTemplates.map((t) => {
             const selected = safeKey === t.key;
@@ -654,17 +654,17 @@ export function ReadinessView({ roundId }: { roundId: string }) {
                 className={`rounded-md border-[1.5px] p-3 text-left ${selected ? "border-black" : "border-control"}`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-bold text-ink">{t.name}</span>
+                  <span className="text-[0.875rem] font-bold text-ink">{t.name}</span>
                   {selected ? <Check size={15} className="ml-auto shrink-0" /> : null}
                 </div>
-                <p className="mt-1 text-[13px] text-muted">{t.description}</p>
-                <p className="mt-2 text-[12px] text-muted">
+                <p className="mt-1 text-[0.8125rem] text-muted">{t.description}</p>
+                <p className="mt-2 text-[0.75rem] text-muted">
                   <span className="font-semibold text-ink">When to use: </span>
                   {t.whenToUse}
                 </p>
                 <div className="mt-2 flex flex-col gap-1">
                   {t.keyTerms.map((kt) => (
-                    <div key={kt.term} className="text-[12px] text-muted">
+                    <div key={kt.term} className="text-[0.75rem] text-muted">
                       <span className="font-semibold text-ink">{kt.term}: </span>
                       {kt.explanation}
                     </div>
@@ -696,12 +696,12 @@ export function ReadinessView({ roundId }: { roundId: string }) {
       <section className="rounded-lg bg-paper p-4 shadow-hairline md:p-5">
         <div className="flex items-center gap-2">
           <Sparkles size={16} />
-          <h2 className="text-[16px] font-bold text-ink">Pitch-deck review</h2>
-          <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">
+          <h2 className="text-[1rem] font-bold text-ink">Pitch-deck review</h2>
+          <span className="rounded-full bg-canvas px-2.5 py-1 text-[0.6875rem] font-semibold text-muted">
             Deterministic rubric — every finding cites its signal
           </span>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[0.8125rem] text-muted">
           {signals?.dataRoom.pitchDeck
             ? `Reviews "${signals.dataRoom.pitchDeck.title}" (v${signals.dataRoom.pitchDeck.version}) from your data room.`
             : "Upload a pitch deck to the data room first."}
@@ -732,31 +732,31 @@ export function ReadinessView({ roundId }: { roundId: string }) {
         {review ? (
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-[15px] font-bold text-ink">Score: {review.overallScore}/100</span>
+              <span className="text-[0.9375rem] font-bold text-ink">Score: {review.overallScore}/100</span>
               {!review.deckTextProvided ? (
-                <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">
+                <span className="rounded-full bg-canvas px-2.5 py-1 text-[0.6875rem] font-semibold text-muted">
                   Text checks skipped — no deck text supplied
                 </span>
               ) : null}
             </div>
-            <p className="text-[13px] text-muted">{review.narrative}</p>
+            <p className="text-[0.8125rem] text-muted">{review.narrative}</p>
             {review.results.map((r) => (
               <div key={r.criterion} className="rounded-md border-[1.5px] border-control p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold ${
                       r.verdict === "pass" ? "bg-black text-white" : r.verdict === "partial" ? "bg-canvas text-ink" : "bg-canvas text-muted"
                     }`}
                   >
                     {r.verdict === "pass" ? "Strong" : r.verdict === "partial" ? "Partial" : "Not detected"}
                   </span>
-                  <span className="text-[14px] font-semibold text-ink">{r.label}</span>
-                  <span className="text-[12px] text-muted">{r.score}/2</span>
+                  <span className="text-[0.875rem] font-semibold text-ink">{r.label}</span>
+                  <span className="text-[0.75rem] text-muted">{r.score}/2</span>
                 </div>
-                <p className="mt-1 text-[12px] text-muted">Investors look for: {r.expectation}</p>
-                <p className="mt-1 text-[13px] text-ink">{r.note}</p>
+                <p className="mt-1 text-[0.75rem] text-muted">Investors look for: {r.expectation}</p>
+                <p className="mt-1 text-[0.8125rem] text-ink">{r.note}</p>
                 {r.signals.filter((s) => s.source === "deck_text").map((s, i) => (
-                  <p key={i} className="mt-1 flex gap-1.5 text-[12px] text-muted">
+                  <p key={i} className="mt-1 flex gap-1.5 text-[0.75rem] text-muted">
                     <FileText size={12} className="mt-0.5 shrink-0" />
                     <span className="italic">{s.excerpt}</span>
                   </p>

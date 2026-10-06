@@ -32,7 +32,7 @@ export default async function StudioPage({ params }: { params: Promise<{ id: str
         </Link>
         {/* Phase 13 A8: scope indicator — this is the project-scoped studio,
             not the workspace-wide Creative Studio. */}
-        <p className="mt-3 text-[11px] font-medium tracking-wide text-subtle">
+        <p className="mt-3 text-[0.6875rem] font-medium tracking-wide text-subtle">
           Project
         </p>
         <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Marketing studio</h1>

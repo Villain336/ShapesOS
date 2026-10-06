@@ -2,9 +2,9 @@
 //
 // House pattern per app/dashboard/studio/StudioApp.tsx (AGENTS.md): page
 // shell bg-canvas p-4 md:p-6 (in page.tsx), title text-xl bold,
-// subtitle text-[13px] text-muted, sub-tabs with Lucide icon + label and
+// subtitle text-[0.8125rem] text-muted, sub-tabs with Lucide icon + label and
 // ACTIVE = border-ink text-ink, primary buttons
-// bg-ink hover:bg-night-hover, data lists as DENSE TABLES with badge
+// bg-ink hover:bg-ink-hover, data lists as DENSE TABLES with badge
 // columns and rows hover:bg-hover-paper, filter toolbar = dropdowns +
 // search + violet button, info notes border-line bg-canvas.
 "use client";
@@ -43,7 +43,7 @@ function Chip({
   void tone;
   return (
     <span
-      className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}
+      className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control"}
     >
       {children}
     </span>
@@ -53,7 +53,7 @@ function Chip({
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
@@ -154,7 +154,7 @@ const STATUS_LABELS: Record<string, string> = {
 // new = needs attention, actioned = done, reviewed/dismissed = neutral.
 function statusBadge(s: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   if (s === "new")
     return (
       <span className={`${base} bg-needs text-ink`}>
@@ -203,8 +203,8 @@ function truncate(s: string | null, n: number): string {
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="grid grid-cols-[160px_1fr] gap-3 py-1.5">
-      <dt className="text-[12px] font-medium text-muted">{label}</dt>
-      <dd className="text-[13px] text-ink">{value || "—"}</dd>
+      <dt className="text-[0.75rem] font-medium text-muted">{label}</dt>
+      <dd className="text-[0.8125rem] text-ink">{value || "—"}</dd>
     </div>
   );
 }
@@ -304,7 +304,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Propose-only. </span>
         The fleet reports — semantic summaries and recommended responses are
         proposals. Anything that acts goes through the Phase 9 approval
@@ -361,7 +361,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
 
       {/* Dense change table */}
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Detected</th>
@@ -407,14 +407,14 @@ function ChangesTab({ projects }: { projects: Project[] }) {
             ))}
             {changes.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={7} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No changes yet — add competitors in the Watchlist tab, then run the fleet.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={7} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
@@ -427,12 +427,12 @@ function ChangesTab({ projects }: { projects: Project[] }) {
       {expanded && (
         <div className="mt-3 rounded-lg border border-line bg-white p-4">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-semibold text-ink">{expanded.competitorDomain}</span>
+            <span className="text-[0.875rem] font-semibold text-ink">{expanded.competitorDomain}</span>
             <Chip>
               {CHANGE_LABELS[expanded.changeType] ?? expanded.changeType}
             </Chip>
             {statusBadge(expanded.status)}
-            <span className="text-[12px] text-muted">{fmtDate(expanded.detectedAt)}</span>
+            <span className="text-[0.75rem] text-muted">{fmtDate(expanded.detectedAt)}</span>
           </div>
           <dl className="divide-y divide-line">
             <DetailRow label="Page" value={expanded.url} />
@@ -450,7 +450,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
             <button onClick={() => setStatus(expanded.id, "dismissed")} disabled={actingId === expanded.id} className={btnGhost}>
               <XCircle size={14} /> Dismiss
             </button>
-            <span className="text-[12px] text-subtle">
+            <span className="text-[0.75rem] text-subtle">
               “Actioned” means you handled it outside ShapesOS (e.g. via the Phase 9 approval
               executor) — the fleet never acted on its own.
             </span>
@@ -543,7 +543,7 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Polite by design. </span>
         The fleet fetches sitemaps and tracked pages with ≥2s between hits per
         domain, a 15s timeout, an identifiable user agent, and a real
@@ -578,10 +578,10 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
           Add competitor
         </button>
       </div>
-      {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
+      {error && <p className="mb-3 text-[0.8125rem] text-failed-text">{error}</p>}
 
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Competitor</th>
@@ -610,7 +610,7 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => deleteWatch(w.id)}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-muted hover:bg-failed-tint hover:text-failed-text"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] text-muted hover:bg-failed-tint hover:text-failed-text"
                     title="Remove watch"
                   >
                     <Trash2 size={13} />
@@ -620,14 +620,14 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
             ))}
             {watches.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={5} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No competitors watched yet — add one above.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={5} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
@@ -689,7 +689,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
           Rebuild digest
         </button>
         {digest && (
-          <span className="text-[12px] text-subtle">
+          <span className="text-[0.75rem] text-subtle">
             Week {fmtDate(digest.weekStart)} – {fmtDate(digest.weekEnd)} · generated{" "}
             {fmtDate(digest.generatedAt)}
           </span>
@@ -697,7 +697,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
       </div>
 
       {!digest && !loading && (
-        <div className="rounded-lg border border-line bg-canvas p-8 text-center text-[13px] text-subtle">
+        <div className="rounded-lg border border-line bg-canvas p-8 text-center text-[0.8125rem] text-subtle">
           No digest yet — the weekly cron builds it automatically.
         </div>
       )}
@@ -715,7 +715,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
 
           {/* Per-competitor velocity */}
           <div className="overflow-hidden rounded-lg border border-line bg-white">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Competitor</th>
@@ -743,7 +743,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
                     <td className="px-3 py-2">
                       <ul className="space-y-1">
                         {c.topChanges.map((tc, i) => (
-                          <li key={i} className="flex items-center gap-1.5 text-[12.5px] text-muted">
+                          <li key={i} className="flex items-center gap-1.5 text-[0.78125rem] text-muted">
                             <Chip>{CHANGE_LABELS[tc.changeType] ?? tc.changeType}</Chip>
                             <span className="truncate" title={tc.summary ?? tc.url}>
                               {tc.summary ? truncate(tc.summary, 70) : shortUrl(tc.url)}
@@ -760,22 +760,22 @@ function DigestTab({ projects }: { projects: Project[] }) {
 
           {/* SERP presence */}
           <div>
-            <h3 className="mb-2 text-[13px] font-semibold text-ink">
+            <h3 className="mb-2 text-[0.8125rem] font-semibold text-ink">
               Keyword presence — watched competitors in the top 10
             </h3>
             {!digest.serpAvailable ? (
-              <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+              <div className="rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
                 SERP vendor unavailable this week — keyword presence skipped (no
                 SERP vendor is configured; the digest degrades gracefully
                 instead of failing).
               </div>
             ) : digest.serpPresence.length === 0 ? (
-              <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+              <div className="rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
                 No watched competitor in the top 10 for tracked keywords this week.
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-line bg-white">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
                     <tr className="border-b border-line text-xs font-semibold text-muted">
                       <th className="px-3 py-2 font-medium">Keyword</th>
@@ -807,11 +807,11 @@ function DigestTab({ projects }: { projects: Project[] }) {
 
           {/* Review velocity status */}
           <div>
-            <h3 className="mb-2 text-[13px] font-semibold text-ink">
+            <h3 className="mb-2 text-[0.8125rem] font-semibold text-ink">
               Review velocity — licensed adapters
             </h3>
             <div className="overflow-hidden rounded-lg border border-line bg-white">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Source</th>
@@ -832,7 +832,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
                       <td className="px-3 py-2 text-muted">
                         {rv.avgRating !== null ? rv.avgRating.toFixed(1) : "—"}
                       </td>
-                      <td className="max-w-[380px] px-3 py-2 text-[12.5px] text-muted">
+                      <td className="max-w-[380px] px-3 py-2 text-[0.78125rem] text-muted">
                         {rv.detail ?? "—"}
                       </td>
                     </tr>
@@ -840,7 +840,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
                 </tbody>
               </table>
             </div>
-            <p className="mt-1.5 text-[12px] text-subtle">
+            <p className="mt-1.5 text-[0.75rem] text-subtle">
               Run per-business pulls from the Reviews tab — the digest only
               reports adapter availability, never scraped data.
             </p>
@@ -850,7 +850,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
           <div className="rounded-lg border border-line bg-canvas p-4">
             <div className="mb-2 flex items-center gap-2">
               <Bell size={14} className="text-muted" />
-              <span className="text-[13px] font-semibold text-ink">Google Alerts baseline</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">Google Alerts baseline</span>
               <select
                 value={alertDomain}
                 onChange={(e) => setAlertDomainPick(e.target.value)}
@@ -863,7 +863,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
                 ))}
               </select>
             </div>
-            <div className="whitespace-pre-line text-[12.5px] leading-relaxed text-muted">
+            <div className="whitespace-pre-line text-[0.78125rem] leading-relaxed text-muted">
               {googleAlertsGuidance(alertDomain || "competitor.com")}
             </div>
           </div>
@@ -927,7 +927,7 @@ function ReviewsTab() {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Licensed paths only. </span>
         Yelp Fusion (free tier), DataForSEO Business Data (metered through M6),
         and the GBP API for owned listings. No G2/Capterra/Trustpilot scraping —
@@ -962,25 +962,25 @@ function ReviewsTab() {
           Pull reviews
         </button>
       </div>
-      {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
+      {error && <p className="mb-3 text-[0.8125rem] text-failed-text">{error}</p>}
 
       {pull && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <Chip tone={pull.result.status === "ok" ? "green" : "slate"}>{pull.result.status}</Chip>
-            <span className="text-[13px] text-muted">
+            <span className="text-[0.8125rem] text-muted">
               {pull.velocity.reviewsThisWeek} reviews this week
               {pull.velocity.avgRating !== null && ` · avg ${pull.velocity.avgRating.toFixed(1)}★`}
             </span>
           </div>
           {pull.result.detail && (
-            <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+            <div className="rounded-lg border border-line bg-canvas p-3 text-[0.78125rem] text-muted">
               {pull.result.detail}
             </div>
           )}
           {pull.themes.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-line bg-white">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Complaint theme (heuristic, your data only)</th>
@@ -1028,7 +1028,7 @@ export function CompetitorsClient({ projects }: { projects: Project[] }) {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

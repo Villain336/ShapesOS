@@ -24,9 +24,9 @@ export function EmptyState({
           {icon}
         </div>
       ) : null}
-      <div className="mt-3 text-[14px] font-medium text-ink">{title}</div>
+      <div className="mt-3 text-[0.875rem] font-medium text-ink">{title}</div>
       {description ? (
-        <p className="mt-1 max-w-70 text-[12.5px] leading-relaxed text-ink-2">{description}</p>
+        <p className="mt-1 max-w-70 text-[0.78125rem] leading-relaxed text-ink-2">{description}</p>
       ) : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>

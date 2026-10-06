@@ -20,8 +20,8 @@ const RANGES = [
 const cardCls = "rounded-lg bg-paper p-4 shadow-hairline";
 const thCls = "px-3 py-2 text-left text-xs font-semibold text-muted";
 const thNum = "px-3 py-2 text-right text-xs font-semibold text-muted";
-const tdCls = "px-3 py-2 text-[13px] text-ink";
-const tdNum = "px-3 py-2 text-right text-[13px] tabular-nums text-ink";
+const tdCls = "px-3 py-2 text-[0.8125rem] text-ink";
+const tdNum = "px-3 py-2 text-right text-[0.8125rem] tabular-nums text-ink";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
@@ -38,13 +38,13 @@ function channelLabel(c: string): string {
 }
 
 function SampleTag() {
-  return <span className="ml-2 inline-flex h-5 items-center rounded-full bg-canvas px-2 text-[11px] font-semibold text-muted">Sample data</span>;
+  return <span className="ml-2 inline-flex h-5 items-center rounded-full bg-canvas px-2 text-[0.6875rem] font-semibold text-muted">Sample data</span>;
 }
 
 function SectionHead({ icon: Icon, title, right }: { icon: typeof Globe; title: string; right?: React.ReactNode }) {
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+      <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
         <Icon className="h-4 w-4" /> {title}
       </h2>
       {right}
@@ -54,7 +54,7 @@ function SectionHead({ icon: Icon, title, right }: { icon: typeof Globe; title: 
 
 function NotConnected({ what }: { what: string }) {
   return (
-    <p className="rounded-md bg-canvas px-3 py-3 text-[13px] text-muted">
+    <p className="rounded-md bg-canvas px-3 py-3 text-[0.8125rem] text-muted">
       {what} isn&apos;t connected.{" "}
       <Link href="/dashboard/settings/connectors" className="font-semibold text-ink underline-offset-2 hover:underline">
         Connect it
@@ -129,7 +129,7 @@ export function AnalyticsHome() {
         </select>
         {loading ? <Loader2 className="h-4 w-4 aos-spin text-muted" aria-label="Loading" /> : null}
         {error ? (
-          <span className="flex items-center gap-2 text-[13px] text-failed-text">
+          <span className="flex items-center gap-2 text-[0.8125rem] text-failed-text">
             <span className="aos-shape aos-shape--failed" aria-hidden /> {error}
           </span>
         ) : null}
@@ -138,9 +138,9 @@ export function AnalyticsHome() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-lg bg-paper p-3 shadow-hairline">
-            <div className="text-[12px] font-semibold text-muted">{k.label}</div>
+            <div className="text-[0.75rem] font-semibold text-muted">{k.label}</div>
             <div className="mt-1 text-xl font-heading stretch-heading tabular-nums text-ink">{k.value}</div>
-            <div className="mt-0.5 truncate text-[12px] text-subtle">{k.hint}</div>
+            <div className="mt-0.5 truncate text-[0.75rem] text-subtle">{k.hint}</div>
           </div>
         ))}
       </div>
@@ -151,13 +151,13 @@ export function AnalyticsHome() {
             icon={Share2}
             title="Social engagement"
             right={
-              <span className="flex items-center text-[12px] text-muted">
+              <span className="flex items-center text-[0.75rem] text-muted">
                 Impressions per day{social?.mock ? <SampleTag /> : null}
               </span>
             }
           />
           {data?.social.status === "error" ? (
-            <p className="text-[13px] text-failed-text">{(data.social as { message: string }).message}</p>
+            <p className="text-[0.8125rem] text-failed-text">{(data.social as { message: string }).message}</p>
           ) : (
             <>
               <LineChart label="Social impressions per day" points={from && to ? fillDays((social?.daily ?? []).map((d) => ({ x: d.day, y: d.impressions })), from, to) : []} />
@@ -175,7 +175,7 @@ export function AnalyticsHome() {
                 <tbody>
                   {(social?.byPlatform ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-center text-[13px] text-muted">
+                      <td colSpan={6} className="px-3 py-4 text-center text-[0.8125rem] text-muted">
                         No published posts in this range. <Link href="/dashboard/social" className="font-semibold text-ink hover:underline">Open Social</Link>
                       </td>
                     </tr>
@@ -198,9 +198,9 @@ export function AnalyticsHome() {
         </section>
 
         <section className={cardCls}>
-          <SectionHead icon={Wallet} title="Revenue and spend by channel" right={<Link href="/dashboard/attribution" className="text-[13px] font-semibold text-ink hover:underline">Attribution</Link>} />
+          <SectionHead icon={Wallet} title="Revenue and spend by channel" right={<Link href="/dashboard/attribution" className="text-[0.8125rem] font-semibold text-ink hover:underline">Attribution</Link>} />
           {data?.attribution.status === "error" ? (
-            <p className="text-[13px] text-failed-text">{(data.attribution as { message: string }).message}</p>
+            <p className="text-[0.8125rem] text-failed-text">{(data.attribution as { message: string }).message}</p>
           ) : (
             <>
               <BarList
@@ -224,7 +224,7 @@ export function AnalyticsHome() {
                   <tbody>
                     {(attr?.channels ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-3 py-4 text-center text-[13px] text-muted">No touches in this range.</td>
+                        <td colSpan={7} className="px-3 py-4 text-center text-[0.8125rem] text-muted">No touches in this range.</td>
                       </tr>
                     ) : (
                       attr!.channels.map((c) => (
@@ -251,7 +251,7 @@ export function AnalyticsHome() {
           {!ga4 || ga4.status === "not_connected" ? (
             <NotConnected what="Google Analytics 4" />
           ) : ga4.status === "error" ? (
-            <p className="text-[13px] text-failed-text">{ga4.message}</p>
+            <p className="text-[0.8125rem] text-failed-text">{ga4.message}</p>
           ) : (
             <table className="w-full text-left">
               <thead>
@@ -266,7 +266,7 @@ export function AnalyticsHome() {
                   <tr key={p.path} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className={`${tdCls} max-w-[280px]`}>
                       <div className="truncate font-medium">{p.title ?? p.path}</div>
-                      <div className="truncate font-mono text-[12px] text-muted">{p.path}</div>
+                      <div className="truncate font-mono text-[0.75rem] text-muted">{p.path}</div>
                     </td>
                     <td className={tdNum}>{int(p.sessions)}</td>
                     <td className={tdNum}>{int(p.conversions)}</td>
@@ -282,7 +282,7 @@ export function AnalyticsHome() {
           {!gsc || gsc.status === "not_connected" ? (
             <NotConnected what="Google Search Console" />
           ) : gsc.status === "error" ? (
-            <p className="text-[13px] text-failed-text">{gsc.message}</p>
+            <p className="text-[0.8125rem] text-failed-text">{gsc.message}</p>
           ) : (
             <table className="w-full text-left">
               <thead>
@@ -331,12 +331,12 @@ export function AnalyticsHome() {
                       <Link href={`/dashboard/social?post=${encodeURIComponent(p.id)}`} className="block truncate font-medium hover:underline">
                         {p.title}
                       </Link>
-                      <div className="text-[12px] text-muted">
+                      <div className="text-[0.75rem] text-muted">
                         {p.platforms.map((x) => platformLabel(x)).join(", ")}
                         {p.mock ? " · sample" : ""}
                       </div>
                     </td>
-                    <td className={`${tdCls} font-mono text-[12px] text-muted`}>{p.campaign}</td>
+                    <td className={`${tdCls} font-mono text-[0.75rem] text-muted`}>{p.campaign}</td>
                     <td className={tdNum}>{int(p.impressions)}</td>
                     <td className={tdNum}>{int(p.engagements)}</td>
                     <td className={tdNum}>{int(p.clicks)}</td>

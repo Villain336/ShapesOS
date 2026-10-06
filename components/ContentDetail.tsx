@@ -29,7 +29,7 @@ const inputCls =
   "rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 const btnPrimary =
-  "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
 const noteCls = "rounded-md bg-paper px-4 py-3 text-sm text-ink shadow-hairline";

@@ -28,10 +28,10 @@ export default async function ThanksPage({ params, searchParams }: PageProps<"/s
       <h1 className="aos-heading">{!order ? "We couldn't find that order" : confirmed ? "Thank you — your order is confirmed" : "Thank you — we're confirming your payment"}</h1>
       {order ? (
         <>
-          <p className="text-[15px] text-muted">
+          <p className="text-[0.9375rem] text-muted">
             Order <span className="font-mono text-ink">{order.label}</span> · {fmtPrice(order.totalCents, store.currency)}
           </p>
-          <p className="text-[15px]">
+          <p className="text-[0.9375rem]">
             {confirmed
               ? "Your payment was received. A receipt is on its way from Stripe."
               : order.status === "cancelled"
@@ -40,7 +40,7 @@ export default async function ThanksPage({ params, searchParams }: PageProps<"/s
           </p>
         </>
       ) : (
-        <p className="text-[15px] text-muted">If you just paid, your receipt from Stripe is the record of your purchase.</p>
+        <p className="text-[0.9375rem] text-muted">If you just paid, your receipt from Stripe is the record of your purchase.</p>
       )}
       <div className="pt-2">
         <Link href={`/shop/${store.slug}`} className={shopBtnSecondary}>

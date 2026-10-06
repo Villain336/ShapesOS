@@ -77,15 +77,15 @@ export default function SkillsClient({
         >
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[13.5px] font-medium text-ink">{skill.name}</span>
-              <span className="rounded-full bg-inset px-2 py-0.5 font-mono text-[11px] text-ink-3">
+              <span className="text-[0.84375rem] font-medium text-ink">{skill.name}</span>
+              <span className="rounded-full bg-inset px-2 py-0.5 font-mono text-[0.6875rem] text-ink-3">
                 v{skill.version}
               </span>
-              <span className="rounded-full bg-inset px-2 py-0.5 text-[11px] text-ink-3">
+              <span className="rounded-full bg-inset px-2 py-0.5 text-[0.6875rem] text-ink-3">
                 {trustTierLabel(skill.trustTier)}
               </span>
             </div>
-            <p className="mt-0.5 line-clamp-2 text-[12.5px] text-ink-2">
+            <p className="mt-0.5 line-clamp-2 text-[0.78125rem] text-ink-2">
               {skill.description}
             </p>
           </div>
@@ -98,7 +98,7 @@ export default function SkillsClient({
         </div>
       ))}
       {error && (
-        <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-red">
+        <p className="flex items-center gap-1.5 pt-2 text-[0.78125rem] text-red">
           <TriangleAlert className="size-3.5" />
           {error}
         </p>

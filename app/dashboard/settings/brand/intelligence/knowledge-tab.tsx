@@ -11,27 +11,27 @@ import { BookOpen, Check, Pencil, Pin, PinOff, Plus, Trash2, TriangleAlert, X } 
 import { confirmAction } from "@/lib/ui/feedback";
 // ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
 const inputCls =
-  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
-const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const theadCls = "border-b border-line text-left text-[0.75rem] text-muted";
 const thCls = "px-3 py-2 text-left font-medium";
 const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
-const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted";
 
 // Statuses here are agent/provider states, not agent states — neutral chips.
 function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
 }
 const btnDeny =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[13px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[0.8125rem] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 
 export interface KnowledgeEntry {
   id: string;
@@ -96,7 +96,7 @@ function Switch({
   label: string;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[0.8125rem] text-muted">
       <button
         type="button"
         role="switch"
@@ -121,10 +121,10 @@ function Switch({
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} aria-hidden />
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+          <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted">
             <X size={16} />
           </button>
@@ -285,15 +285,15 @@ export default function KnowledgeTab({
       <div className="flex flex-wrap items-center gap-2">
         {pendingReview.length > 0 && (
           <div className="w-full rounded-lg border border-line bg-needs-tint aos-shape aos-shape--needs aos-shape--edged p-3">
-            <p className="text-[13px] font-medium text-ink">
+            <p className="text-[0.8125rem] font-medium text-ink">
               {pendingReview.length} learner proposal{pendingReview.length === 1 ? "" : "s"} waiting for review
             </p>
-            <p className="text-[12.5px] text-muted">
+            <p className="text-[0.78125rem] text-muted">
               Accept the entries you agree with — they go live only when you accept them.
             </p>
           </div>
         )}
-        <div className="flex items-center gap-1.5 text-[13px] text-muted">
+        <div className="flex items-center gap-1.5 text-[0.8125rem] text-muted">
           <BookOpen size={14} />
           <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className={inputCls} aria-label="Filter by kind">
             <option value="">All kinds</option>
@@ -302,7 +302,7 @@ export default function KnowledgeTab({
             ))}
           </select>
         </div>
-        <span className="text-[12.5px] text-subtle">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
+        <span className="text-[0.78125rem] text-subtle">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
         {canEdit && (
           <button type="button" onClick={openNew} className={`${btnPrimary} ml-auto`}>
             <Plus size={14} /> Add entry
@@ -311,7 +311,7 @@ export default function KnowledgeTab({
       </div>
 
       <div className={tableShell}>
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[0.8125rem]">
           <thead className={theadCls}>
             <tr>
               <th className={thCls}>Title</th>
@@ -334,7 +334,7 @@ export default function KnowledgeTab({
                 <td className="px-3 py-2.5 font-medium text-ink">
                   {e.title}
                   {needsReview(e) && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-needs-tint px-2 py-0.5 text-[11px] font-medium text-ink aos-shape aos-shape--needs aos-shape--edged">
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-needs-tint px-2 py-0.5 text-[0.6875rem] font-medium text-ink aos-shape aos-shape--needs aos-shape--edged">
                       <TriangleAlert size={11} /> Needs review
                     </span>
                   )}
@@ -345,11 +345,11 @@ export default function KnowledgeTab({
                 </td>
                 <td className="px-3 py-2.5">
                   {e.pinned ? (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted">
+                    <span className="inline-flex items-center gap-1 text-[0.75rem] font-medium text-muted">
                       <Pin size={12} /> pinned
                     </span>
                   ) : (
-                    <span className="text-[12px] text-subtle">—</span>
+                    <span className="text-[0.75rem] text-subtle">—</span>
                   )}
                 </td>
                 {canEdit && (
@@ -385,7 +385,7 @@ export default function KnowledgeTab({
         <Modal title={editing === "new" ? "Add knowledge entry" : "Edit knowledge entry"} onClose={() => setEditing(null)}>
           <div className="mb-3 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[12.5px] font-medium text-muted">Kind</label>
+              <label className="mb-1 block text-[0.78125rem] font-medium text-muted">Kind</label>
               <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value, body: KIND_HINT[e.target.value] ?? "{}" })} className={`${inputCls} w-full`} disabled={editing !== "new"}>
                 {KINDS.map((k) => (
                   <option key={k} value={k}>{k}</option>
@@ -393,12 +393,12 @@ export default function KnowledgeTab({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[12.5px] font-medium text-muted">Title</label>
+              <label className="mb-1 block text-[0.78125rem] font-medium text-muted">Title</label>
               <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={`${inputCls} w-full`} placeholder="e.g. Acme Starter plan" />
             </div>
           </div>
-          <label className="mb-1 block text-[12.5px] font-medium text-muted">Body — JSON</label>
-          <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={8} spellCheck={false} className={`${inputCls} mb-3 w-full font-mono text-[12px]`} />
+          <label className="mb-1 block text-[0.78125rem] font-medium text-muted">Body — JSON</label>
+          <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={8} spellCheck={false} className={`${inputCls} mb-3 w-full font-mono text-[0.75rem]`} />
           <div className="mb-4">
             <Switch checked={form.pinned} onChange={(v) => setForm({ ...form, pinned: v })} label="Pin — the learner may never modify this" />
           </div>
@@ -413,8 +413,8 @@ export default function KnowledgeTab({
 
       {confirmDelete && (
         <Modal title="Delete this entry?" onClose={() => setConfirmDelete(null)}>
-          <p className="mb-1 text-[13px] text-ink">{confirmDelete.title}</p>
-          <p className="mb-4 text-[12.5px] text-muted">Agents will no longer know this. This cannot be undone.</p>
+          <p className="mb-1 text-[0.8125rem] text-ink">{confirmDelete.title}</p>
+          <p className="mb-4 text-[0.78125rem] text-muted">Agents will no longer know this. This cannot be undone.</p>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setConfirmDelete(null)} className={btnGhost}>Cancel</button>
             <button type="button" onClick={() => remove(confirmDelete)} disabled={busy} className={btnDeny}>

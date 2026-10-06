@@ -151,13 +151,13 @@ export function IconsPanel() {
           ))}
         </select>
         {error && (
-          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
+          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] leading-snug text-failed-text">
             {error}
           </p>
         )}
         {results.length > 0 ? (
           <>
-            <p className="text-[11px] text-subtle">
+            <p className="text-[0.6875rem] text-subtle">
               {total > results.length
                 ? `Showing ${results.length} of ~${total.toLocaleString()} matches`
                 : `${results.length} match${results.length === 1 ? "" : "es"}`}
@@ -183,7 +183,7 @@ export function IconsPanel() {
             </div>
           </>
         ) : searched !== null && !busy ? (
-          <p className="flex items-start gap-1.5 text-[12px] text-muted">
+          <p className="flex items-start gap-1.5 text-[0.75rem] text-muted">
             <ImageOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               No icons found for “{searched}”. Try another search or a different
@@ -191,7 +191,7 @@ export function IconsPanel() {
             </span>
           </p>
         ) : (
-          <p className="flex items-start gap-1.5 text-[12px] leading-snug text-muted">
+          <p className="flex items-start gap-1.5 text-[0.75rem] leading-snug text-muted">
             <Shapes className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
             <span>
               Search 100k+ icons from open-source sets. Click an icon to place
@@ -199,7 +199,7 @@ export function IconsPanel() {
             </span>
           </p>
         )}
-        <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+        <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
           Only permissively-licensed sets (MIT, Apache-2.0, ISC, CC0) are
           searchable — no attribution required on your exports. Icons are
           stored in your design, so exports never phone home.

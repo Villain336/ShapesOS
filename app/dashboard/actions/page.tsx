@@ -39,7 +39,7 @@ export default async function ActionsPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading">Actions</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Connect your apps once — agents then propose real-world actions here. Reads run
           automatically; every write or destructive action waits for your approval. Nothing
           executes silently.

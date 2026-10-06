@@ -147,7 +147,7 @@ export function NewPOModal({
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>
             <h3 className="text-lg font-bold tracking-tight text-ink">New purchase order</h3>
-            <p className="mt-0.5 text-[13px] text-muted">
+            <p className="mt-0.5 text-[0.8125rem] text-muted">
               Drafts are free — sending needs your approval (money is a red lane).
             </p>
           </div>
@@ -168,7 +168,7 @@ export function NewPOModal({
           <div className="relative mt-1">
             {supplier ? (
               <div className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2">
-                <span className="text-[13px] font-medium text-ink">
+                <span className="text-[0.8125rem] font-medium text-ink">
                   {supplier.name}
                   {supplier.company && <span className="text-subtle"> · {supplier.company}</span>}
                 </span>
@@ -178,7 +178,7 @@ export function NewPOModal({
                     setSupplier(null);
                     setSupplierQuery("");
                   }}
-                  className="text-[12px] font-semibold text-muted hover:text-ink"
+                  className="text-[0.75rem] font-semibold text-muted hover:text-ink"
                 >
                   Change
                 </button>
@@ -206,7 +206,7 @@ export function NewPOModal({
                           setSupplier(h);
                           setShowHits(false);
                         }}
-                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-canvas"
+                        className="block w-full px-3 py-2 text-left text-[0.8125rem] hover:bg-canvas"
                       >
                         <span className="font-medium text-ink">{h.name}</span>
                         {h.company && <span className="text-subtle"> · {h.company}</span>}
@@ -233,12 +233,12 @@ export function NewPOModal({
             <button
               type="button"
               onClick={() => setItems([...items, { productId: "", name: "", qty: "1", price: "" }])}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
+              className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink hover:underline"
             >
               <Plus size={13} /> Add line
             </button>
           </div>
-          <p className="mt-1 text-[12px] text-muted">
+          <p className="mt-1 text-[0.75rem] text-muted">
             Link a line to a catalog product and receiving the PO books a restock for it.
           </p>
           <div className="mt-1 space-y-2">
@@ -321,7 +321,7 @@ export function NewPOModal({
               />
             </div>
             <div className="flex items-end justify-end">
-              <p className="text-[13px] text-muted">
+              <p className="text-[0.8125rem] text-muted">
                 Subtotal{" "}
                 <span className="font-bold text-ink tabular-nums">{formatMoney(subtotal)}</span>
               </p>

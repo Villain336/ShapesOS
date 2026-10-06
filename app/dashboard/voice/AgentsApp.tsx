@@ -109,7 +109,7 @@ export function AgentsApp() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="aos-heading">Voice Agents</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           LiveKit follow-up agents that qualify leads and book meetings — consent-gated, disclosure-first.
         </p>
       </div>
@@ -166,13 +166,13 @@ export function AgentsApp() {
                   </Link>
                 </td>
                 <td className={tdCls}><Chip tone={a.purpose === "followup" ? "brand" : "slate"}>{a.purpose}</Chip></td>
-                <td className={`${tdCls} font-mono text-[12px]`}>{a.voiceId}</td>
+                <td className={`${tdCls} font-mono text-[0.75rem]`}>{a.voiceId}</td>
                 <td className={tdCls}><Chip tone={statusTone(a.status)}>{a.status}</Chip></td>
                 <td className={tdCls}>{a._count.sessions}</td>
                 <td className={tdCls}>{a._count.scripts}</td>
                 <td className={tdCls}>
                   <button
-                    className={a.killSwitch ? "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover" : btnGhost}
+                    className={a.killSwitch ? "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover" : btnGhost}
                     onClick={() => toggleKill(a)}
                     title={a.killSwitch ? "Kill switch engaged — release" : "Engage kill switch"}
                   >
@@ -190,7 +190,7 @@ export function AgentsApp() {
           </tbody>
         </table>
       </div>
-      <div className="flex items-center gap-2 text-[12px] text-muted">
+      <div className="flex items-center gap-2 text-[0.75rem] text-muted">
         <Pause className="h-3.5 w-3.5" />
         <Play className="h-3.5 w-3.5" />
         Pausing/archiving an agent also refuses new sessions (gate a). Delete is blocked while session history exists.

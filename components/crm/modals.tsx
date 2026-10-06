@@ -26,7 +26,7 @@ function Shell({ title, onClose, children, wide }: {
         aria-label={title}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h3 className="text-[15px] font-bold text-ink">{title}</h3>
+          <h3 className="text-[0.9375rem] font-bold text-ink">{title}</h3>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink">
             <X size={16} />
           </button>
@@ -157,7 +157,7 @@ export function PipelineModal({
         autoFocus
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
       />
-      <p className="mt-2 text-[12px] text-muted">
+      <p className="mt-2 text-[0.75rem] text-muted">
         Starts with the standard stages: New → Contacted → Qualified → Proposal → Won / Lost.
       </p>
       <div className="mt-4 flex justify-end gap-2">
@@ -218,7 +218,7 @@ export function ImportModal({
       {!report ? (
         <>
           <label
-            className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-control bg-canvas px-4 py-6 text-[13px] text-muted hover:border-ink hover:bg-canvas"
+            className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-control bg-canvas px-4 py-6 text-[0.8125rem] text-muted hover:border-ink hover:bg-canvas"
             onDrop={(e) => { e.preventDefault(); pickFile(e.dataTransfer.files?.[0]); }}
             onDragOver={(e) => e.preventDefault()}
           >
@@ -230,12 +230,12 @@ export function ImportModal({
             />
           </label>
           <textarea
-            className={`${inputCls} h-40 w-full font-mono text-[12px]!`}
+            className={`${inputCls} h-40 w-full font-mono text-[0.75rem]!`}
             placeholder={"name,email,phone,company,title,source,valueCents,stage\nJane Doe,jane@acme.com,555-1234,Acme,CEO,referral,500000,new"}
             value={csv}
             onChange={(e) => setCsv(e.target.value)}
           />
-          <p className="mt-2 text-[12px] text-muted">
+          <p className="mt-2 text-[0.75rem] text-muted">
             Header row required. Columns: name, email, phone, company, title, source, valueCents, stage. Max 5,000 rows, 2 MB.
           </p>
           <div className="mt-4 flex justify-end gap-2">
@@ -249,22 +249,22 @@ export function ImportModal({
         <>
           <div className="mb-3 grid grid-cols-3 gap-2">
             <div className="rounded-md bg-canvas px-3 py-2 text-center">
-              <div className="text-[18px] font-bold text-ink tabular-nums">{report.created}</div>
-              <div className="text-[11px] text-muted">Created</div>
+              <div className="text-[1.125rem] font-bold text-ink tabular-nums">{report.created}</div>
+              <div className="text-[0.6875rem] text-muted">Created</div>
             </div>
             <div className="rounded-md bg-canvas px-3 py-2 text-center">
-              <div className="text-[18px] font-bold text-ink tabular-nums">{report.duplicates}</div>
-              <div className="text-[11px] text-muted">Duplicates skipped</div>
+              <div className="text-[1.125rem] font-bold text-ink tabular-nums">{report.duplicates}</div>
+              <div className="text-[0.6875rem] text-muted">Duplicates skipped</div>
             </div>
             <div className="rounded-md bg-failed-tint px-3 py-2 text-center">
-              <div className="text-[18px] font-bold text-failed-text tabular-nums">{report.errors.length}</div>
-              <div className="text-[11px] text-muted">Errors</div>
+              <div className="text-[1.125rem] font-bold text-failed-text tabular-nums">{report.errors.length}</div>
+              <div className="text-[0.6875rem] text-muted">Errors</div>
             </div>
           </div>
           {report.errors.length > 0 && (
             <ul className="mb-3 max-h-48 space-y-1 overflow-y-auto rounded-md border border-line p-3">
               {report.errors.map((e, i) => (
-                <li key={i} className="text-[12.5px] text-muted">
+                <li key={i} className="text-[0.78125rem] text-muted">
                   <span className="font-semibold">Row {e.row}:</span> {e.error}
                 </li>
               ))}

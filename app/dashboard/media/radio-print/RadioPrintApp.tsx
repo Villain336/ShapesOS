@@ -141,7 +141,7 @@ export function RadioPrintApp() {
     }
   }
 
-  const inputCls = "mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none";
+  const inputCls = "mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none";
 
   return (
     <div className="flex flex-col gap-4">
@@ -153,7 +153,7 @@ export function RadioPrintApp() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -200,7 +200,7 @@ export function RadioPrintApp() {
                 <input value={r.market} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, market: e.target.value } : o)))} placeholder="Market" className={inputCls} />
                 <input value={r.callSign} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, callSign: e.target.value } : o)))} placeholder="WXYZ" className={`${inputCls} w-20`} />
                 <input value={r.daypartMix} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, daypartMix: e.target.value } : o)))} placeholder="Dayparts" className={inputCls} />
-                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
               </div>
             ))}
             <button onClick={() => setInventory((x) => [...x, { name: "", market: "", callSign: "", daypartMix: "", placement: "" }])} className="mt-1 text-xs text-muted underline">+ inventory</button>
@@ -221,12 +221,12 @@ export function RadioPrintApp() {
               <div key={i} className="mt-1 rounded-md border border-line p-2">
                 <div className="flex gap-1">
                   <input value={d.description} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, description: e.target.value } : o)))} placeholder="30s drive-time spots (400×)" className={inputCls} />
-                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} aria-label="Remove row" className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" aria-hidden /></button>
                 </div>
                 <div className="mt-1 grid grid-cols-3 gap-1">
-                  <div><label className="block text-[11px] text-muted">Qty</label><input type="number" value={d.quantity} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, quantity: Number(e.target.value) } : o)))} className={inputCls} /></div>
-                  <div><label className="block text-[11px] text-muted">Unit price ($)</label><input type="number" value={(d.unitPriceCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, unitPriceCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
-                  <div><label className="block text-[11px] text-muted">Total ($)</label><input type="number" value={(d.totalCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, totalCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[0.6875rem] text-muted">Qty</label><input type="number" value={d.quantity} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, quantity: Number(e.target.value) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[0.6875rem] text-muted">Unit price ($)</label><input type="number" value={(d.unitPriceCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, unitPriceCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[0.6875rem] text-muted">Total ($)</label><input type="number" value={(d.totalCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, totalCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
                 </div>
               </div>
             ))}
@@ -260,9 +260,9 @@ export function RadioPrintApp() {
           <p className="text-sm text-muted">No IO briefs yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-canvas text-[0.6875rem] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Brief</th>
                   <th className="px-3 py-2 font-medium">Channel</th>
                   <th className="px-3 py-2 font-medium">Max spend</th>
@@ -279,19 +279,19 @@ export function RadioPrintApp() {
                       <td className="px-3 py-2 font-medium text-ink">{b.name}</td>
                       <td className="px-3 py-2 text-muted">{b.channel}</td>
                       <td className="px-3 py-2 font-medium text-ink">{money(b.maxSpendCents)}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{b.ioTermsJson.flightStart} → {b.ioTermsJson.flightEnd}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{b.ioTermsJson.flightStart} → {b.ioTermsJson.flightEnd}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           {FLOW.map((s, i) => {
                             const done = FLOW.indexOf(b.signatureStatus) >= i;
                             return (
                               <div key={s} className="flex items-center gap-1">
-                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${done ? "bg-ink text-white" : "border border-line bg-paper text-muted"}`}>{s.replace(/_/g, " ")}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[0.6875rem] ${done ? "bg-ink text-white" : "border border-line bg-paper text-muted"}`}>{s.replace(/_/g, " ")}</span>
                                 {i < FLOW.length - 1 && <span className="h-px w-4 bg-line" />}
                               </div>
                             );
                           })}
-                          {b.signatureStatus === "cancelled" && <span className="rounded-full border border-failed bg-failed-tint px-2 py-0.5 text-[11px] text-failed-text">cancelled</span>}
+                          {b.signatureStatus === "cancelled" && <span className="rounded-full border border-failed bg-failed-tint px-2 py-0.5 text-[0.6875rem] text-failed-text">cancelled</span>}
                         </div>
                       </td>
                       <td className="px-3 py-2">
@@ -316,7 +316,7 @@ export function RadioPrintApp() {
                           <div className="mt-3">
                             <label className="block text-xs font-medium text-muted">Proof-of-run URL (receipt of performance)</label>
                             <div className="mt-1 flex gap-1">
-                              <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…affidavit or file link" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                              <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…affidavit or file link" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
                               <button
                                 onClick={() => { if (proofUrl) { setStatus(b.id, "proof_received", { proofOfRunUrl: proofUrl }); setProofUrl(""); } }}
                                 disabled={loading || !proofUrl}
@@ -325,7 +325,7 @@ export function RadioPrintApp() {
                                 Attach proof
                               </button>
                             </div>
-                            {b.proofOfRunUrl && <p className="mt-1 text-[11px] text-muted">Current: {b.proofOfRunUrl}</p>}
+                            {b.proofOfRunUrl && <p className="mt-1 text-[0.6875rem] text-muted">Current: {b.proofOfRunUrl}</p>}
                           </div>
                         </td>
                       </tr>

@@ -137,6 +137,8 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   { table: "email_accounts", column: "user_id" },
   // Phase 18.1 (WS=desk): focus state, voice + shortcut overrides (per person).
   { table: "user_desk_state", column: "user_id" },
+  // Phase 18.1 (WS=find): theme, language, time zone, shortcuts… (lib/preferences).
+  { table: "user_preferences", column: "user_id" },
   { table: "user_security", column: "user_id" },
 ];
 

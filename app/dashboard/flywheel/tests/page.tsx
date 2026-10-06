@@ -11,7 +11,7 @@ import { resolveExperimentStore } from "@/lib/flywheel/testlab/store";
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -21,7 +21,7 @@ function chip(text: React.ReactNode, cls?: string) {
 // running = agent run in progress, qa = awaiting attention, complete/archived = neutral.
 function statusBadge(status: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   if (status === "running")
     return (
       <span className={`${base} bg-running text-white`}>
@@ -67,13 +67,13 @@ export default async function TestLabPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Test Lab</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Peek-safe A/B testing with an honesty dashboard — the lab refuses to
             declare a winner it can&apos;t defend.
           </p>
         </div>
         <Link href="/dashboard/flywheel/tests/new">
-          <Button className="inline-flex h-control cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-5 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40"><Plus className="mr-1 h-4 w-4" /> New experiment</Button>
+          <Button className="inline-flex h-control cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-5 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40"><Plus className="mr-1 h-4 w-4" /> New experiment</Button>
         </Link>
       </header>
 
@@ -92,12 +92,12 @@ export default async function TestLabPage() {
           <span className="ml-1.5 text-xs font-normal text-muted">ranked by PIE/ICE</span>
         </h2>
         {ideas.length === 0 ? (
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             No ideas yet. Ideas arrive from Phases 2–6 signals — or add one via the API.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Idea</th>
@@ -110,8 +110,8 @@ export default async function TestLabPage() {
                 {ideas.map((idea) => (
                   <tr key={idea.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">{idea.title}</td>
-                    <td className="px-3 py-2 font-mono text-[12px] text-muted">{idea.pieIceScore.toFixed(1)}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{idea.sourceSignal ?? "—"}</td>
+                    <td className="px-3 py-2 font-mono text-[0.75rem] text-muted">{idea.pieIceScore.toFixed(1)}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{idea.sourceSignal ?? "—"}</td>
                     <td className="px-3 py-2">{chip(idea.status, "border-line bg-hover text-muted")}</td>
                   </tr>
                 ))}
@@ -124,13 +124,13 @@ export default async function TestLabPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold tracking-tight text-ink">Experiments</h2>
         {experiments.length === 0 ? (
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             No experiments yet. Create one to walk the full lifecycle:
             draft → QA → launch → verdict → archive.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Experiment</th>
@@ -147,11 +147,11 @@ export default async function TestLabPage() {
                       <Link href={`/dashboard/flywheel/tests/${e.id}`} className="font-medium text-ink hover:text-ink">
                         {e.name}
                       </Link>
-                      <span className="block max-w-xs truncate text-[12px] text-muted">{e.hypothesis}</span>
+                      <span className="block max-w-xs truncate text-[0.75rem] text-muted">{e.hypothesis}</span>
                     </td>
                     <td className="px-3 py-2">{statusBadge(e.status)}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{e.channel}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{e.primaryMetric}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{e.channel}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{e.primaryMetric}</td>
                     <td className="px-3 py-2">
                       {e.verdict ? chip(e.verdict) : <span className="text-subtle">—</span>}
                     </td>

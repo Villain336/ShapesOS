@@ -94,7 +94,7 @@ export function Board<T extends { id: string }>({
                 </div>
               ))}
               {col.length === 0 && (
-                <div className="rounded-md border border-dashed border-control px-3 py-6 text-center text-[12px] text-subtle">{emptyHint}</div>
+                <div className="rounded-md border border-dashed border-control px-3 py-6 text-center text-[0.75rem] text-subtle">{emptyHint}</div>
               )}
             </div>
           </div>

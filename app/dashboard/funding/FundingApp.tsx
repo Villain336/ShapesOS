@@ -74,7 +74,7 @@ export function FundingApp() {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[0.875rem] font-semibold ${
                 active ? "bg-black text-white" : "bg-paper text-muted shadow-hairline"
               }`}
             >
@@ -95,7 +95,7 @@ export function FundingApp() {
         round ? (
           <ReadinessView roundId={round.id} />
         ) : (
-          <div className="rounded-lg bg-paper p-4 text-[14px] text-muted shadow-hairline">
+          <div className="rounded-lg bg-paper p-4 text-[0.875rem] text-muted shadow-hairline">
             Save your raise profile on the Raise tab first — readiness tracks against your active round.
           </div>
         )

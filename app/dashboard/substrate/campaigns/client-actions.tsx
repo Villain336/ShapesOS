@@ -83,7 +83,7 @@ export function NewCampaignForm({ parentId }: { parentId?: string }) {
           <option value="launch">Launch</option>
         </select>
       </div>
-      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+      {error ? <p className="text-[0.8125rem] text-failed-text">{error}</p> : null}
       <button type="submit" className={btnPrimary} disabled={busy || !name.trim()}>
         {busy ? "Creating…" : parentId ? "Create sub-campaign" : "Create campaign"}
       </button>
@@ -165,7 +165,7 @@ export function AttachLinkForm({ campaignId, fragments }: { campaignId: string; 
           </select>
         </div>
       </div>
-      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+      {error ? <p className="text-[0.8125rem] text-failed-text">{error}</p> : null}
       <button type="submit" className={btnPrimary} disabled={busy || !value}>
         {busy ? "Attaching…" : "Attach to campaign"}
       </button>
@@ -260,8 +260,8 @@ export function RunScanButton() {
       <button onClick={scan} disabled={busy} className={btnRun}>
         {busy ? "Scanning fragments…" : "Run backfill scan"}
       </button>
-      {result ? <span className="text-[13px] text-muted">{result}</span> : null}
-      {error ? <span className="text-[13px] text-failed-text">{error}</span> : null}
+      {result ? <span className="text-[0.8125rem] text-muted">{result}</span> : null}
+      {error ? <span className="text-[0.8125rem] text-failed-text">{error}</span> : null}
     </span>
   );
 }

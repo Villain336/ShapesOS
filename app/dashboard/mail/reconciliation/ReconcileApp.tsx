@@ -76,7 +76,7 @@ const signed = (cents: number) => `${cents >= 0 ? "+" : "−"}${money(Math.abs(c
 const inputCls =
   "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSecondary =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
@@ -87,7 +87,7 @@ type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone";
 function Chip({ tone, children }: { tone?: Tone; children: React.ReactNode }) {
   void tone;
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[11px] font-medium leading-4 text-muted shadow-control">
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[0.6875rem] font-medium leading-4 text-muted shadow-control">
       {children}
     </span>
   );
@@ -165,7 +165,7 @@ export function ReconcileApp() {
   return (
     <div className="flex flex-col gap-3">
       {error ? (
-        <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+        <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[0.75rem] text-failed-text">
           <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
           <span>{error}</span>
         </div>
@@ -174,7 +174,7 @@ export function ReconcileApp() {
       <div className="flex flex-wrap items-end gap-3 rounded-lg bg-paper px-4 py-3 shadow-hairline">
         <div className="flex gap-3 pt-1.5">
           {(["campaign", "month"] as const).map((m) => (
-            <label key={m} className="flex items-center gap-1.5 text-[13px] text-ink">
+            <label key={m} className="flex items-center gap-1.5 text-[0.8125rem] text-ink">
               <input type="radio" checked={mode === m} onChange={() => setMode(m)} />
               {m === "campaign" ? "Campaign" : "Month"}
             </label>
@@ -227,7 +227,7 @@ export function ReconcileApp() {
               {report.flags.map((f, i) => (
                 <div
                   key={i}
-                  className={`flex items-start gap-2 rounded-md px-2.5 py-2 text-[12px] ${
+                  className={`flex items-start gap-2 rounded-md px-2.5 py-2 text-[0.75rem] ${
                     f.severity === "warn" ? "bg-needs-tint text-ink" : "bg-canvas text-muted"
                   }`}
                 >
@@ -240,9 +240,9 @@ export function ReconcileApp() {
 
           <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
             <div className="border-b border-line px-4 py-2.5">
-              <h3 className="text-[13px] font-semibold text-ink">Line items</h3>
+              <h3 className="text-[0.8125rem] font-semibold text-ink">Line items</h3>
             </div>
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                   <th className="px-3 py-2">Line</th>
@@ -280,12 +280,12 @@ export function ReconcileApp() {
           <div className="rounded-lg bg-paper shadow-hairline">
             <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5">
               <Receipt size={14} className="text-ink" />
-              <h3 className="text-[13px] font-semibold text-ink">Imported invoices ({invoices.length})</h3>
+              <h3 className="text-[0.8125rem] font-semibold text-ink">Imported invoices ({invoices.length})</h3>
             </div>
             {invoices.length === 0 ? (
-              <p className="px-4 py-3 text-[12px] text-subtle">No invoices imported for this scope yet.</p>
+              <p className="px-4 py-3 text-[0.75rem] text-subtle">No invoices imported for this scope yet.</p>
             ) : (
-              <table className="w-full text-[13px]">
+              <table className="w-full text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                     <th className="px-3 py-2">Vendor</th>
@@ -310,8 +310,8 @@ export function ReconcileApp() {
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-line bg-paper px-4 py-10 text-center">
-          <p className="text-[13px] font-medium text-ink">Pick a scope and run reconciliation</p>
-          <p className="mt-1 text-[12px] text-subtle">
+          <p className="text-[0.8125rem] font-medium text-ink">Pick a scope and run reconciliation</p>
+          <p className="mt-1 text-[0.75rem] text-subtle">
             Ledger estimates are compared against webhook-derived provider actuals and imported invoices.
           </p>
         </div>
@@ -338,7 +338,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
   return (
     <div className="rounded-lg bg-paper px-4 py-3 shadow-hairline">
       <p className="text-xs font-semibold text-muted">{label}</p>
-      <p className={`mt-1 text-[20px] font-semibold tabular-nums ${tone}`}>{value}</p>
+      <p className={`mt-1 text-[1.25rem] font-semibold tabular-nums ${tone}`}>{value}</p>
     </div>
   );
 }
@@ -397,17 +397,17 @@ function InvoiceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-night/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-ink">Import provider invoice</h3>
+          <h3 className="text-[0.875rem] font-semibold text-ink">Import provider invoice</h3>
           <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="flex flex-col gap-3 p-4">
           {error ? (
-            <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+            <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[0.75rem] text-failed-text">
               <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
               <span>{error}</span>
             </div>

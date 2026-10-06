@@ -24,27 +24,27 @@ import {
 } from "lucide-react";
 // ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
 const inputCls =
-  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
-const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const theadCls = "border-b border-line text-left text-[0.75rem] text-muted";
 const thCls = "px-3 py-2 text-left font-medium";
 const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
-const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted";
 
 // Statuses here are agent/provider states, not agent states — neutral chips.
 function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
 }
 const btnDeny =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[13px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[0.8125rem] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 import type { LessonRow } from "./page";
 
 interface PrefRow {
@@ -125,7 +125,7 @@ function Switch({
   label: string;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[0.8125rem] text-muted">
       <button
         type="button"
         role="switch"
@@ -158,10 +158,10 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} aria-hidden />
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+          <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -361,10 +361,10 @@ export default function MemoryTab({
             <Brain size={17} />
           </span>
           <div className="min-w-0">
-            <p className="text-[13.5px] font-medium text-ink">
+            <p className="text-[0.84375rem] font-medium text-ink">
               Agent learning is {paused ? "paused" : "on"}
             </p>
-            <p className="text-[12.5px] text-muted">
+            <p className="text-[0.78125rem] text-muted">
               {paused
                 ? "Agents still use what they learned, but nothing new is recorded."
                 : "Every interaction can become a durable lesson. You can inspect, correct, or retire anything below."}
@@ -373,7 +373,7 @@ export default function MemoryTab({
         </div>
         <div className="flex items-center gap-2">
           <Toggle on={paused} onChange={togglePaused} disabled={!canEdit || busy} label="Pause agent learning" />
-          <span className="text-[12.5px] text-muted">{paused ? "Paused" : "Learning"}</span>
+          <span className="text-[0.78125rem] text-muted">{paused ? "Paused" : "Learning"}</span>
         </div>
         <button type="button" onClick={exportJson} className={btnGhost}>
           <Download size={14} /> Export
@@ -404,7 +404,7 @@ export default function MemoryTab({
       {/* Lessons */}
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-ink">
+          <h2 className="text-[0.875rem] font-semibold text-ink">
             What I&apos;ve learned <span className="ml-1 font-normal text-subtle">{activeCount} active</span>
           </h2>
           <div className="flex items-center gap-2">
@@ -421,7 +421,7 @@ export default function MemoryTab({
           </div>
         </div>
         <div className={tableShell}>
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead className={theadCls}>
               <tr>
                 <th className={thCls}>Lesson</th>
@@ -446,7 +446,7 @@ export default function MemoryTab({
                 <tr key={l.id} className={rowCls}>
                   <td className="px-3 py-2.5">
                     <p className="font-medium leading-snug text-ink">{l.hypothesis}</p>
-                    <p className="mt-0.5 text-[12px] text-muted">via {l.action}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-muted">via {l.action}</p>
                   </td>
                   <td className="px-3 py-2.5">
                     <Chip>
@@ -456,7 +456,7 @@ export default function MemoryTab({
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1.5">
                       <Chip>{l.source}</Chip>
-                      <span className="text-[12px] text-muted" title="Linked source episodes">
+                      <span className="text-[0.75rem] text-muted" title="Linked source episodes">
                         {l.sourceCount} ref{l.sourceCount === 1 ? "" : "s"}
                       </span>
                     </div>
@@ -496,18 +496,18 @@ export default function MemoryTab({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[12px] text-subtle">
+        <p className="mt-2 text-[0.75rem] text-subtle">
           Retiring removes a lesson from what agents recall. Retired lessons stay in history for audit — they are never hard-deleted.
         </p>
       </section>
 
       {/* Preferences */}
       <section>
-        <h2 className="mb-2 text-[14px] font-semibold text-ink">
+        <h2 className="mb-2 text-[0.875rem] font-semibold text-ink">
           How I should work <span className="ml-1 font-normal text-subtle">{preferences.length}</span>
         </h2>
         <div className={tableShell}>
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead className={theadCls}>
               <tr>
                 <th className={thCls}>Preference</th>
@@ -574,14 +574,14 @@ export default function MemoryTab({
       {/* Edit lesson modal */}
       {editing && (
         <Modal title="Edit lesson" onClose={() => setEditing(null)}>
-          <label className="mb-1 block text-[12.5px] font-medium text-muted">Lesson</label>
+          <label className="mb-1 block text-[0.78125rem] font-medium text-muted">Lesson</label>
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             rows={3}
             className={`${inputCls} mb-3 w-full`}
           />
-          <label className="mb-1 block text-[12.5px] font-medium text-muted">What produced it</label>
+          <label className="mb-1 block text-[0.78125rem] font-medium text-muted">What produced it</label>
           <input value={editAction} onChange={(e) => setEditAction(e.target.value)} className={`${inputCls} mb-4 w-full`} />
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setEditing(null)} className={btnGhost}>Cancel</button>
@@ -595,8 +595,8 @@ export default function MemoryTab({
       {/* Delete confirm */}
       {confirmDelete && (
         <Modal title="Retire this lesson?" onClose={() => setConfirmDelete(null)}>
-          <p className="mb-1 text-[13px] text-ink">{confirmDelete.hypothesis}</p>
-          <p className="mb-4 text-[12.5px] text-muted">
+          <p className="mb-1 text-[0.8125rem] text-ink">{confirmDelete.hypothesis}</p>
+          <p className="mb-4 text-[0.78125rem] text-muted">
             Agents will stop recalling it. It stays in history for audit — nothing is hard-deleted.
           </p>
           <div className="flex justify-end gap-2">
@@ -616,7 +616,7 @@ export default function MemoryTab({
       {/* Edit preference modal */}
       {editPref && (
         <Modal title={`Edit — ${prettyKey(editPref.key)}`} onClose={() => setEditPref(null)}>
-          <label className="mb-1 block text-[12.5px] font-medium text-muted">Value</label>
+          <label className="mb-1 block text-[0.78125rem] font-medium text-muted">Value</label>
           <textarea value={prefValue} onChange={(e) => setPrefValue(e.target.value)} rows={3} className={`${inputCls} mb-3 w-full`} />
           <div className="mb-4">
             <Switch checked={prefPinned} onChange={setPrefPinned} label="Pin — the learner may never change this" />
@@ -666,15 +666,15 @@ function OnboardingQuestions({
     <section className="rounded-lg border border-line bg-paper p-5">
       <div className="flex items-center gap-2">
         <Sparkles size={16} className="text-muted" />
-        <h2 className="text-[14px] font-semibold text-ink">How do you like to work?</h2>
+        <h2 className="text-[0.875rem] font-semibold text-ink">How do you like to work?</h2>
       </div>
-      <p className="mt-1 text-[12.5px] text-muted">
+      <p className="mt-1 text-[0.78125rem] text-muted">
         Three quick answers seed your preference profile — agents use them immediately instead of learning the hard way.
       </p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         {ONBOARD_QUESTIONS.map((q) => (
           <div key={q.key}>
-            <p className="mb-2 text-[12.5px] font-medium text-muted">{q.question}</p>
+            <p className="mb-2 text-[0.78125rem] font-medium text-muted">{q.question}</p>
             <div className="flex flex-col gap-1.5">
               {q.options.map((opt) => {
                 const selected = answers[q.key] === opt;
@@ -685,7 +685,7 @@ function OnboardingQuestions({
                     disabled={!canEdit || saving}
                     onClick={() => setAnswers((a) => ({ ...a, [q.key]: opt }))}
                     aria-pressed={selected}
-                    className={`rounded-full px-2.5 py-1.5 text-left text-[12.5px] aos-press transition disabled:opacity-40 ${
+                    className={`rounded-full px-2.5 py-1.5 text-left text-[0.78125rem] aos-press transition disabled:opacity-40 ${
                       selected
                         ? "bg-ink text-white font-medium"
                         : "bg-paper text-muted shadow-outline hover:text-ink"

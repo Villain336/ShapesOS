@@ -30,7 +30,7 @@ const money = (cents: number) =>
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -40,7 +40,7 @@ function chip(text: React.ReactNode, cls?: string) {
 // proposed = needs (triangle), approved/executed = done, denied/revoked = neutral.
 function statusChip(s: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   const shape = (extra: string) => (
     <span
       className={`aos-shape ${extra} [--aos-shape-size:9px]`}
@@ -70,13 +70,13 @@ function statusChip(s: string) {
   );
 }
 
-const HI = "mt-1 border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]";
-const HSELECT = "rounded-md border border-line bg-white px-2 py-1 text-[13px] text-ink focus-visible:border-ink focus-visible:outline-none";
+const HI = "mt-1 border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]";
+const HSELECT = "rounded-md border border-line bg-white px-2 py-1 text-[0.8125rem] text-ink focus-visible:border-ink focus-visible:outline-none";
 
 function DataTable({ headers, children }: { headers: string[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-line">
-      <table className="w-full text-left text-[13px]">
+      <table className="w-full text-left text-[0.8125rem]">
         <thead>
           <tr className="border-b border-line text-xs font-semibold text-muted">
             {headers.map((h) => (
@@ -346,13 +346,13 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
   return (
     <div className="flex h-full flex-col gap-4">
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[0.8125rem] text-failed-text">
           <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
         </div>
       )}
       {frozenScopes.length > 0 && (
-        <div className="flex items-start gap-2 rounded-xl bg-needs p-3 text-[13px] text-ink">
+        <div className="flex items-start gap-2 rounded-xl bg-needs p-3 text-[0.8125rem] text-ink">
           <span
             className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]"
             style={{ color: "inherit" }}
@@ -371,7 +371,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -390,14 +390,14 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
             action={<Button size="sm" className="bg-paper text-ink shadow-outline hover:bg-hover-paper" onClick={refresh} disabled={loading}>Refresh</Button>}
           >
             {proposals.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted">No proposals yet — trigger an optimizer run.</p>
+              <p className="py-2 text-[0.8125rem] text-muted">No proposals yet — trigger an optimizer run.</p>
             ) : (
               <DataTable headers={["Amount", "Shift", "Status", "Δ marginal ROAS", "Decision record", "Action"]}>
                 {proposals.map((p) => (
                   <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-semibold text-ink">{money(p.amountCents)}</td>
                     <td className="px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-[12px] text-muted">
+                      <span className="flex items-center gap-1.5 text-[0.75rem] text-muted">
                         <span className="text-subtle">{p.sourceChannel}</span>
                         <ArrowRight className="h-3.5 w-3.5 text-subtle" />
                         <span className="text-subtle">{p.destChannel}</span>
@@ -410,7 +410,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                       </span>
                     </td>
                     <td className="px-3 py-2 font-medium text-ink">{Number(p.marginalRoasDelta).toFixed(2)}x</td>
-                    <td className="max-w-xs px-3 py-2 text-[12px] text-muted">
+                    <td className="max-w-xs px-3 py-2 text-[0.75rem] text-muted">
                       {p.decisionRecord?.curveParams
                         ? Object.entries(p.decisionRecord.curveParams)
                             .map(([ch, c]: any) => `${ch}: ${c.curveType} R²=${Number(c.rSquared).toFixed(2)}`)
@@ -446,7 +446,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
               description="Pre-signed bounded envelopes — pool caps, not standing authority. Explicit opt-in; defaults to disabled; ≤30d expiry; instant revocation."
             >
               {sras.length === 0 ? (
-                <p className="py-2 text-[13px] text-muted">No SRA envelopes. Mode (b) is disabled until one is signed.</p>
+                <p className="py-2 text-[0.8125rem] text-muted">No SRA envelopes. Mode (b) is disabled until one is signed.</p>
               ) : (
                 <DataTable headers={["Envelope", "Status", "Caps", "Allowlist / expiry", "Action"]}>
                   {sras.map((s) => (
@@ -454,7 +454,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                       <td className="px-3 py-2">
                         <span className="font-medium text-ink">{s.name}</span>
                         {s.consequences && (
-                          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[12px] text-muted">
+                          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[0.75rem] text-muted">
                             {s.consequences.map((c: string, i: number) => (
                               <li key={i}>{c}</li>
                             ))}
@@ -462,10 +462,10 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                         )}
                       </td>
                       <td className="px-3 py-2">{statusChip(s.computedStatus ?? s.status)}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">
                         {money(s.perShiftCapCents)}/shift · {money(s.dailyAggregateCapCents)}/day · {money(s.weeklyAggregateCapCents)}/wk · ±{s.perChannelBandPct}% band
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-muted">
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">
                         {Array.isArray(s.channels) ? s.channels.join(", ") : ""} · expires{" "}
                         {new Date(s.validUntil).toLocaleDateString()} · signers: {(s.signerIds ?? []).length}
                       </td>
@@ -485,18 +485,18 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
             {isOwner && (
               <Panel title="Sign a new SRA" description="Deliberate act with plain-language consequences. Conservative defaults.">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <label className="text-[13px] font-medium text-muted">Name<Input value={sraName} onChange={(e) => setSraName(e.target.value)} className={HI} /></label>
-                  <label className="text-[13px] font-medium text-muted">Channels (comma-separated allowlist)<Input value={sraChannels} onChange={(e) => setSraChannels(e.target.value)} className={HI} /></label>
-                  <label className="text-[13px] font-medium text-muted">Valid until<Input type="date" value={sraValidUntil} onChange={(e) => setSraValidUntil(e.target.value)} className={HI} /></label>
-                  <label className="text-[13px] font-medium text-muted">Pool daily budget ($)<Input value={sraPool} onChange={(e) => setSraPool(e.target.value)} className={HI} /></label>
-                  <label className="text-[13px] font-medium text-muted md:col-span-2">Signer IDs (comma-separated — 2 required when cumulative movement can reach $1k)<Input value={sraSigners} onChange={(e) => setSraSigners(e.target.value)} className={HI} placeholder="user_1, user_2" /></label>
+                  <label className="text-[0.8125rem] font-medium text-muted">Name<Input value={sraName} onChange={(e) => setSraName(e.target.value)} className={HI} /></label>
+                  <label className="text-[0.8125rem] font-medium text-muted">Channels (comma-separated allowlist)<Input value={sraChannels} onChange={(e) => setSraChannels(e.target.value)} className={HI} /></label>
+                  <label className="text-[0.8125rem] font-medium text-muted">Valid until<Input type="date" value={sraValidUntil} onChange={(e) => setSraValidUntil(e.target.value)} className={HI} /></label>
+                  <label className="text-[0.8125rem] font-medium text-muted">Pool daily budget ($)<Input value={sraPool} onChange={(e) => setSraPool(e.target.value)} className={HI} /></label>
+                  <label className="text-[0.8125rem] font-medium text-muted md:col-span-2">Signer IDs (comma-separated — 2 required when cumulative movement can reach $1k)<Input value={sraSigners} onChange={(e) => setSraSigners(e.target.value)} className={HI} placeholder="user_1, user_2" /></label>
                 </div>
                 <div className="mt-3 flex items-center gap-3 border-t border-line pt-4">
                   <Button className="bg-needs text-ink hover:brightness-95" onClick={createSra} disabled={busy}>
                     <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Sign envelope
                   </Button>
                   {sraResult && (
-                    <p className="text-[12px] text-ink">Signed. Mode (b) is now available inside this envelope only.</p>
+                    <p className="text-[0.75rem] text-ink">Signed. Mode (b) is now available inside this envelope only.</p>
                   )}
                 </div>
               </Panel>
@@ -507,7 +507,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
         {tab === "breakers" && (
           <Panel title="Circuit breakers" description="One-way ratchets: pause/freeze only, never authorize. Evaluated every run + 15-min watchdog.">
             {breakers.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted">No breaker events.</p>
+              <p className="py-2 text-[0.8125rem] text-muted">No breaker events.</p>
             ) : (
               <DataTable headers={["Breaker", "Scope", "Status", "Reason", "Action"]}>
                 {breakers.map((b) => (
@@ -523,7 +523,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                       {b.acknowledgedBy
                         ? chip(`acknowledged — cool-down until ${new Date(b.cooldownUntil).toLocaleString()}`)
                         : (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[10px] font-semibold leading-tight text-ink">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-ink">
                             <span
                               className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:9px]"
                               style={{ color: "inherit" }}
@@ -533,10 +533,10 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                           </span>
                         )}
                     </td>
-                    <td className="max-w-xs px-3 py-2 text-[12px] text-muted">{b.reason}</td>
+                    <td className="max-w-xs px-3 py-2 text-[0.75rem] text-muted">{b.reason}</td>
                     <td className="px-3 py-2">
                       {!b.acknowledgedBy && isOwner && (
-                        <Button size="sm" className="bg-ink text-white hover:bg-night-hover" onClick={() => acknowledgeBreaker(b.id)} disabled={busy}>
+                        <Button size="sm" className="bg-ink text-white hover:bg-ink-hover" onClick={() => acknowledgeBreaker(b.id)} disabled={busy}>
                           Acknowledge
                         </Button>
                       )}
@@ -551,7 +551,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
         {tab === "curves" && (
           <Panel title="Marginal-ROAS curves" description="Best of Hill / power / log-log by R², with adstock + seasonality.">
             {curves.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted">No fitted curves yet.</p>
+              <p className="py-2 text-[0.8125rem] text-muted">No fitted curves yet.</p>
             ) : (
               <DataTable headers={["Channel", "Curve", "R²", "Window / model", "Params"]}>
                 {curves.map((c) => (
@@ -561,9 +561,9 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                     <td className="px-3 py-2">
                       {chip(`R² ${Number(c.rSquared).toFixed(2)}`)}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{c.dataWindow} · {c.modelVersion}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{c.dataWindow} · {c.modelVersion}</td>
                     <td className="px-3 py-2">
-                      <code className="block max-w-xs truncate text-[11px] text-muted">{JSON.stringify(c.params)}</code>
+                      <code className="block max-w-xs truncate text-[0.6875rem] text-muted">{JSON.stringify(c.params)}</code>
                       {c.iroasCalibrationFactor && chip(`holdout-calibrated ×${Number(c.iroasCalibrationFactor).toFixed(2)}`, "border-line bg-hover-paper text-ink")}
                     </td>
                   </tr>
@@ -580,7 +580,7 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
           >
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-[13px] font-medium text-muted">
+                <label className="flex items-center gap-2 text-[0.8125rem] font-medium text-muted">
                   Mode
                   <select
                     value={runMode}
@@ -592,18 +592,18 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                   </select>
                 </label>
                 {runMode === "b" && activeSra && (
-                  <span className="text-[12px] text-muted">Using SRA: {activeSra.name}</span>
+                  <span className="text-[0.75rem] text-muted">Using SRA: {activeSra.name}</span>
                 )}
                 <Button className="bg-running text-white hover:brightness-110" onClick={triggerRun} disabled={busy}>
                   <Play className="mr-1 h-3.5 w-3.5" /> Run optimizer
                 </Button>
               </div>
-              <label className="text-[13px] font-medium text-muted">
+              <label className="text-[0.8125rem] font-medium text-muted">
                 Channels JSON (lagged data points; the fixture below is pre-filled)
-                <Textarea value={runChannels} onChange={(e) => setRunChannels(e.target.value)} rows={10} className="mt-1 border-line bg-white font-mono text-[11px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" />
+                <Textarea value={runChannels} onChange={(e) => setRunChannels(e.target.value)} rows={10} className="mt-1 border-line bg-white font-mono text-[0.6875rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" />
               </label>
               {runResult && (
-                <div className="rounded-lg border border-line bg-canvas p-3 text-[12px] text-muted">
+                <div className="rounded-lg border border-line bg-canvas p-3 text-[0.75rem] text-muted">
                   Run {runResult.run?.id}: {runResult.proposals?.length ?? 0} proposals,{" "}
                   {runResult.run?.deniedCount ?? 0} denied, frozen={String(runResult.run?.frozen)}.{" "}
                   {runResult.run?.frozen ? "Frozen — see health snapshot / breaker trips." : ""}
@@ -619,23 +619,23 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
             description="Hash-chained, replayable. Every proposal, policy decision (allow and deny), execution, and breaker event."
             action={
               chainIntact === null ? undefined : chainIntact ? (
-                <span className="flex items-center gap-1 text-[12px] text-ink"><CheckCircle2 className="h-3.5 w-3.5" /> chain intact</span>
+                <span className="flex items-center gap-1 text-[0.75rem] text-ink"><CheckCircle2 className="h-3.5 w-3.5" /> chain intact</span>
               ) : (
-                <span className="flex items-center gap-1 text-[12px] text-failed-text"><XCircle className="h-3.5 w-3.5" /> CHAIN BROKEN</span>
+                <span className="flex items-center gap-1 text-[0.75rem] text-failed-text"><XCircle className="h-3.5 w-3.5" /> CHAIN BROKEN</span>
               )
             }
           >
             {audit.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted">No audit events yet.</p>
+              <p className="py-2 text-[0.8125rem] text-muted">No audit events yet.</p>
             ) : (
               <DataTable headers={["Kind", "Time", "Actor", "Correlation", "Payload"]}>
                 {audit.map((e) => (
                   <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">{chip(e.kind, "border-line bg-hover text-muted")}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{new Date(e.ts).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{e.actor}</td>
-                    <td className="px-3 py-2"><code className="text-[10px] text-subtle">{e.correlationId}</code></td>
-                    <td className="px-3 py-2"><code className="block max-w-xs truncate text-[11px] text-muted">{JSON.stringify(e.payload)}</code></td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{new Date(e.ts).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{e.actor}</td>
+                    <td className="px-3 py-2"><code className="text-[0.625rem] text-subtle">{e.correlationId}</code></td>
+                    <td className="px-3 py-2"><code className="block max-w-xs truncate text-[0.6875rem] text-muted">{JSON.stringify(e.payload)}</code></td>
                   </tr>
                 ))}
               </DataTable>

@@ -187,8 +187,8 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
       <section className="rounded-lg border border-line bg-paper p-4 shadow-hairline">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold text-ink">{meta.label}</h2>
-            <p className="mt-0.5 text-[13px] text-muted">
+            <h2 className="text-[0.9375rem] font-semibold text-ink">{meta.label}</h2>
+            <p className="mt-0.5 text-[0.8125rem] text-muted">
               {conn ? (
                 <>
                   {conn.label ?? "Connected"} · connected {new Date(conn.connectedAt).toLocaleDateString()}
@@ -207,12 +207,12 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
           </div>
         </div>
         {linkEntries.length > 0 && (
-          <p className="mt-3 text-[13px] text-muted">
+          <p className="mt-3 text-[0.8125rem] text-muted">
             Mapped: {linkEntries.map(([k, v]) => `${v} ${OBJECT_LABEL[k] ?? k}`).join(" · ")}
           </p>
         )}
         {status.exports && (
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[0.8125rem] text-muted">
             Posted to {meta.label}: {status.exports.exported} document{status.exports.exported === 1 ? "" : "s"}
             {status.exports.pending ? ` · ${status.exports.pending} interrupted (retried with the same key next run)` : ""}
             {status.exports.failed ? ` · ${status.exports.failed} refused` : ""}
@@ -240,7 +240,7 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
 
       {status.exports && status.exports.recentFailures.length > 0 && (
         <section>
-          <h3 className="mb-2 text-[13px] font-bold text-ink">Documents waiting</h3>
+          <h3 className="mb-2 text-[0.8125rem] font-bold text-ink">Documents waiting</h3>
           <div className={tableWrapCls}>
             <table className={tableCls}>
               <thead>
@@ -265,9 +265,9 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
       )}
 
       <section>
-        <h3 className="mb-2 text-[13px] font-bold text-ink">Recent runs</h3>
+        <h3 className="mb-2 text-[0.8125rem] font-bold text-ink">Recent runs</h3>
         {status.runs.length === 0 ? (
-          <p className="text-[13px] text-muted">No runs yet. Ask an agent to run a sync — it asks before it writes anything.</p>
+          <p className="text-[0.8125rem] text-muted">No runs yet. Ask an agent to run a sync — it asks before it writes anything.</p>
         ) : (
           <div className={tableWrapCls}>
             <table className={`${tableCls} min-w-[640px]`}>
@@ -324,10 +324,10 @@ function XeroTenantPicker({ workspaceId, status, onChanged }: { workspaceId: str
   }
   return (
     <section className="rounded-lg border border-line bg-paper p-4 shadow-hairline">
-      <h3 className="text-[13px] font-bold text-ink">Xero organisation</h3>
-      <p className="mt-0.5 text-[13px] text-muted">Exports and imports use this organisation.</p>
+      <h3 className="text-[0.8125rem] font-bold text-ink">Xero organisation</h3>
+      <p className="mt-0.5 text-[0.8125rem] text-muted">Exports and imports use this organisation.</p>
       {tenants.length === 0 ? (
-        <p className="mt-2 text-[13px] text-muted">No organisations were granted. Reconnect Xero and pick at least one.</p>
+        <p className="mt-2 text-[0.8125rem] text-muted">No organisations were granted. Reconnect Xero and pick at least one.</p>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="xero-tenant">
@@ -389,8 +389,8 @@ function LocationMapping({ workspaceId }: { workspaceId: string }) {
   }
   return (
     <section>
-      <h3 className="mb-1 text-[13px] font-bold text-ink">Shopify locations</h3>
-      <p className="mb-2 text-[13px] text-muted">Each Shopify location keeps its stock in one stock location. A first sync creates a warehouse for any location you haven&apos;t mapped.</p>
+      <h3 className="mb-1 text-[0.8125rem] font-bold text-ink">Shopify locations</h3>
+      <p className="mb-2 text-[0.8125rem] text-muted">Each Shopify location keeps its stock in one stock location. A first sync creates a warehouse for any location you haven&apos;t mapped.</p>
       {msg && <p className={`mb-2 ${msg.ok ? noteBoxCls : errorBoxCls}`}>{msg.text}</p>}
       {data && (
         <div className={tableWrapCls}>
@@ -494,8 +494,8 @@ function EmployeeMapping({ workspaceId }: { workspaceId: string }) {
   const unconfirmed = data ? data.remote.filter((e) => !data.links.some((l) => l.remoteId === e.id && l.confirmed)).length : 0;
   return (
     <section>
-      <h3 className="mb-1 text-[13px] font-bold text-ink">Gusto employees</h3>
-      <p className="mb-2 text-[13px] text-muted">
+      <h3 className="mb-1 text-[0.8125rem] font-bold text-ink">Gusto employees</h3>
+      <p className="mb-2 text-[0.8125rem] text-muted">
         Confirm which team member each Gusto employee is. Email matches are suggestions; only confirmed matches are used when a pay run is sent to Gusto.{" "}
         {data ? `${unconfirmed} not confirmed.` : ""}
       </p>
@@ -640,8 +640,8 @@ function AccountMapping({ workspaceId, provider }: { workspaceId: string; provid
     <section>
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-[13px] font-bold text-ink">Chart of accounts mapping</h3>
-          <p className="text-[13px] text-muted">
+          <h3 className="text-[0.8125rem] font-bold text-ink">Chart of accounts mapping</h3>
+          <p className="text-[0.8125rem] text-muted">
             Posting only uses confirmed rows; a document whose accounts aren&apos;t confirmed waits. {rows ? `${unconfirmed} account${unconfirmed === 1 ? "" : "s"} not confirmed.` : ""}
           </p>
         </div>

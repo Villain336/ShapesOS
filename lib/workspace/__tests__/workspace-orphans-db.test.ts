@@ -162,6 +162,15 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
   user_desktop_layouts: { user_id: OWNER },
   user_recent_items: { user_id: OWNER },
   desktop_briefings: { user_id: OWNER },
+  // Phase 18.1 (find): a Spotlight text row is a file's (search_texts_source_check
+  // pairs source with its key column; the key is filled through FILL_LINKS).
+  search_texts: { source: "file", status: "indexed" },
+};
+
+// Optional foreign keys a CHECK constraint requires for the fixed values above
+// (filled by creating the parent row, like a NOT NULL key).
+const FILL_LINKS: Record<string, readonly string[]> = {
+  search_texts: ["file_id"],
 };
 
 /** The tenant GUC plus the person GUC (lib/desktop/scope.ts) so owner-only tables answer too. */
@@ -203,7 +212,7 @@ async function synth(
       let v: unknown;
       if (c.col === "workspace_id") v = ws;
       else if (FIXED_VALUES[table]?.[c.col] !== undefined) v = FIXED_VALUES[table]![c.col];
-      else if (fk && c.notnull && !c.hasdef) {
+      else if (fk && ((c.notnull && !c.hasdef) || FILL_LINKS[table]?.includes(c.col))) {
         const parent = fk.reftable === table ? null : await synth(tx, fk.reftable, ws, pending, depth + 1);
         if (!parent) throw new Error(`self-referencing NOT NULL key ${table}.${c.col}`);
         v = parent[fk.refcol];

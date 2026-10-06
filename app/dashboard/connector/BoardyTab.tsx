@@ -35,7 +35,7 @@ const BOARDY_EVENT_LABELS: Record<string, string> = {
 
 function BoardyTimeline({ events }: { events: BoardyRequestView["events"] }) {
   if (events.length === 0) {
-    return <p className="text-[13px] text-muted">No events yet.</p>;
+    return <p className="text-[0.8125rem] text-muted">No events yet.</p>;
   }
   return (
     <ol className="flex flex-col">
@@ -47,15 +47,15 @@ function BoardyTimeline({ events }: { events: BoardyRequestView["events"] }) {
           <span className="mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-ink bg-paper" aria-hidden />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-[14px] font-semibold text-ink">
+              <span className="text-[0.875rem] font-semibold text-ink">
                 {BOARDY_EVENT_LABELS[e.kind] ?? e.kind}
               </span>
-              <span className="text-[12px] text-muted">
+              <span className="text-[0.75rem] text-muted">
                 {e.actorIdentity} · {new Date(e.createdAt).toLocaleString()}
               </span>
             </div>
             {e.message && (
-              <p className="mt-1 rounded-md border border-line bg-canvas p-2.5 text-[13px] leading-relaxed text-ink">
+              <p className="mt-1 rounded-md border border-line bg-canvas p-2.5 text-[0.8125rem] leading-relaxed text-ink">
                 {e.message}
               </p>
             )}
@@ -106,7 +106,7 @@ function RequestCard({
   return (
     <div className="flex flex-col gap-4 rounded-lg bg-paper p-5 shadow-hairline">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[16px] font-semibold text-ink">
+        <div className="text-[1rem] font-semibold text-ink">
           {request.targetName}
           {request.targetRole && (
             <span className="font-normal text-muted"> · {request.targetRole}</span>
@@ -119,34 +119,34 @@ function RequestCard({
       </div>
 
       <div className="rounded-md border border-line bg-canvas p-3">
-        <p className="mb-1 text-[12px] font-semibold text-muted">
+        <p className="mb-1 text-[0.75rem] font-semibold text-muted">
           Draft request email — to boardy@boardy.ai (sends only after you approve)
         </p>
-        <p className="text-[14px] font-semibold text-ink">{request.draftedSubject}</p>
-        <p className="mt-1 whitespace-pre-line text-[14px] leading-relaxed text-ink">
+        <p className="text-[0.875rem] font-semibold text-ink">{request.draftedSubject}</p>
+        <p className="mt-1 whitespace-pre-line text-[0.875rem] leading-relaxed text-ink">
           {request.draftedBody}
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <p className="mb-1 text-[12px] font-semibold text-muted">Why now</p>
-          <p className="text-[14px] text-ink">{request.targetContext}</p>
+          <p className="mb-1 text-[0.75rem] font-semibold text-muted">Why now</p>
+          <p className="text-[0.875rem] text-ink">{request.targetContext}</p>
         </div>
         <div>
-          <p className="mb-1 text-[12px] font-semibold text-muted">What you bring them</p>
-          <p className="text-[14px] text-ink">{request.offerSummary}</p>
+          <p className="mb-1 text-[0.75rem] font-semibold text-muted">What you bring them</p>
+          <p className="text-[0.875rem] text-ink">{request.offerSummary}</p>
         </div>
       </div>
 
       {request.replySummary && (
         <div className="rounded-md border border-line bg-needs-tint p-3">
-          <p className="mb-1 text-[12px] font-semibold text-muted">Boardy&apos;s reply</p>
-          <p className="text-[14px] text-ink">{request.replySummary}</p>
+          <p className="mb-1 text-[0.75rem] font-semibold text-muted">Boardy&apos;s reply</p>
+          <p className="text-[0.875rem] text-ink">{request.replySummary}</p>
         </div>
       )}
 
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
 
       {request.status === "draft" && !declining && (
         <div className="flex flex-wrap items-center gap-2">
@@ -186,7 +186,7 @@ function RequestCard({
 
       {request.status === "approved" && (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-[13px] text-muted">
+          <label className="flex items-center gap-2 text-[0.8125rem] text-muted">
             Send from your address via
             <input
               value={sentVia}
@@ -213,7 +213,7 @@ function RequestCard({
 
       {request.status === "sent" && !triaging && (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             Sent — when Boardy replies, triage it here as a priority thread.
           </p>
           <span className="flex-1" />
@@ -226,7 +226,7 @@ function RequestCard({
       {request.status === "sent" && triaging && (
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">
+            <span className="text-[0.75rem] font-semibold text-muted">
               Reply summary (what Boardy said)
             </span>
             <textarea
@@ -254,7 +254,7 @@ function RequestCard({
         </div>
       )}
 
-      <details className="text-[13px]">
+      <details className="text-[0.8125rem]">
         <summary className="cursor-pointer font-semibold text-muted">Lineage</summary>
         <div className="mt-2">
           <BoardyTimeline events={request.events} />
@@ -349,7 +349,7 @@ export function BoardyTab({
     <div className="flex flex-col gap-4">
       <div className="rounded-lg bg-paper p-5 shadow-hairline">
         <h2 className="aos-subheading">Boardy escalation rail</h2>
-        <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted">
+        <p className="mt-1 max-w-3xl text-[0.8125rem] leading-relaxed text-muted">
           When your own network has no warm path to a target, escalate to Boardy —
           the AI superconnector. The connector drafts a context-rich request email;
           you approve it per instance; it sends from your own address to
@@ -369,43 +369,43 @@ export function BoardyTab({
       {composing && (
         <div className="flex flex-col gap-3 rounded-lg bg-paper p-5 shadow-hairline">
           <h3 className="aos-subheading">Draft a Boardy request</h3>
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             Auto-draft only — nothing sends until you approve it.
           </p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Your name</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Your name</span>
               <input value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="Tico Hamphill" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Target name</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Target name</span>
               <input value={targetName} onChange={(e) => setTargetName(e.target.value)} placeholder="Alex Rivera" className={inputCls} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Target role (optional)</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Target role (optional)</span>
               <input value={targetRole} onChange={(e) => setTargetRole(e.target.value)} placeholder="Partner, Sequoia" className={inputCls} />
             </label>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">
+            <span className="text-[0.75rem] font-semibold text-muted">
               Why now — who they are, why this intro (min 20 chars)
             </span>
             <textarea value={targetContext} onChange={(e) => setTargetContext(e.target.value)} rows={3} className={textareaCls} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">
+            <span className="text-[0.75rem] font-semibold text-muted">
               What you bring them — your offer (min 20 chars)
             </span>
             <textarea value={offerSummary} onChange={(e) => setOfferSummary(e.target.value)} rows={3} className={textareaCls} />
           </label>
           <label className="flex max-w-xs flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Mode</span>
+            <span className="text-[0.75rem] font-semibold text-muted">Mode</span>
             <select value={mode} onChange={(e) => setMode(e.target.value as ConnectorMode)} className={inputCls}>
               <option value="leads">Leads</option>
               <option value="funding">Funding</option>
             </select>
           </label>
-          {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+          {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -424,7 +424,7 @@ export function BoardyTab({
       )}
 
       {requests.length === 0 ? (
-        <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           No Boardy requests yet. Draft one when your network has no warm path —
           Boardy is free, and every request needs your per-instance approval
           before anything sends.

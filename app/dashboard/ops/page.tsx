@@ -52,13 +52,13 @@ export default async function OpsOverviewPage() {
               href={k.href}
               className="rounded-lg bg-paper px-4 py-3 shadow-hairline hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)]"
             >
-              <p className="text-[12px] font-semibold text-muted">{k.label}</p>
-              <p className="mt-1 text-[22px] font-bold tabular-nums text-ink">{k.value}</p>
+              <p className="text-[0.75rem] font-semibold text-muted">{k.label}</p>
+              <p className="mt-1 text-[1.375rem] font-bold tabular-nums text-ink">{k.value}</p>
             </Link>
           ))}
         </section>
       ) : (
-        <p className="rounded-lg border border-line bg-paper px-4 py-3 text-[13px] text-muted">
+        <p className="rounded-lg border border-line bg-paper px-4 py-3 text-[0.8125rem] text-muted">
           Operations numbers are unavailable right now. The apps below still work.
         </p>
       )}
@@ -69,8 +69,8 @@ export default async function OpsOverviewPage() {
             href={s.href}
             className="rounded-lg bg-paper px-4 py-3.5 shadow-hairline hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)]"
           >
-            <p className="text-[14px] font-bold text-ink">{s.label}</p>
-            <p className="mt-0.5 text-[13px] text-muted">{s.description}</p>
+            <p className="text-[0.875rem] font-bold text-ink">{s.label}</p>
+            <p className="mt-0.5 text-[0.8125rem] text-muted">{s.description}</p>
           </Link>
         ))}
       </section>

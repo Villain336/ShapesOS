@@ -31,7 +31,7 @@ import {
 const inputCls =
   "h-control w-full rounded-md border-[1.5px] bg-paper px-3 text-base text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-3 focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const primaryBtn =
-  "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink text-base font-semibold text-white hover:bg-night-hover disabled:bg-disabled disabled:text-disabled-fg";
+  "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink text-base font-semibold text-white hover:bg-ink-hover disabled:bg-disabled disabled:text-disabled-fg";
 const secondaryBtn =
   "aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink shadow-outline disabled:bg-disabled disabled:text-disabled-fg";
 

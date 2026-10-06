@@ -58,7 +58,7 @@ import { LogoMark } from "@/components/aos/LogoMark";
 import { AgentTree } from "@/components/aos/AgentTree";
 import { CountBadge } from "@/components/aos/AgentAvatar";
 import { StatusShape } from "@/components/aos/StatusShape";
-import { activeNavHref, visibleNavGroups, type NavItem } from "@/lib/nav/config";
+import { activeNavHref, NAV_GROUPS, visibleNavGroups, type NavItem } from "@/lib/nav/config";
 // Phase 18.1 (WS=desk): the dock — pins + recents over the one nav list.
 import { pinnedNavItems } from "@/lib/desktop/nav-overlay";
 import { appForHref } from "@/lib/desktop/recents";
@@ -67,6 +67,12 @@ import { openAppSwitcher } from "@/components/desk/events";
 import { useInPane, useLocalFlag, writeLocalFlag } from "@/components/desk/useInPane";
 import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
 import { STATUS_META } from "@/lib/aos/status";
+// Phase 18.1 (WS=find, i18n): shell strings and nav labels in the person's
+// language. Edits in this file are limited to t() calls and the localized
+// nav overlay (lib/nav/i18n.ts) — WS=desk owns the dock/pins changes here.
+import { useMemo } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { localizeNavGroups } from "@/lib/nav/i18n";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
@@ -163,6 +169,7 @@ function WorkspaceMenu({
   collapsed?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n(); // p18-find i18n
   const current = workspaces.find((w) => w.id === currentId) ?? workspaces[0];
   // Any member may switch — switching is scoping, not privilege; every API
   // route still enforces its own RBAC, and the cookie is validated against
@@ -189,7 +196,7 @@ function WorkspaceMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={`Switch workspace (current: ${current?.name ?? "Workspace"})`}
+        aria-label={t("shell.switchWorkspaceCurrent", { name: current?.name ?? t("shell.workspace") })}
         className={cn(
           "flex items-center rounded-sm text-left transition-[background-color] duration-150 hover:bg-night-hover",
           collapsed ? "size-12 justify-center" : "w-full gap-3 px-2 py-1.5",
@@ -200,14 +207,14 @@ function WorkspaceMenu({
           <>
             <span className="min-w-0 flex-1">
               <span className="block text-[17px] leading-5 font-extrabold stretch-display tracking-heading text-paper">ShapesOS</span>
-              <span className="block truncate text-xs text-night-muted">{current?.name ?? "Workspace"}</span>
+              <span className="block truncate text-xs text-night-muted">{current?.name ?? t("shell.workspace")}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-night-soft" aria-hidden />
           </>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={6} className="w-72 rounded-lg bg-paper p-1.5 text-ink shadow-raised ring-0">
-        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">Switch workspace</DropdownMenuLabel>
+        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">{t("shell.switchWorkspace")}</DropdownMenuLabel>
         {workspaces.map((w) => {
           const selected = w.id === currentId;
           const switching = w.id === switchingId;
@@ -225,7 +232,7 @@ function WorkspaceMenu({
               </span>
               <span className="min-w-0 flex-1 truncate">{w.name}</span>
               {selected ? (
-                <Check className="size-4" aria-label="Current workspace" />
+                <Check className="size-4" aria-label={t("shell.currentWorkspace")} />
               ) : switching ? (
                 <RefreshCw className="size-4 animate-spin text-muted" aria-hidden />
               ) : null}
@@ -237,16 +244,16 @@ function WorkspaceMenu({
           <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-key bg-paper shadow-control">
             <Plus className="size-4" />
           </span>
-          Create workspace
+          {t("shell.createWorkspace")}
         </DropdownMenuItem>
         <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/settings/workspace")}>
           <Settings className="ml-2 size-4" aria-hidden />
-          Workspace settings
+          {t("shell.workspaceSettings")}
         </DropdownMenuItem>
         {canManageBilling ? (
           <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/billing")}>
             <CreditCard className="ml-2 size-4" aria-hidden />
-            Billing
+            {t("shell.billing")}
           </DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>
@@ -270,6 +277,7 @@ function UserRow({
   canManageBilling?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n(); // p18-find i18n
   const avatar = (
     <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-paper text-xs font-extrabold text-ink">
       {initials(user)}
@@ -278,7 +286,7 @@ function UserRow({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Account menu"
+        aria-label={t("shell.accountMenu")}
         className={cn(
           "flex items-center rounded-sm text-left transition-[background-color] duration-150 hover:bg-night-hover",
           collapsed ? "size-12 justify-center" : "w-full gap-3 px-2 py-2",
@@ -288,7 +296,7 @@ function UserRow({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-base leading-5 font-semibold text-paper">{user.name ?? user.email ?? "Signed in"}</span>
+              <span className="block truncate text-base leading-5 font-semibold text-paper">{user.name ?? user.email ?? t("shell.signedIn")}</span>
               <span className="block truncate text-xs text-night-muted">{plan ?? user.email}</span>
             </span>
             <SlidersHorizontal className="size-4 shrink-0 text-night-soft" aria-hidden />
@@ -297,18 +305,18 @@ function UserRow({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-60 rounded-lg bg-paper p-1.5 text-ink shadow-raised ring-0">
         <DropdownMenuLabel className="px-3 py-2 font-normal">
-          <span className="block truncate text-md font-semibold text-ink">{user.name ?? "Signed in"}</span>
+          <span className="block truncate text-md font-semibold text-ink">{user.name ?? t("shell.signedIn")}</span>
           {user.email ? <span className="block truncate text-xs text-muted">{user.email}</span> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="mx-2 my-1 bg-line" />
         <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/settings")}>
           <Settings className="size-4" aria-hidden />
-          Settings
+          {t("shell.settings")}
         </DropdownMenuItem>
         {canManageBilling ? (
           <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/billing")}>
             <CreditCard className="size-4" aria-hidden />
-            Billing
+            {t("shell.billing")}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator className="mx-2 my-1 bg-line" />
@@ -317,7 +325,7 @@ function UserRow({
           onClick={() => signOut({ callbackUrl: "/login" })}
         >
           <LogOut className="size-4" aria-hidden />
-          Sign out
+          {t("shell.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -347,8 +355,9 @@ function NavRow({
   onNavigate?: () => void;
 }) {
   const Icon = item.icon;
+  const { t } = useI18n(); // p18-find i18n
   if (collapsed) {
-    const tip = count > 0 ? `${item.label}: ${count} waiting on you` : item.label;
+    const tip = count > 0 ? t("shell.waitingOnYou", { label: item.label, count }) : item.label;
     return (
       <li>
         <RailTip label={tip}>
@@ -383,7 +392,7 @@ function NavRow({
       >
         <Icon aria-hidden className="size-[18px] shrink-0" />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        {count > 0 ? <CountBadge count={count} tone="needs" label={`${count} approval${count === 1 ? "" : "s"} waiting on you`} /> : null}
+        {count > 0 ? <CountBadge count={count} tone="needs" label={t("shell.approvalsWaiting", { count })} /> : null}
       </Link>
       {onTogglePin ? (
         <button
@@ -426,7 +435,9 @@ function DockSections({
   const [editing, setEditing] = useState(false);
   const recentsCollapsed = useLocalFlag(RECENTS_COLLAPSE_KEY);
   const current = activeNavHref(pathname);
-  const pins = pinnedNavItems({ pinned: dock.pinned }, role);
+  const { messages } = useI18n(); // p18-find i18n: pins carry the localized labels
+  const localized = useMemo(() => localizeNavGroups(NAV_GROUPS, messages), [messages]);
+  const pins = pinnedNavItems({ pinned: dock.pinned }, role, localized);
   const recents = dock.recents.filter((r) => r.href !== pathname);
   if (collapsed) {
     if (pins.length === 0) return null;
@@ -558,8 +569,10 @@ function NavList({
 }) {
   const current = activeNavHref(pathname);
   const uid = useId();
-  // Phase 18.1: the nav as this member's role sees it (gated items hidden).
-  const groups = visibleNavGroups(role);
+  const { t, messages } = useI18n(); // p18-find i18n
+  // Phase 18.1: the nav as this member's role sees it (gated items hidden),
+  // in the person's language (lib/nav/i18n overlay).
+  const groups = useMemo(() => localizeNavGroups(visibleNavGroups(role), messages), [role, messages]);
   const pinnedSet = new Set(dock.pinned);
   return (
     <div className="flex flex-col gap-3">
@@ -570,7 +583,7 @@ function NavList({
             <div
               role="group"
               aria-labelledby={group.title && !collapsed ? headingId : undefined}
-              aria-label={group.title ? (collapsed ? group.title : undefined) : group.id === "account" ? "Account" : "Home"}
+              aria-label={group.title ? (collapsed ? group.title : undefined) : group.id === "account" ? t("shell.groupAccount") : t("shell.groupHome")}
               className={cn(group.id === "account" && "border-t border-night-line pt-3", collapsed && group.title && "border-t border-night-line pt-3")}
             >
               {group.title && !collapsed ? (
@@ -608,14 +621,15 @@ function NavList({
 
 function RunningNow({ tree, collapsed, onNavigate }: { tree: SidebarTree; collapsed: boolean; onNavigate?: () => void }) {
   const headingId = `${useId()}-running`;
+  const { t } = useI18n(); // p18-find i18n
   const live = tree ? [tree.lead, ...tree.branches].filter((n) => n.status !== "done").length : 0;
   if (collapsed) {
     if (!tree) return null;
     const nodes = [tree.lead, ...visibleBranches(tree.branches, MAX_RUNNING_ROWS - 1).shown];
     return (
-      <ul aria-label="Running now" className="flex flex-col items-center gap-1 border-t border-night-line pt-3">
+      <ul aria-label={t("shell.runningNow")} className="flex flex-col items-center gap-1 border-t border-night-line pt-3">
         {nodes.map((n) => {
-          const tip = `${n.name}${n.isLead ? " (lead)" : ""}: ${n.line}`;
+          const tip = `${n.name}${n.isLead ? t("shell.leadSuffix") : ""}: ${n.line}`;
           return (
             <li key={n.key}>
               <RailTip label={tip}>
@@ -638,28 +652,29 @@ function RunningNow({ tree, collapsed, onNavigate }: { tree: SidebarTree; collap
     <section aria-labelledby={headingId} className="border-t border-night-line px-2 pt-3">
       <div className="mb-1 flex items-center justify-between px-2">
         <h2 id={headingId} className="text-xs font-semibold text-night-muted">
-          Running now
+          {t("shell.runningNow")}
         </h2>
         {tree ? <span className="text-xs font-semibold text-night-muted tabular-nums">{live}</span> : null}
       </div>
       {tree ? (
         <AgentTree lead={tree.lead} branches={tree.branches} tone="night" maxBranches={MAX_RUNNING_ROWS - 1} onNavigate={onNavigate} />
       ) : (
-        <p className="px-2 pb-2 text-xs text-night-muted">Nothing running. Start a new task and it shows up here.</p>
+        <p className="px-2 pb-2 text-xs text-night-muted">{t("shell.nothingRunning")}</p>
       )}
     </section>
   );
 }
 
 function UsageMeterBox({ usage }: { usage: NonNullable<SidebarUsage> }) {
+  const { t, format } = useI18n(); // p18-find i18n
   return (
     <Link
       href="/dashboard/settings/usage"
       className="block rounded-md bg-night-hover px-4 py-3 transition-[background-color] duration-150 hover:bg-night-raised"
-      aria-label={`Usage this month: ${usage.pct}% (${usage.used.toLocaleString()} of ${usage.cap.toLocaleString()} credits)`}
+      aria-label={t("shell.usageAria", { pct: usage.pct, used: format.number(usage.used), cap: format.number(usage.cap) })}
     >
       <span className="flex items-center justify-between text-xs">
-        <span className="text-night-soft">Usage this month</span>
+        <span className="text-night-soft">{t("shell.usageThisMonth")}</span>
         <span className="font-semibold text-paper tabular-nums">{usage.pct}%</span>
       </span>
       <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-night-line">
@@ -713,13 +728,15 @@ export function SidebarPanel({
   role,
   initialDock,
 }: SidebarPanelProps) {
-  const planText = planLabel(plan);
+  const { t } = useI18n(); // p18-find i18n
+  const planBase = planLabel(plan);
+  const planText = planBase ? t("shell.planLabel", { plan: planBase.replace(/ plan$/, "") }) : null;
   const dock = useDock(initialDock ?? null);
   const toggle = onToggleCollapsed ? (
     <button
       type="button"
       onClick={onToggleCollapsed}
-      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={collapsed ? t("shell.expandSidebar") : t("shell.collapseSidebar")}
       aria-expanded={!collapsed}
       className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
     >
@@ -739,7 +756,7 @@ export function SidebarPanel({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close navigation"
+                aria-label={t("shell.closeNavigation")}
                 className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft hover:bg-night-hover hover:text-paper"
               >
                 <X className="size-4" aria-hidden />
@@ -747,14 +764,14 @@ export function SidebarPanel({
             ) : null}
           </div>
           {collapsed ? (
-            <RailTip label="New task (⌘N)">
+            <RailTip label={t("shell.newTaskHint")}>
               <button
                 type="button"
                 onClick={() => {
                   onNavigate?.();
                   openNewTask();
                 }}
-                aria-label="New task"
+                aria-label={t("shell.newTask")}
                 aria-haspopup="dialog"
                 className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink"
               >
@@ -770,11 +787,11 @@ export function SidebarPanel({
                   openNewTask();
                 }}
                 aria-haspopup="dialog"
-                title="New task (⌘N)"
+                title={t("shell.newTaskHint")}
                 className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink"
               >
                 <Plus className="size-4" aria-hidden />
-                New task
+                {t("shell.newTask")}
               </button>
               <button
                 type="button"
@@ -782,8 +799,8 @@ export function SidebarPanel({
                   onNavigate?.();
                   openCommandBar();
                 }}
-                aria-label="Search (⌘K)"
-                title="Search (⌘K)"
+                aria-label={t("shell.search")}
+                title={t("shell.search")}
                 className="aos-press flex size-11 shrink-0 items-center justify-center rounded-full bg-night-raised text-paper hover:bg-night-line"
               >
                 <Search className="size-4" aria-hidden />
@@ -791,7 +808,7 @@ export function SidebarPanel({
             </div>
           )}
         </div>
-        <nav aria-label="Dashboard" className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
+        <nav data-shell-nav aria-label={t("shell.dashboardNav")} className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
           <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} role={role} dock={dock} onNavigate={onNavigate} />
           {extra && !collapsed ? <div className="mt-4 border-t border-night-line pt-3">{extra}</div> : null}
         </nav>
@@ -831,6 +848,7 @@ export interface DashboardChromeProps {
 export function AppSidebar(props: DashboardChromeProps) {
   const pathname = usePathname();
   const inPane = useInPane();
+  const { t } = useI18n(); // p18-find i18n
   const chat = useChat();
   const { actionable } = useNeedsYouCount();
   const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
@@ -870,7 +888,7 @@ export function AppSidebar(props: DashboardChromeProps) {
         extra={
           showThreads ? (
             <>
-              <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">Chats · {chat.session?.projectDomain}</div>
+              <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">{t("shell.chatsFor", { project: chat.session?.projectDomain ?? "" })}</div>
               <ThreadListSection />
             </>
           ) : null
@@ -895,12 +913,13 @@ export function MobileNav({
   const { actionable } = useNeedsYouCount();
   const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
   const [open, setOpen] = useState(false);
+  const { t } = useI18n(); // p18-find i18n
   const lead = tree?.lead ?? null;
   const inPane = useInPane();
   if (inPane) return null;
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-paper px-4 md:hidden">
-      <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="ShapesOS home">
+      <Link href="/dashboard" className="flex items-center gap-2.5" aria-label={t("shell.home")}>
         <LogoMark size={26} />
         <span className="text-[17px] font-extrabold stretch-display tracking-heading text-ink">ShapesOS</span>
       </Link>
@@ -917,16 +936,16 @@ export function MobileNav({
         {headerActions}
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger
-            aria-label="Open navigation"
+            aria-label={t("shell.openNavigation")}
             className="relative flex size-10 items-center justify-center rounded-full text-ink hover:bg-hover"
           >
             <MenuIcon className="size-5" aria-hidden />
             {actionable > 0 ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-paper" /> : null}
           </Dialog.Trigger>
           <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+            <Dialog.Backdrop className="fixed inset-0 z-50 bg-night/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
             <Dialog.Popup className="aos-night fixed inset-y-0 left-0 z-50 w-[min(20rem,88vw)] shadow-overlay transition-transform duration-200 ease-aos data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
-              <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+              <Dialog.Title className="sr-only">{t("shell.navigation")}</Dialog.Title>
               <SidebarPanel
                 {...props}
                 pathname={pathname}

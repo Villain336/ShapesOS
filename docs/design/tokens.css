@@ -65,20 +65,32 @@
   --aos-focus: #2450E0;
   --aos-focus-on-night: #4D74FF;
   --aos-focus-halo: rgba(36, 80, 224, 0.22);
+  --aos-focus-width: 2px;
+
+  /* ---------- Ink fill hover (primary buttons; Phase 18.1) ----------
+     The hover of a black primary button. A token of its own so dark mode,
+     where the primary fill turns light, can hover lighter instead of black. */
+  --aos-ink-hover: #1C1C1B;
+  /* Inside an ink fill (the active palette / menu row, a pressed chip):
+     secondary text and raised tiles. */
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
 
   /* ---------- Type ---------- */
   --aos-font-sans: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --aos-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --aos-text-2xs: 11px;  /* keycaps */
-  --aos-text-xs: 12px;   /* captions, group labels */
-  --aos-text-sm: 13px;   /* badges, chips, helper text */
-  --aos-text-md: 14px;   /* secondary body */
-  --aos-text-base: 15px; /* body, buttons, list rows */
-  --aos-text-lg: 18px;   /* section headings */
-  --aos-text-xl: 24px;   /* page headings */
-  --aos-text-2xl: 32px;  /* display */
-  --aos-text-3xl: 40px;  /* hero display */
+  /* rem, so the text-size preference (root font size) scales them.
+     At the default 16px root: 11 / 12 / 13 / 14 / 15 / 18 / 24 / 32 / 40px. */
+  --aos-text-2xs: 0.6875rem;  /* 11px keycaps */
+  --aos-text-xs: 0.75rem;     /* 12px captions, group labels */
+  --aos-text-sm: 0.8125rem;   /* 13px badges, chips, helper text */
+  --aos-text-md: 0.875rem;    /* 14px secondary body */
+  --aos-text-base: 0.9375rem; /* 15px body, buttons, list rows */
+  --aos-text-lg: 1.125rem;    /* 18px section headings */
+  --aos-text-xl: 1.5rem;      /* 24px page headings */
+  --aos-text-2xl: 2rem;       /* 32px display */
+  --aos-text-3xl: 2.5rem;     /* 40px hero display */
 
   --aos-leading-tight: 1.15;
   --aos-leading-snug: 1.3;
@@ -107,11 +119,16 @@
   --aos-radius-xl: 18px;    /* composer */
 
   /* ---------- Control heights ---------- */
-  --aos-h-badge: 28px;
-  --aos-h-chip: 32px;
-  --aos-h-sm: 36px;
-  --aos-h-md: 44px; /* default buttons and inputs; also the minimum touch target */
-  --aos-h-lg: 52px;
+  /* rem (28 / 32 / 36 / 44 / 52px at the default root) so controls grow with text. */
+  --aos-h-badge: 1.75rem;
+  --aos-h-chip: 2rem;
+  --aos-h-sm: 2.25rem;
+  --aos-h-md: 2.75rem; /* default buttons and inputs; also the minimum touch target */
+  --aos-h-lg: 3.25rem;
+
+  /* ---------- Density (Phase 18.1): comfortable here, compact below ---------- */
+  --aos-row-h: 2.75rem;   /* palette rows, menu rows, sidebar items */
+  --aos-gutter: 2.5rem;   /* page side padding on wide screens */
 
   /* ---------- Spacing (4px grid) ---------- */
   --aos-space-1: 4px;
@@ -153,8 +170,56 @@
   --aos-clay-grid: #E0E0DC; /* ground grid lines */
 }
 
-/* Dark variant of the clay scene (the repo's inert `.dark` class variant). */
-.dark {
+/* ===================================================================
+   Phase 18.1: dark, high contrast, density, text size, motion.
+   The shell renders <html> with classes from the person's preferences
+   (lib/preferences/shell.ts), server-side, so the first paint is right:
+     theme-light | theme-dark (+ .dark) | theme-system (follows the OS)
+     contrast-high, density-compact, motion-reduce, font-scale-112|125|150
+   Every light colour token has a dark value; the system block repeats the
+   explicit dark block exactly (lib/design/__tests__/tokens.test.ts checks
+   both, and the contrast of the status colours on dark).
+   =================================================================== */
+
+:root.dark,
+:root.theme-dark {
+  /* Neutrals: canvas and paper go dark; ink goes light (text AND the primary
+     fill, so a primary button is light with dark text in dark mode). */
+  --aos-ink: #F2F2EF;
+  --aos-paper: #1C1C1A;
+  --aos-canvas: #121211;
+  --aos-line: #2E2E2B;
+  --aos-line-strong: #3C3C38;
+  --aos-control: #5A5A55;
+  --aos-hover: #262624;
+  --aos-hover-on-paper: #2A2A27;
+  --aos-text: #F2F2EF;
+  --aos-text-muted: #ABABA5;
+  --aos-text-subtle: #93938D;
+  --aos-disabled-bg: #2A2A27;
+  --aos-disabled-fg: #7A7A74;
+  --aos-ink-hover: #D6D6D2;
+  --aos-on-ink-muted: #5E5E5B;
+  --aos-ink-raised: #DADAD6;
+  /* Status: the same four meanings and shapes, lifted so marks and text read
+     on dark (>= 4.5:1 on paper and canvas). Filled badges and buttons keep
+     the light fills (mode-invariant surfaces below): white on blue stays 6.4:1. */
+  --aos-running: #7090FF;
+  --aos-running-pressed: #5A7BF0;
+  --aos-running-tint: #1A2240;
+  --aos-needs: #F7C21B;
+  --aos-needs-tint: #3A2F0C;
+  --aos-done: #2BB36D;
+  --aos-failed: #F46A5E;
+  --aos-failed-text: #FF7A6E;
+  --aos-failed-tint: #3B1714;
+  /* Focus: a brighter blue so the ring reads on dark (6.3:1 on canvas). */
+  --aos-focus: #6F8FFF;
+  --aos-focus-halo: rgba(111, 143, 255, 0.32);
+  /* Elevation: deeper drop shadows; hairlines follow --aos-line. */
+  --aos-shadow-raised: 0 0 0 1px var(--aos-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+  --aos-shadow-overlay: 0 0 0 1px var(--aos-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4), 0 24px 56px -24px rgba(0, 0, 0, 0.8);
+  /* Twin clay: the scene keeps its clay look on dark chrome. */
   --aos-clay-0: #2A2A28;
   --aos-clay-1: #33332F;
   --aos-clay-2: #45453F;
@@ -162,6 +227,219 @@
   --aos-clay-4: #7A7A72;
   --aos-clay-grid: #3A3A36;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root.theme-system {
+    /* Neutrals: canvas and paper go dark; ink goes light (text AND the primary
+       fill, so a primary button is light with dark text in dark mode). */
+    --aos-ink: #F2F2EF;
+    --aos-paper: #1C1C1A;
+    --aos-canvas: #121211;
+    --aos-line: #2E2E2B;
+    --aos-line-strong: #3C3C38;
+    --aos-control: #5A5A55;
+    --aos-hover: #262624;
+    --aos-hover-on-paper: #2A2A27;
+    --aos-text: #F2F2EF;
+    --aos-text-muted: #ABABA5;
+    --aos-text-subtle: #93938D;
+    --aos-disabled-bg: #2A2A27;
+    --aos-disabled-fg: #7A7A74;
+    --aos-ink-hover: #D6D6D2;
+    --aos-on-ink-muted: #5E5E5B;
+    --aos-ink-raised: #DADAD6;
+    /* Status: the same four meanings and shapes, lifted so marks and text read
+       on dark (>= 4.5:1 on paper and canvas). Filled badges and buttons keep
+       the light fills (mode-invariant surfaces below): white on blue stays 6.4:1. */
+    --aos-running: #7090FF;
+    --aos-running-pressed: #5A7BF0;
+    --aos-running-tint: #1A2240;
+    --aos-needs: #F7C21B;
+    --aos-needs-tint: #3A2F0C;
+    --aos-done: #2BB36D;
+    --aos-failed: #F46A5E;
+    --aos-failed-text: #FF7A6E;
+    --aos-failed-tint: #3B1714;
+    /* Focus: a brighter blue so the ring reads on dark (6.3:1 on canvas). */
+    --aos-focus: #6F8FFF;
+    --aos-focus-halo: rgba(111, 143, 255, 0.32);
+    /* Elevation: deeper drop shadows; hairlines follow --aos-line. */
+    --aos-shadow-raised: 0 0 0 1px var(--aos-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+    --aos-shadow-overlay: 0 0 0 1px var(--aos-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4), 0 24px 56px -24px rgba(0, 0, 0, 0.8);
+    /* Twin clay: the scene keeps its clay look on dark chrome. */
+    --aos-clay-0: #2A2A28;
+    --aos-clay-1: #33332F;
+    --aos-clay-2: #45453F;
+    --aos-clay-3: #5C5C55;
+    --aos-clay-4: #7A7A72;
+    --aos-clay-grid: #3A3A36;
+  }
+}
+
+/* High contrast: stronger lines and secondary text, a thicker focus ring. */
+:root.contrast-high {
+  --aos-line: #767672;
+  --aos-line-strong: #5E5E5B;
+  --aos-control: #5E5E5B;
+  --aos-text-muted: #2E2E2C;
+  --aos-text-subtle: #4A4A47;
+  --aos-disabled-fg: #5E5E5B;
+  --aos-focus-width: 3px;
+  --aos-shadow-hairline: 0 0 0 1.5px var(--aos-line);
+}
+
+:root.contrast-high:is(.dark, .theme-dark) {
+  --aos-line: #8E8E88;
+  --aos-line-strong: #A3A39E;
+  --aos-control: #A3A39E;
+  --aos-text-muted: #E2E2DF;
+  --aos-text-subtle: #C8C8C3;
+  --aos-disabled-fg: #A3A39E;
+  --aos-focus-width: 3px;
+  --aos-shadow-hairline: 0 0 0 1.5px var(--aos-line);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.contrast-high.theme-system {
+    --aos-line: #8E8E88;
+    --aos-line-strong: #A3A39E;
+    --aos-control: #A3A39E;
+    --aos-text-muted: #E2E2DF;
+    --aos-text-subtle: #C8C8C3;
+    --aos-disabled-fg: #A3A39E;
+    --aos-focus-width: 3px;
+    --aos-shadow-hairline: 0 0 0 1.5px var(--aos-line);
+  }
+}
+
+/* Mode-invariant surfaces. Night surfaces (sidebar, toasts, code) stay
+   black in both modes, and status fills keep their light fill and text
+   colours (white on blue, black on yellow), so inside them the light values
+   apply: the white current row in the black sidebar stays white, and
+   text-white on a blue badge stays white. */
+:root:is(.dark, .theme-dark) :is(.aos-night, .bg-night) {
+  --aos-ink: #000000;
+  --aos-paper: #FFFFFF;
+  --aos-canvas: #F3F3F1;
+  --aos-line: #E2E2DF;
+  --aos-line-strong: #D6D6D2;
+  --aos-control: #CFCFCB;
+  --aos-hover: #E6E6E3;
+  --aos-hover-on-paper: #F3F3F1;
+  --aos-text: #000000;
+  --aos-text-muted: #5E5E5B;
+  --aos-text-subtle: #76766F;
+  --aos-disabled-bg: #E2E2DF;
+  --aos-disabled-fg: #8A8A86;
+  --aos-ink-hover: #1C1C1B;
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
+  --aos-focus: #2450E0;
+  --aos-focus-halo: rgba(36, 80, 224, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.theme-system :is(.aos-night, .bg-night) {
+    --aos-ink: #000000;
+    --aos-paper: #FFFFFF;
+    --aos-canvas: #F3F3F1;
+    --aos-line: #E2E2DF;
+    --aos-line-strong: #D6D6D2;
+    --aos-control: #CFCFCB;
+    --aos-hover: #E6E6E3;
+    --aos-hover-on-paper: #F3F3F1;
+    --aos-text: #000000;
+    --aos-text-muted: #5E5E5B;
+    --aos-text-subtle: #76766F;
+    --aos-disabled-bg: #E2E2DF;
+    --aos-disabled-fg: #8A8A86;
+    --aos-ink-hover: #1C1C1B;
+    --aos-on-ink-muted: #BDBDB8;
+    --aos-ink-raised: #2A2A28;
+    --aos-focus: #2450E0;
+    --aos-focus-halo: rgba(36, 80, 224, 0.22);
+  }
+}
+
+:root:is(.dark, .theme-dark) :is(.bg-running, .bg-done, .bg-failed, .bg-needs) {
+  --aos-ink: #000000;
+  --aos-paper: #FFFFFF;
+  --aos-canvas: #F3F3F1;
+  --aos-line: #E2E2DF;
+  --aos-line-strong: #D6D6D2;
+  --aos-control: #CFCFCB;
+  --aos-hover: #E6E6E3;
+  --aos-hover-on-paper: #F3F3F1;
+  --aos-text: #000000;
+  --aos-text-muted: #5E5E5B;
+  --aos-text-subtle: #76766F;
+  --aos-disabled-bg: #E2E2DF;
+  --aos-disabled-fg: #8A8A86;
+  --aos-ink-hover: #1C1C1B;
+  --aos-on-ink-muted: #BDBDB8;
+  --aos-ink-raised: #2A2A28;
+  --aos-focus: #2450E0;
+  --aos-focus-halo: rgba(36, 80, 224, 0.22);
+  --aos-running: #2450E0;
+  --aos-running-pressed: #1A3BB0;
+  --aos-running-tint: #EAF0FF;
+  --aos-needs: #F7C21B;
+  --aos-needs-tint: #FFF6D6;
+  --aos-done: #0F7F45;
+  --aos-failed: #D92D20;
+  --aos-failed-text: #C42A1E;
+  --aos-failed-tint: #FCECEA;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.theme-system :is(.bg-running, .bg-done, .bg-failed, .bg-needs) {
+    --aos-ink: #000000;
+    --aos-paper: #FFFFFF;
+    --aos-canvas: #F3F3F1;
+    --aos-line: #E2E2DF;
+    --aos-line-strong: #D6D6D2;
+    --aos-control: #CFCFCB;
+    --aos-hover: #E6E6E3;
+    --aos-hover-on-paper: #F3F3F1;
+    --aos-text: #000000;
+    --aos-text-muted: #5E5E5B;
+    --aos-text-subtle: #76766F;
+    --aos-disabled-bg: #E2E2DF;
+    --aos-disabled-fg: #8A8A86;
+    --aos-ink-hover: #1C1C1B;
+    --aos-on-ink-muted: #BDBDB8;
+    --aos-ink-raised: #2A2A28;
+    --aos-focus: #2450E0;
+    --aos-focus-halo: rgba(36, 80, 224, 0.22);
+    --aos-running: #2450E0;
+    --aos-running-pressed: #1A3BB0;
+    --aos-running-tint: #EAF0FF;
+    --aos-needs: #F7C21B;
+    --aos-needs-tint: #FFF6D6;
+    --aos-done: #0F7F45;
+    --aos-failed: #D92D20;
+    --aos-failed-text: #C42A1E;
+    --aos-failed-tint: #FCECEA;
+  }
+}
+
+:root.theme-light { color-scheme: light; }
+:root.theme-dark { color-scheme: dark; }
+:root.theme-system { color-scheme: light dark; }
+
+/* Density: compact rows, controls and gutters. */
+:root.density-compact {
+  --aos-row-h: 2.25rem;
+  --aos-gutter: 1.5rem;
+  --aos-h-md: 2.5rem;
+  --aos-h-sm: 2rem;
+  --aos-h-lg: 2.75rem;
+}
+
+/* Text size: the root font size scales every rem-based token. */
+:root.font-scale-112 { font-size: 112%; }
+:root.font-scale-125 { font-size: 125%; }
+:root.font-scale-150 { font-size: 150%; }
 
 /* ---------- Base ---------- */
 html {
@@ -172,7 +450,7 @@ html {
 }
 
 :where(button, a, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--aos-focus);
+  outline: var(--aos-focus-width) solid var(--aos-focus);
   outline-offset: 2px;
 }
 .aos-night :where(button, a, input, textarea, select, [tabindex]):focus-visible {
@@ -273,3 +551,12 @@ html {
   }
   .aos-press:hover, .aos-press:active { transform: none; }
 }
+/* The "Reduce motion" preference (Phase 18.1) applies the same rules even
+   when the OS doesn't ask for them. */
+:root.motion-reduce *, :root.motion-reduce *::before, :root.motion-reduce *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+:root.motion-reduce .aos-press:hover, :root.motion-reduce .aos-press:active { transform: none; }

@@ -291,7 +291,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (250 keys)</summary>
+<details><summary>Not set on Render, on purpose (253 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -354,6 +354,9 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | default 90 is right | `DATASET_STALE_AFTER_DAYS` |
 | the memory pass runs as the app role with in-session budgets (no extra DB login on Render) | `MEMORY_WORKER_ROLE` |
 | default cache dir | `MEMORY_MODEL_CACHE` |
+| default on: meaning-search uses the cached local MiniLM | `SPOTLIGHT_SEMANTIC` |
+| default on: uploads index their text in the background | `SPOTLIGHT_INDEX_ON_WRITE` |
+| default 200 per search-index cron run is right | `SEARCH_INDEX_BATCH` |
 | demo/test only | `POS_TERMINAL_MOCK` |
 | bring-your-own media buying | `VIBE_CLIENT_ID`, `VIBE_CLIENT_SECRET`, `VIBE_API_TOKEN` |
 | default test mode stays on | `VIBE_TEST_MODE` |

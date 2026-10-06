@@ -101,8 +101,13 @@ export async function releaseHeldNotifications(userId: string, now: Date = new D
   if (claimed.length) {
     try {
       const { queuePushForNotifications } = await import("@/lib/push/notify");
+      // Phase 18.1 integration: the person's push channel (lib/preferences)
+      // decides what a released row pushes, exactly as when it was written.
+      const { filterByNotificationPrefs } = await import("@/lib/preferences");
+      const pushable = await filterByNotificationPrefs(claimed, "push");
+      if (pushable.length === 0) return claimed.length;
       queuePushForNotifications(
-        claimed.map((r) => ({
+        pushable.map((r) => ({
           workspaceId: r.workspaceId,
           userId: r.userId,
           kind: r.kind as NotificationKind,

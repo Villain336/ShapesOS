@@ -99,7 +99,7 @@ function SentimentBar({ sentiment }: { sentiment: PerEngineScore["sentiment"] })
         {seg(sentiment.negative, "bg-failed", "Negative")}
         {seg(sentiment.unmentioned, "bg-line", "Unmentioned")}
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-muted">
         <span><span className="font-semibold text-ink">{sentiment.positive}</span> positive</span>
         <span><span className="font-semibold text-muted">{sentiment.neutral}</span> neutral</span>
         <span><span className="font-semibold text-failed-text">{sentiment.negative}</span> negative</span>
@@ -120,7 +120,7 @@ const ACTION_STATUS_CHIP: Record<string, string> = {
 
 function chip(text: React.ReactNode, cls: string) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );
@@ -294,7 +294,7 @@ export default async function AeoPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="aos-heading">AEO — answer-engine visibility</h1>
-            <p className="mt-0.5 max-w-3xl text-[13px] text-muted">
+            <p className="mt-0.5 max-w-3xl text-[0.8125rem] text-muted">
               Versioned money-prompt sets run weekly against official LLM APIs (N=3 reps), parsed by a
               nano-class judge. The act leg turns source-impact findings into owned-domain GEO16 fixes
               (supervised ladder) and third-party user action plans.
@@ -305,11 +305,11 @@ export default async function AeoPage({
               name="brand"
               defaultValue={brand}
               placeholder="Brand for matching…"
-              className="w-44 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
+              className="w-44 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
             />
             <button
               type="submit"
-              className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover"
+              className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover"
             >
               Set
             </button>
@@ -341,9 +341,9 @@ export default async function AeoPage({
           {chip("No composite score", "border-line bg-paper text-muted")}
         </div>
         <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Engine</th>
                 <th className="px-3 py-2 font-medium">Mention rate</th>
                 <th className="px-3 py-2 font-medium">Answer SoV</th>
@@ -362,7 +362,7 @@ export default async function AeoPage({
                   <tr key={engine} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">
                       <span className="font-medium text-ink">{ENGINE_LABELS[engine]}</span>
-                      <span className="block font-mono text-[10px] text-subtle">{ENGINE_MODELS[engine]}</span>
+                      <span className="block font-mono text-[0.625rem] text-subtle">{ENGINE_MODELS[engine]}</span>
                     </td>
                     {!score ? (
                       <td colSpan={6} className="px-3 py-2 text-xs text-subtle">No completed run yet for this engine.</td>
@@ -387,8 +387,8 @@ export default async function AeoPage({
                         <td className="px-3 py-2">
                           <SentimentBar sentiment={score.sentiment} />
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-muted">{score.responses} resp · {score.prompts} prompts</td>
-                        <td className="px-3 py-2 text-[12px] text-muted">
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">{score.responses} resp · {score.prompts} prompts</td>
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">
                           {latest ? `v${latest.version} · ${latest.startedAt.toLocaleDateString()}` : "—"}
                         </td>
                       </>
@@ -399,7 +399,7 @@ export default async function AeoPage({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-subtle">
+        <p className="mt-2 text-[0.6875rem] text-subtle">
           Mention rate = mean % of reps per prompt where the brand was mentioned (2/3 = 67%), not a binary flag.
           Answer share of voice = brand appearances ÷ total responses × 100.
         </p>
@@ -415,9 +415,9 @@ export default async function AeoPage({
           {chip("per engine", "border-line bg-paper text-muted")}
         </div>
         <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
+          <table className="w-full min-w-[640px] text-left text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Domain</th>
                 <th className="px-3 py-2 font-medium">Engine</th>
                 <th className="px-4 py-2.5 font-medium" title="Times the domain was cited across the prompt set">
@@ -458,7 +458,7 @@ export default async function AeoPage({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-subtle">
+        <p className="mt-2 text-[0.6875rem] text-subtle">
           Co-occurrence lift is the defensible impact metric: high-lift domains are where effort pays.
           Benchmarks — listicles 1.89, YouTube 1.83, review platforms 1.23, Reddit 0.73 (citations per URL).
         </p>
@@ -476,16 +476,16 @@ export default async function AeoPage({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-lg border border-line bg-paper p-4">
             <h3 className="mb-1 text-sm font-semibold text-ink">Owned-domain GEO16 fixes</h3>
-            <p className="mb-3 text-[11px] text-muted">
+            <p className="mb-3 text-[0.6875rem] text-muted">
               Approval flows into the supervised fix-agent ladder: proposed → approved → applied. Never autonomous.
             </p>
             {ownedFixes.length === 0 ? (
               <p className="text-xs text-subtle">No owned-domain fix proposals yet.</p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
-                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                    <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                       <th className="px-3 py-2 font-medium">Page</th>
                       <th className="px-3 py-2 font-medium">Pillars</th>
                       <th className="px-3 py-2 font-medium">Benchmark impact</th>
@@ -512,7 +512,7 @@ export default async function AeoPage({
                                 ))}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-muted">
+                            <td className="px-3 py-2 text-[0.75rem] text-muted">
                               {fix?.benchmarkImpactPct != null ? `+${fix.benchmarkImpactPct}% citations` : "—"}
                             </td>
                             <td className="px-3 py-2">{chip(a.status, ACTION_STATUS_CHIP[a.status] ?? ACTION_STATUS_CHIP.proposed)}</td>
@@ -524,7 +524,7 @@ export default async function AeoPage({
                             <tr key={`${a.id}-detail`} className="border-b border-line bg-paper/40">
                               <td colSpan={5} className="px-3 py-2">
                                 {fix?.proposedChange && <p className="text-xs text-muted">{fix.proposedChange}</p>}
-                                {fix?.rationale && <p className="mt-1 text-[11px] text-subtle">{fix.rationale}</p>}
+                                {fix?.rationale && <p className="mt-1 text-[0.6875rem] text-subtle">{fix.rationale}</p>}
                               </td>
                             </tr>
                           )}
@@ -539,7 +539,7 @@ export default async function AeoPage({
 
           <div className="rounded-lg border border-line bg-paper p-4">
             <h3 className="mb-1 text-sm font-semibold text-ink">Third-party user action plans</h3>
-            <p className="mb-3 text-[11px] text-muted">
+            <p className="mb-3 text-[0.6875rem] text-muted">
               ShapesOS cannot edit third-party pages — these are concrete plans for you to execute. Approving
               marks a commitment; it never publishes on your behalf.
             </p>
@@ -547,9 +547,9 @@ export default async function AeoPage({
               <p className="text-xs text-subtle">No third-party action plans yet.</p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
-                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                    <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                       <th className="px-3 py-2 font-medium">Target</th>
                       <th className="px-3 py-2 font-medium">Expected lift</th>
                       <th className="px-3 py-2 font-medium">Deadline</th>
@@ -569,10 +569,10 @@ export default async function AeoPage({
                                 {plan?.exactTarget ?? a.sourceRef}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-muted">
+                            <td className="px-3 py-2 text-[0.75rem] text-muted">
                               {(plan?.expectedLift ?? a.expectedLift) != null ? `+${Number(plan?.expectedLift ?? a.expectedLift).toFixed(1)} pts` : "—"}
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-muted">
+                            <td className="px-3 py-2 text-[0.75rem] text-muted">
                               {plan?.deadline ? (
                                 <span className="flex items-center gap-1">
                                   <CalendarClock className="h-3 w-3" /> {plan.deadline}
@@ -617,9 +617,9 @@ export default async function AeoPage({
               <p className="text-xs text-subtle">No prompt sets yet — create one below.</p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
-                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                    <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                       <th className="px-3 py-2 font-medium">Version</th>
                       <th className="px-3 py-2 font-medium">Prompts</th>
                       <th className="px-3 py-2 font-medium">Created</th>
@@ -632,7 +632,7 @@ export default async function AeoPage({
                       <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className="px-3 py-2 font-semibold text-ink">v{s.version}</td>
                         <td className="px-3 py-2 text-muted">{s.promptCount}</td>
-                        <td className="px-3 py-2 text-[12px] text-muted">{s.createdAt.toLocaleDateString()}</td>
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">{s.createdAt.toLocaleDateString()}</td>
                         <td className="px-3 py-2">
                           {s.active ? chip("Active", "border-line bg-paper text-muted shadow-control") : <span className="text-subtle">—</span>}
                         </td>
@@ -655,7 +655,7 @@ export default async function AeoPage({
 
           <div className="rounded-lg border border-line bg-paper p-4">
             <h3 className="mb-1 text-sm font-semibold text-ink">Weekly run trigger</h3>
-            <p className="mb-3 text-[11px] text-muted">
+            <p className="mb-3 text-[0.6875rem] text-muted">
               Runs the active prompt set against all four engines (N=3 reps each), then the nano-judge parses
               mention, position, sentiment, competitors, and cited sources. Official APIs only — no consumer
               chat-UI scraping. Weekly default; daily available at ~4.3× cost. Envelope ~$1–5/mo per brand
@@ -666,7 +666,7 @@ export default async function AeoPage({
             ) : (
               <p className="text-xs text-subtle">Editor role required to start a run.</p>
             )}
-            <div className="mt-4 border-t border-line pt-3 text-[11px] text-muted">
+            <div className="mt-4 border-t border-line pt-3 text-[0.6875rem] text-muted">
               <Link href="/dashboard/authority" className="font-medium text-muted hover:text-ink">
                 ← Back to Authority overview
               </Link>

@@ -127,14 +127,14 @@ function BgRemovalControl({ el }: { el: ImageElement }) {
         <button
           onClick={() => void remove()}
           disabled={busy}
-          className={`${iconBtn} ${busy ? "" : "!w-auto !px-2.5 gap-1.5 text-[12px] font-medium"}`}
+          className={`${iconBtn} ${busy ? "" : "!w-auto !px-2.5 gap-1.5 text-[0.75rem] font-medium"}`}
           title="Remove background (runs in your browser)"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eraser className="h-3.5 w-3.5" />}
           {busy ? progress ?? "Working…" : "Remove background"}
         </button>
       )}
-      {error && <span className="max-w-64 text-[11px] leading-snug text-failed-text">{error}</span>}
+      {error && <span className="max-w-64 text-[0.6875rem] leading-snug text-failed-text">{error}</span>}
     </div>
   );
 }
@@ -351,14 +351,14 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
         value={designName}
         onChange={(e) => onNameChange(e.target.value)}
         aria-label="Design name"
-        className="w-44 rounded-md border border-transparent px-2 py-1 text-[13px] font-semibold text-ink hover:border-line focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+        className="w-44 rounded-md border border-transparent px-2 py-1 text-[0.8125rem] font-semibold text-ink hover:border-line focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
       />
 
       <div className="h-5 w-px bg-line" />
 
       {selected.length === 0 && page && (
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[12px] text-muted">
+          <label className="flex items-center gap-1.5 text-[0.75rem] text-muted">
             <input
               type="color"
               value={page.background}
@@ -368,13 +368,13 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
             />
             Background
           </label>
-          <span className="rounded-key bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-muted">
+          <span className="rounded-key bg-canvas px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted">
             {page.width} × {page.height}
           </span>
           <div ref={resizeRef} className="relative">
             <button
               onClick={() => setResizeOpen((o) => !o)}
-              className={`${btnGhost} !py-1 text-[12px]`}
+              className={`${btnGhost} !py-1 text-[0.75rem]`}
               title="Magic resize — convert this page to another size"
             >
               <Scaling className="h-3.5 w-3.5 text-ink" />
@@ -383,7 +383,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
             </button>
             {resizeOpen && (
               <div className="absolute left-0 z-30 mt-1 w-56 overflow-hidden rounded-md border border-line bg-paper shadow-overlay">
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold text-subtle">
+                <p className="px-3 pb-1 pt-2 text-[0.6875rem] font-semibold text-subtle">
                   Resize page to…
                 </p>
                 {AI_DESIGN_SIZES.map((preset) => {
@@ -393,18 +393,18 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                       key={preset.key}
                       disabled={current}
                       onClick={() => doMagicResize(preset)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-hover-paper disabled:cursor-default disabled:hover:bg-transparent"
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[0.8125rem] text-ink hover:bg-hover-paper disabled:cursor-default disabled:hover:bg-transparent"
                     >
                       <span className={current ? "text-subtle" : ""}>{preset.label}</span>
                       {current ? (
-                        <span className="text-[11px] font-medium text-subtle">Current</span>
+                        <span className="text-[0.6875rem] font-medium text-subtle">Current</span>
                       ) : (
                         <Scaling className="h-3.5 w-3.5 text-subtle" />
                       )}
                     </button>
                   );
                 })}
-                <p className="border-t border-line px-3 py-2 text-[11px] leading-snug text-subtle">
+                <p className="border-t border-line px-3 py-2 text-[0.6875rem] leading-snug text-subtle">
                   Layout scales proportionally. Locked elements resize too. Undo with Ctrl+Z.
                 </p>
               </div>
@@ -432,7 +432,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               const v = Math.min(400, Math.max(8, parseInt(e.target.value, 10) || 8));
               for (const t of textEls) updateElement(t.id, { fontSize: v });
             }}
-            className={`${inputCls} w-16 py-1 text-[12px]`}
+            className={`${inputCls} w-16 py-1 text-[0.75rem]`}
             title="Font size"
           />
           <button
@@ -481,7 +481,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               value={singleText.text}
               onChange={(e) => updateElement(singleText.id, { text: e.target.value })}
               aria-label="Text content"
-              className={`${inputCls} w-52 py-1 text-[12px]`}
+              className={`${inputCls} w-52 py-1 text-[0.75rem]`}
               placeholder="Text content"
             />
           )}
@@ -502,7 +502,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
 
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <label className="flex items-center gap-1 text-[12px] text-muted" title="Opacity">
+          <label className="flex items-center gap-1 text-[0.75rem] text-muted" title="Opacity">
             <input
               type="range"
               min={0}
@@ -622,7 +622,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                 <button
                   key={fmt}
                   onClick={() => void doExport(fmt)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-hover-paper"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8125rem] text-ink hover:bg-hover-paper"
                 >
                   <Check className="h-3.5 w-3.5 invisible" />
                   {label}
@@ -633,7 +633,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
         </div>
         {saveLabel && (
           <span
-            className={`flex items-center gap-1 text-[12px] ${
+            className={`flex items-center gap-1 text-[0.75rem] ${
               saveState === "error" ? "text-failed-text" : "text-muted"
             }`}
           >
@@ -646,7 +646,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
       </div>
 
       {notice && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-toast-in items-center gap-3 rounded-lg bg-night py-2.5 pl-4 pr-2.5 text-[13px] text-night-soft shadow-toast">
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-toast-in items-center gap-3 rounded-lg bg-night py-2.5 pl-4 pr-2.5 text-[0.8125rem] text-night-soft shadow-toast">
           <Check className="h-4 w-4 shrink-0 text-white" />
           <span>{notice}</span>
           <button
@@ -654,7 +654,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               undo();
               setNotice(null);
             }}
-            className="rounded-full bg-paper px-3 py-1 text-[12px] font-semibold text-ink aos-press hover:bg-hover-paper"
+            className="rounded-full bg-paper px-3 py-1 text-[0.75rem] font-semibold text-ink aos-press hover:bg-hover-paper"
           >
             Undo
           </button>

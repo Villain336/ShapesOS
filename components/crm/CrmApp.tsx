@@ -176,17 +176,17 @@ export function CrmApp() {
       <div className="border-b border-line bg-paper px-5 pb-0 pt-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[12px] font-medium text-subtle">ShapesOS · CRM</p>
+            <p className="text-[0.75rem] font-medium text-subtle">ShapesOS · CRM</p>
             <div className="mt-0.5 flex items-center gap-2">
               <div className="relative">
                 <select
-                  className="cursor-pointer border-0 bg-transparent pl-0 pr-8 rounded-sm text-[20px] font-bold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="cursor-pointer border-0 bg-transparent pl-0 pr-8 rounded-sm text-[1.25rem] font-bold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   value={activePipelineId ?? ""}
                   onChange={(e) => setActivePipelineId(e.target.value)}
                   aria-label="Active pipeline"
                 >
                   {pipelines.map((p) => (
-                    <option key={p.id} value={p.id} className="!text-[14px]">
+                    <option key={p.id} value={p.id} className="!text-[0.875rem]">
                       {p.name}{p.activeLeads > 0 ? ` (${p.activeLeads})` : ""}
                     </option>
                   ))}
@@ -222,7 +222,7 @@ export function CrmApp() {
           ))}
           <Link
             href="/dashboard/ops"
-            className="ml-auto inline-flex items-center gap-1 px-1 py-2 text-[13px] font-semibold text-muted hover:text-ink"
+            className="ml-auto inline-flex items-center gap-1 px-1 py-2 text-[0.8125rem] font-semibold text-muted hover:text-ink"
           >
             Invoices, inventory and projects moved to Operations <ArrowUpRight size={14} />
           </Link>
@@ -294,7 +294,7 @@ export function CrmApp() {
       </div>
 
       {/* Aggregation status bar */}
-      <div className="flex items-center gap-6 border-t border-line bg-paper px-5 py-2.5 text-[12.5px]">
+      <div className="flex items-center gap-6 border-t border-line bg-paper px-5 py-2.5 text-[0.78125rem]">
         <span className="text-muted">
           <span className="font-bold text-ink tabular-nums">{summary.count}</span> leads in view
         </span>

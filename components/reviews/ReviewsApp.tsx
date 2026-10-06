@@ -33,15 +33,15 @@ import { closeOnEscape } from "@/lib/ui/keyboard";
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-4";
 const inputCls =
-  "w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-60";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-60";
 const btnGhost =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[12.5px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-60";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.78125rem] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-60";
 const btnDeny =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[12.5px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-60";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.78125rem] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-60";
 const chipCls =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[11px] font-semibold text-muted shadow-control";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.6875rem] font-semibold text-muted shadow-control";
 
 // All tones are statuses/tiers, not agent states — neutral chips.
 function Chip({ children }: { children: React.ReactNode }) {
@@ -80,7 +80,7 @@ function Switch({
   label: string;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[12.5px] font-medium text-muted">
+    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[0.78125rem] font-medium text-muted">
       <button
         type="button"
         role="switch"
@@ -103,7 +103,7 @@ function Switch({
 }
 
 function Stars({ n }: { n: number | null }) {
-  if (n == null) return <span className="text-[12px] text-subtle">—</span>;
+  if (n == null) return <span className="text-[0.75rem] text-subtle">—</span>;
   return (
     <span className="inline-flex items-center gap-0.5" aria-label={`${n} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -253,7 +253,7 @@ function ConfigCard({ onSaved }: { onSaved: () => void }) {
     <section className={cardCls}>
       <div className="mb-3 flex items-center gap-2">
         <Settings2 size={15} className="text-muted" />
-        <h2 className="text-[13px] font-semibold text-ink">Review site config</h2>
+        <h2 className="text-[0.8125rem] font-semibold text-ink">Review site config</h2>
         {configs.filter((c) => c.enabled).length > 0 && (
           <Chip>{configs.filter((c) => c.enabled).length} enabled</Chip>
         )}
@@ -271,7 +271,7 @@ function ConfigCard({ onSaved }: { onSaved: () => void }) {
           className={inputCls}
           inputMode="url"
         />
-        <label className="flex items-center gap-1.5 text-[12px] text-muted">
+        <label className="flex items-center gap-1.5 text-[0.75rem] text-muted">
           <input
             type="number"
             min={0}
@@ -289,9 +289,9 @@ function ConfigCard({ onSaved }: { onSaved: () => void }) {
         <button onClick={save} disabled={saving || !reviewUrl.trim()} className={btnPrimary}>
           {saving ? <Loader2 size={14} className="aos-spin" /> : <Check size={14} />} Save config
         </button>
-        {msg && <span className="text-[12px] text-muted">{msg}</span>}
+        {msg && <span className="text-[0.75rem] text-muted">{msg}</span>}
       </div>
-      <p className="mt-2 text-[11.5px] leading-relaxed text-subtle">
+      <p className="mt-2 text-[0.71875rem] leading-relaxed text-subtle">
         Google is the default send target. Requests go out after the delay via the messaging
         approval queue — every send is manual-approved and consent-gated.
       </p>
@@ -313,7 +313,7 @@ function FunnelCard({ stats }: { stats: FunnelStats | null }) {
   return (
     <section className={cardCls}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-ink">Request funnel</h2>
+        <h2 className="text-[0.8125rem] font-semibold text-ink">Request funnel</h2>
         {stats && (
           <div className="flex items-center gap-1.5">
             <Chip>view {stats.viewRate}%</Chip>
@@ -325,10 +325,10 @@ function FunnelCard({ stats }: { stats: FunnelStats | null }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {cells.map((c) => (
           <div key={c.label} className="rounded-lg bg-canvas px-3 py-2.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted">
+            <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-wide text-muted">
               <c.icon size={13} /> {c.label}
             </div>
-            <div className="mt-1 text-[22px] font-semibold tracking-tight text-ink">{c.value}</div>
+            <div className="mt-1 text-[1.375rem] font-semibold tracking-tight text-ink">{c.value}</div>
           </div>
         ))}
       </div>
@@ -400,7 +400,7 @@ function SendCard({ onSent }: { onSent: () => void }) {
     <section className={cardCls}>
       <div className="mb-3 flex items-center gap-2">
         <Send size={15} className="text-muted" />
-        <h2 className="text-[13px] font-semibold text-ink">Send review request</h2>
+        <h2 className="text-[0.8125rem] font-semibold text-ink">Send review request</h2>
       </div>
       <div className="relative" ref={boxRef}>
         <div className="flex flex-wrap items-center gap-2">
@@ -420,8 +420,8 @@ function SendCard({ onSent }: { onSent: () => void }) {
                     className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-hover-paper"
                     onClick={() => { setLead(h); setOpen(false); }}
                   >
-                    <span className="text-[13px] font-medium text-ink">{h.name}</span>
-                    <span className="truncate text-[11.5px] text-subtle">{h.phone || h.email || ""}</span>
+                    <span className="text-[0.8125rem] font-medium text-ink">{h.name}</span>
+                    <span className="truncate text-[0.71875rem] text-subtle">{h.phone || h.email || ""}</span>
                   </button>
                 ))}
               </div>
@@ -437,18 +437,18 @@ function SendCard({ onSent }: { onSent: () => void }) {
         </div>
       </div>
       {lead && (
-        <p className="mt-2 text-[12px] text-muted">
+        <p className="mt-2 text-[0.75rem] text-muted">
           To: <span className="font-medium text-ink">{lead.name}</span>
           {channel === "sms" ? ` · ${lead.phone || "no phone on file"}` : ` · ${lead.email || "no email on file"}`}
         </p>
       )}
       {msg && (
-        <p className={`mt-2 flex items-start gap-1.5 text-[12.5px] ${msg.tone === "ok" ? "text-muted" : "text-failed-text"}`}>
+        <p className={`mt-2 flex items-start gap-1.5 text-[0.78125rem] ${msg.tone === "ok" ? "text-muted" : "text-failed-text"}`}>
           {msg.tone === "ok" ? <ShieldCheck size={14} className="mt-0.5 shrink-0" /> : <span className="mt-0.5 shrink-0 aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Warning" />}
           {msg.text}
         </p>
       )}
-      <p className="mt-2 text-[11.5px] text-subtle">
+      <p className="mt-2 text-[0.71875rem] text-subtle">
         Sends are consent-gated and manual-approved. No consent on file → the send is suppressed and surfaced here.
       </p>
     </section>
@@ -469,10 +469,10 @@ function QrModal({ requestId, leadName, onClose }: { requestId: string; leadName
       .then((j) => { if (j.qrDataUrl) setData(j); });
   }, [requestId]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xs rounded-lg bg-paper p-5 text-center shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-[13px] font-semibold text-ink">Print QR — {leadName}</h3>
+          <h3 className="text-[0.8125rem] font-semibold text-ink">Print QR — {leadName}</h3>
           <button onClick={onClose} className="rounded p-1 text-subtle hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
@@ -480,7 +480,7 @@ function QrModal({ requestId, leadName, onClose }: { requestId: string; leadName
         {data ? (
           <>
             <img src={data.qrDataUrl} alt="Review QR code" className="mx-auto h-56 w-56 rounded-lg border border-line" />
-            <p className="mt-2 break-all text-[11px] text-subtle">{data.pageUrl}</p>
+            <p className="mt-2 break-all text-[0.6875rem] text-subtle">{data.pageUrl}</p>
             <a href={data.qrDataUrl} download={`review-qr-${requestId}.png`} className={`${btnPrimary} mt-3 w-full justify-center`}>
               <Download size={14} /> Download PNG
             </a>
@@ -527,18 +527,18 @@ function RequestsTable({ refreshKey }: { refreshKey: number }) {
     <section className={cardCls}>
       <div className="mb-3 flex items-center gap-2">
         <ListChecks size={15} className="text-muted" />
-        <h2 className="text-[13px] font-semibold text-ink">Requests</h2>
-        <span className="text-[12px] text-subtle">{rows.length}</span>
+        <h2 className="text-[0.8125rem] font-semibold text-ink">Requests</h2>
+        <span className="text-[0.75rem] text-subtle">{rows.length}</span>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-8"><Loader2 size={18} className="aos-spin text-subtle" /></div>
       ) : rows.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-subtle">No review requests yet. Queue one above or trigger one from a lead.</p>
+        <p className="py-8 text-center text-[0.8125rem] text-subtle">No review requests yet. Queue one above or trigger one from a lead.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-[12.5px]">
+          <table className="w-full min-w-[760px] text-left text-[0.78125rem]">
             <thead>
-              <tr className="border-b border-line text-[11px] font-medium tracking-wide text-muted">
+              <tr className="border-b border-line text-[0.6875rem] font-medium tracking-wide text-muted">
                 <th className="px-2 py-2">Lead</th>
                 <th className="px-2 py-2">Channel</th>
                 <th className="px-2 py-2">Status</th>
@@ -553,7 +553,7 @@ function RequestsTable({ refreshKey }: { refreshKey: number }) {
                 <tr key={r.id} className="border-b border-line hover:bg-hover-paper">
                   <td className="px-2 py-2">
                     <div className="font-medium text-ink">{r.lead.name}</div>
-                    <div className="text-[11px] text-subtle">{r.channel === "sms" ? r.lead.phone : r.lead.email}</div>
+                    <div className="text-[0.6875rem] text-subtle">{r.channel === "sms" ? r.lead.phone : r.lead.email}</div>
                   </td>
                   <td className="px-2 py-2"><Chip>{r.channel.toUpperCase()}</Chip></td>
                   <td className="px-2 py-2"><Chip>{r.status}</Chip></td>
@@ -633,7 +633,7 @@ function IncomingReviews() {
     <div className="space-y-3">
       <div className={`${cardCls} flex items-start gap-2`}>
         <MessageSquareText size={15} className="mt-0.5 shrink-0 text-muted" />
-        <p className="text-[12.5px] leading-relaxed text-muted">
+        <p className="text-[0.78125rem] leading-relaxed text-muted">
           Drafts are AI-written and <span className="font-semibold">never posted automatically</span>.
           Each draft creates an approval item — approve it in{" "}
           <a href="/dashboard/approvals?source=messaging" className="font-medium text-ink underline">Needs you</a>,
@@ -641,23 +641,23 @@ function IncomingReviews() {
         </p>
       </div>
       {err && (
-        <p role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[12.5px] text-failed-text">
+        <p role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.78125rem] text-failed-text">
           <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
           <span>{err}</span>
         </p>
       )}
       {reviews.length === 0 && (
-        <p className="py-10 text-center text-[13px] text-subtle">No unanswered monitored reviews. New Google reviews needing a reply will appear here.</p>
+        <p className="py-10 text-center text-[0.8125rem] text-subtle">No unanswered monitored reviews. New Google reviews needing a reply will appear here.</p>
       )}
       {reviews.map((rv) => {
         const d = drafts[rv.id];
         return (
           <article key={rv.id} className={cardCls}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] font-semibold text-ink">{rv.author || "Anonymous"}</span>
+              <span className="text-[0.8125rem] font-semibold text-ink">{rv.author || "Anonymous"}</span>
               <Stars n={rv.rating} />
               <Chip>{rv.sentiment}</Chip>
-              {rv.publishedAt && <span className="text-[11.5px] text-subtle">{fmtDate(rv.publishedAt)}</span>}
+              {rv.publishedAt && <span className="text-[0.71875rem] text-subtle">{fmtDate(rv.publishedAt)}</span>}
               <span className="ml-auto">
                 {rv.approvalStatus === "pending" ? (
                   <Chip>draft awaiting approval</Chip>
@@ -666,15 +666,15 @@ function IncomingReviews() {
                 ) : null}
               </span>
             </div>
-            {rv.text && <p className="mt-2 text-[13px] leading-relaxed text-muted">{rv.text}</p>}
+            {rv.text && <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">{rv.text}</p>}
             <div className="mt-3">
               {d ? (
                 <div className="rounded-lg border border-line bg-canvas p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold tracking-wide text-muted">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[0.71875rem] font-semibold tracking-wide text-muted">
                     <Sparkles size={12} /> AI draft {d.mock && <Chip>mock LLM</Chip>}
                   </div>
-                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{d.body}</p>
-                  <p className="mt-2 text-[11.5px] text-muted">
+                  <p className="whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink">{d.body}</p>
+                  <p className="mt-2 text-[0.71875rem] text-muted">
                     Approval <span className="font-mono">{d.approvalId.slice(0, 8)}…</span> pending —{" "}
                     <a href="/dashboard/approvals?source=messaging" className="font-medium text-ink underline">open approvals</a>
                   </p>
@@ -724,7 +724,7 @@ export function ReviewsApp() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium ${
               tab === t.id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

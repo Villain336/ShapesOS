@@ -19,9 +19,9 @@ export function PageHeader({
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="min-w-0">
-        <h1 className="text-[20px] font-semibold tracking-tight text-ink">{title}</h1>
+        <h1 className="text-[1.25rem] font-semibold tracking-tight text-ink">{title}</h1>
         {description ? (
-          <p className="mt-1 max-w-150 text-[13px] text-ink-2">{description}</p>
+          <p className="mt-1 max-w-150 text-[0.8125rem] text-ink-2">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

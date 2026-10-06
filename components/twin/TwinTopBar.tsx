@@ -79,7 +79,7 @@ function SiteSwitcher({ current, sites, hrefFor }: { current: TwinSnapshot["site
               >
                 <SIcon size={16} aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                <span className={cn("aos-mono text-xs", active ? "text-night-soft" : "text-muted")}>{s.code}</span>
+                <span className={cn("aos-mono text-xs", active ? "text-on-ink-muted" : "text-muted")}>{s.code}</span>
                 {active ? <Check size={14} aria-hidden /> : null}
               </Link>
             );
@@ -147,7 +147,7 @@ function TwinSearch({ snapshot, onPick }: { snapshot: TwinSnapshot; onPick: (hit
               {hits.map((h, i) => (
                 <li key={h.key} role="option" aria-selected={i === cursor} onMouseEnter={() => setCursor(i)} onClick={() => choose(h)} className={cn("flex min-h-11 cursor-pointer flex-col justify-center rounded-sm px-3 py-1.5", i === cursor ? "bg-ink text-paper" : "text-ink")}>
                   <span className="text-sm font-semibold">{h.title}</span>
-                  <span className={cn("text-xs", i === cursor ? "text-night-soft" : "text-muted")}>{h.hint}</span>
+                  <span className={cn("text-xs", i === cursor ? "text-on-ink-muted" : "text-muted")}>{h.hint}</span>
                 </li>
               ))}
             </ul>

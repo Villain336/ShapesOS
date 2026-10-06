@@ -44,6 +44,8 @@ import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
 import { generate_image } from "@/lib/images/tool";
 // Phase 5: tool groups (per-task tool grants).
 import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
+// Phase 18.1 (WS=find): Spotlight for agents — the same search people run in ⌘K.
+import { search_workspace } from "@/lib/search/tool";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1053,6 +1055,8 @@ export const TOOLS: ToolDef[] = [
   research_question,
   // Phase 4b: grounded answers from published datasets.
   ask_business_data,
+  // Phase 18.1: one index for people and agents (lib/search/records.ts).
+  search_workspace,
   // Phase 7: images from OpenAI's image model, saved as workspace files.
   generate_image,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
@@ -1084,6 +1088,7 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   get_workflows: "workspace",
   load_skill: "workspace",
   ask_business_data: "workspace",
+  search_workspace: "workspace",
   automation_flow_status: "workspace",
   research_keywords: "web",
   research_question: "web",
@@ -1220,6 +1225,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
  * asks, whatever a rule says.
  */
 export const TOOL_ACTION: Readonly<Record<string, string>> = {
+  // Phase 18.1: read-only search over the workspace — a Tier-0 "search_" kind.
+  search_workspace: "search_workspace",
   research_keywords: "search_keywords",
   research_question: "search_web",
   create_content_draft: "draft_content",

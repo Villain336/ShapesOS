@@ -51,6 +51,12 @@ import { AppSwitcher } from "@/components/desk/AppSwitcher";
 import { PaneBridge, ShortcutHost } from "@/components/desk/ShortcutHost";
 import { PausedBanner } from "@/components/desk/PausedBanner";
 import { ControlCenter } from "@/components/desk/ControlCenter";
+// Phase 18.1 (WS=find): skip link (layout-level, every dashboard page), the
+// person's translated shell strings, and the one-time device time-zone save.
+import { SkipLink } from "@/components/a11y/SkipLink";
+import { TimeZoneSync } from "@/components/preferences/TimeZoneSync";
+import { getI18n } from "@/lib/i18n/server";
+import { getShellState } from "@/lib/preferences/server";
 
 export default async function DashboardLayout({
   children,
@@ -131,9 +137,14 @@ export default async function DashboardLayout({
     (defaultKit?.colors as Record<string, string> | null)?.primary,
   );
 
+  const [{ t }, shellState] = await Promise.all([getI18n(), getShellState()]);
+
   if (pane) {
+    // Phase 18.1 (WS=desk): a split-view pane — no sidebar / top bar; the
+    // page still gets its own skip link + main landmark (WS=find).
     return (
       <BrandTheme primary={brandPrimary}>
+        <SkipLink label={t("a11y.skipToContent")} />
         <ChatProvider>
           <CommandBar workspaceId={workspace.id} />
           <NewTaskDialog />
@@ -150,6 +161,9 @@ export default async function DashboardLayout({
 
   return (
     <BrandTheme primary={brandPrimary}>
+      {/* Phase 18.1: first focusable element on every dashboard page. */}
+      <SkipLink label={t("a11y.skipToContent")} />
+      <TimeZoneSync needed={shellState.signedIn && shellState.timeZone === null} />
       <ChatProvider>
         {/* Phase 18.1 (WS=desk): visits → recents; ⌃Tab switcher; keyboard host + "?". */}
         <RecentsTracker />

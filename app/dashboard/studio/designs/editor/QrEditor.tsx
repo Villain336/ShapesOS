@@ -16,10 +16,10 @@ export function QrEditor({ el }: { el: QrElement }) {
         onChange={(e) => updateElement(el.id, { payload: e.target.value })}
         aria-label="QR payload"
         placeholder="https://… or text"
-        className="h-8 w-56 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+        className="h-8 w-56 rounded-md border-[1.5px] border-control bg-paper px-2 text-[0.75rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
         title="QR payload (URL or text)"
       />
-      <label className="flex items-center gap-1 text-[12px] text-muted" title="QR foreground">
+      <label className="flex items-center gap-1 text-[0.75rem] text-muted" title="QR foreground">
         <input
           type="color"
           value={el.foreground}
@@ -28,7 +28,7 @@ export function QrEditor({ el }: { el: QrElement }) {
         />
         Code
       </label>
-      <label className="flex items-center gap-1 text-[12px] text-muted" title="QR background">
+      <label className="flex items-center gap-1 text-[0.75rem] text-muted" title="QR background">
         <input
           type="color"
           value={el.background}

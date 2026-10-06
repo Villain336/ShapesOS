@@ -99,7 +99,7 @@ function FoundationTile({ status }: { status: AosColorStatus }) {
   return (
     <div className={cn("relative h-[265px] overflow-hidden rounded-md p-6", statusSurface(status))}>
       <CroppedShape status={status} variant="tile" />
-      <p className="relative text-[22px] leading-tight font-extrabold stretch-display tracking-heading">{TILE_TITLE[status]}</p>
+      <p className="relative text-[1.375rem] leading-tight font-extrabold stretch-display tracking-heading">{TILE_TITLE[status]}</p>
       <p className="relative mt-2 max-w-[22ch] text-md">{STATUS_META[status].description}</p>
       <p className="aos-mono absolute bottom-6 left-6 z-10 text-xs">{HEX[status]}</p>
     </div>

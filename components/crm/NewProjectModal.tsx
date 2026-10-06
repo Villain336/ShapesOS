@@ -114,7 +114,7 @@ export function NewProjectModal({
             </div>
           )}
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-ink">Project name</span>
+            <span className="text-[0.8125rem] font-semibold text-ink">Project name</span>
             <input
               className={inputCls}
               placeholder="e.g. Q4 website redesign"
@@ -123,10 +123,10 @@ export function NewProjectModal({
             />
           </label>
           <div className="relative flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-ink">Customer (CRM lead, optional)</span>
+            <span className="text-[0.8125rem] font-semibold text-ink">Customer (CRM lead, optional)</span>
             {customer ? (
               <div className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2">
-                <span className="text-[13px] text-ink">
+                <span className="text-[0.8125rem] text-ink">
                   {customer.name}
                   {customer.company ? ` · ${customer.company}` : ""}
                 </span>
@@ -135,7 +135,7 @@ export function NewProjectModal({
                     setCustomer(null);
                     setCustomerQuery("");
                   }}
-                  className="text-[12px] font-semibold text-muted hover:text-ink"
+                  className="text-[0.75rem] font-semibold text-muted hover:text-ink"
                 >
                   Change
                 </button>
@@ -158,7 +158,7 @@ export function NewProjectModal({
                           setCustomer(l);
                           setShowHits(false);
                         }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-canvas"
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-[0.8125rem] hover:bg-canvas"
                       >
                         <span className="text-ink">{l.name}</span>
                         <span className="text-subtle">{l.company ?? ""}</span>
@@ -166,12 +166,12 @@ export function NewProjectModal({
                     ))}
                   </div>
                 )}
-                {searching && <span className="text-[12px] text-subtle">Searching…</span>}
+                {searching && <span className="text-[0.75rem] text-subtle">Searching…</span>}
               </>
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-ink">Initial milestones (optional)</span>
+            <span className="text-[0.8125rem] font-semibold text-ink">Initial milestones (optional)</span>
             {milestones.map((m, i) => (
               <div key={i} className="flex gap-2">
                 <input
@@ -195,7 +195,7 @@ export function NewProjectModal({
             ))}
             <button
               onClick={() => setMilestones((prev) => [...prev, ""])}
-              className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-ink hover:underline"
+              className="inline-flex w-fit items-center gap-1.5 text-[0.8125rem] font-semibold text-ink hover:underline"
             >
               <Plus size={14} /> Add milestone
             </button>
@@ -203,7 +203,7 @@ export function NewProjectModal({
           <div className="flex justify-end gap-2 border-t border-line pt-4">
             <button
               onClick={onClose}
-              className="rounded-md border border-line bg-paper px-3 py-[7px] text-[13px] font-semibold text-ink hover:bg-canvas"
+              className="rounded-md border border-line bg-paper px-3 py-[7px] text-[0.8125rem] font-semibold text-ink hover:bg-canvas"
             >
               Cancel
             </button>

@@ -202,8 +202,8 @@ export function LeadSlideOver({
         <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <Avatar name={lead.name} size={44} />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[17px] font-bold text-ink">{lead.name}</h2>
-            <p className="truncate text-[13px] text-muted">
+            <h2 className="truncate text-[1.0625rem] font-bold text-ink">{lead.name}</h2>
+            <p className="truncate text-[0.8125rem] text-muted">
               {[lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || "—"}
             </p>
           </div>
@@ -214,7 +214,7 @@ export function LeadSlideOver({
               title={lead.starred ? "Unfollow" : "Follow"}
             >
               <Star size={15} fill={lead.starred ? "currentColor" : "none"} className={lead.starred ? "text-ink" : "text-subtle"} />
-              <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
+              <span className="hidden sm:inline text-[0.78125rem]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
             <a
               href={`/dashboard/crm/inbox?lead=${encodeURIComponent(lead.id)}`}
@@ -222,7 +222,7 @@ export function LeadSlideOver({
               title="Open the conversation with this lead"
             >
               <MessagesSquare size={15} />
-              <span className="hidden sm:inline text-[12.5px]">Conversation</span>
+              <span className="hidden sm:inline text-[0.78125rem]">Conversation</span>
             </a>
             <a
               href={`/dashboard/crm?lead=${lead.id}`}
@@ -230,7 +230,7 @@ export function LeadSlideOver({
               title="Open full view"
             >
               <SquareArrowOutUpRight size={15} />
-              <span className="hidden sm:inline text-[12.5px]">Open</span>
+              <span className="hidden sm:inline text-[0.78125rem]">Open</span>
             </a>
             <button type="button" onClick={onClose} aria-label="Close lead panel" className="rounded-full p-2 text-subtle hover:bg-hover-paper hover:text-ink">
               <X size={17} />
@@ -315,21 +315,21 @@ export function LeadSlideOver({
                 ["Created", new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-[12px] font-medium text-muted">{k}</dt>
-                  <dd className="mt-0.5 truncate text-[13px] font-medium text-ink" title={String(v)}>{v}</dd>
+                  <dt className="text-[0.75rem] font-medium text-muted">{k}</dt>
+                  <dd className="mt-0.5 truncate text-[0.8125rem] font-medium text-ink" title={String(v)}>{v}</dd>
                 </div>
               ))}
               <div>
-                <dt className="text-[12px] font-medium text-muted">Stage</dt>
+                <dt className="text-[0.75rem] font-medium text-muted">Stage</dt>
                 <dd className="mt-1"><StageBadge label={stage?.label ?? lead.stage} color={stage?.color ?? "gray"} /></dd>
               </div>
               <div>
-                <dt className="text-[12px] font-medium text-muted">Score</dt>
+                <dt className="text-[0.75rem] font-medium text-muted">Score</dt>
                 <dd className="mt-1"><ScoreBar score={lead.score} /></dd>
               </div>
               <div>
-                <dt className="text-[12px] font-medium text-muted">Last touch</dt>
-                <dd className="mt-0.5 text-[13px] font-medium text-ink">{timeAgo(lead.lastActivityAt)}</dd>
+                <dt className="text-[0.75rem] font-medium text-muted">Last touch</dt>
+                <dd className="mt-0.5 text-[0.8125rem] font-medium text-ink">{timeAgo(lead.lastActivityAt)}</dd>
               </div>
             </dl>
           )}
@@ -338,7 +338,7 @@ export function LeadSlideOver({
           <h3 className={sectionTitleCls}>Pipeline Health</h3>
           <div className="mb-5 rounded-md border border-line p-4">
             <div className="flex items-center gap-4">
-              <div className="text-[34px] font-bold tabular-nums text-ink">{lead.score}</div>
+              <div className="text-[2.125rem] font-bold tabular-nums text-ink">{lead.score}</div>
               <div className="flex-1">
                 <div className="mb-1.5 flex gap-1">
                   {stages.map((s, i) => (
@@ -350,25 +350,25 @@ export function LeadSlideOver({
                     />
                   ))}
                 </div>
-                <p className="text-[12px] text-muted">
+                <p className="text-[0.75rem] text-muted">
                   Stage {stageIdx + 1} of {stages.length} — {stage?.label}
                 </p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="rounded-md bg-canvas px-3 py-2">
-                <div className="text-[16px] font-bold tabular-nums">{activities.length}</div>
-                <div className="text-[11px] text-muted">Touchpoints</div>
+                <div className="text-[1rem] font-bold tabular-nums">{activities.length}</div>
+                <div className="text-[0.6875rem] text-muted">Touchpoints</div>
               </div>
               <div className="rounded-md bg-canvas px-3 py-2">
-                <div className="text-[16px] font-bold tabular-nums">{formatMoney(lead.valueCents)}</div>
-                <div className="text-[11px] text-muted">Est. value</div>
+                <div className="text-[1rem] font-bold tabular-nums">{formatMoney(lead.valueCents)}</div>
+                <div className="text-[0.6875rem] text-muted">Est. value</div>
               </div>
               <div className="rounded-md bg-canvas px-3 py-2">
-                <div className="text-[16px] font-bold tabular-nums text-ink">
+                <div className="text-[1rem] font-bold tabular-nums text-ink">
                   {formatMoney(lead.valueCents != null ? Math.round(lead.valueCents * lead.score / 100) : null)}
                 </div>
-                <div className="text-[11px] text-muted">Weighted</div>
+                <div className="text-[0.6875rem] text-muted">Weighted</div>
               </div>
             </div>
           </div>
@@ -378,9 +378,9 @@ export function LeadSlideOver({
           <div className="mb-5 rounded-md border border-line p-4">
             <div className="flex items-center gap-4">
               <MiniBars data={buckets} />
-              <div className="text-[26px] font-bold tabular-nums text-ink">
+              <div className="text-[1.625rem] font-bold tabular-nums text-ink">
                 {buckets.reduce((a, b) => a + b, 0)}
-                <span className="ml-1 text-[12px] font-medium text-muted">8 wks</span>
+                <span className="ml-1 text-[0.75rem] font-medium text-muted">8 wks</span>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-5 gap-2">
@@ -389,8 +389,8 @@ export function LeadSlideOver({
                 ["SMS", counts.sms], ["Notes", counts.note],
               ].map(([k, v]) => (
                 <div key={k as string} className="rounded-md bg-canvas px-2 py-1.5 text-center">
-                  <div className="text-[14px] font-bold tabular-nums">{v as number}</div>
-                  <div className="text-[10.5px] text-muted">{k as string}</div>
+                  <div className="text-[0.875rem] font-bold tabular-nums">{v as number}</div>
+                  <div className="text-[0.65625rem] text-muted">{k as string}</div>
                 </div>
               ))}
             </div>
@@ -402,7 +402,7 @@ export function LeadSlideOver({
               <h3 className={sectionTitleCls}>Score Detail</h3>
               <ul className="mb-5 space-y-1 rounded-md border border-line p-3">
                 {scoreBreakdown.reasons.map((r, i) => (
-                  <li key={i} className="text-[12.5px] text-muted">· {r}</li>
+                  <li key={i} className="text-[0.78125rem] text-muted">· {r}</li>
                 ))}
               </ul>
             </>
@@ -413,7 +413,7 @@ export function LeadSlideOver({
           <div className="mb-3 flex gap-2">
             <select
               aria-label="Touchpoint type"
-              className={`${selectCls} py-[6px]! text-[12.5px]!`}
+              className={`${selectCls} py-[6px]! text-[0.78125rem]!`}
               value={newAct.type}
               onChange={(e) => setNewAct({ ...newAct, type: e.target.value })}
             >
@@ -426,7 +426,7 @@ export function LeadSlideOver({
             <input
               ref={logInputRef}
               aria-label="Touchpoint note"
-              className={`${inputCls} flex-1 py-[6px]! text-[12.5px]!`}
+              className={`${inputCls} flex-1 py-[6px]! text-[0.78125rem]!`}
               placeholder={newAct.type === "call" ? "How did the call go?" : "Log a touchpoint…"}
               value={newAct.body}
               onChange={(e) => setNewAct({ ...newAct, body: e.target.value })}
@@ -447,18 +447,18 @@ export function LeadSlideOver({
                   </span>
                   <div className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-2">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-ink">{m.label}</span>
-                      <span className="shrink-0 text-[11px] text-subtle">
+                      <span className="text-[0.75rem] font-semibold text-ink">{m.label}</span>
+                      <span className="shrink-0 text-[0.6875rem] text-subtle">
                         {timeAgo(a.createdAt)}{a.actor ? ` · ${a.actor}` : ""}
                       </span>
                     </div>
-                    {a.body && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-muted">{a.body}</p>}
+                    {a.body && <p className="mt-0.5 whitespace-pre-wrap text-[0.8125rem] text-muted">{a.body}</p>}
                   </div>
                 </li>
               );
             })}
             {activities.length === 0 && (
-              <p className="py-4 text-center text-[13px] text-subtle">No activity yet.</p>
+              <p className="py-4 text-center text-[0.8125rem] text-subtle">No activity yet.</p>
             )}
           </ol>
         </div>

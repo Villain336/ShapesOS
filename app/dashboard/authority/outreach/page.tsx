@@ -38,7 +38,7 @@ const REPUTATION_CHIP = {
 
 function chip(text: string, cls: string) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );
@@ -65,7 +65,7 @@ function ChecklistGate({ failures }: { failures: { code: string; message: string
   const failed = new Set(failures.map((f) => f.code));
   return (
     <div className="mt-2 rounded-lg border border-line bg-paper p-3">
-      <p className="mb-2 text-[11px] font-semibold text-muted">
+      <p className="mb-2 text-[0.6875rem] font-semibold text-muted">
         Depth-3 enablement checklist — the gate, not a toggle
       </p>
       <ul className="space-y-1.5">
@@ -87,7 +87,7 @@ function ChecklistGate({ failures }: { failures: { code: string; message: string
           );
         })}
       </ul>
-      <p className="mt-2 flex items-start gap-1.5 text-[11px] text-muted">
+      <p className="mt-2 flex items-start gap-1.5 text-[0.6875rem] text-muted">
         <Clock className="mt-0.5 h-3 w-3 shrink-0" />
         One-click unsubscribe + physical mailing address are enforced on every template at draft time (CAN-SPAM).
       </p>
@@ -143,7 +143,7 @@ export default async function OutreachPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">Outreach</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Guest-post outreach on the 3-depth ladder: prospecting → human-sent drafts → gated
             automated pitching. Nothing sends without its depth&apos;s trust gate.
           </p>
@@ -168,9 +168,9 @@ export default async function OutreachPage() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Campaign</th>
                   <th className="px-3 py-2 font-medium">Depth</th>
                   <th className="px-3 py-2 font-medium">Status</th>
@@ -195,7 +195,7 @@ export default async function OutreachPage() {
                           >
                             {c.name}
                           </Link>
-                          <span className="block text-[11px] text-muted">{depthMeta.hint}</span>
+                          <span className="block text-[0.6875rem] text-muted">{depthMeta.hint}</span>
                         </td>
                         <td className="px-3 py-2">
                           {chip(`Depth ${c.depth} — ${depthMeta.label}`, "border-line bg-paper text-muted")}
@@ -217,7 +217,7 @@ export default async function OutreachPage() {
                         <td className="px-3 py-2">
                           {canEdit && c.depth !== 3 && c.status === "draft" && <ActivateShallowButton campaignId={c.id} />}
                           {c.depth === 3 && c.status === "active" && (
-                            <span className="flex items-center gap-1 text-[11px] font-medium text-ink">
+                            <span className="flex items-center gap-1 text-[0.6875rem] font-medium text-ink">
                               <Send className="h-3 w-3" /> live within caps
                             </span>
                           )}
@@ -263,9 +263,9 @@ export default async function OutreachPage() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Domain</th>
                   <th className="px-3 py-2 font-medium">Reputation</th>
                   <th className="px-3 py-2 font-medium">Spam rate</th>
@@ -282,7 +282,7 @@ export default async function OutreachPage() {
                       <td className="px-3 py-2">
                         <span className="font-medium text-ink">{d.domain}</span>
                         {d.checklistFailures.length > 0 && (
-                          <span className="block text-[11px] text-failed-text">
+                          <span className="block text-[0.6875rem] text-failed-text">
                             {d.checklistFailures.map((f) => f.code).join(" · ")}
                           </span>
                         )}
@@ -294,7 +294,7 @@ export default async function OutreachPage() {
                         <span className={d.spamOk ? "text-muted" : "font-semibold text-failed-text"}>
                           {d.spamRatePct.toFixed(3)}%
                         </span>
-                        <span className="text-[11px] text-subtle"> / {d.spamCeilingPct}%</span>
+                        <span className="text-[0.6875rem] text-subtle"> / {d.spamCeilingPct}%</span>
                       </td>
                       <td className="px-3 py-2">
                         <span className={d.bounceStatus === "healthy" ? "text-muted" : "font-semibold text-failed-text"}>
@@ -329,7 +329,7 @@ export default async function OutreachPage() {
         ) : (
           <p className="text-xs text-muted">Domain management requires the editor role.</p>
         )}
-        <p className="mt-2 max-w-2xl text-[11px] text-muted">
+        <p className="mt-2 max-w-2xl text-[0.6875rem] text-muted">
           Secondary domains only for cold sending. Primary domains and Gmail free accounts are hard-blocked
           by the depth-3 gate — registering them here will show the block, not bypass it. Canada cold pitching
           is blocked at dispatch (CASL).

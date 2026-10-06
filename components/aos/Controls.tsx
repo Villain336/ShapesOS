@@ -100,6 +100,79 @@ export function PermissionSegmented({
 }
 
 // ---------------------------------------------------------------------------
+// Segmented (Phase 18.1): a neutral pill group for plain choices (theme,
+// density, text size). Same shape and keyboard model as the permission
+// control; the selected option is solid ink — choices are not agent states,
+// so they never take a status colour.
+// ---------------------------------------------------------------------------
+
+export function Segmented<T extends string | number>({
+  value,
+  onChange,
+  label,
+  labelledBy,
+  options,
+  disabled,
+  className,
+}: {
+  value: T;
+  onChange?: (v: T) => void;
+  /** Accessible name when no visible label is linked via labelledBy. */
+  label?: string;
+  labelledBy?: string;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  function onKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (!onChange || disabled) return;
+    const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const at = Math.max(0, options.findIndex((o) => o.value === value));
+    const nextIndex = (at + delta + options.length) % options.length;
+    onChange(options[nextIndex]!.value);
+    refs.current[nextIndex]?.focus();
+  }
+  return (
+    <div
+      role="radiogroup"
+      aria-label={labelledBy ? undefined : label}
+      aria-labelledby={labelledBy}
+      onKeyDown={onKey}
+      className={cn("inline-flex max-w-full shrink-0 flex-wrap items-center gap-0.5 rounded-full bg-canvas p-1", disabled && "opacity-60", className)}
+    >
+      {options.map((o, i) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            disabled={disabled}
+            onClick={() => {
+              if (!on) onChange?.(o.value);
+            }}
+            className={cn(
+              "h-8 rounded-full px-3.5 text-sm font-semibold whitespace-nowrap transition-[background-color,color] duration-150",
+              on ? "bg-ink text-paper" : "text-ink hover:bg-hover",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Switch
 // ---------------------------------------------------------------------------
 

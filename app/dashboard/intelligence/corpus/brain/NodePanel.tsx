@@ -160,7 +160,7 @@ export function NodePanel({
           {node.removalReason && (
             <div className="rounded-md border-[1.5px] border-failed bg-failed-tint p-2">
               <dt className="text-xs font-semibold text-failed-text">Removal reason</dt>
-              <dd className="mt-0.5 text-[12px] leading-snug text-failed-text">{node.removalReason}</dd>
+              <dd className="mt-0.5 text-[0.75rem] leading-snug text-failed-text">{node.removalReason}</dd>
             </div>
           )}
         </dl>
@@ -184,7 +184,7 @@ export function NodePanel({
               {flagging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Flag className="h-3.5 w-3.5" />}
               Flag for removal
             </button>
-            <p className="text-[11px] leading-snug text-subtle">
+            <p className="text-[0.6875rem] leading-snug text-subtle">
               Flagging only marks the source — ingested data is never deleted here. Flags take effect
               on the next rebuild.
             </p>

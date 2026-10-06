@@ -119,17 +119,17 @@ export default async function MediaAttributionPage({
   return (
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <h1 className="aos-heading">Offline attribution</h1>
-      <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+      <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
         Per-placement QR/pURL scans, promo redemptions, tracked calls, and branded-search lift.
         Directional indicators — never causal claims.
       </p>
 
       <form method="GET" className="mt-4 flex flex-wrap items-end gap-2">
-        <label className="text-[13px] text-muted">
+        <label className="text-[0.8125rem] text-muted">
           Buy ID{" "}
           <input name="buyId" defaultValue={buyId ?? ""} placeholder="buy_…" className={inputCls} />
         </label>
-        <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
+        <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
           Load
         </button>
       </form>
@@ -144,7 +144,7 @@ export default async function MediaAttributionPage({
       {buyId && rollup && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-ink">Placements — {rollup.totalScans} scans</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Placement</th><th className={thCls}>Slug</th><th className={thCls}>Scans</th></tr>
             </thead>
@@ -168,7 +168,7 @@ export default async function MediaAttributionPage({
       {buyId && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-ink">Promo codes — {promoSum.totalRedemptions} redemptions</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Channel</th><th className={thCls}>Code</th><th className={thCls}>Redemptions</th></tr>
             </thead>
@@ -196,7 +196,7 @@ export default async function MediaAttributionPage({
             {callStats.costPerCallCents !== null &&
               ` · ${"$" + (callStats.costPerCallCents / 100).toFixed(2)}/call (${callStats.basis})`}
           </h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Station</th><th className={thCls}>Number</th><th className={thCls}>Calls</th><th className={thCls}>Talk time</th></tr>
             </thead>
@@ -239,7 +239,7 @@ export default async function MediaAttributionPage({
                 <input name={name} defaultValue={val ?? ""} placeholder={name === "brandQuery" ? "acme plumbing" : name.includes("Start") || name.includes("End") ? "2026-09-01" : "raleigh"} className={inputCls} />
               </label>
             ))}
-            <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
+            <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
               Compute lift
             </button>
           </form>
@@ -250,7 +250,7 @@ export default async function MediaAttributionPage({
           {lift && (
             <div className="mt-4 rounded-xl border border-line bg-white p-4">
               <p className="text-sm font-medium">{lift.verdict}</p>
-              <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
+              <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr><th className={thCls}>Metro</th><th className={thCls}>Kind</th><th className={thCls}>Baseline/day</th><th className={thCls}>Flight/day</th><th className={thCls}>Lift</th></tr>
                 </thead>
