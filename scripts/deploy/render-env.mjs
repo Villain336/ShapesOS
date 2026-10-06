@@ -404,9 +404,16 @@ export const TABLE = [
   // --- agent loop and memory tuning: defaults are right -------------------
   ...["AGENT_INLINE_BUDGET_SECONDS", "AGENT_WORKER_POLL_MS", "AGENT_JOB_LEASE_SECONDS", "AGENT_JOB_HEARTBEAT_SECONDS", "AGENT_JOB_MAX_ATTEMPTS", "AGENT_MAX_STEPS", "AGENT_MAX_RUN_MINUTES", "AGENT_MAX_RUN_COST_MICRO_USD", "AGENT_COMPACT_AT_TOKENS", "AGENT_TOOL_RESULT_MAX_CHARS", "AGENT_FIX_CYCLES",
     "LLM_MODEL_COPY", "LLM_MODEL_BULK", "LLM_MODEL_BACKGROUND", "LLM_MODEL_LEAD", "LLM_MODEL_SUBAGENT", "LLM_MODEL_CODE", "LLM_MODEL_CODE_MAX",
-    "LEARNING_LOOKBACK_DAYS", "LEARNING_MAX_EPISODES", "LEARNING_SIMILARITY_THRESHOLD", "LEARNING_DECAY_DAYS", "LEARNING_DECAY_CONFIDENCE", "LEARNING_CONSOLIDATE_MAX_WORKSPACES"].map(
+    "LEARNING_LOOKBACK_DAYS", "LEARNING_MAX_EPISODES", "LEARNING_SIMILARITY_THRESHOLD", "LEARNING_DECAY_DAYS", "LEARNING_DECAY_CONFIDENCE", "LEARNING_CONSOLIDATE_MAX_WORKSPACES",
+    // Phase 17 (model): context-editing trigger and the Message Batches switch.
+    "AGENT_CONTEXT_EDIT_AT_TOKENS", "LLM_BATCH"].map(
     (k) => [k, { cls: "exclude", why: "default is right (change in the dashboard only to tune)" }],
   ),
+  // --- Phase 17 (model): evaluation-only knobs (scripts/eval sweeps them) ---
+  ...["LLM_EFFORT_LEAD", "LLM_EFFORT_SUBAGENT", "LLM_EFFORT_CODE", "LLM_EFFORT_CODE_MAX", "LLM_EFFORT_COPY", "LLM_EFFORT_BULK", "LLM_EFFORT_BACKGROUND", "CHAT_CACHE_LAYOUT"].map(
+    (k) => [k, { cls: "exclude", why: "evaluation knobs (scripts/eval); unset = the measured defaults" }],
+  ),
+  ["ANTHROPIC_BASE_URL", { cls: "exclude", why: "the Anthropic SDK's own override; only the test fake and the eval dry run set it" }],
 
   // --- deploy-state: shared storage credentials and graceful shutdown ------
   ["MARKETR_BLOB_DIR", { cls: "exclude", why: "local-disk blob root; hosted runs MARKETR_STORAGE=s3" }],
