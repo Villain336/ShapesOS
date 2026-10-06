@@ -364,12 +364,12 @@ export async function runCursorTurn(
     }
     for (const ev of r.events) {
       if (ev.type === "point") {
-        const { type: _t, ...data } = ev;
+        const data = Object.fromEntries(Object.entries(ev).filter(([k]) => k !== "type")) as Omit<typeof ev, "type">;
         if ("elementId" in ev) lastElement = ev.elementId;
         points.push(ev.label || ("elementId" in ev ? ev.elementId : `${ev.x},${ev.y}`));
         emit({ event: "point", data });
       } else if (ev.type === "draw") {
-        const { type: _t, ...data } = ev;
+        const data = Object.fromEntries(Object.entries(ev).filter(([k]) => k !== "type")) as Omit<typeof ev, "type">;
         emit({ event: "draw", data });
       } else {
         emit({ event: "dictation", data: { text: ev.text } });

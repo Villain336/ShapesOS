@@ -63,7 +63,10 @@ export function parseLatestYml(text: string): { version: string | null; releaseD
     const top = /^([A-Za-z0-9_]+):\s*(.*)$/.exec(line);
     if (top) {
       inFiles = top[1] === "files";
-      if (cur) files.push(cur), (cur = null);
+      if (cur) {
+        files.push(cur);
+        cur = null;
+      }
       if (top[1] === "version") version = unq(top[2]!);
       if (top[1] === "releaseDate") releaseDate = unq(top[2]!);
       continue;
