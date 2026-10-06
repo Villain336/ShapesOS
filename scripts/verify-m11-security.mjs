@@ -197,6 +197,10 @@ const PUBLIC_BY_DESIGN = {
   // Phase 12 (people): public event registration — capability model, see route comments.
   "app/api/events/[slug]/register/route.ts":
     "public event registration (registrants have no account); only a PUBLISHED event resolves (SELECT-only app.event_route policy), unknown/draft 404; ticket price, sales window and seats re-checked server-side from the database (never client prices); seats reserved with row-locked conditional counter updates + DB CHECKs (never oversold); paid tickets stay PENDING until the Stripe-signed tenant webhook confirms them, the Checkout Session uses the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); per-event+IP limit (10/10 min) + CAPTCHA step-up from the second attempt when configured; 16 KiB body cap; returns a signed view link or the Checkout URL only",
+  // Phase 18.2 (WS=comms): a member's private calendar feed — calendar apps
+  // subscribe without a session, so the URL token is the capability (GET only).
+  "app/api/comms/calendar/feed/[workspaceId]/[token]/route.ts":
+    "Phase 18.2 private ICS subscribe feed; GET only (read-only); a random 32-byte token is the capability, stored as sha256 only under the URL workspace's FORCE-RLS scope, revocable (revoked → 404 at once) and void once its member leaves; unknown/revoked/malformed all answer the same 404; serves only what ShapesOS holds for that member (never connector credentials, never calls Google/Outlook); per-IP rate limit in proxy.ts",
   // Phase 10 (portal): client-portal sign-in — capability model, see route comments.
   "app/api/portal/login/route.ts":
     "Phase 10 client-portal sign-in request; always the same 200; emails a single-use 15-minute link (SHA-256 at rest, FORCE RLS) only to a client whose portal is on; login lockout, CAPTCHA step-up, per-address send limit shared with workspace sign-in mail, JSON only, proxy auth tier",
@@ -231,7 +235,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 42 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events; Phase 12 (people): +1 event registration
+  Object.keys(PUBLIC_BY_DESIGN).length === 43 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events; Phase 12 (people): +1 event registration; Phase 18.2 (comms): +1 private calendar feed (GET-only, token capability)
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

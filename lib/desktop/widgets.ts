@@ -178,7 +178,8 @@ export const WIDGETS: Readonly<Record<WidgetId, WidgetDef>> = Object.freeze({
     minSize: { w: 3, h: 3 },
     maxSize: { w: 6, h: 8 },
     minRole: "viewer",
-    href: "/dashboard/calls",
+    // Phase 18.2 (WS=comms): "Open" goes to the Calendar app.
+    href: "/dashboard/calendar",
     source: "booking + Google/Outlook calendar connector reads",
   },
   inbox: {

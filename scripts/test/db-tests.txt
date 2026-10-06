@@ -214,3 +214,5 @@ lib/notifications/__tests__/focus-channels-db.test.ts
 lib/comms/__tests__/reminders-db.test.ts
 # Phase 18.2 (comms): Contacts — the sync gives every record of the four people stores its own identity and never merges (idempotent), suggestions never cross workspaces (FORCE RLS), confirm merges with who/when, reject is remembered for every record pair across the two people (an agent's re-proposal is refused), unlink undoes, the timeline reads linked activity, Spotlight's contact kind returns one result per person, suggest_merge never merges and confirm_merge asks without a rule.
 lib/comms/__tests__/contacts-db.test.ts
+# Phase 18.2 (comms): Calendar — the view reads this workspace's bookings and the member's OWN reminders and calendar connections (never a teammate's; a failing connector is an error line; the dev mock is labelled and never editable), find time avoids busy bookings, a person's event create is audited and another member's calendar is refused, the agent tool asks first (write_outlook_calendar), the private ICS feed (hash only, own items only, 404 when revoked / other workspace / malformed / member left).
+lib/comms/__tests__/calendar-db.test.ts

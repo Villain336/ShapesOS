@@ -16,6 +16,10 @@
 //   find_contact        safe     —                      0 (read the address book)
 //   suggest_merge       safe     —                      0 (only PROPOSES: a pending suggestion a person decides)
 //   confirm_merge       publish  confirm_contact_merge  1 (merges two contacts; asks unless a rule says auto)
+//   calendar_list_events            safe     —                       0
+//   calendar_find_time              safe     —                       0 (proposes slots, books nothing)
+//   calendar_create_event_google    publish  write_google_calendar   2 (the connector's own action)
+//   calendar_create_event_outlook   publish  write_outlook_calendar  2 (the connector's own action)
 //
 // (Mail, Calendar, Contacts, Messages and Meet tools are added below as each
 // app lands; the full table is in the Phase 18.2 report.)
@@ -241,7 +245,126 @@ const confirm_merge: ToolDef = {
   },
 };
 
-export const COMMS_TOOLS: ToolDef[] = [list_reminders, create_reminder, complete_reminder, find_contact, suggest_merge, confirm_merge];
+// ---------------------------------------------------------------------------
+// Calendar (lib/comms/calendar): the member's own calendars + ShapesOS events.
+// ---------------------------------------------------------------------------
+
+async function memberTz(userId: string): Promise<string> {
+  const { getUserPreferences } = await import("@/lib/preferences");
+  return (await getUserPreferences(userId).catch(() => null))?.timeZone ?? "UTC";
+}
+
+const calendar_list_events: ToolDef = {
+  name: "calendar_list_events",
+  description:
+    "List the person's calendar between two times: their connected Google / Outlook calendars, bookings, focus blocks, Ops events, scheduled social posts, reminders and calls (title, start, end, source, attendees).",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: { from: { type: "string", description: "Window start, ISO 8601 (default now)." }, to: { type: "string", description: "Window end, ISO 8601 (default from + 7 days, max 31 days)." } },
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const from = parseWhen(args.from);
+    const to = parseWhen(args.to);
+    if (from === "invalid" || to === "invalid") return { summary: "from / to must be ISO 8601 date-times." };
+    const start = from ?? new Date();
+    const end = to ?? new Date(start.getTime() + 7 * 86_400_000);
+    if (end <= start || end.getTime() - start.getTime() > 31 * 86_400_000) return { summary: "The window must be after from and at most 31 days." };
+    const { loadCalendarEvents } = await import("./calendar/sources.server");
+    const load = await loadCalendarEvents({ workspaceId: ctx.workspaceId, userId: ctx.userId, timeZone: await memberTz(ctx.userId) }, start, end);
+    const events = load.events.slice(0, 100).map((e) => ({ id: e.id, source: e.source, title: e.title, start: e.start, end: e.end, attendees: e.attendees, mock: e.mock || undefined }));
+    return {
+      summary: `${load.events.length} event${load.events.length === 1 ? "" : "s"} (${load.timeZone})${load.errors.length ? `; ${load.errors.map((e) => `${e.source}: ${e.message}`).join("; ")}` : ""}`,
+      details: { timeZone: load.timeZone, events, connectedCalendars: load.connections },
+    };
+  },
+};
+
+const calendar_find_time: ToolDef = {
+  name: "calendar_find_time",
+  description:
+    "Find free slots for a meeting in the person's working hours (their time zone), around their connected calendars, bookings, focus blocks, calls and Ops events. Proposes slots only — booking one is a separate calendar_create_event_* call, which asks first.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      durationMin: { type: "number", description: "Meeting length in minutes (default 30)." },
+      from: { type: "string", description: "Search from, ISO 8601 (default now)." },
+      to: { type: "string", description: "Search until, ISO 8601 (default 7 days later, max 31 days)." },
+      max: { type: "number", description: "How many slots (default 5)." },
+    },
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const from = parseWhen(args.from);
+    const to = parseWhen(args.to);
+    if (from === "invalid" || to === "invalid") return { summary: "from / to must be ISO 8601 date-times." };
+    const now = new Date();
+    const start = from ?? now;
+    const end = to ?? new Date(start.getTime() + 7 * 86_400_000);
+    if (end <= start || end.getTime() - start.getTime() > 31 * 86_400_000) return { summary: "The window must be after from and at most 31 days." };
+    const tz = await memberTz(ctx.userId);
+    const { busyIntervals } = await import("./calendar/sources.server");
+    const { findSlots } = await import("./calendar/freebusy");
+    const { busy, errors, connected } = await busyIntervals({ workspaceId: ctx.workspaceId, userId: ctx.userId, timeZone: tz }, start, end);
+    const slots = findSlots({ busy, from: start, to: end, durationMin: Number(args.durationMin) || 30, timeZone: tz, max: Math.min(Math.max(Number(args.max) || 5, 1), 20), notBefore: new Date(now.getTime() + 15 * 60_000) });
+    return {
+      summary: `${slots.length} free slot${slots.length === 1 ? "" : "s"} (${tz}; ${connected} connected calendar${connected === 1 ? "" : "s"}${errors.length ? `, ${errors.length} could not be read` : ""})`,
+      details: { timeZone: tz, slots: slots.map((x) => ({ start: x.start.toISOString(), end: x.end.toISOString() })), errors },
+    };
+  },
+};
+
+function calendarCreateTool(provider: "google" | "outlook"): ToolDef {
+  const key = provider === "google" ? "google-calendar" : "outlook-calendar";
+  const label = provider === "google" ? "Google Calendar" : "Outlook Calendar";
+  return {
+    name: `calendar_create_event_${provider}`,
+    description: `Create an event on the person's own ${label} and invite attendees. Asks first unless a rule allows it.`,
+    kind: "publish",
+    minRole: "viewer",
+    argsSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Event title." },
+        start: { type: "string", description: "Start, ISO 8601 (with an offset, or a wall time plus timeZone)." },
+        end: { type: "string", description: "End, ISO 8601." },
+        timeZone: { type: "string", description: "IANA zone for wall times without an offset (default the person's zone)." },
+        attendees: { type: "string", description: "Attendee emails, comma-separated." },
+        description: { type: "string", description: "Event description." },
+        location: { type: "string", description: "Location or call link." },
+      },
+      required: ["title", "start", "end"],
+    },
+    async execute(ctx, args): Promise<ToolResult> {
+      const { personalConnections } = await import("./connectors.server");
+      const { saveCalendarEvent } = await import("./calendar/write.server");
+      const conn = (await personalConnections(ctx.workspaceId, ctx.userId, [key]))[0];
+      if (!conn) return { summary: `${label} is not connected for this person. Connect it in Settings → Connectors.` };
+      const fields = {
+        title: str(args.title),
+        start: str(args.start),
+        end: str(args.end),
+        timeZone: str(args.timeZone) ?? (await memberTz(ctx.userId)),
+        attendees: str(args.attendees),
+        description: str(args.description),
+        location: str(args.location),
+      };
+      try {
+        const out = await saveCalendarEvent({ workspaceId: ctx.workspaceId, userId: ctx.userId, connectionId: conn.id, fields, by: "agent" });
+        return { summary: out.mock ? `MOCK — ${label} is not really connected; nothing was created.` : `Created "${fields.title}" on ${label}.`, details: out };
+      } catch (err) {
+        return { summary: err instanceof Error ? err.message : `${label} refused the event.` };
+      }
+    },
+  };
+}
+
+const calendar_create_event_google = calendarCreateTool("google");
+const calendar_create_event_outlook = calendarCreateTool("outlook");
+
+export const COMMS_TOOLS: ToolDef[] = [list_reminders, create_reminder, complete_reminder, find_contact, suggest_merge, confirm_merge, calendar_list_events, calendar_find_time, calendar_create_event_google, calendar_create_event_outlook];
 
 /** Each tool's group (lib/agents/grants.ts TOOL_GROUPS). */
 export const COMMS_TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
@@ -253,6 +376,10 @@ export const COMMS_TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   find_contact: "workspace",
   suggest_merge: "workspace",
   confirm_merge: "ops",
+  calendar_list_events: "calendar",
+  calendar_find_time: "calendar",
+  calendar_create_event_google: "calendar",
+  calendar_create_event_outlook: "calendar",
 };
 
 /** The automation action each non-safe tool stands for (its tier). */
@@ -260,4 +387,7 @@ export const COMMS_TOOL_ACTION: Readonly<Record<string, string>> = {
   create_reminder: "create_reminder",
   complete_reminder: "complete_reminder",
   confirm_merge: "confirm_contact_merge",
+  // The connectors' own write actions (lib/agents/grants.ts connectorAction): same switch as the connector tools.
+  calendar_create_event_google: "write_google_calendar",
+  calendar_create_event_outlook: "write_outlook_calendar",
 };
