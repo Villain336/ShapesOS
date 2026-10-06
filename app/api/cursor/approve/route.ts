@@ -5,10 +5,10 @@
 // action — decided SERVER-side from the tool registry (lib/cursor/policy.ts),
 // never from anything the client sends. Otherwise it goes through
 // executeTool with the person's confirmation (lib/cursor/proposals.ts).
-// Editor+ only (requireWorkspaceRole); only the person the proposal was
+// Editor+ only (roleAtLeast on the current membership); only the person the proposal was
 // made for can decide it. Rate limit: write tier.
 
-import { requireWorkspaceRole } from "@/lib/authz";
+import { roleAtLeast } from "@/lib/authz";
 import { CursorHttpError, cursorErrorResponse, forbiddenCursor, readCursorJson, resolveCursorCaller } from "@/lib/cursor/http";
 import { ApproveBodySchema } from "@/lib/cursor/validate";
 import { decideCursorProposal } from "@/lib/cursor/proposals";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const caller = await resolveCursorCaller(req);
-    if (!(await requireWorkspaceRole(caller.userId, caller.workspaceId, "editor"))) throw forbiddenCursor("Viewers can't approve actions.");
+    if (!roleAtLeast(caller.role, "editor")) throw forbiddenCursor("Viewers can't approve actions.");
     const parsed = ApproveBodySchema.safeParse(await readCursorJson(req, 16 * 1024));
     if (!parsed.success) throw new CursorHttpError(400, "bad_request", "Send { approvalId, decision, via }.");
     const out = await decideCursorProposal({ workspaceId: caller.workspaceId, userId: caller.userId, role: caller.role, ...parsed.data });

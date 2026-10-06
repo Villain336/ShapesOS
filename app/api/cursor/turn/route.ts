@@ -19,7 +19,7 @@
 // talkSeconds, checked before the model is called.
 
 import { randomBytes } from "node:crypto";
-import { requireWorkspaceRole } from "@/lib/authz";
+import { roleAtLeast } from "@/lib/authz";
 import { CursorHttpError, cursorErrorResponse, forbiddenCursor, readCursorJson, resolveCursorCaller } from "@/lib/cursor/http";
 import { MAX_TURN_BODY_BYTES, TurnBodySchema, screenshotLimitError } from "@/lib/cursor/validate";
 import { CursorTurnError, cursorVisionProvider, runCursorTurn } from "@/lib/cursor/brain";
@@ -33,7 +33,7 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   try {
     const caller = await resolveCursorCaller(req);
-    if (!(await requireWorkspaceRole(caller.userId, caller.workspaceId, "viewer"))) throw forbiddenCursor("You are not a member of this workspace.");
+    if (!roleAtLeast(caller.role, "viewer")) throw forbiddenCursor("You are not a member of this workspace.");
     const raw = await readCursorJson(req, MAX_TURN_BODY_BYTES);
     const parsed = TurnBodySchema.safeParse(raw);
     if (!parsed.success) {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     if (new Set(body.screenshots.map((s) => s.screen)).size !== body.screenshots.length) {
       throw new CursorHttpError(400, "bad_request", "Each screenshot needs its own screen number.");
     }
-    if (body.mode === "agent" && !(await requireWorkspaceRole(caller.userId, caller.workspaceId, "editor"))) {
+    if (body.mode === "agent" && !roleAtLeast(caller.role, "editor")) {
       throw forbiddenCursor("Viewers can't start background tasks.");
     }
     if ((await cursorVisionProvider(caller.workspaceId)) === "none") {

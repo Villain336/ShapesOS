@@ -10,7 +10,7 @@
 // desktop) — a labelled mock only with ALLOW_FAKE_PROVIDERS=1.
 
 import { randomBytes } from "node:crypto";
-import { requireWorkspaceRole } from "@/lib/authz";
+import { roleAtLeast } from "@/lib/authz";
 import { cursorErrorResponse, forbiddenCursor, resolveCursorCaller } from "@/lib/cursor/http";
 import { mintSttToken, sttProviderName } from "@/lib/voice/stt";
 import { preflightTalkMinutes, recordTalkMinutes } from "@/lib/cursor/metering";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const caller = await resolveCursorCaller(req);
-    if (!(await requireWorkspaceRole(caller.userId, caller.workspaceId, "viewer"))) throw forbiddenCursor("You are not a member of this workspace.");
+    if (!roleAtLeast(caller.role, "viewer")) throw forbiddenCursor("You are not a member of this workspace.");
     const provider = sttProviderName();
     if (provider === "none") {
       return Response.json(

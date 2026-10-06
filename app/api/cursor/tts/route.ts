@@ -7,10 +7,10 @@
 // characters at the provider's cost-plus price), checked against the credits
 // BEFORE the provider is called. The voice is `voice` when given, else the
 // person's choice in Settings → You → Cursor; never an invented id.
-// Any member (requireWorkspaceRole viewer).
+// Any member (roleAtLeast viewer on the current membership).
 
 import { randomBytes } from "node:crypto";
-import { requireWorkspaceRole } from "@/lib/authz";
+import { roleAtLeast } from "@/lib/authz";
 import { CursorHttpError, cursorErrorResponse, forbiddenCursor, readCursorJson, resolveCursorCaller } from "@/lib/cursor/http";
 import { TtsBodySchema } from "@/lib/cursor/validate";
 import { synthesizeSpeech, ttsProviderChain, ELEVENLABS_DEFAULT_MODEL } from "@/lib/voice/tts";
@@ -23,7 +23,7 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     const caller = await resolveCursorCaller(req);
-    if (!(await requireWorkspaceRole(caller.userId, caller.workspaceId, "viewer"))) throw forbiddenCursor("You are not a member of this workspace.");
+    if (!roleAtLeast(caller.role, "viewer")) throw forbiddenCursor("You are not a member of this workspace.");
     const parsed = TtsBodySchema.safeParse(await readCursorJson(req, 32 * 1024));
     if (!parsed.success) throw new CursorHttpError(parsed.error.issues.some((i) => i.code === "too_big") ? 413 : 400, "bad_request", "Send { text } with at most 2,000 characters.");
     const chain = ttsProviderChain();

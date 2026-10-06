@@ -6,7 +6,7 @@
 // mock: true }) and the desktop reads it with fetch when provider is "mock".
 // Read-only; the caller must be signed in (cookie or cursor token).
 
-import { requireWorkspaceRole } from "@/lib/authz";
+import { roleAtLeast } from "@/lib/authz";
 import { cursorErrorResponse, forbiddenCursor, resolveCursorCaller } from "@/lib/cursor/http";
 import { cursorMocksAllowed, mockSttMessages } from "@/lib/voice/stt";
 import { SSE_HEADERS, formatSseEvent } from "@/lib/http/sse";
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   if (!cursorMocksAllowed()) return Response.json({ error: { code: "not_found", message: "Not found." } }, { status: 404 });
   try {
     const caller = await resolveCursorCaller(req);
-    if (!(await requireWorkspaceRole(caller.userId, caller.workspaceId, "viewer"))) throw forbiddenCursor();
+    if (!roleAtLeast(caller.role, "viewer")) throw forbiddenCursor();
     const text = mockSttMessages().map((m) => formatSseEvent("message", m)).join("");
     return new Response(text, { headers: { ...SSE_HEADERS, "X-Shapes-Mock": "1" } });
   } catch (err) {

@@ -13,6 +13,7 @@
 import type { WorkspaceRole } from "@prisma/client";
 import { getMembership } from "@/lib/authz";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { bearerCursorToken, cursorTokenSecret, verifyCursorToken } from "./token";
 
 export class CursorHttpError extends Error {
@@ -42,10 +43,12 @@ export async function resolveCursorCaller(req: Request): Promise<CursorCallerInf
     if (!secret) throw new CursorHttpError(401, "unauthorized", "Cursor tokens are not enabled on this server.");
     const v = verifyCursorToken(bearer, secret);
     if (!v.ok) throw new CursorHttpError(401, v.reason === "expired" ? "token_expired" : "unauthorized", v.reason === "expired" ? "The cursor token expired. Ask for a new one." : "Invalid cursor token.");
-    const m = await getMembership(v.claims.uid, v.claims.ws);
+    // The token was minted from a session that passed every sign-in check
+    // (including a workspace's 2FA policy) at most 10 minutes ago; here the
+    // CURRENT membership row decides (removed → 401, role changes at once).
+    const m = await tokenMembership(v.claims.uid, v.claims.ws);
     if (!m) throw new CursorHttpError(401, "unauthorized", "You are no longer a member of that workspace.");
-    // Users live in the session (JWT), not a table: a token caller has no display name.
-    return { userId: v.claims.uid, name: null, workspaceId: v.claims.ws, role: m.role, via: "token" };
+    return { userId: v.claims.uid, name: m.name, workspaceId: v.claims.ws, role: m.role, via: "token" };
   }
   const user = await requireUser();
   if (!user?.id) throw new CursorHttpError(401, "unauthorized", "Sign in to use the cursor.");
@@ -53,6 +56,13 @@ export async function resolveCursorCaller(req: Request): Promise<CursorCallerInf
   const m = await getMembership(user.id, ws.id);
   if (!m) throw new CursorHttpError(403, "forbidden", "You are not a member of this workspace.");
   return { userId: user.id, name: user.name ?? null, workspaceId: ws.id, role: m.role, via: "cookie" };
+}
+
+async function tokenMembership(userId: string, workspaceId: string): Promise<{ role: WorkspaceRole; name: string | null } | null> {
+  const row = await prisma.workspaceMember.findFirst({ where: { workspaceId, userId }, select: { role: true, name: true } });
+  if (row) return { role: row.role, name: row.name ?? null };
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } });
+  return ws?.ownerUserId === userId ? { role: "owner", name: null } : null;
 }
 
 /** The contract's error body. */
