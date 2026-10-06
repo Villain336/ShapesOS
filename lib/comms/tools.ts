@@ -20,6 +20,12 @@
 //   calendar_find_time              safe     —                       0 (proposes slots, books nothing)
 //   calendar_create_event_google    publish  write_google_calendar   2 (the connector's own action)
 //   calendar_create_event_outlook   publish  write_outlook_calendar  2 (the connector's own action)
+//   mail_list_threads   safe     —                      0 (the person's inbox: own mailboxes, CRM, social DMs)
+//   mail_read_thread    safe     —                      0 (never marks anything read)
+//   mail_label_thread   safe     —                      0 (stores a summary + SUGGESTED labels only)
+//   mail_draft_reply    publish  draft_mail_reply       0 (a draft; nothing is sent)
+//   mail_send           publish  send_outreach_email    2 (the existing email send action: asks unless a rule says auto)
+//   social_send_dm      publish  send_social_dm         2 (a DM to a customer: asks unless a rule says auto)
 //
 // (Mail, Calendar, Contacts, Messages and Meet tools are added below as each
 // app lands; the full table is in the Phase 18.2 report.)
@@ -364,7 +370,159 @@ function calendarCreateTool(provider: "google" | "outlook"): ToolDef {
 const calendar_create_event_google = calendarCreateTool("google");
 const calendar_create_event_outlook = calendarCreateTool("outlook");
 
-export const COMMS_TOOLS: ToolDef[] = [list_reminders, create_reminder, complete_reminder, find_contact, suggest_merge, confirm_merge, calendar_list_events, calendar_find_time, calendar_create_event_google, calendar_create_event_outlook];
+// ---------------------------------------------------------------------------
+// Mail (lib/comms/mail): the person's unified inbox — their own mailboxes,
+// the CRM conversations and the workspace's social DMs.
+// ---------------------------------------------------------------------------
+
+function mailCtx(ctx: { workspaceId: string; userId: string; role: string }) {
+  return { workspaceId: ctx.workspaceId, userId: ctx.userId, role: ctx.role as "viewer" | "editor" | "admin" | "owner" };
+}
+
+const mail_list_threads: ToolDef = {
+  name: "mail_list_threads",
+  description:
+    "List the person's inbox in the Mail app: their own Gmail / Outlook, the CRM conversations (email and SMS with leads) and social DMs, newest first, with thread keys, subjects, senders, unread state and any summary.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      folder: { type: "string", description: "inbox (default) | unread | archived" },
+      query: { type: "string", description: "Optional words to match (subject, people)." },
+      source: { type: "string", description: "Optional: gmail | outlook | crm | social" },
+      limit: { type: "number", description: "Max threads (default 20, max 50)." },
+    },
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const { listMailbox } = await import("./mail/mailbox.server");
+    const { isMailSource } = await import("./mail/types");
+    const folder = args.folder === "unread" || args.folder === "archived" ? args.folder : "inbox";
+    const source = isMailSource(args.source) ? args.source : null;
+    const listing = await listMailbox(mailCtx(ctx), { folder, q: str(args.query) ?? null, source, limit: Math.min(Math.max(Number(args.limit) || 20, 1), 50) });
+    const threads = listing.threads.map((t) => ({ key: t.key, source: t.source, via: t.via, subject: t.subject, from: t.from.name ?? t.from.address, at: t.lastMessageAt, unread: t.unread, summary: t.summary, mock: t.mock || undefined }));
+    const errors = listing.sources.filter((s) => s.error).map((s) => `${s.source}: ${s.error}`);
+    return { summary: `${threads.length} thread${threads.length === 1 ? "" : "s"}${errors.length ? ` (${errors.join("; ")})` : ""}`, details: { threads, sources: listing.sources } };
+  },
+};
+
+const mail_read_thread: ToolDef = {
+  name: "mail_read_thread",
+  description: "Read one thread from the person's inbox by its key (from mail_list_threads): every message with sender, time and text. Reading never marks it read.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: { type: "object", properties: { key: { type: "string", description: "The thread key." } }, required: ["key"] },
+  async execute(ctx, args): Promise<ToolResult> {
+    const key = str(args.key);
+    if (!key) return { summary: "Pass the thread key from mail_list_threads." };
+    const { readMailThread } = await import("./mail/mailbox.server");
+    const d = await readMailThread(mailCtx(ctx), key, { markRead: false });
+    const messages = d.messages.slice(-15).map((m) => ({ from: m.from.name ?? m.from.address, direction: m.direction, at: m.at, text: m.body.slice(0, 4000) }));
+    return { summary: `"${d.thread.subject}" — ${d.messages.length} message${d.messages.length === 1 ? "" : "s"}`, details: { thread: { key: d.thread.key, subject: d.thread.subject, via: d.thread.via, mock: d.thread.mock }, messages, reply: d.reply } };
+  },
+};
+
+const mail_label_thread: ToolDef = {
+  name: "mail_label_thread",
+  description: "Save a short summary and 1-3 SUGGESTED labels on one of the person's Gmail / Outlook threads (the person accepts labels; nothing changes in the mailbox).",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "The thread key (gmail:… or outlook:…)." },
+      summary: { type: "string", description: "Two or three plain sentences." },
+      labels: { type: "string", description: "Suggested labels, comma-separated (e.g. needs reply, billing)." },
+    },
+    required: ["key"],
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const { parseThreadKey, normalizeTag } = await import("./mail/types");
+    const ref = parseThreadKey(args.key);
+    if (!ref || (ref.source !== "gmail" && ref.source !== "outlook")) return { summary: "Only Gmail and Outlook threads take labels here." };
+    const labels = (str(args.labels) ?? "").split(",").map(normalizeTag).filter((x): x is string => !!x).slice(0, 3);
+    const summary = str(args.summary)?.slice(0, 1200) ?? null;
+    const r = await scoped(ctx.workspaceId, (tx) =>
+      tx.mailThreadCache.updateMany({
+        where: { workspaceId: ctx.workspaceId, ownerUserId: ctx.userId, connectionId: ref.connectionId, externalId: ref.externalId },
+        data: { suggestedTags: labels, ...(summary ? { summary, summarizedAt: new Date() } : {}) },
+      }),
+    );
+    return { summary: r.count ? `Suggested ${labels.join(", ") || "no labels"}${summary ? " and saved a summary" : ""}.` : "That thread is not in the person's cached inbox (list it first)." };
+  },
+};
+
+const mail_draft_reply: ToolDef = {
+  name: "mail_draft_reply",
+  description: "Draft a reply to a thread in the person's inbox and save it as a draft in Mail (nothing is sent; the person reviews and sends it).",
+  kind: "publish",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: { key: { type: "string", description: "The thread key." }, instructions: { type: "string", description: "Optional: what the reply should say." } },
+    required: ["key"],
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const key = str(args.key);
+    if (!key) return { summary: "Pass the thread key." };
+    const { draftReply } = await import("./mail/agent.server");
+    const out = await draftReply(mailCtx(ctx), key, { instructions: str(args.instructions) ?? null, agentKey: ctx.agentKey ?? "drafter", runId: ctx.runId ?? null });
+    return { summary: `Draft saved for "${out.draft.subject ?? key}"${out.mock ? " (MOCK model)" : ""} — review it in Mail.`, details: { draftId: out.draft.id, href: `/dashboard/mail?thread=${encodeURIComponent(key)}` } };
+  },
+};
+
+const mail_send: ToolDef = {
+  name: "mail_send",
+  description:
+    "Send email for the person: a reply in a thread from their inbox (Gmail, Outlook, or a CRM conversation by email / SMS), or a new email from one of their own mailboxes. Asks first unless a rule allows it.",
+  kind: "publish",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "Thread key to reply in (gmail:… / outlook:… / crm:…). Omit for a new email." },
+      connectionId: { type: "string", description: "New email only: which of the person's mailboxes (from mail_list_threads sources)." },
+      to: { type: "string", description: "New email: recipients, comma-separated." },
+      subject: { type: "string", description: "Subject (new email / CRM email)." },
+      body: { type: "string", description: "The message text." },
+      channel: { type: "string", description: "CRM only: email | sms." },
+      replyToMessageId: { type: "string", description: "Gmail / Outlook reply: the message id to answer (from mail_read_thread reply)." },
+    },
+    required: ["body"],
+  },
+  async execute(ctx, args): Promise<ToolResult> {
+    const { sendMail } = await import("./mail/send.server");
+    const key = str(args.key) ?? null;
+    if (key?.startsWith("social:")) return { summary: "Use social_send_dm for social messages." };
+    let replyTo = str(args.replyToMessageId) ?? null;
+    if (key && !key.startsWith("crm:") && !replyTo) {
+      const { readMailThread } = await import("./mail/mailbox.server");
+      replyTo = (await readMailThread(mailCtx(ctx), key)).reply.replyToMessageId ?? null;
+    }
+    const out = await sendMail(
+      { workspaceId: ctx.workspaceId, userId: ctx.userId, role: mailCtx(ctx).role, by: "agent" },
+      { threadKey: key, connectionId: str(args.connectionId) ?? null, to: str(args.to) ?? null, subject: str(args.subject) ?? null, body: String(args.body ?? ""), channel: args.channel === "sms" ? "sms" : args.channel === "email" ? "email" : null, replyToMessageId: replyTo },
+    );
+    return { summary: out.outcome === "mock" ? (out.detail ?? "MOCK — nothing was sent.") : `${out.outcome === "queued" ? "Queued (waiting for its approval / quiet hours)" : out.outcome === "suppressed" ? `Not sent (${out.detail})` : "Sent"} via ${out.source}.`, details: out };
+  },
+};
+
+const social_send_dm: ToolDef = {
+  name: "social_send_dm",
+  description: "Reply in a social DM conversation from the inbox (Instagram, Messenger, WhatsApp, X, Telegram …) on one of this workspace's own accounts. Asks first unless a rule allows it.",
+  kind: "publish",
+  minRole: "editor",
+  argsSchema: { type: "object", properties: { key: { type: "string", description: "The social:… thread key." }, text: { type: "string", description: "The message." } }, required: ["key", "text"] },
+  async execute(ctx, args): Promise<ToolResult> {
+    const key = str(args.key);
+    if (!key?.startsWith("social:")) return { summary: "Pass a social:… thread key from mail_list_threads." };
+    const { sendMail } = await import("./mail/send.server");
+    const out = await sendMail({ workspaceId: ctx.workspaceId, userId: ctx.userId, role: mailCtx(ctx).role, by: "agent" }, { threadKey: key, body: String(args.text ?? ""), idempotencySeed: ctx.runId ?? null });
+    return { summary: out.outcome === "mock" ? (out.detail ?? "MOCK — nothing reached a platform.") : "Sent.", details: out };
+  },
+};
+
+export const COMMS_TOOLS: ToolDef[] = [list_reminders, create_reminder, complete_reminder, find_contact, suggest_merge, confirm_merge, calendar_list_events, calendar_find_time, calendar_create_event_google, calendar_create_event_outlook, mail_list_threads, mail_read_thread, mail_label_thread, mail_draft_reply, mail_send, social_send_dm];
 
 /** Each tool's group (lib/agents/grants.ts TOOL_GROUPS). */
 export const COMMS_TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
@@ -380,6 +538,13 @@ export const COMMS_TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   calendar_find_time: "calendar",
   calendar_create_event_google: "calendar",
   calendar_create_event_outlook: "calendar",
+  mail_list_threads: "email",
+  mail_read_thread: "email",
+  mail_label_thread: "email",
+  mail_draft_reply: "email",
+  mail_send: "email",
+  // A DM through Zernio is the workspace's connected social account.
+  social_send_dm: "social",
 };
 
 /** The automation action each non-safe tool stands for (its tier). */
@@ -390,4 +555,8 @@ export const COMMS_TOOL_ACTION: Readonly<Record<string, string>> = {
   // The connectors' own write actions (lib/agents/grants.ts connectorAction): same switch as the connector tools.
   calendar_create_event_google: "write_google_calendar",
   calendar_create_event_outlook: "write_outlook_calendar",
+  mail_draft_reply: "draft_mail_reply",
+  // The existing email send action (the Gmail / Outlook send tools' own): Tier 2.
+  mail_send: "send_outreach_email",
+  social_send_dm: "send_social_dm",
 };

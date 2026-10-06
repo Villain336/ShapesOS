@@ -246,7 +246,8 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     displayName: "Gmail",
     authType: "oauth2",
     description:
-      "Import your email network (message metadata only — bodies are never read), and send or reply in-thread after you confirm.",
+      // Phase 18.2 (WS=comms): + reading your inbox in the Mail app.
+      "Read your inbox in the Mail app (thread headers cached; a message body is fetched when you open it and never stored), import your email network from message metadata, and send or reply in-thread after you confirm.",
     oauth: {
       // Phase 11 (conncore): gmail.send for the gated send / reply tools.
       scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],

@@ -61,6 +61,7 @@ import {
   ListTodo,
   BookUser,
   CalendarDays,
+  Mailbox,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
@@ -105,6 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, description: "Home: what needs attention", keywords: "home dashboard main" },
       // Phase 18.2 (WS=comms): the everyday communication apps.
+      { href: "/dashboard/mail", label: "Mail", icon: Mail, description: "One inbox: mail, lead conversations, social DMs", keywords: "email inbox gmail outlook messages dms compose reply unread" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, description: "Your calendars, bookings and events", keywords: "schedule agenda meetings events google outlook ics find time availability" },
       { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, description: "One address book for everyone you know", keywords: "people address book person contact cards duplicates merge leads network investors" },
       { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },
@@ -125,7 +127,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/reviews", label: "Reviews", icon: Star, description: "Review requests and replies", keywords: "ratings reputation" },
       { href: "/dashboard/authority", label: "Authority", icon: Globe, description: "Outreach, PR, listings, AEO", keywords: "outreach pr listings aeo backlinks" },
       { href: "/dashboard/media", label: "Media", icon: Megaphone, description: "Media buying and spend pools", keywords: "ads advertising spend dooh radio" },
-      { href: "/dashboard/direct-mail", label: "Direct mail", icon: Mail, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
+      { href: "/dashboard/direct-mail", label: "Direct mail", icon: Mailbox, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw, description: "Reallocation, recycling, test lab", keywords: "reallocation recycling ctv dsp tests" },
       { href: "/dashboard/calls", label: "Calls", icon: Phone, description: "Call tracking and bookings", keywords: "phone tracking numbers bookings" },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },

@@ -84,6 +84,7 @@ export const es: Catalogue = {
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
       // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Correo", description: "Una bandeja: correo, conversaciones con leads, mensajes sociales" },
       "/dashboard/calendar": { label: "Calendario", description: "Tus calendarios, reservas y eventos" },
       "/dashboard/contacts": { label: "Contactos", description: "Una libreta de direcciones para todas las personas que conoces" },
       "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
@@ -316,6 +317,7 @@ export const es: Catalogue = {
         seo_audit: "Hacer una auditoría SEO",
         // Phase 18.2 (WS=comms)
         suggest_merge: "Buscar otros registros de esta persona",
+        draft_mail_reply: "Redactar una respuesta",
       },
     },
   },
@@ -354,6 +356,8 @@ export const es: Catalogue = {
       ticket: "Ticket",
       deal: "Oportunidad",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Correo",
     },
   },
 

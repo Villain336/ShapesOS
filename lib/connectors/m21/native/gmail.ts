@@ -20,6 +20,11 @@
 // Rate bounds: max 500 messages per call, metadata fetched sequentially.
 // Auth: OAuth2 Bearer <redacted> refresh via lib/vault/refresh.ts.
 //
+// Phase 18.2 (WS=comms): list_threads / get_thread (scope gmail.readonly,
+// already granted) serve the Mail app: thread HEADERS are cached for
+// listing, message bodies are returned only for the thread being opened and
+// never stored (lib/connectors/m21/live/gmail-read.ts). Reads only.
+//
 // Phase 11 (conncore): send_email and reply_to_message (scope gmail.send)
 // are MUTATING tools — the chat confirmation gate asks before each one
 // (connectorAction → "send_outreach_email", Tier 2: always asks). The live
@@ -36,6 +41,7 @@ import type {
 import { boolProp, fail, liveOk, strProp } from "../types";
 import { liveFailure, tokenSourceFrom, type LiveDeps } from "../live/http";
 import { gmailProfile, gmailReply, gmailSend } from "../live/gmail";
+import { gmailGetThread, gmailListThreads } from "../live/gmail-read";
 import { MimeInputError } from "../live/mime";
 
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -144,6 +150,27 @@ export class GmailAdapter implements ConnectorAdapter {
           required: ["messageId", "body"],
         },
       },
+      // Phase 18.2 (WS=comms): the Mail app's reads.
+      {
+        name: "list_threads",
+        description: "List recent Gmail threads (subject, people, date, labels, unread), newest first; optional Gmail search query.",
+        mutating: false,
+        argsSchema: {
+          type: "object",
+          properties: {
+            q: strProp("Optional Gmail search, e.g. \"in:inbox newer_than:7d\"."),
+            labelIds: strProp("Optional label id, e.g. INBOX."),
+            maxResults: strProp("Max threads (default 25, max 50)."),
+            pageToken: strProp("Next page token from a previous call."),
+          },
+        },
+      },
+      {
+        name: "get_thread",
+        description: "Read one Gmail thread: every message's headers and plain-text body, oldest first. Nothing is stored.",
+        mutating: false,
+        argsSchema: { type: "object", properties: { threadId: strProp("Gmail thread id (from list_threads).") }, required: ["threadId"] },
+      },
       {
         name: "list_network_contacts",
         description:
@@ -170,6 +197,25 @@ export class GmailAdapter implements ConnectorAdapter {
   ): Promise<InvokeResult> {
     if (tool === "send_email" || tool === "reply_to_message") {
       return this.write(tool, args, credential, _ctx);
+    }
+    if (tool === "list_threads" || tool === "get_thread") {
+      const auth = tokenSourceFrom(credential, _ctx);
+      if (!auth) return { ok: false, mock: false, errorCode: "not_connected", error: "Gmail is not connected. Connect Gmail to read your mail here." };
+      try {
+        if (tool === "list_threads") {
+          return liveOk(
+            await gmailListThreads(
+              auth,
+              { q: typeof args.q === "string" ? args.q.slice(0, 500) : null, labelIds: typeof args.labelIds === "string" ? args.labelIds.slice(0, 100) : null, max: Number(args.maxResults) || 25, pageToken: typeof args.pageToken === "string" ? args.pageToken : null },
+              this.deps,
+            ),
+          );
+        }
+        return liveOk(await gmailGetThread(auth, String(args.threadId ?? ""), this.deps));
+      } catch (err) {
+        if (err instanceof Error && / must be /.test(err.message)) return { ok: false, mock: false, errorCode: "bad_request", error: err.message };
+        return liveFailure(err, "Gmail");
+      }
     }
     if (tool !== "list_network_contacts") {
       return fail(`Unknown tool "${tool}" for the Gmail connector.`);

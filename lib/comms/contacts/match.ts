@@ -155,12 +155,12 @@ export function compareRecords(a: PersonRecord, b: PersonRecord): PairEvidence {
   return { score: Math.round(score * 100) / 100, reasons: sorted };
 }
 
-export function recordKey(r: Pick<PersonRecord, "kind" | "id">): string {
+export function recordKey(r: { kind: string; id: string }): string {
   return `${r.kind}:${r.id}`;
 }
 
 /** Canonical order for a pair (the suggestion's unique key). */
-export function orderPair<T extends Pick<PersonRecord, "kind" | "id">>(a: T, b: T): [T, T] {
+export function orderPair<T extends { kind: string; id: string }>(a: T, b: T): [T, T] {
   return recordKey(a) <= recordKey(b) ? [a, b] : [b, a];
 }
 

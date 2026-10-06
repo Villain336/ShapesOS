@@ -159,6 +159,9 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "create_reminder", label: "Add a reminder", description: "Add a to-do with a due time to the person's own Reminders list." },
   { action: "complete_reminder", label: "Complete a reminder", description: "Tick one of the person's own reminders done." },
   // Contacts: merging two people's cards (each record stays in its own app) — Tier 1.
+  // Mail: drafting a reply is a draft (Tier 0); a social DM is external (Tier 2).
+  { action: "draft_mail_reply", label: "Draft a mail reply", description: "Write a reply into the person's Mail drafts (nothing is sent)." },
+  { action: "send_social_dm", label: "Send a social DM", description: "Reply to a customer in a social DM (Instagram, Messenger, WhatsApp …) through Zernio.", group: "connectors" },
   { action: "confirm_contact_merge", label: "Merge contacts", description: "Confirm a merge suggestion so two contact cards become one (the records stay in their own apps; a person can unlink).", group: "ops" },
 ];
 

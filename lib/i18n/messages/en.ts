@@ -88,6 +88,7 @@ export const en = {
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Mail", description: "One inbox: mail, lead conversations, social DMs" },
       "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
       "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
@@ -321,6 +322,7 @@ export const en = {
         seo_audit: "Run an SEO audit",
         // Phase 18.2 (WS=comms)
         suggest_merge: "Find other records of this person",
+        draft_mail_reply: "Draft a reply",
       },
     },
   },
@@ -359,6 +361,8 @@ export const en = {
       ticket: "Ticket",
       deal: "Deal",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Mail",
     },
   },
 

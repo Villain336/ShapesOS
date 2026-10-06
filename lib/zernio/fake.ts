@@ -33,6 +33,8 @@ import {
   type ZernioCampaignDoc,
   type ZernioPostDoc,
   type ZernioProfileDoc,
+  type ZernioInboxConversation,
+  type ZernioInboxMessage,
 } from "./spec";
 
 export const FAKE_ZERNIO_LABEL = "FAKE Zernio (MOCK) — in-memory stand-in built from the Zernio OpenAPI spec v1.217.1";
@@ -105,6 +107,8 @@ export class FakeZernio {
   readonly adAccounts = new Map<string, ZernioAdAccountDoc[]>();
   readonly campaigns = new Map<string, FakeCampaign>();
   readonly posts = new Map<string, ZernioPostDoc & { profileIds: string[] }>();
+  /** Phase 18.2 (WS=comms): inbox conversations (social DMs) by conversation id. */
+  readonly conversations = new Map<string, { conv: ZernioInboxConversation; messages: ZernioInboxMessage[] }>();
   readonly leadForms: Array<Record<string, unknown>> = [];
   readonly audiences: Array<Record<string, unknown>> = [];
   /** Managed-ads fees (USD) per profile for GET /v1/usage metering mode. */
@@ -184,6 +188,41 @@ export class FakeZernio {
       ]);
     }
     return acct;
+  }
+
+  /** Phase 18.2: seed a DM conversation on an account (tests; the list also seeds one per DM account). */
+  seedConversation(accountId: string, input: { participantName?: string; messages?: { text: string; direction?: "incoming" | "outgoing"; at?: string }[] } = {}): ZernioInboxConversation {
+    const acct = this.accounts.get(accountId);
+    if (!acct) throw new Error(`FakeZernio: no account ${accountId}`);
+    const id = `conv_${this.id(`conv:${accountId}:${this.conversations.size}`)}`;
+    const name = input.participantName ?? `Customer${MOCK}`;
+    const msgs = (input.messages ?? [{ text: `Hi! Is this still available?${MOCK}`, direction: "incoming" as const }]).map((m, i) => ({
+      id: `m_${this.id(`msg:${id}:${i}`)}`,
+      conversationId: id,
+      accountId,
+      platform: acct.platform,
+      message: m.text,
+      senderId: m.direction === "outgoing" ? accountId : `p_${id}`,
+      senderName: m.direction === "outgoing" ? (acct.username ?? null) : name,
+      direction: m.direction ?? "incoming",
+      createdAt: m.at ?? new Date(this.now() - (60 - i) * 60_000).toISOString(),
+    }));
+    const last = msgs[msgs.length - 1];
+    const conv: ZernioInboxConversation = {
+      id,
+      platform: acct.platform,
+      accountId,
+      accountUsername: acct.username,
+      participantId: `p_${id}`,
+      participantName: name,
+      lastMessage: last?.message ?? "",
+      updatedTime: last?.createdAt ?? new Date(this.now()).toISOString(),
+      status: "active",
+      unreadCount: msgs.filter((m) => m.direction === "incoming").length,
+      url: null,
+    };
+    this.conversations.set(id, { conv, messages: msgs });
+    return conv;
   }
 
   /** Seed a campaign on an ads account (synced campaigns the real API would discover). */
@@ -587,6 +626,69 @@ export class FakeZernio {
       return { status: 200, body: { uploadUrl: `https://media.zernio.com/fake-upload/${key}`, publicUrl: `https://media.zernio.com/${key}`, key, expiresIn: 3600 } };
     });
     // getUsage — GET /v1/usage (metering mode with profileId projection)
+    // Phase 18.2 (WS=comms): the inbox (Messages group). DM platforms per the
+    // list endpoint's description; one "(MOCK)" conversation is seeded per DM
+    // account the first time a profile's inbox is listed.
+    const DM_PLATFORMS = new Set(["facebook", "instagram", "twitter", "bluesky", "reddit", "telegram", "whatsapp"]);
+    // listInboxConversations — GET /v1/inbox/conversations
+    this.route("GET", "/v1/inbox/conversations", "listInboxConversations", (req) => {
+      const accounts = (req.query.profileId ? this.profileAccounts(req.query.profileId) : [...this.accounts.values()]).filter((a) => DM_PLATFORMS.has(a.platform));
+      for (const a of accounts) {
+        if (![...this.conversations.values()].some((c) => c.conv.accountId === a._id)) this.seedConversation(a._id);
+      }
+      const ids = new Set(accounts.map((a) => a._id));
+      let list = [...this.conversations.values()].map((c) => c.conv).filter((c) => ids.has(c.accountId));
+      if (req.query.platform) list = list.filter((c) => c.platform === req.query.platform);
+      if (req.query.accountId) list = list.filter((c) => c.accountId === req.query.accountId);
+      if (req.query.status) list = list.filter((c) => c.status === req.query.status);
+      list.sort((a, b) => String(b.updatedTime).localeCompare(String(a.updatedTime)));
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+      return { status: 200, body: { data: list.slice(0, limit), pagination: { hasMore: list.length > limit, nextCursor: null }, meta: { accountsQueried: accounts.length } } };
+    });
+    // getInboxConversationMessages — GET /v1/inbox/conversations/{conversationId}/messages
+    this.route("GET", "/v1/inbox/conversations/{conversationId}/messages", "getInboxConversationMessages", (req) => {
+      if (!req.query.accountId) return err(400, "accountId is required", { type: "invalid_request_error", code: "missing_required_field", param: "accountId" });
+      const c = this.conversations.get(req.params.conversationId!);
+      if (!c || c.conv.accountId !== req.query.accountId) return err(404, "Account or conversation not found");
+      const msgs = req.query.sortOrder === "desc" ? [...c.messages].reverse() : c.messages;
+      return { status: 200, body: { status: "success", messages: msgs, pagination: { hasMore: false, nextCursor: null }, sortOrderApplied: req.query.sortOrder === "desc" ? "desc" : "asc" } };
+    });
+    // sendInboxMessage — POST /v1/inbox/conversations/{conversationId}/messages
+    this.route("POST", "/v1/inbox/conversations/{conversationId}/messages", "sendInboxMessage", (req) =>
+      this.idempotent(req, () => {
+        const accountId = typeof req.body?.accountId === "string" ? req.body.accountId : "";
+        const text = typeof req.body?.message === "string" ? req.body.message : "";
+        if (!accountId) return err(400, "accountId is required", { type: "invalid_request_error", code: "missing_required_field", param: "accountId" });
+        if (!text.trim()) return err(400, "message is required", { type: "invalid_request_error", code: "missing_required_field", param: "message" });
+        const c = this.conversations.get(req.params.conversationId!);
+        if (!c || c.conv.accountId !== accountId) return err(404, "Account or conversation not found");
+        const msg: ZernioInboxMessage = {
+          id: `m_${this.id(`sent:${c.conv.id}:${c.messages.length}`)}`,
+          conversationId: c.conv.id,
+          accountId,
+          platform: c.conv.platform,
+          message: text,
+          senderId: accountId,
+          senderName: c.conv.accountUsername ?? null,
+          direction: "outgoing",
+          createdAt: new Date(this.now()).toISOString(),
+        };
+        c.messages.push(msg);
+        c.conv.lastMessage = text;
+        c.conv.updatedTime = msg.createdAt;
+        return { status: 200, body: { success: true, data: { messageId: msg.id, conversationId: c.conv.id } } };
+      }),
+    );
+    // markConversationRead — POST /v1/inbox/conversations/{conversationId}/read
+    this.route("POST", "/v1/inbox/conversations/{conversationId}/read", "markConversationRead", (req) => {
+      const accountId = typeof req.body?.accountId === "string" ? req.body.accountId : "";
+      if (!accountId) return err(400, "accountId is required", { type: "invalid_request_error", code: "missing_required_field", param: "accountId" });
+      const c = this.conversations.get(req.params.conversationId!);
+      if (!c || c.conv.accountId !== accountId) return err(404, "Account or conversation not found");
+      const marked = c.conv.unreadCount ?? 0;
+      c.conv.unreadCount = 0;
+      return { status: 200, body: { success: true, markedCount: marked } };
+    });
     this.route("GET", "/v1/usage", "getUsage", (req) => {
       const profileId = req.query.profileId;
       if (profileId && !this.profiles.has(profileId)) return err(404, "Not found");
