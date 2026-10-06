@@ -187,6 +187,17 @@ describe("Spotlight (DB)", () => {
     assert.ok(editor.hits.some((h) => h.href === `/dashboard/apps/${draftAppSlug}` && /Draft/.test(h.subtitle ?? "")));
   });
 
+  it("every source stays in its workspace (each kind is seeded in both)", async () => {
+    // Every OTHER record carries the word "theirs"; nothing in WS does.
+    const theirsThere = await spotlight(OTHER, "owner", "theirs", { userId: ANA, perKind: 20 });
+    const kindsThere = new Set(theirsThere.hits.map((h) => h.kind));
+    for (const k of ["lead", "file_content", "inbox_message", "chat_message", "contact", "company", "deal", "person", "ticket", "app", "project"]) {
+      assert.ok(kindsThere.has(k as never), `seeded ${k} in the other workspace: ${[...kindsThere].join(",")}`);
+    }
+    const here = await spotlight(WS, "owner", "theirs", { userId: ANA, perKind: 20, semantic: "off" });
+    assert.deepEqual(here.hits.map((h) => `${h.kind}:${h.title}`), [], "no source leaks across workspaces");
+  });
+
   it("no role, another workspace, trashed files: nothing", async () => {
     assert.deepEqual(await searchRecords(WS, null, "tamarillo"), []);
     const theirs = await spotlight(OTHER, "viewer", "tamarillo", { userId: BEN });
