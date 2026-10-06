@@ -290,7 +290,7 @@ export const en = {
       matchMeaning: "Meaning",
       inside: "Inside: {snippet}",
       actionsFor: "Actions for {title}",
-      askPrompt: "Tell me about this {kind}: {title}",
+      askPrompt: "Tell me about “{title}” ({kind}).",
       actPrompt: "Look at this {kind} and do what it needs next: {title}",
       semanticOff: "Meaning search is warming up; showing name and text matches.",
       kindFilter: "Only {kinds}",

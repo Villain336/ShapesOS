@@ -95,6 +95,8 @@ Headings get **wider**, not just bolder; that width is the brand's signature. Se
 
 **Menus, popovers, palette.** White, `radius-lg`. Menus use `shadow-raised`; the command palette and dialogs use `shadow-overlay`. Rows are 44px, `radius-sm`; the active row is solid black with white text. Destructive rows use `failed-text` and a `failed-tint` hover.
 
+**Spotlight (⌘K Records, Phase 18.1).** Results are grouped by kind under a 11px `subtle` kind label, best group first. A row may carry a second line, the snippet around the match: matched words are **bold and underlined** in `ink` (never highlighted yellow: yellow means Needs you). How it matched (Name · Text · Meaning) sits on the right in 12px `subtle`. Inside the active (ink) row, secondary text uses `on-ink-muted` and tiles `ink-raised`, so the row reads in both themes. ↵ opens, ⌘↵ asks the lead agent about the record, → lists its agent actions (the tools keep their tiers).
+
 **Sidebar.** Black (`aos-night`), 288px expanded, 80px collapsed rail. Nav items 40–44px, `radius-sm`; inactive text `night-soft`, hover `night-hover`, current page is a **white** row with black text (`aria-current="page"`). Counts sit in small pills.
 
 **Toasts.** Black, `radius-lg`, `shadow-toast`, enter with `animate-toast-in`. Lead with the status shape in its `-night` color. Exactly one action per toast; the action's name matches the result ("Approve" becomes "Approved").

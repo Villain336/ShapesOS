@@ -287,7 +287,7 @@ export const es: Catalogue = {
       matchMeaning: "Significado",
       inside: "Dentro: {snippet}",
       actionsFor: "Acciones para {title}",
-      askPrompt: "Cuéntame sobre este registro ({kind}): {title}",
+      askPrompt: "Cuéntame sobre «{title}» ({kind}).",
       actPrompt: "Revisa este registro ({kind}) y haz lo que necesite a continuación: {title}",
       semanticOff: "La búsqueda por significado se está preparando; se muestran coincidencias por nombre y texto.",
       kindFilter: "Solo {kinds}",

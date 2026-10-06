@@ -771,7 +771,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
           const r = item.record;
           if (!r) break;
           const kind = (messages.records.kinds as Record<string, string>)[r.kind] ?? r.kind;
-          void handToAgent(r, t("commandBar.spotlight.askPrompt", { kind: kind.toLowerCase(), title: r.title }), "Ask about record");
+          void handToAgent(r, t("commandBar.spotlight.askPrompt", { kind, title: r.title }), "Ask about record");
           break;
         }
         case "record-act": {
@@ -1104,45 +1104,54 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                         />
                       );
                     };
-                    // Phase 18.1: Records are grouped by kind (a small label per kind).
+                    // Phase 18.1: Records are grouped by kind. Each kind is its own
+                    // listbox group (groups don't nest in a listbox); the first one
+                    // carries the "Records" heading.
                     const kindRuns = group.section === "records" && page.name === "root" ? recordKindRuns(group.items) : null;
+                    // Group labels are plain elements (a heading role isn't allowed
+                    // inside a listbox); each group points at its label.
+                    const heading = (
+                      <div id={`cmdk-h-${group.section}`} className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">
+                        {sectionLabel(group.section)}
+                        {group.section === "records" && records.semantic === "warming" ? (
+                          <span className="ml-2 font-normal text-subtle">{t("commandBar.spotlight.semanticOff")}</span>
+                        ) : null}
+                      </div>
+                    );
+                    if (kindRuns && kindRuns.some((r) => r.kind)) {
+                      return kindRuns.map((run, i) => {
+                        const runItems = group.items.slice(run.start, run.start + run.count);
+                        const label = run.kind ? ((messages.records.kinds as Record<string, string>)[run.kind] ?? run.kind) : t("commandBar.sections.records");
+                        const runId = `cmdk-h-records-${run.kind || "more"}`;
+                        return (
+                          <div key={`records-${run.kind || "more"}`} role="group" aria-labelledby={runId}>
+                            {i === 0 ? heading : null}
+                            <div id={runId} className={run.kind ? "px-3 pt-1.5 pb-0.5 text-2xs font-semibold text-subtle" : "sr-only"}>
+                              {label}
+                            </div>
+                            {runItems.map(row)}
+                          </div>
+                        );
+                      });
+                    }
                     return (
                       <div key={group.section} role="group" aria-labelledby={`cmdk-h-${group.section}`}>
-                        <h3 id={`cmdk-h-${group.section}`} className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">
-                          {sectionLabel(group.section)}
-                          {group.section === "records" && records.semantic === "warming" ? (
-                            <span className="ml-2 font-normal text-subtle">{t("commandBar.spotlight.semanticOff")}</span>
-                          ) : null}
-                        </h3>
-                        {kindRuns
-                          ? kindRuns.map((run) => {
-                              const runItems = group.items.slice(run.start, run.start + run.count);
-                              if (!run.kind) return runItems.map(row);
-                              const label = (messages.records.kinds as Record<string, string>)[run.kind] ?? run.kind;
-                              const runId = `cmdk-h-records-${run.kind}`;
-                              return (
-                                <div key={run.kind} role="group" aria-labelledby={runId}>
-                                  <p id={runId} className="px-3 pt-1.5 pb-0.5 text-2xs font-semibold text-subtle">
-                                    {label}
-                                  </p>
-                                  {runItems.map(row)}
-                                </div>
-                              );
-                            })
-                          : group.items.map(row)}
+                        {heading}
+                        {group.items.map(row)}
                       </div>
                     );
                   })}
-                  {items.length === 0 && page.name !== "playbooks" && (
-                    <p className="px-3 py-6 text-center text-sm text-subtle">{t("commandBar.noMatches")}</p>
-                  )}
-                  {page.name === "root" && records.loading && query.trim().length >= 2 && (
-                    <p className="flex items-center gap-1.5 px-3 py-2 text-xs text-subtle" role="status">
-                      <Loader2 className="size-3.5 aos-spin" aria-hidden />
-                      {t("commandBar.searchingRecords")}
-                    </p>
-                  )}
                 </div>
+                {/* Outside the listbox: a listbox may only own options and groups. */}
+                {items.length === 0 && page.name !== "playbooks" && (
+                  <p className="px-3 pb-6 text-center text-sm text-subtle">{t("commandBar.noMatches")}</p>
+                )}
+                {page.name === "root" && records.loading && query.trim().length >= 2 && (
+                  <p className="flex items-center gap-1.5 px-5 pb-2 text-xs text-subtle" role="status">
+                    <Loader2 className="size-3.5 aos-spin" aria-hidden />
+                    {t("commandBar.searchingRecords")}
+                  </p>
+                )}
 
                 {/* Footer (kit): ↑ ↓ Move · ↵ Open · esc Clear, result count right. */}
                 <div className="flex items-center gap-4 border-t border-line px-4 py-3 text-xs text-muted sm:px-5">
