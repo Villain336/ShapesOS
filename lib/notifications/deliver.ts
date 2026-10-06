@@ -46,7 +46,7 @@ export async function deliverNow(inputs: readonly NotificationInput[], deps: Del
       deps.webPush ??
       (async (userId: string, n: NotificationInput) => {
         const { sendWebPush } = await import("@/lib/push/web");
-        return sendWebPush(userId, { kind: n.kind, workspaceId: n.workspaceId, title: n.title, body: n.body ?? null, href: n.href ?? null, tag: n.dedupKey ?? null });
+        return sendWebPush(userId, { kind: n.kind, title: n.title, body: n.body ?? null, href: n.href ?? null, tag: n.dedupKey ?? null });
       });
     for (const n of webPushable) track(send(n.userId, n));
   }

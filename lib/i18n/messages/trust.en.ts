@@ -178,7 +178,7 @@ export const trustEn = {
     },
     channelFor: "{kind} by {channel}",
     webPush: "Browser notifications",
-    webPushHelp: "Desktop notifications from this browser, even when ShapesOS is in the background. Your browser asks first.",
+    webPushHelp: "Notifications on the browsers you connected below, even when ShapesOS is in the background. Turn off to pause them on every browser.",
     emailDigest: "Email digest",
     emailDigestHelp: "One email a day with what you haven't read yet.",
     digest: { off: "Off", daily: "Daily" },

@@ -1,38 +1,41 @@
 // ShapesOS — Phase 18.3: Web Push delivery — THE SEAM between the two 18.3
 // workstreams.
 //
-//   WS=flow owns this file's real implementation: the service worker, the
-//   browser push subscriptions (storage + subscribe/unsubscribe routes) and
-//   VAPID signing with node:crypto (ECDSA P-256 / aes128gcm, RFC 8291/8292).
-//   WS=trust (lib/notifications/deliver.ts) calls sendWebPush() for every
-//   notification row whose recipient's Web Push channel allows the kind
-//   (lib/notifications/channels.ts), after focus / do not disturb.
+//   WS=flow owns this file's real implementation (branch claude/p18-3-flow:
+//   the service worker, push_subscriptions, VAPID + aes128gcm with
+//   node:crypto). WS=trust (lib/notifications/deliver.ts) calls
+//   sendWebPush(userId, payload) for every notification row whose
+//   recipient's Web Push channel allows the kind (lib/notifications/
+//   channels.ts), after focus / do not disturb.
 //
-// THIS IS A TYPED STUB written by WS=trust: it sends nothing and says so
-// ({ sent: 0, skipped: "not_configured" }). The integrator replaces the body
-// with WS=flow's implementation; the signature below is the contract.
+// THIS IS A TYPED STUB written by WS=trust so this branch builds on its own:
+// it sends nothing and says so ({ skipped: "not_configured" }). The types and
+// the signature below are copied from WS=flow's branch, so at integration
+// WS=flow's file simply replaces this one.
 
+/** What a push shows. Kept small: one 4 KB encrypted message carries it all. */
 export interface WebPushPayload {
-  /** Notification kind (lib/preferences NOTIFICATION_KINDS). */
-  kind: string;
-  workspaceId: string;
   title: string;
   body?: string | null;
-  /** Same-app link to open on click ("/dashboard/…"). */
+  /** Where a click goes (same-origin path only). */
   href?: string | null;
-  /** Collapses repeats on the device (the notification's dedup key). */
+  /** Notification kind (for the service worker's tag / grouping). */
+  kind?: string | null;
+  /** Replaces an earlier push with the same tag on the device. */
   tag?: string | null;
 }
 
 export interface WebPushResult {
   sent: number;
-  /** Why nothing was sent (no subscription, not configured, …). */
-  skipped?: string | null;
+  failed: number;
+  removed: number;
+  skipped: "not_configured" | "no_subscriptions" | null;
+  reason?: string;
 }
 
-/** Send one notification to every Web Push subscription of this person. Never throws. */
+/** Send one push to every browser this person subscribed. Never throws. STUB: sends nothing. */
 export async function sendWebPush(userId: string, payload: WebPushPayload): Promise<WebPushResult> {
   void userId;
   void payload;
-  return { sent: 0, skipped: "not_configured" };
+  return { sent: 0, failed: 0, removed: 0, skipped: "not_configured", reason: "Web Push is delivered by WS=flow's lib/push/web.ts (stub in this branch)." };
 }

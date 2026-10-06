@@ -197,8 +197,12 @@ export const NotificationPrefsSchema = z
     mutedKinds: z.array(z.enum(NOTIFICATION_KINDS)).max(NOTIFICATION_KINDS.length),
     // Phase 18.3 (WS=trust): Notifications 2.0 — still this ONE store. Each
     // new field has a default, so a row saved before 18.3 reads unchanged.
-    /** Web Push in this browser (lib/push/web.ts). Off until the person opts in. */
-    webPush: z.boolean().default(false),
+    /**
+     * Web Push to the browsers the person connected (lib/push/web.ts). On by
+     * default: connecting a browser (its push subscription) is the opt-in;
+     * this switch pauses browser notifications without disconnecting them.
+     */
+    webPush: z.boolean().default(true),
     /** The daily email digest of unread notifications (lib/notifications/digest.ts). */
     emailDigest: z.enum(EMAIL_DIGESTS).default("off"),
     /** Slack direct messages (workspace Slack app installed + the person found by email). */
@@ -246,7 +250,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   density: "comfortable",
   motion: "system",
   fontScale: 100,
-  notifications: { inApp: true, push: true, mutedKinds: [], webPush: false, emailDigest: "off", slack: false, summary: false, channels: {} },
+  notifications: { inApp: true, push: true, mutedKinds: [], webPush: true, emailDigest: "off", slack: false, summary: false, channels: {} },
   shortcuts: {},
   desktop: {},
   voice: {},

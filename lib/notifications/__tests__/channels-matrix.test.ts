@@ -26,10 +26,13 @@ describe("notification channel matrix", () => {
     const p = base();
     for (const k of NOTIFICATION_KINDS) assert.equal(channelAllows(p, k, "inApp"), true, k);
     for (const k of NOTIFICATION_KINDS) {
-      assert.equal(channelAllows(p, k, "webPush"), false);
       assert.equal(channelAllows(p, k, "email"), false);
       assert.equal(channelAllows(p, k, "slack"), false);
     }
+    // Web Push: connecting a browser is the opt-in (no subscription = nothing sent).
+    assert.equal(channelAllows(p, "approval_needed", "webPush"), true);
+    assert.equal(channelAllows(p, "invite_accepted", "webPush"), false);
+    assert.equal(channelAllows(base({ webPush: false }), "approval_needed", "webPush"), false);
     for (const k of ["approval_needed", "approval_decided", "run_failed"]) assert.equal(channelAllows(p, k, "push"), true, `${k} still pushes`);
     assert.equal(channelAllows(p, "alert_fired", "push"), false);
   });

@@ -179,7 +179,7 @@ export const trustEs: Catalogue<typeof trustEn> = {
     },
     channelFor: "{kind} por {channel}",
     webPush: "Notificaciones del navegador",
-    webPushHelp: "Notificaciones de escritorio de este navegador, aunque ShapesOS esté en segundo plano. Tu navegador pregunta antes.",
+    webPushHelp: "Notificaciones en los navegadores que conectaste abajo, aunque ShapesOS esté en segundo plano. Desactívalo para pausarlas en todos.",
     emailDigest: "Resumen por correo",
     emailDigestHelp: "Un correo al día con lo que aún no has leído.",
     digest: { off: "Desactivado", daily: "Diario" },
