@@ -88,6 +88,8 @@ export interface SubscriptionInput {
   endpoint: string;
   keys: { p256dh: string; auth: string };
   userAgent?: string | null;
+  /** Phase 18.3 integration: the sign-in session that subscribed (token.sid). */
+  sessionId?: string | null;
 }
 
 /** Validate a browser PushSubscription.toJSON(); null = refused (with why). */
@@ -166,12 +168,33 @@ export async function saveWebPushSubscription(userId: string, sub: SubscriptionI
     }
     const row = await tx.pushSubscription.upsert({
       where: { userId_endpoint: { userId, endpoint: sub.endpoint } },
-      create: { userId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, authSecret: sub.keys.auth, userAgent: sub.userAgent?.slice(0, 300) ?? null },
-      update: { p256dh: sub.keys.p256dh, authSecret: sub.keys.auth, failureCount: 0, lastError: null, userAgent: sub.userAgent?.slice(0, 300) ?? undefined },
+      create: { userId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, authSecret: sub.keys.auth, userAgent: sub.userAgent?.slice(0, 300) ?? null, sessionId: sub.sessionId?.slice(0, 64) ?? null },
+      // A re-subscribe from a new sign-in moves the browser to that session.
+      update: { p256dh: sub.keys.p256dh, authSecret: sub.keys.auth, failureCount: 0, lastError: null, userAgent: sub.userAgent?.slice(0, 300) ?? undefined, sessionId: sub.sessionId?.slice(0, 64) ?? null },
       select: { id: true },
     });
     return row;
   });
+}
+
+/**
+ * Phase 18.3 integration: a sign-in session ended (WS=trust's revoke) — remove
+ * the subscriptions that session made, inside the caller's owner-scoped
+ * transaction (app.user_id already set to `userId`).
+ *   { only: sid }    one revoked session's browsers;
+ *   { except: sid }  "sign out other sessions": every browser but the current
+ *                    session's (subscriptions from pre-registry tokens too —
+ *                    those tokens are cut off as well). except null = all.
+ */
+export async function removeSessionSubscriptions(tx: Tx, userId: string, by: { only: string } | { except: string | null }): Promise<number> {
+  const where: Prisma.PushSubscriptionWhereInput =
+    "only" in by
+      ? { userId, sessionId: by.only }
+      : by.except
+        ? { userId, OR: [{ sessionId: null }, { sessionId: { not: by.except } }] }
+        : { userId };
+  const res = await tx.pushSubscription.deleteMany({ where });
+  return res.count;
 }
 
 /** Remove one of this person's subscriptions (by endpoint or id). */

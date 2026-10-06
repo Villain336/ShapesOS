@@ -17980,6 +17980,11 @@ model PushSubscription {
   p256dh       String
   authSecret   String    @map("auth_secret")
   userAgent    String?   @map("user_agent") @db.VarChar(300)
+  // Phase 18.3 integration: the sign-in session (user_sessions.id, token.sid)
+  // that subscribed this browser. Revoking that session (Settings → You →
+  // Privacy) removes the subscription, so a signed-out device stops getting
+  // pushes. Null = subscribed from a token minted before the registry.
+  sessionId    String?   @map("session_id") @db.VarChar(64)
   failureCount Int       @default(0) @map("failure_count")
   lastError    String?   @map("last_error") @db.VarChar(300)
   lastSentAt   DateTime? @map("last_sent_at")
@@ -17987,6 +17992,7 @@ model PushSubscription {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@unique([userId, endpoint])
+  @@index([userId, sessionId])
   @@map("push_subscriptions")
 }
 

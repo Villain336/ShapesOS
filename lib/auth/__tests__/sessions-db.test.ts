@@ -4,7 +4,9 @@
 //     off tokens minted before the registry (legacy cutoff);
 //   - user_sessions is owner-only (FORCE RLS on app.user_id): another person,
 //     or no person GUC at all, sees nothing and can't write a row for someone else;
-//   - account deletion removes the rows.
+//   - account deletion removes the rows;
+//   - (integration) revoking a session removes the Web Push subscriptions it
+//     made; "sign out other sessions" keeps only the current session's.
 // Real Postgres as the least-privilege app role.
 // Run: DATABASE_URL=<app role> npx tsx --test lib/auth/__tests__/sessions-db.test.ts
 // Listed in scripts/test/db-tests.txt.
@@ -17,6 +19,7 @@ import { randomUUID } from "node:crypto";
 const RUN = randomUUID().slice(0, 8);
 const ALICE = `sess-alice-${RUN}`;
 const BOB = `sess-bob-${RUN}`;
+const CARA = `sess-cara-${RUN}`;
 
 let prisma: typeof import("@/lib/prisma").prisma;
 let s: typeof import("../sessions");
@@ -32,7 +35,10 @@ before(async () => {
 });
 
 after(async () => {
-  for (const u of [ALICE, BOB]) await s.withSessionOwner(u, (tx) => tx.userSession.deleteMany({ where: { userId: u } }));
+  for (const u of [ALICE, BOB, CARA]) {
+    await s.withSessionOwner(u, (tx) => tx.userSession.deleteMany({ where: { userId: u } }));
+    await s.withSessionOwner(u, (tx) => tx.pushSubscription.deleteMany({ where: { userId: u } }));
+  }
   await prisma.$disconnect();
 });
 
@@ -103,5 +109,27 @@ describe("session registry (DB)", () => {
     await s.startUserSession({ userId: BOB, expiresAt: exp() });
     await s.withSessionOwner(BOB, (tx) => tx.$executeRawUnsafe(`DELETE FROM "user_sessions" WHERE "user_id" = $1`, BOB));
     assert.equal((await s.withSessionOwner(BOB, (tx) => tx.userSession.findMany({ where: { userId: BOB } }))).length, 0);
+  });
+  it("revoking a session removes the Web Push subscriptions it made (Phase 18.3 integration)", async () => {
+    const { saveWebPushSubscription } = await import("@/lib/push/web");
+    const sub = (n: string, sessionId: string | null) =>
+      saveWebPushSubscription(CARA, { endpoint: `https://fcm.googleapis.com/fcm/send/${RUN}-${n}`, keys: { p256dh: "BPk", auth: "au" }, sessionId });
+    const here = await s.startUserSession({ userId: CARA, expiresAt: exp() });
+    const laptop = await s.startUserSession({ userId: CARA, expiresAt: exp() });
+    const phone = await s.startUserSession({ userId: CARA, expiresAt: exp() });
+    await sub("here", here);
+    await sub("laptop", laptop);
+    await sub("phone", phone);
+    await sub("legacy", null);
+    const endpoints = async () =>
+      (await s.withSessionOwner(CARA, (tx) => tx.pushSubscription.findMany({ where: { userId: CARA }, select: { endpoint: true } }))).map((r) => r.endpoint.split("-").pop()).sort();
+    assert.deepEqual(await endpoints(), ["here", "laptop", "legacy", "phone"]);
+    assert.equal(await s.revokeUserSession(CARA, phone), true);
+    assert.deepEqual(await endpoints(), ["here", "laptop", "legacy"], "the revoked phone stops getting pushes");
+    // Bob can't remove Cara's subscriptions by revoking her session id.
+    assert.equal(await s.revokeUserSession(BOB, laptop), false);
+    assert.deepEqual(await endpoints(), ["here", "laptop", "legacy"]);
+    await s.revokeOtherSessions(CARA, here);
+    assert.deepEqual(await endpoints(), ["here"], "only this session's browser keeps Web Push (pre-registry tokens are cut off too)");
   });
 });

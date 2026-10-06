@@ -17,15 +17,17 @@
  *      always sees fresh data online — falling back to the last copy when
  *      the network is down. Stored PER PERSON (cache "shapes-data-<key>",
  *      key = a hash of the signed-in subject posted by the app) and deleted
- *      on sign-out (the POST to /api/auth/signout is seen here) and whenever
- *      another person signs in on this browser. No key = nothing cached.
+ *      on sign-out (the POST to /api/auth/signout is seen here), whenever
+ *      another person signs in on this browser, and when a data route answers
+ *      401 (the session ended elsewhere — e.g. revoked from Settings → You →
+ *      Privacy, "Sign out other sessions"). No key = nothing cached.
  *   4. Writes are never cached or replayed here: the app queues its few safe
  *      writes itself (lib/offline/queue.ts) and replays them when online.
  *   5. Web Push: show the notification (lib/push/web.ts payload) and open its
  *      same-origin link on click.
  */
 
-const VERSION = "2026-10-06.4";
+const VERSION = "2026-10-06.5";
 const STATIC_CACHE = "shapes-static-" + VERSION;
 const META_CACHE = "shapes-meta";
 const DATA_PREFIX = "shapes-data-";
@@ -168,6 +170,12 @@ async function dataNetworkFirst(req) {
   const cache = await caches.open(DATA_PREFIX + key);
   try {
     const res = await fetch(req);
+    // Phase 18.3 integration: the session is gone (revoked from another
+    // device, or expired) — this browser's copies must not outlive it offline.
+    if (res.status === 401) {
+      await signOut();
+      return res;
+    }
     const type = res.headers.get("content-type") || "";
     if (res.ok && res.type === "basic" && type.includes("application/json")) await cache.put(req, res.clone());
     return res;

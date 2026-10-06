@@ -184,6 +184,19 @@ describe("service worker (public/sw.js)", () => {
     assert.equal(await (await w.storage.open("shapes-meta")).match("/__shapes/session"), undefined, "malformed / foreign messages ignored");
   });
 
+  it("a 401 from a data route (session revoked elsewhere) purges the data caches and the key", async () => {
+    await w.dispatch("message", { data: { type: "session", key: KEY_A }, origin: ORIGIN });
+    await w.fetchVia("/api/notes");
+    assert.equal(w.storage.caches.get(`shapes-data-${KEY_A}`)!.store.size, 1);
+    w.network.respond = () => new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+    const res = (await w.fetchVia("/api/notes"))!;
+    assert.equal(res.status, 401, "the app still sees the 401");
+    assert.equal([...w.storage.caches.keys()].filter((k) => k.startsWith("shapes-data-")).length, 0, "no copy outlives the session");
+    assert.equal(await (await w.storage.open("shapes-meta")).match("/__shapes/session"), undefined);
+    w.network.online = false;
+    await assert.rejects(() => w.fetchVia("/api/notes") as Promise<unknown>, "offline: nothing to serve");
+  });
+
   it("static assets are cache-first (not in dev); HTML on a static path is never stored", async () => {
     w.network.respond = () => new Response("js", { headers: { "content-type": "text/javascript" } });
     await w.fetchVia("/_next/static/chunks/app.js");

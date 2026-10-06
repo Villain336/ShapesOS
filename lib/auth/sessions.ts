@@ -8,6 +8,8 @@
 //   revokeUserSession()     sign one session out (audited)
 //   revokeOtherSessions()   sign every other session out (audited), including
 //                           tokens minted before the registry (cutoff row)
+//   Both also remove the Web Push subscriptions the revoked sessions made
+//   (lib/push/web.ts, same owner-scoped transaction).
 //
 // user_sessions is FORCE RLS on app.user_id: every statement here runs in a
 // transaction that sets the GUC to the token's OWN subject, so one person can
@@ -19,6 +21,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { USER_GUC } from "@/lib/desktop/scope";
+// Phase 18.3 integration: a revoked session's browsers stop getting Web Push.
+import { removeSessionSubscriptions } from "@/lib/push/web";
 import {
   deviceLabel,
   ipPrefix,
@@ -158,9 +162,11 @@ export async function listUserSessions(userId: string, currentSid: string | null
 /** Sign one of the person's own sessions out. Returns whether a live row was revoked. */
 export async function revokeUserSession(userId: string, sid: string, by: string = "self", now: Date = new Date()): Promise<boolean> {
   if (!sid || sid.startsWith(LEGACY_ROW_PREFIX)) return false;
-  const res = await withSessionOwner(userId, (tx) =>
-    tx.userSession.updateMany({ where: { id: sid, userId, revokedAt: null }, data: { revokedAt: now, revokedBy: by.slice(0, 200) } }),
-  );
+  const res = await withSessionOwner(userId, async (tx) => {
+    const r = await tx.userSession.updateMany({ where: { id: sid, userId, revokedAt: null }, data: { revokedAt: now, revokedBy: by.slice(0, 200) } });
+    if (r.count > 0) await removeSessionSubscriptions(tx, userId, { only: sid });
+    return r;
+  });
   checks.set(sid, { decision: "reject", at: now.getTime() });
   return res.count > 0;
 }
@@ -185,6 +191,7 @@ export async function revokeOtherSessions(userId: string, currentSid: string | n
       create: { id: legacyRowId(userId), userId, deviceLabel: "Sessions from before the session list", createdAt: now, lastSeenAt: now, expiresAt: now, revokedAt: now, revokedBy: by.slice(0, 200) },
       update: { revokedAt: now, revokedBy: by.slice(0, 200) },
     });
+    await removeSessionSubscriptions(tx, userId, { except: currentSid });
     return res.count;
   });
   // Forget this process's "allow" answers (other sessions, and the legacy

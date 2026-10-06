@@ -36,15 +36,5 @@ export async function trustGuard(min: WorkspaceRole = "viewer"): Promise<TrustCo
 
 export const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 
-/**
- * Phase 18.3: the caller's own session id (token.sid), read from the cookie
- * server-side — never from the request body. Null for a token minted before
- * the registry (or a token that isn't the caller's).
- */
-export async function currentSessionId(userId: string): Promise<string | null> {
-  const { headers } = await import("next/headers");
-  const { readSessionToken } = await import("@/lib/auth/mfa/token");
-  const token = await readSessionToken({ headers: await headers() }).catch(() => null);
-  if (!token || token.sub !== userId) return null;
-  return typeof token.sid === "string" && token.sid ? token.sid : null;
-}
+/** Phase 18.3: the caller's own session id (token.sid) — lib/auth/current-session.ts. */
+export { currentSessionId } from "@/lib/auth/current-session";

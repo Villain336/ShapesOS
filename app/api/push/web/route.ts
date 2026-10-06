@@ -8,6 +8,7 @@
 // POST answers 409 and stores nothing.
 
 import { requireSelfService } from "@/lib/auth/require-self-service";
+import { currentSessionId } from "@/lib/auth/current-session";
 import { errorResponse } from "@/lib/api/errors";
 import { vapidConfigFromEnv } from "@/lib/push/vapid";
 import { listWebPushSubscriptions, parseSubscription, removeWebPushSubscription, saveWebPushSubscription } from "@/lib/push/web";
@@ -55,7 +56,10 @@ export async function POST(req: Request) {
     const parsed = parseSubscription(body.subscription);
     if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
     const ua = req.headers.get("user-agent");
-    const saved = await saveWebPushSubscription(me.id, { ...parsed.value, userAgent: ua });
+    // Phase 18.3 integration: remember which sign-in subscribed, so revoking
+    // that session (Settings → You → Privacy) stops pushes to this browser.
+    const sessionId = await currentSessionId(me.id).catch(() => null);
+    const saved = await saveWebPushSubscription(me.id, { ...parsed.value, userAgent: ua, sessionId });
     return Response.json(saved, { status: 201 });
   } catch (err) {
     return errorResponse(err, "POST /api/push/web", req);
