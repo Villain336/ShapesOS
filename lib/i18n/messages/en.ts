@@ -106,6 +106,9 @@ export const en = {
       "/dashboard/ops": { label: "Operations", description: "Orders, invoices, inventory, projects, helpdesk, team" },
       "/dashboard/office": { label: "Office", description: "Docs, sheets and decks" },
       "/dashboard/files": { label: "Files", description: "Workspace files" },
+      // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
+      "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
+      "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },
       "/dashboard/esign": { label: "E-sign", description: "Signature envelopes" },
       "/dashboard/legal": { label: "Legal", description: "Licenses, filings, compliance" },
       "/dashboard/insurance": { label: "Insurance", description: "Policies and renewals" },

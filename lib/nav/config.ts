@@ -274,8 +274,11 @@ export const NAV_SYSTEM_ACTIONS: readonly (NavItem & { hotkey?: string })[] = [
 ];
 
 /** The ⌘K "Go" section: one command per nav destination, in nav order, then the system actions. */
-export function navCommands(groups: NavGroup[] = NAV_GROUPS): NavCommand[] {
-  return [...navGroupCommands(groups), ...NAV_SYSTEM_ACTIONS.map((a) => ({
+export function navCommands(
+  groups: NavGroup[] = NAV_GROUPS,
+  systemActions: readonly (NavItem & { hotkey?: string })[] = NAV_SYSTEM_ACTIONS,
+): NavCommand[] {
+  return [...navGroupCommands(groups), ...systemActions.map((a) => ({
     id: `go:${a.href}`,
     section: "go" as const,
     title: a.label,

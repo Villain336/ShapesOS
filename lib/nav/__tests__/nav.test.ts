@@ -123,7 +123,22 @@ describe("⌘K Go section", () => {
   it("CommandBar builds its Go list from the nav config", () => {
     const src = readFileSync(path.join(ROOT, "components/command-bar/CommandBar.tsx"), "utf8");
     // Phase 18.1: the same nav config, in the person's language (lib/nav/i18n.ts).
-    assert.match(src, /navCommands\(localizeNavGroups\(NAV_GROUPS, messages\)\)/);
+    assert.match(src, /navCommands\(localizeNavGroups\(NAV_GROUPS, messages\), NAV_SYSTEM_ACTIONS\.map\(\(a\) => localizeNavItem\(a, messages\)\)\)/);
+  });
+
+  it("the desk's system actions are localized too (Switch app, Split view)", async () => {
+    const { localizeNavItem } = await import("../i18n");
+    const { en } = await import("@/lib/i18n/messages/en");
+    const { es } = await import("@/lib/i18n/messages/es");
+    const { mergeCatalogues } = await import("@/lib/i18n");
+    const ES = mergeCatalogues(en, es);
+    const cmds = navCommands(NAV_GROUPS, NAV_SYSTEM_ACTIONS.map((a) => localizeNavItem(a, ES)));
+    const sw = cmds.find((c) => c.href === "/dashboard/switch")!;
+    assert.equal(sw.title, "Cambiar de app");
+    assert.match(sw.keywords, /Switch app/, "English words stay searchable");
+    assert.equal(cmds.find((c) => c.href === "/dashboard/split")!.title, "Vista dividida");
+    // English catalogue = the config's own words.
+    for (const a of NAV_SYSTEM_ACTIONS) assert.equal(localizeNavItem(a, en).label, a.label);
   });
 
   it("the localized nav keeps every destination and English search words (Phase 18.1)", async () => {

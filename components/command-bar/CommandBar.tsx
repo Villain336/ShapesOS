@@ -121,8 +121,8 @@ import {
 // Phase 18.1 (WS=find): the palette in the person's language; nav titles come
 // from the localized overlay (English kept as search keywords).
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { localizeNavGroups } from "@/lib/nav/i18n";
-import { NAV_GROUPS } from "@/lib/nav/config";
+import { localizeNavGroups, localizeNavItem } from "@/lib/nav/i18n";
+import { NAV_GROUPS, NAV_SYSTEM_ACTIONS } from "@/lib/nav/config";
 import type { Translator } from "@/lib/i18n";
 
 // Budgets from docs/specs/SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
@@ -259,7 +259,11 @@ async function postAudit(payload: AuditPayload): Promise<void> {
 export function CommandBar({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
   const { t, messages } = useI18n();
-  const goItems = useMemo<UICommand[]>(() => navCommands(localizeNavGroups(NAV_GROUPS, messages)), [messages]);
+  // Phase 18.1 (integration): the desk's system actions (Switch app, Split view) localized too.
+  const goItems = useMemo<UICommand[]>(
+    () => navCommands(localizeNavGroups(NAV_GROUPS, messages), NAV_SYSTEM_ACTIONS.map((a) => localizeNavItem(a, messages))),
+    [messages],
+  );
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page>({ name: "root" });
   const [query, setQuery] = useState("");

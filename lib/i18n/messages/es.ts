@@ -103,6 +103,8 @@ export const es: Catalogue = {
       "/dashboard/ops": { label: "Operaciones", description: "Pedidos, facturas, inventario, proyectos, soporte, equipo" },
       "/dashboard/office": { label: "Oficina", description: "Documentos, hojas y presentaciones" },
       "/dashboard/files": { label: "Archivos", description: "Archivos del espacio de trabajo" },
+      "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
+      "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
       "/dashboard/legal": { label: "Legal", description: "Licencias, trámites, cumplimiento" },
       "/dashboard/insurance": { label: "Seguros", description: "Pólizas y renovaciones" },
