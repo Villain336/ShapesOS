@@ -121,7 +121,7 @@ export async function applyInvoicePayment(tx: Tx, actor: OpsActor, input: ApplyP
   // Phase 11 (conncore): paid in full by a payment → invoice.paid (same
   // dedup key as a status patch, so it is delivered once), in this transaction.
   if (status === "paid") {
-    await emitOpsEvent(tx, actor.workspaceId, invoicePaidEvent({ ...inv, paidCents, status, paidAt: new Date() } as unknown as Record<string, unknown>));
+    await emitOpsEvent(tx, actor.workspaceId, invoicePaidEvent({ ...inv, paidCents, status, paidAt: new Date() } as unknown as Record<string, unknown>), actor.userId);
   }
   return { payment, invoice: { ...inv, paidCents, status }, balanceDueCents: balance - input.amountCents };
 }

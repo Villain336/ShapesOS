@@ -80,9 +80,9 @@ function fixtures() {
     ]),
     // Phase 18.3 (WS=trust): autopilot drafts and workflow approval gates.
     autopilotItem: both((ws) => [
-      { id: `${ws}_ap`, status: "pending", kind: "decay_refresh", sourceRef: "finding_1", title: "Refresh the pricing page", reviewNote: null, createdAt: at(23), projectId: `${ws}_p`, project: { workspaceId: ws, name: "Site" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
-      { id: `${ws}_ap_done`, status: "approved", kind: "decay_refresh", sourceRef: "finding_2", title: "Done already", reviewNote: null, createdAt: at(24), projectId: `${ws}_p`, project: { workspaceId: ws, name: "Site" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
-      { id: `${ws}_gate`, status: "pending", kind: "keyword_brief", sourceRef: `workflow_run:${ws}_wr:node_9`, title: "Workflow approval: Launch — Approve copy", reviewNote: "Check the copy", createdAt: at(25), projectId: `${ws}_p`, project: { workspaceId: ws, name: "Site" }, rule: { name: "Workflow approvals" }, run: { createdBy: "workflow" } },
+      { id: `${ws}_ap`, status: "pending", kind: "decay_refresh", sourceRef: "finding_1", title: "Refresh the pricing page", reviewNote: null, createdAt: at(23), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
+      { id: `${ws}_ap_done`, status: "approved", kind: "decay_refresh", sourceRef: "finding_2", title: "Done already", reviewNote: null, createdAt: at(24), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Weekly refresh" }, run: { createdBy: "u_editor" } },
+      { id: `${ws}_gate`, status: "pending", kind: "keyword_brief", sourceRef: `workflow_run:${ws}_wr:node_9`, title: "Workflow approval: Launch — Approve copy", reviewNote: "Check the copy", createdAt: at(25), projectId: `${ws}_p`, project: { workspaceId: ws, domain: "site.example" }, rule: { name: "Workflow approvals" }, run: { createdBy: "workflow" } },
     ]),
     workflowRun: both((ws) => [
       { id: `${ws}_wr`, status: "waiting_approval", createdBy: "u_owner", triggerKind: "manual", workflowId: `${ws}_wf`, workflow: { name: "Launch" }, project: { workspaceId: ws } },

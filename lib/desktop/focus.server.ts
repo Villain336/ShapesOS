@@ -8,9 +8,9 @@
 
 import { prisma } from "@/lib/prisma";
 import type { NotificationKind } from "@prisma/client";
-import { queuePushForNotifications } from "@/lib/push/notify";
-import { filterByNotificationPrefs } from "@/lib/preferences";
 import { focusEndsAt, isFocusActive, validFocusEnd, type FocusState } from "./focus";
+// Phase 18.3 (WS=trust): released rows go out on every channel the person allows.
+import { deliverNow } from "@/lib/notifications/deliver";
 
 export interface FocusView {
   on: boolean;
@@ -102,12 +102,12 @@ export async function releaseHeldNotifications(userId: string, now: Date = new D
   }
   if (claimed.length) {
     try {
-      // Phase 18.1 integration: the person's push channel (lib/preferences)
-      // decides what a released row pushes, exactly as when it was written.
-      const pushable = await filterByNotificationPrefs(claimed, "push");
-      if (pushable.length === 0) return claimed.length;
-      queuePushForNotifications(
-        pushable.map((r) => ({
+      // Phase 18.1 integration: the person's channels (lib/preferences)
+      // decide what a released row delivers, exactly as when it was written.
+      // Phase 18.3 (WS=trust): every delivery channel (phone push, Web Push,
+      // Slack) through the same seam as the producers.
+      await deliverNow(
+        claimed.map((r) => ({
           workspaceId: r.workspaceId,
           userId: r.userId,
           kind: r.kind as NotificationKind,
@@ -120,7 +120,7 @@ export async function releaseHeldNotifications(userId: string, now: Date = new D
         })),
       );
     } catch {
-      // push is best-effort; the rows are in the bell either way
+      // delivery is best-effort; the rows are in the bell either way
     }
   }
   return claimed.length;

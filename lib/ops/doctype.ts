@@ -280,7 +280,7 @@ export async function opsCreate(
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
       // Phase 11 (conncore): outbound webhook events, in this transaction.
-      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
+      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row, actor.userId);
     }
     return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
@@ -302,7 +302,7 @@ export async function opsCreate(
   for (const row of rows) {
     await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
     // Phase 11 (conncore): outbound webhook events, in this transaction.
-    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row, actor.userId);
   }
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
@@ -611,7 +611,7 @@ export async function opsPatch(
     });
     const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
-    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row, actor.userId);
     return { outcome: "done", row, action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
@@ -619,7 +619,7 @@ export async function opsPatch(
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   // Phase 11 (conncore): outbound webhook events (invoice sent/paid, deal
   // moved/won/lost, ticket solved…) in this transaction.
-  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
+  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row, actor.userId);
   return { outcome: "done", row, action: "update" };
 }
 

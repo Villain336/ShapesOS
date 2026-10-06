@@ -9,12 +9,13 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { aosButton } from "@/components/aos/button";
 import { AgentAvatar } from "@/components/aos/AgentAvatar";
+import { LEAD_AGENT } from "@/lib/aos/agents";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
 import type { DataAccessRow } from "@/lib/privacy/data-access";
 import { fieldCls, labelCls, rowCls, tableCls, tableWrapCls, tdCls, thCls } from "./kit";
 
-const AGENT_NAMES: Record<string, string> = { lead: "Strategist" };
+const AGENT_NAMES: Record<string, string> = { lead: LEAD_AGENT.name };
 
 export function DataAccessTable({ scope, initial, groups }: { scope: "me" | "workspace"; initial: DataAccessRow[]; groups?: string[] }) {
   const { t, format } = useI18n();
