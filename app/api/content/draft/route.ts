@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
   // Fail-soft: capture never breaks draft generation.
   const episodeId = await captureEpisode({
     workspaceId: contentItem.project.workspaceId,
+    userId: user.id, // Phase 18.3: what agents remember from this person's work
     agentId: "content-brief",
     promptSummary: `Draft article for keyword "${brief.keyword}"`,
     outputSummary: draft,
