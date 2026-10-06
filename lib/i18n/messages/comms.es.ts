@@ -340,6 +340,7 @@ export const commsEs: Catalogue<typeof commsEn> = {
     agentBadge: "Agente",
     noteBadge: "Nota",
     presence: { active: "Activo", away: "Ausente", offline: "Desconectado", focus: "Concentrado" },
+    activeAgo: "Activo {ago}",
     lastSeen: "Visto {ago}",
     proposalTitle: "{agent} quiere hacer esto",
     proposalBody: "Nada cambia hasta que alguien lo apruebe. Al aprobar se ejecuta como tú, con tu rol.",

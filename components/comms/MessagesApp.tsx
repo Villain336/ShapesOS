@@ -345,6 +345,8 @@ function ChannelRow({ channel, active, onSelect }: { channel: ChannelView; activ
 
 function presenceText(t: ReturnType<typeof useI18n>["t"], p: PresenceView | undefined, relative: (d: string) => string): string {
   if (!p) return t("comms.messages.presence.offline");
+  // "Active 5 minutes ago" while away; "Last seen …" once offline.
+  if (p.status === "away" && p.lastSeenAt) return t("comms.messages.activeAgo", { ago: relative(p.lastSeenAt) });
   if (p.status === "offline" && p.lastSeenAt) return t("comms.messages.lastSeen", { ago: relative(p.lastSeenAt) });
   return t(`comms.messages.presence.${p.status}`);
 }

@@ -340,6 +340,7 @@ export const commsEn = {
     agentBadge: "Agent",
     noteBadge: "Note",
     presence: { active: "Active", away: "Away", offline: "Offline", focus: "Focusing" },
+    activeAgo: "Active {ago}",
     lastSeen: "Last seen {ago}",
     proposalTitle: "{agent} wants to do this",
     proposalBody: "Nothing changes until someone approves. Approving runs it as you, with your role.",

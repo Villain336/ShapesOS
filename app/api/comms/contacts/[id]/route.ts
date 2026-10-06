@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const ctx = await commsGuard("viewer");
     const { id } = await params;
-    const detail = await withWorkspaceScope(ctx.workspaceId, (tx) => getIdentityDetail(tx, ctx.workspaceId, String(id).slice(0, 64)));
+    const detail = await withWorkspaceScope(ctx.workspaceId, (tx) => getIdentityDetail(tx, ctx.workspaceId, String(id).slice(0, 64), ctx.userId));
     return Response.json(detail);
   } catch (err) {
     return errorResponse(err, "GET /api/comms/contacts/[id]");

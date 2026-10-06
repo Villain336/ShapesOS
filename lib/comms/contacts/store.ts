@@ -406,7 +406,7 @@ function cardOf(i: { id: string; displayName: string; emails: string[]; phones: 
 }
 
 /** One person: every linked record, the timeline across them, and pending suggestions about them. */
-export async function getIdentityDetail(db: Db, workspaceId: string, identityId: string): Promise<IdentityDetail> {
+export async function getIdentityDetail(db: Db, workspaceId: string, identityId: string, viewerUserId: string | null = null): Promise<IdentityDetail> {
   const identity = await db.contactIdentity.findFirst({ where: { id: identityId, workspaceId } });
   if (!identity) throw new ContactsError(404, "Contact not found.");
   const recs = await recordsOf(db, workspaceId, identityId);
@@ -422,7 +422,7 @@ export async function getIdentityDetail(db: Db, workspaceId: string, identityId:
     linkedVia: link.linkedVia,
     confirmedAt: link.confirmedAt ? link.confirmedAt.toISOString() : null,
   }));
-  const timeline = await identityTimeline(db, workspaceId, recs.map((x) => x.r));
+  const timeline = await identityTimeline(db, workspaceId, recs.map((x) => x.r), 60, viewerUserId);
   const suggestions = (await listSuggestions(db, { workspaceId, status: "pending", identityId, limit: 20 })).items;
   return { identity: cardOf(identity, [...new Set(records.map((r) => r.kind))]), records, timeline, suggestions };
 }
@@ -433,7 +433,12 @@ export async function getIdentityDetail(db: Db, workspaceId: string, identityId:
  * tickets and invoices, funding interactions, and cached mail threads that
  * include one of their addresses. Newest first, bounded.
  */
-export async function identityTimeline(db: Db, workspaceId: string, records: PersonRecord[], limit = 60): Promise<TimelineItem[]> {
+/**
+ * The timeline across a person's linked records. Cached Gmail / Outlook
+ * threads are PERSONAL: they appear only for their owner (viewerUserId), and
+ * not at all without one.
+ */
+export async function identityTimeline(db: Db, workspaceId: string, records: PersonRecord[], limit = 60, viewerUserId: string | null = null): Promise<TimelineItem[]> {
   const leadIds = records.filter((r) => r.kind === "lead").map((r) => r.id);
   const contactIds = records.filter((r) => r.kind === "ops_contact").map((r) => r.id);
   const fundingIds = records.filter((r) => r.kind === "funding_contact").map((r) => r.id);
@@ -479,8 +484,8 @@ export async function identityTimeline(db: Db, workspaceId: string, records: Per
         })
       : none,
     fundingIds.length ? db.fundingInteraction.findMany({ where: { workspaceId, contactId: { in: fundingIds } }, orderBy: { occurredAt: "desc" }, take, select: { id: true, kind: true, summary: true, occurredAt: true } }) : none,
-    emails.length
-      ? db.mailThreadCache.findMany({ where: { workspaceId, participants: { hasSome: emails } }, orderBy: { lastMessageAt: "desc" }, take, select: { id: true, source: true, subject: true, lastMessageAt: true, connectionId: true, externalId: true } })
+    emails.length && viewerUserId
+      ? db.mailThreadCache.findMany({ where: { workspaceId, ownerUserId: viewerUserId, participants: { hasSome: emails } }, orderBy: { lastMessageAt: "desc" }, take, select: { id: true, source: true, subject: true, lastMessageAt: true, connectionId: true, externalId: true } })
       : none,
   ]);
   const items: TimelineItem[] = [];

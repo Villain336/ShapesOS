@@ -126,6 +126,20 @@ describe("a person decides", () => {
     const identityId = await inWs(WS_A, (tx) => store.identityForRecord(tx, WS_A, "lead", ids.lead!));
     const d = await inWs(WS_A, (tx) => store.getIdentityDetail(tx, WS_A, identityId));
     assert.ok(d.timeline.some((e) => e.type === "mail" && e.title.includes(`Pricing question ${RUN}`)));
+
+    // A cached Gmail thread is personal: it shows for its owner only.
+    const conn = await prisma.connectorConnection.create({ data: { workspaceId: WS_A, connectorKey: "gmail", userId: OWNER, status: "active", scopes: [] } });
+    await inWs(WS_A, (tx) =>
+      tx.mailThreadCache.create({
+        data: { workspaceId: WS_A, connectionId: conn.id, ownerUserId: OWNER, source: "gmail", externalId: `t-${RUN}`, latestMessageId: `m-${RUN}`, subject: `Private renewal ${RUN}`, participants: [EMAIL], lastMessageAt: new Date(), unread: false, labels: [] },
+      }),
+    );
+    const own = await inWs(WS_A, (tx) => store.getIdentityDetail(tx, WS_A, identityId, OWNER));
+    assert.ok(own.timeline.some((e) => e.title === `Private renewal ${RUN}`), "the owner sees their own thread");
+    const other = await inWs(WS_A, (tx) => store.getIdentityDetail(tx, WS_A, identityId, `someone-else-${RUN}`));
+    assert.ok(!other.timeline.some((e) => e.title === `Private renewal ${RUN}`), "a teammate never does");
+    const anon = await inWs(WS_A, (tx) => store.getIdentityDetail(tx, WS_A, identityId));
+    assert.ok(!anon.timeline.some((e) => e.title === `Private renewal ${RUN}`), "nor a caller with no viewer");
   });
 });
 

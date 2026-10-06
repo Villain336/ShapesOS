@@ -35,7 +35,7 @@ export async function nextMeetingsPrep(input: { workspaceId: string; userId: str
           input.workspaceId,
           identity.links.map((l) => ({ kind: l.recordKind as "lead", id: l.recordId })),
         );
-        const timeline = await identityTimeline(tx, input.workspaceId, [...recs.values()], 10);
+        const timeline = await identityTimeline(tx, input.workspaceId, [...recs.values()], 10, input.userId);
         const last = timeline.find((t) => t.type !== "meeting");
         const deals = timeline.filter((t) => t.type === "deal" && /\bopen\b/.test(t.detail ?? "")).slice(0, 2);
         const parts = [`${identity.displayName}${identity.companies[0] ? ` (${identity.companies[0]})` : ""}`];
