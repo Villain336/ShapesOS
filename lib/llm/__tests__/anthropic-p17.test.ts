@@ -287,7 +287,7 @@ describe("A4 — service tier", () => {
     assert.equal("service_tier" in (build("claude-opus-5-5", base()).params as unknown as P), false);
   });
 
-  it("generate() never takes priority capacity and records its timing", async () => {
+  it("generate() on a non-interactive workload never takes priority capacity (copy keeps the default) and records its timing", async () => {
     const records: ChatUsageRecord[] = [];
     restore = __setChatUsageRecorder(async (r) => void records.push(r));
     const sent: P[] = [];
@@ -296,6 +296,8 @@ describe("A4 — service tier", () => {
     };
     await new AnthropicLlmProvider("k", "claude-haiku-4-5", { client, workload: "background" }).generate("x", { usage: { workspaceId: "ws" } });
     assert.equal(sent[0].service_tier, "standard_only");
+    await new AnthropicLlmProvider("k", "claude-haiku-4-5", { client, workload: "copy" }).generate("x");
+    assert.equal("service_tier" in sent[1], false, "copy: a person may be waiting");
     assert.equal(records.length, 1);
     assert.ok(typeof records[0].timing?.durationMs === "number");
     assert.equal(records[0].serviceTier, "standard");

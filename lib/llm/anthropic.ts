@@ -73,6 +73,9 @@ import type {
 } from "./types";
 
 export const ANTHROPIC_TIMEOUT_MS = 120_000;
+
+/** Phase 17 (A4): workloads no person waits on (never priority capacity). */
+export const NON_INTERACTIVE_WORKLOADS: ReadonlySet<string> = new Set(["bulk", "background", "subagent"]);
 export const ANTHROPIC_MAX_RETRIES = 1;
 
 /** Map an SDK error to a classified, key-free LlmProviderError. */
@@ -795,10 +798,11 @@ export class AnthropicLlmProvider implements LlmProvider {
           model: this.model,
           max_tokens: maxTokens,
           messages: [{ role: "user", content: prompt }],
-          // Phase 17 (A4): generate() serves copy / bulk / background work —
-          // never a person waiting on a stream — so it never takes priority
-          // capacity (SDK service_tier: 'auto' | 'standard_only').
-          service_tier: "standard_only",
+          // Phase 17 (A4): bulk / background / sub-agent work nobody waits
+          // for never takes priority capacity (SDK service_tier: 'auto' |
+          // 'standard_only'); copy (a person may be waiting on a draft) keeps
+          // the API default.
+          ...(NON_INTERACTIVE_WORKLOADS.has(this.workload ?? "") ? { service_tier: "standard_only" as const } : {}),
         },
         opts?.signal ? { signal: opts.signal } : undefined,
       );
