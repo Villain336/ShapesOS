@@ -22,6 +22,7 @@ import { WorkspaceBoundLlmProvider, valueActionMeterFields } from "@/lib/llm/wor
 import { llmTokenCredits } from "@/lib/metering/credits";
 import { checkCap, getUsageSummary, meter, setSpendCap } from "@/lib/metering/service";
 import { joinCreditPool, leaveCreditPool } from "@/lib/metering/pool";
+import { flushUsageRecording } from "@/lib/llm/usage";
 
 const RUN = randomUUID().slice(0, 8);
 const ids = {
@@ -94,6 +95,7 @@ describe("model token billing (Phase 15.2)", () => {
   it("a platform-key call is debited ceil(cost × 1.5) credits through meter()", async () => {
     const p = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_1`) });
     await p.chat({ messages: [{ role: "user", content: "hi" }], maxTokens: 64, usage: { workspaceId: ids.starter } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_1` } });
     assert.equal(ev.credits, OPUS_CALL_CREDITS);
     assert.equal(OPUS_CALL_CREDITS, 2);
@@ -105,6 +107,7 @@ describe("model token billing (Phase 15.2)", () => {
   it("a BYOK call (the workspace's own key) is recorded at 0 credits with keySource workspace and the credits it saved", async () => {
     const p = new AnthropicLlmProvider("ws-own-key", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_2`), keySource: "workspace" });
     await p.chat({ messages: [{ role: "user", content: "hi" }], maxTokens: 64, usage: { workspaceId: ids.byok } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_2` } });
     assert.equal(ev.credits, 0);
     assert.equal(ev.keySource, "workspace");
@@ -121,7 +124,9 @@ describe("model token billing (Phase 15.2)", () => {
     const p = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_3`) });
     // The same provider response id twice (a retried record / a replayed turn).
     await p.chat({ messages: [{ role: "user", content: "a" }], maxTokens: 64, usage: { workspaceId: ids.starter } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     await p.chat({ messages: [{ role: "user", content: "a" }], maxTokens: 64, usage: { workspaceId: ids.starter } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     assert.equal(await prisma.usageEvent.count({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_3` } }), 1);
     assert.equal((await used(ids.starter)) - before, OPUS_CALL_CREDITS);
   });
@@ -140,6 +145,7 @@ describe("model token billing (Phase 15.2)", () => {
     const p = new OpenAiCompatibleLlmProvider("k", "gpt-5.5", "https://api.openai.com/v1", { fetchImpl: fakeFetch });
     const before = await used(ids.starter);
     const out = await p.generate("hi", { usage: { workspaceId: ids.starter } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     assert.equal(out, "Hello");
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:openai-compatible:chatcmpl_tb_${RUN}` } });
     // gpt-5.5: 10,000×5 + 10,000×30 + 10,000×0.5 = 355,000 micro-USD → ceil(53.25) = 54.
@@ -165,6 +171,7 @@ describe("model token billing (Phase 15.2)", () => {
   it("the workspace's own key is never gated by the platform credit cap", async () => {
     const p = new AnthropicLlmProvider("own", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_5`), keySource: "workspace" });
     const res = await p.chat({ messages: [{ role: "user", content: "x" }], maxTokens: 64, usage: { workspaceId: ids.capped } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     assert.equal(res.stopReason, "end_turn");
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_5` } });
     assert.equal(ev.credits, 0);
@@ -174,6 +181,7 @@ describe("model token billing (Phase 15.2)", () => {
     await setSpendCap(ids.capped, { capCredits: 1 }); // 1 credit left; the call costs 2
     const p = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_6`) });
     await p.chat({ messages: [{ role: "user", content: "x" }], maxTokens: 64, usage: { workspaceId: ids.capped } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_6` } });
     assert.equal(ev.credits, OPUS_CALL_CREDITS);
     assert.equal((await checkCap(ids.capped)).allowed, false);
@@ -192,6 +200,7 @@ describe("model token billing (Phase 15.2)", () => {
     const inner = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_tb_${RUN}_8`) });
     const bound = new WorkspaceBoundLlmProvider(inner, { workspaceId: ids.starter, billing: "included" }, "platform");
     await bound.generate("draft");
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const ev = await prisma.usageEvent.findUniqueOrThrow({ where: { idempotencyKey: `llm:anthropic:msg_tb_${RUN}_8` } });
     assert.equal(ev.credits, 0);
     assert.equal(await used(ids.starter), before);

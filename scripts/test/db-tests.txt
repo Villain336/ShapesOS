@@ -184,3 +184,5 @@ lib/zernio/__tests__/zernio-db.test.ts
 # Phase 15.4 (zernio): the /api/zernio routes (session stubbed) on the labelled FAKE Zernio — viewers read without creating a profile; admins connect; the callback works only for the user the state was signed for and records only accounts on that workspace's profile; OpenAI Ads keys pass through unstored; "use in every project" idempotent; the metering cron skips without a live key.
 lib/zernio/__tests__/zernio-routes-db.test.ts
 lib/runtime/__tests__/agent-drain-db.test.ts
+# Phase 17 (latency): async usage metering through the agent_jobs outbox — background ledger write, crash between ledger and run event retried once, dead writer's row finished by a worker, replays idempotent, 0-credit events never take the balance lock, cap still checked before the call.
+lib/llm/__tests__/usage-outbox-db.test.ts

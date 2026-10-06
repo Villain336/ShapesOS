@@ -17,6 +17,7 @@ import { createAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
 import { runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
 import { AnthropicLlmProvider, type AnthropicClientLike } from "../anthropic";
 import { MockLlmProvider } from "../mock";
+import { flushUsageRecording } from "@/lib/llm/usage";
 
 // usage_events is append-only (a trigger refuses DELETE): unique ids per run,
 // workspaces are left in place.
@@ -88,6 +89,7 @@ describe("chat() usage → metering + run cost (DB)", () => {
       maxTokens: 128,
       usage: { workspaceId: WS_A, runId: run.id, actorId: "user-a", agentKey: "lead" },
     });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     // 1000×4 + 200×20 + 5000×0.2 + 400×5 = 4000 + 4000 + 1000 + 2000
     assert.equal(res.costMicroUsd, 11_000);
 
@@ -123,8 +125,10 @@ describe("chat() usage → metering + run cost (DB)", () => {
     const run = await createAgentRun({ workspaceId: WS_A, kind: "chat", startedBy: "user-a" });
     const p1 = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_p7_${RUN}_2`) });
     await p1.chat({ messages: [{ role: "user", content: "a" }], maxTokens: 64, usage: { workspaceId: WS_A, runId: run.id } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const p2 = new AnthropicLlmProvider("k", "claude-sonnet-5-5", { client: client(`msg_p7_${RUN}_3`) });
     for await (const _ of p2.chatStream({ messages: [{ role: "user", content: "b" }], maxTokens: 64, usage: { workspaceId: WS_A, runId: run.id } })) void _;
+    await flushUsageRecording();
 
     const streamed = await prisma.usageEvent.findUnique({ where: { idempotencyKey: `llm:anthropic:msg_p7_${RUN}_3` } });
     assert.ok(streamed);
@@ -146,6 +150,7 @@ describe("chat() usage → metering + run cost (DB)", () => {
     const run = await createAgentRun({ workspaceId: WS_A, kind: "chat", startedBy: "user-a" });
     const p = new AnthropicLlmProvider("k", "claude-opus-4-8", { client: client(`msg_p7_${RUN}_4`) });
     const res = await p.chat({ messages: [{ role: "user", content: "c" }], maxTokens: 64, usage: { workspaceId: WS_A, runId: run.id } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     assert.equal(res.costMicroUsd, null);
     const ev = await prisma.usageEvent.findUnique({ where: { idempotencyKey: `llm:anthropic:msg_p7_${RUN}_4` } });
     assert.equal(ev?.llmCostMicroUsd, null);
@@ -168,6 +173,7 @@ describe("chat() usage → metering + run cost (DB)", () => {
     try {
       const p = new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_p7_${RUN}_5`) });
       const res = await p.chat({ messages: [{ role: "user", content: "d" }], maxTokens: 64, usage: { workspaceId: WS_A, runId: otherRun.id } });
+      await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
       assert.equal(res.stopReason, "end_turn");
     } finally {
       console.warn = warn;
@@ -182,7 +188,9 @@ describe("chat() usage → metering + run cost (DB)", () => {
   it("no usage context, or a mock provider, records nothing", async () => {
     const before = await prisma.usageEvent.count({ where: { workspaceId: WS_B, action: "llm_tokens" } });
     await new AnthropicLlmProvider("k", "claude-opus-5-5", { client: client(`msg_p7_${RUN}_6`) }).chat({ messages: [{ role: "user", content: "e" }], maxTokens: 64 });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     await new MockLlmProvider().chat({ messages: [{ role: "user", content: "f" }], maxTokens: 64, usage: { workspaceId: WS_B } });
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     assert.equal(await prisma.usageEvent.count({ where: { workspaceId: WS_B, action: "llm_tokens" } }), before);
     assert.equal(await prisma.usageEvent.count({ where: { idempotencyKey: `llm:anthropic:msg_p7_${RUN}_6` } }), 0);
   });
