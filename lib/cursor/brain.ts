@@ -22,7 +22,7 @@ import type { WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import type { ChatContentBlock, ChatMessage, ChatResponse, ChatToolResultBlock, ChatToolUseBlock, LlmProvider } from "@/lib/llm/types";
+import type { ChatContentBlock, ChatMessage, ChatResponse, ChatToolDef, ChatToolResultBlock, ChatToolUseBlock, LlmProvider } from "@/lib/llm/types";
 import { LlmProviderError } from "@/lib/llm/errors";
 import { MockLlmProvider } from "@/lib/llm/mock";
 import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
@@ -334,7 +334,7 @@ export async function runCursorTurn(
     if (!tools) return undefined;
     const deferred = tools.defs.filter((d) => d.deferLoading);
     if (deferred.length === 0 || serverSearch) return tools.defs;
-    const out = tools.defs.filter((d) => !d.deferLoading || activated.has(d.name)).map((d) => ({ ...d, deferLoading: undefined }));
+    const out: ChatToolDef[] = tools.defs.filter((d) => !d.deferLoading || activated.has(d.name)).map((d) => ({ ...d, deferLoading: undefined }));
     if (deferred.some((d) => !activated.has(d.name))) out.push(SEARCH_TOOLS_DEF);
     return out;
   };

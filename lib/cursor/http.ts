@@ -13,7 +13,6 @@
 import type { WorkspaceRole } from "@prisma/client";
 import { getMembership } from "@/lib/authz";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
 import { bearerCursorToken, cursorTokenSecret, verifyCursorToken } from "./token";
 
 export class CursorHttpError extends Error {
@@ -45,8 +44,8 @@ export async function resolveCursorCaller(req: Request): Promise<CursorCallerInf
     if (!v.ok) throw new CursorHttpError(401, v.reason === "expired" ? "token_expired" : "unauthorized", v.reason === "expired" ? "The cursor token expired. Ask for a new one." : "Invalid cursor token.");
     const m = await getMembership(v.claims.uid, v.claims.ws);
     if (!m) throw new CursorHttpError(401, "unauthorized", "You are no longer a member of that workspace.");
-    const user = await prisma.user.findUnique({ where: { id: v.claims.uid }, select: { name: true } });
-    return { userId: v.claims.uid, name: user?.name ?? null, workspaceId: v.claims.ws, role: m.role, via: "token" };
+    // Users live in the session (JWT), not a table: a token caller has no display name.
+    return { userId: v.claims.uid, name: null, workspaceId: v.claims.ws, role: m.role, via: "token" };
   }
   const user = await requireUser();
   if (!user?.id) throw new CursorHttpError(401, "unauthorized", "Sign in to use the cursor.");
