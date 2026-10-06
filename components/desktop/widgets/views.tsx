@@ -169,7 +169,9 @@ function AgentsView({ data, i18n: { t } }: ViewProps<AgentsData>) {
   }
   return (
     <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-      <LeadAgentCard tree={data.tree} action={data.leadAction} className="shadow-none ring-1 ring-line" t={t} />
+      {/* Three branches fit the widget's default height in every language; the
+          card says how many more, and "Open" shows the whole tree. */}
+      <LeadAgentCard tree={data.tree} action={data.leadAction} className="shadow-none ring-1 ring-line" t={t} maxBranches={3} />
       <div className="flex min-w-0 flex-col gap-4">
         <LiveActivity counts={data.tree.counts} run={data.live?.run} chips={data.live?.chips} />
       </div>

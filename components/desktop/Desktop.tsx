@@ -372,7 +372,7 @@ export function Desktop({
                 )}
                 <h2 className="min-w-0 flex-1 truncate text-base font-bold stretch-heading tracking-heading text-ink">{title}</h2>
                 {editing ? null : (
-                  <Link href={def.href} className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold text-ink hover:bg-hover">
+                  <Link href={def.href} className="inline-flex h-8 shrink-0 items-center rounded-full px-3 text-sm font-semibold text-ink hover:bg-hover">
                     {t("desk.desktop.open")}
                   </Link>
                 )}
