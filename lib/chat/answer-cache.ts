@@ -20,7 +20,8 @@
 
 import { createHash } from "node:crypto";
 import { LAYER_HEADERS, UNTRUSTED_CLOSE } from "@/lib/intelligence/company/prompt-context";
-import type { ChatMessage } from "@/lib/llm/types";
+import type { ChatContentBlock, ChatMessage } from "@/lib/llm/types";
+import { CONTEXT_OPEN } from "./context-markers";
 import type { ChatToolCall } from "./tool-exec";
 
 export const ANSWER_CACHE_TTL_MS = 10 * 60_000;
@@ -42,16 +43,32 @@ export function normalizeQuestion(text: string): string {
 export function answerCacheKey(input: { workspaceId: string; projectId: string; system: string; messages: readonly ChatMessage[] }): string | null {
   if (input.messages.length !== 1) return null;
   const last = input.messages[input.messages.length - 1];
-  const question = last && last.role === "user" && typeof last.content === "string" ? normalizeQuestion(last.content) : "";
+  if (!last || last.role !== "user") return null;
+  // Phase 17 (A1): the first user message carries the workspace context block
+  // (the data the answer stands on — it is part of the key, minus recalled
+  // episodes) and then the question itself as a separate text block.
+  const { context, question: raw } = splitFirstUserMessage(last.content);
+  const question = normalizeQuestion(raw);
   if (!question) return null;
-  const history = input.messages.slice(0, -1).map((m) => `${m.role}:${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`);
   const h = createHash("sha256");
   h.update(withoutEpisodes(input.system));
   h.update("\u0000");
-  h.update(history.join("\u0001"));
+  h.update(withoutEpisodes(context));
   h.update("\u0000");
   h.update(question);
   return `${input.workspaceId}:${input.projectId}:${h.digest("hex")}`;
+}
+
+/** The context block(s) and the user's own text of a first user message. PURE. */
+export function splitFirstUserMessage(content: string | readonly ChatContentBlock[]): { context: string; question: string } {
+  if (typeof content === "string") return { context: "", question: content };
+  const context: string[] = [];
+  const question: string[] = [];
+  for (const b of content) {
+    if (b.type !== "text") return { context: "", question: "" }; // attachments, images: never FAQ-style
+    (b.text.startsWith(CONTEXT_OPEN) ? context : question).push(b.text);
+  }
+  return { context: context.join("\n"), question: question.join("\n") };
 }
 
 /**

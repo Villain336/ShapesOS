@@ -359,8 +359,8 @@ export function staticSystemPrompt(input: StaticPromptInput): string {
     .join("\n");
 }
 
-export const CONTEXT_OPEN = "<workspace-context>";
-export const CONTEXT_CLOSE = "</workspace-context>";
+import { CONTEXT_OPEN, CONTEXT_CLOSE } from "./context-markers";
+export { CONTEXT_OPEN, CONTEXT_CLOSE };
 
 export interface WorkspaceContextParts {
   projectContext: string;
