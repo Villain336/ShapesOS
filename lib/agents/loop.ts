@@ -56,6 +56,7 @@ import { invalidToolResult } from "@/lib/llm/tool-input";
 import { LlmProviderError } from "@/lib/llm/errors";
 import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import type {
+  ChatCacheTtl,
   ChatContentBlock,
   ChatMessage,
   ChatRequest,
@@ -160,6 +161,27 @@ export const handBackText = (cycles: number): string =>
   "The diff so far is on the run page. Tell me how you'd like to proceed, or point me at the failing part.";
 
 export const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
+
+// ── Phase 17 (WS=model): per-workload request shape ─────────────────────────
+
+/**
+ * A1: the static prefix's cache TTL. People pause longer than 5 minutes
+ * between chat turns (and code runs are long), so the lead / code workloads
+ * take the 1-hour TTL; sub-agents and background runs are bursts of calls
+ * seconds apart, where the default 5-minute entry stays warm on its own.
+ */
+export function cacheTtlForWorkload(workload: LlmWorkload): ChatCacheTtl {
+  return workload === "lead" || workload === "code" || workload === "code_max" ? "1h" : "5m";
+}
+
+/**
+ * A4: nobody is waiting on a sub-agent / background / bulk call, so it never
+ * takes priority capacity ("standard_only"); a lead or code call keeps the
+ * API default ("auto").
+ */
+export function serviceTierForWorkload(workload: LlmWorkload): "standard_only" | undefined {
+  return workload === "lead" || workload === "code" || workload === "code_max" ? undefined : "standard_only";
+}
 export const MAX_TOKENS_NOTE =
   "Your last reply was cut off at the output-token limit. Continue exactly where you stopped; do not repeat what you already wrote.";
 
@@ -291,6 +313,12 @@ export interface AgentLoopInput {
   state?: LoopState | null;
   /** "build" routes the Operator to the code workload. */
   mode?: "build" | "default";
+  /**
+   * Phase 17 (A4): the workload of a fresh run when it is not the agent's
+   * own (a scheduled skill runs the lead's reach on the subagent workload:
+   * no person is waiting). Ignored on a resumed run (its state has one).
+   */
+  workload?: LlmWorkload;
   limits?: Partial<AgentLoopLimits>;
   /** Epoch ms: at a step boundary after this, stop with status "handoff". */
   handoffAt?: number;
@@ -509,7 +537,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       system: input.system,
       messages: input.messages,
       mode: input.mode,
-      workload: workloadForAgent(agentKey, { mode: input.mode }),
+      workload: input.workload ?? workloadForAgent(agentKey, { mode: input.mode }),
       now: now(),
     });
   }
@@ -638,8 +666,12 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       maxTokens: WORKLOAD_MAX_TOKENS[s.workload],
       thinking: "adaptive",
       cache: true,
+      // Phase 17 (A1): 1h for people, 5m for sub-agents / background.
+      cacheTtl: cacheTtlForWorkload(s.workload),
       cacheConversation: true,
       compaction: true,
+      // Phase 17 (A4): background work never takes priority capacity.
+      serviceTier: serviceTierForWorkload(s.workload),
       signal: ctx.signal,
       usage: {
         workspaceId: ctx.workspaceId,
@@ -912,6 +944,8 @@ async function compactClientSide(s: LoopState, provider: LlmProvider, tools: Loo
     maxTokens: 8192,
     toolChoice: "none",
     cache: true,
+    cacheTtl: cacheTtlForWorkload(s.workload),
+    serviceTier: serviceTierForWorkload(s.workload),
     signal: ctx.signal,
     usage: { workspaceId: ctx.workspaceId, projectId: ctx.projectId || null, actorId: ctx.userId || null, runId: ctx.runId ?? null, agentKey: ctx.agentKey ?? "lead" },
   });

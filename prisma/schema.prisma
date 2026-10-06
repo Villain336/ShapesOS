@@ -3381,6 +3381,11 @@ model AiChatThread {
   // it may use (server-computed grant; empty = the agent's defaults).
   agentKey     String   @default("lead") @map("agent_key")
   allowedTools String[] @default([]) @map("allowed_tools")
+  // Phase 17 (A3, WS=model): a short "facts so far" summary of earlier
+  // turns' read-tool results (lib/chat/facts.ts), carried into the next
+  // turn's context block as a labelled summary — never a transcript.
+  factsSummary   String?   @map("facts_summary") @db.Text
+  factsSummaryAt DateTime? @map("facts_summary_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
