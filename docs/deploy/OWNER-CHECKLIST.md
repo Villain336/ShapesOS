@@ -4,7 +4,7 @@ Only the steps that need you: identity, payment and legal. About 45 minutes in t
 
 ## 1. GitHub (10 min)
 
-- [ ] **Fix the Actions limit.** Settings → Billing and plans → Actions: check the minutes used and the spending limit. The `verify` job on #23 and #24 never got a runner; nothing builds until this is fixed. Then re-run the failed jobs on both runs.
+- [ ] **Check your Actions minutes.** Settings → Billing and plans → Actions. CI already runs on every pull request; each release adds one image build (roughly 30–60 minutes). The `verify` cancellations on #23/#24 cleared up on their own (`main` went green on 2026-10-05), so there is nothing to fix unless the minutes run out.
 - [ ] **Create the `production` environment.** Repo → Settings → Environments → New environment `production`:
   - Required reviewers: you.
   - Deployment branches: selected branches → `main`.
@@ -39,6 +39,10 @@ Only the steps that need you: identity, payment and legal. About 45 minutes in t
 - [ ] Set `MARKETR_PLATFORM_OPERATORS` to your user id or email.
 - [ ] Register OAuth apps on `https://app.shapesos.com` (Google, Microsoft, Slack, …) when you turn each connector on; the callback paths are in `.env.example`.
 - [ ] Approve the waiting release (Actions → release → Review deployments → production). I check the result and hand you the URLs.
+
+## 6. Turn on automatic releases (1 min, last)
+
+- [ ] When the first release is live and healthy: Settings → Secrets and variables → Actions → Variables → New repository variable `RELEASE_ENABLED` = `true`. From then on every green `ci` run on `main` builds a release and waits for your approval on the `production` environment. Until you set it, merges to `main` build nothing (a manual run of **release** still works).
 
 ## Later
 

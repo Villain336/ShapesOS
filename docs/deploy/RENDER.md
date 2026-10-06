@@ -419,7 +419,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 ## 10. First deploy
 
 1. Steps 5–9 done, GitHub variables (step 2.4) set.
-2. Open the waiting release run from step 4 and approve `production` (or start a new run on `main` with dry run unchecked; after this, every merge to `main` starts `release` by itself once `ci` passes, and waits for your approval).
+2. Open the waiting release run from step 4 and approve `production` (or start a new run on `main` with dry run unchecked; automatic releases stay off until you set the repository variable `RELEASE_ENABLED=true`; after that, every merge to `main` starts `release` by itself once `ci` passes, and waits for your approval).
 3. The deploy job logs each step: rollback targets → migrate image live → migrate job `succeeded` → worker live → web live → smoke `https://app.shapesos.com/api/health → 200 ok, commit <sha>`.
 4. Check by hand:
    - `https://shapesos.com` shows the website; `https://shapesos.com/login` lands on `https://app.shapesos.com/login`.

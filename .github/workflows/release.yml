@@ -13,6 +13,7 @@
 #   vars.RENDER_MIGRATE_SERVICE_ID    crn-… of shapesos-migrate
 #   vars.APP_URL                      https://app.shapesos.com (baked into the
 #                                     runner bundle; smoke-tested at /api/health)
+#   vars.RELEASE_ENABLED              "true" turns on automatic releases after ci
 # Images go to ghcr.io/<owner>/shapesos-{runner,worker,migrate,backup} with
 # the job's GITHUB_TOKEN (packages: write).
 #
@@ -49,9 +50,14 @@ jobs:
     # workflow_run also fires for ci runs of pull requests — including a fork
     # whose branch is named "main". Release only a successful ci run of a push
     # to this repository's main.
+    # Automatic releases stay off until the owner sets the repository variable
+    # RELEASE_ENABLED=true (OWNER-CHECKLIST.md step 6), so merges to main don't
+    # spend Actions minutes building images before Render exists. A manual run
+    # always works (dry run by default).
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
+      (vars.RELEASE_ENABLED == 'true' &&
+       github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
