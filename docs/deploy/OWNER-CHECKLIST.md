@@ -10,6 +10,7 @@ Only the steps that need you: identity, payment and legal. About 45 minutes in t
   - Deployment branches: selected branches → `main`.
 - [ ] **Add the Render key** (after step 2): Settings → Secrets and variables → Actions → New repository secret `RENDER_API_KEY`.
 - [ ] **Add the variables** (after step 2): `RENDER_WEB_SERVICE_ID`, `RENDER_WORKER_SERVICE_ID`, `RENDER_MIGRATE_SERVICE_ID` (from each service's URL in Render) and `APP_URL` = `https://app.shapesos.com`.
+- [ ] **Live collaboration (Phase 18.2)**: add `RENDER_COLLAB_SERVICE_ID` (the `shapesos-collab` service) and point `collab.shapesos.com` at it like `app.` ([RENDER.md, Live collaboration](RENDER.md#live-collaboration-phase-182)).
 - [ ] **A classic personal access token** with only `read:packages`, for Render to pull the images (RENDER.md step 3).
 
 ## 2. Render (10 min)

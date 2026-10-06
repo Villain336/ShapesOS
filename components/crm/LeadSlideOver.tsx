@@ -7,6 +7,8 @@ import {
   MessageSquareText, MessagesSquare, Calendar, NotebookPen, Flag,
 } from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
+// Phase 18.2 (WS=content): a record's notes.
+import { RecordNotes } from "@/components/notes/RecordNotes";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { LeadActions } from "./LeadActions";
 import { ConvertLeadStrip } from "@/components/ops/CrmAccounts";
@@ -461,6 +463,9 @@ export function LeadSlideOver({
               <p className="py-4 text-center text-[0.8125rem] text-subtle">No activity yet.</p>
             )}
           </ol>
+
+          {/* Phase 18.2 (WS=content): the notes linked to this lead. */}
+          <RecordNotes kind="lead" id={lead.id} label={lead.name} className="mt-6 shadow-none ring-1 ring-line" />
         </div>
       </div>
     </>

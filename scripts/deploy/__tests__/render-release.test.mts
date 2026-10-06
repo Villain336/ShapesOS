@@ -38,7 +38,7 @@ function fakeRender(s: Scenario = {}) {
   const deploys = new Map<string, { id: string; service: string; status: string; polls: number; image?: string; createdAt: string; rollback?: boolean }>();
   const jobs = new Map<string, { polls: number }>();
   if (s.previous !== false) {
-    for (const svc of ["srv-web", "srv-worker"]) {
+    for (const svc of ["srv-web", "srv-worker", "srv-collab"]) {
       deploys.set(`dep-prev-${svc}`, { id: `dep-prev-${svc}`, service: svc, status: "live", polls: 0, image: "old", createdAt: new Date(clock - 1e6).toISOString() });
     }
   }
@@ -134,6 +134,25 @@ describe("render-release", () => {
     // The migrate job only starts after the migrate image is live.
     const firstJob = f.calls.indexOf("POST /services/crn-migrate/jobs");
     assert.ok(f.calls.slice(0, firstJob).some((c) => /^GET \/services\/crn-migrate\/deploys\/dep-1$/.test(c)));
+  });
+
+  // Phase 18.2 (WS=content): the optional live-collaboration service runs the worker image.
+  it("with --collab-service: the worker image also goes to shapesos-collab (after the worker, before web), and rolls back with them", async () => {
+    const f = fakeRender();
+    await release({ ...OPTS, collab: "srv-collab" }, f.deps);
+    assert.deepEqual(f.posts(), [
+      "POST /services/crn-migrate/deploys",
+      "POST /services/crn-migrate/jobs",
+      "POST /services/srv-worker/deploys",
+      "POST /services/srv-collab/deploys",
+      "POST /services/srv-web/deploys",
+    ]);
+    assert.deepEqual(f.bodies[3], { imageUrl: `ghcr.io/villain336/shapesos-worker:${SHA}` });
+    const g = fakeRender({ failDeployOf: "srv-web" });
+    await assert.rejects(release({ ...OPTS, collab: "srv-collab" }, g.deps), /rolled back web, collab and worker/);
+    assert.equal(parseArgs(["--sha", SHA, "--registry", "ghcr.io/villain336", "--web-service", "srv-a", "--worker-service", "srv-b", "--migrate-service", "crn-c", "--health-url", "https://x.test/api/health", "--collab-service", "srv-d"]).collab, "srv-d");
+    assert.equal(parseArgs(["--sha", SHA, "--registry", "ghcr.io/villain336", "--web-service", "srv-a", "--worker-service", "srv-b", "--migrate-service", "crn-c", "--health-url", "https://x.test/api/health"]).collab, null);
+    assert.throws(() => parseArgs(["--sha", SHA, "--registry", "ghcr.io/villain336", "--web-service", "srv-a", "--worker-service", "srv-b", "--migrate-service", "crn-c", "--health-url", "https://x.test/api/health", "--collab-service", "nope"]), ReleaseError);
   });
 
   it("a failed migration stops the release before worker and web are touched", async () => {

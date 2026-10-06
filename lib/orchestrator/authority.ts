@@ -73,6 +73,10 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   // Phase 18.2 (WS=comms): confirming a Contacts merge suggestion links two
   // records as one person — internal, no audience, reversible (unlink).
   "confirm_contact_merge",
+  // Phase 18.2 (WS=content): an agent writing a note in the Notes app — an
+  // internal note owned by the person it works for (private by default),
+  // no money, no outside audience; reversible (the person deletes it).
+  "write_internal_note",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

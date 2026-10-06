@@ -35,6 +35,7 @@ import { DEFAULT_TIME_ZONE, resolveTimeZone, startOfZonedDay } from "@/lib/time/
 import { CLOSED_STAGES, DEFAULT_STAGES, parseStages } from "@/lib/crm/stages";
 import type { TwinKpi } from "@/lib/twin/types";
 import type { WidgetId } from "./widgets";
+import type { WorkspaceRole } from "@prisma/client";
 // Phase 18.1 (integration): widget text in the person's language (English when absent).
 import { createTranslator, type Translator } from "@/lib/i18n";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/i18n/locales";
@@ -648,6 +649,20 @@ async function loadBriefing(ctx: LoaderContext): Promise<BriefingData> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 18.2 (WS=content): Notes
+// ---------------------------------------------------------------------------
+
+export interface NotesWidgetData {
+  notes: { id: string; title: string; preview: string; pinned: boolean; ago: string }[];
+}
+
+async function loadNotesWidget(ctx: LoaderContext): Promise<NotesWidgetData> {
+  const { listNotes } = await import("@/lib/notes/service");
+  const notes = await listNotes({ workspaceId: ctx.workspaceId, userId: ctx.userId, role: ctx.role as WorkspaceRole }, { limit: 5 });
+  return { notes: notes.map((n) => ({ id: n.id, title: n.title, preview: n.preview, pinned: n.pinned, ago: ago(ctx, new Date(n.updatedAt)) })) };
+}
+
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Phase 18.2 (WS=comms): Reminders — the member's own open to-dos.
@@ -690,6 +705,7 @@ export interface WidgetDataMap {
   suggestions: SuggestionsData;
   // Phase 18.2 (WS=comms)
   reminders: RemindersData;
+  notes: NotesWidgetData;
 }
 
 export const WIDGET_LOADERS: { [K in WidgetId]: (ctx: LoaderContext) => Promise<WidgetDataMap[K]> } = {
@@ -709,6 +725,7 @@ export const WIDGET_LOADERS: { [K in WidgetId]: (ctx: LoaderContext) => Promise<
   suggestions: loadSuggestions,
   // Phase 18.2 (WS=comms)
   reminders: loadReminders,
+  notes: loadNotesWidget,
 };
 
 /** Load the data for the widgets on a desktop (only those placed; in parallel). */

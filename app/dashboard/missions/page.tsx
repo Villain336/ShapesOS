@@ -5,6 +5,8 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { MissionsApp } from "./MissionsApp";
+// Phase 18.2 (WS=content): templates removed in the Store are hidden from the picker.
+import { removedMissionTemplates } from "@/lib/store/state";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,8 @@ export const metadata = {
 export default async function MissionsPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
-  await getOrCreateWorkspace(user.id, user.email);
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const hidden = [...(await removedMissionTemplates(workspace.id).catch(() => new Set<string>()))];
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -26,7 +29,7 @@ export default async function MissionsPage() {
           and hands the steps to sub-agents; nothing goes out without your approval.
         </p>
       </div>
-      <MissionsApp />
+      <MissionsApp hiddenTemplateIds={hidden} />
     </div>
   );
 }

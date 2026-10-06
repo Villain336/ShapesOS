@@ -32,6 +32,8 @@ const ALLOW = new Map<string, string>([
   ["lib/ops/events/catalog.ts:opsEvent.findFirst", "resolvePublishedEvent: maps a public /events/<slug> to its workspace via the SELECT-only app.event_route policy (published rows only)"],
   // Phase 18.2 (comms): the project team chat now runs under withWorkspaceScope; its project lookup comes first and resolves the workspace from the caller's own memberships.
   ["app/api/team/chat/route.ts:project.findFirst", "projectAccess: resolves the project through accessibleWorkspaceWhere(userId) (the caller's memberships) before any workspace is known; every chat query after it is workspace-scoped"],
+  // Phase 18.2 (content): public file share links — token hash → link, the one cross-workspace read, through the SELECT-only app.file_share_route policy (live links only); everything after it runs under the link's workspace scope.
+  ["lib/files/shares.ts:workspaceFileShare.findFirst", "resolveShareToken: maps a public /r/file/<token> to its link via the SELECT-only app.file_share_route policy (unrevoked rows only)"],
   ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 

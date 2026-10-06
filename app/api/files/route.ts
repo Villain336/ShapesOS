@@ -1,6 +1,9 @@
 // Marketr — workspace filesystem API (Phase B, W3, track B1).
 // GET  /api/files?workspaceId=&prefix=[&trashed=1] → DirListing + quota (viewer+)
 // POST /api/files — multipart: workspaceId, path (target dir), file (editor+)
+//   Phase 18.2: replace=1 — a file already at that path gets a NEW VERSION
+//   (the old bytes are kept, lib/filesystem/versions.ts) instead of a 409;
+//   needs the "version" right on that file (lib/files/acl.ts).
 //
 // All RBAC through requireWorkspaceAccess (recognized by the M11 scan).
 // Uploads are restricted to /files and /memory — /skills is reserved for the
@@ -21,6 +24,10 @@ import {
 import { normalizeLogicalPath } from "@/lib/filesystem/paths";
 import { safeFilename } from "@/lib/security/upload-safety";
 import { prisma } from "@/lib/prisma";
+import { overwriteFile } from "@/lib/filesystem/versions";
+import { requireFileAction } from "@/lib/files/access";
+import { fileActor } from "@/lib/files/http";
+import { HttpError } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -125,8 +132,9 @@ export async function POST(req: NextRequest) {
 
   const filename = safeFilename(uploaded.name || "file");
   const logicalPath = `${dir}/${filename}`;
+  const replace = form.get("replace") === "1";
+  const buf = Buffer.from(await uploaded.arrayBuffer());
   try {
-    const buf = Buffer.from(await uploaded.arrayBuffer());
     const file = await writeFile({
       workspaceId: access.workspaceId,
       logicalPath,
@@ -138,6 +146,27 @@ export async function POST(req: NextRequest) {
     });
     return Response.json({ file }, { status: 201 });
   } catch (err) {
+    // Phase 18.2: the same path again, with "replace" chosen → a new version.
+    if (err instanceof FsError && err.code === "conflict" && replace) {
+      try {
+        const norm = normalizeLogicalPath(logicalPath);
+        const existing = await prisma.workspaceFile.findFirst({
+          where: { workspaceId: access.workspaceId, logicalPath: norm.ok ? norm.path : logicalPath, trashedAt: null },
+          select: { id: true },
+        });
+        if (!existing) return fsErrorToResponse(err);
+        await requireFileAction(fileActor(user.id, access.workspaceId, access.membership.role), existing.id, "version");
+        const res = await overwriteFile({ workspaceId: access.workspaceId, fileId: existing.id, bytes: buf, mimeType: uploaded.type || undefined, userId: user.id, maxBytes: DEFAULT_MAX_FILE_BYTES });
+        const file = await prisma.workspaceFile.findFirst({ where: { id: existing.id, workspaceId: access.workspaceId } });
+        return Response.json({ file: file ? { id: file.id, logicalPath: file.logicalPath, filename: file.filename, mimeType: file.mimeType, sizeBytes: file.sizeBytes, version: res.version } : null, replaced: true, version: res.version }, { status: 200 });
+      } catch (e2) {
+        if (e2 instanceof HttpError) return Response.json({ error: e2.message }, { status: e2.status });
+        return fsErrorToResponse(e2);
+      }
+    }
+    if (err instanceof FsError && err.code === "conflict") {
+      return Response.json({ error: err.message, code: "conflict", canReplace: true }, { status: 409 });
+    }
     return fsErrorToResponse(err);
   }
 }

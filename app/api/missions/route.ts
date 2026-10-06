@@ -11,6 +11,8 @@ import { loadMission, startMission, type LoadedMission } from "@/lib/missions/en
 import { missionAgentView } from "@/lib/aos/missions";
 import { safeMissionRuns } from "@/lib/aos/missions.server";
 import { enqueueMissionLaunch } from "@/lib/agents/mission-runtime";
+// Phase 18.2 (WS=content): templates removed in the Store.
+import { removedMissionTemplates } from "@/lib/store/state";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,10 @@ export async function POST(req: NextRequest) {
   if (gate instanceof Response) return gate;
   const body = await readJson(req);
   try {
+    // Phase 18.2 (WS=content): a template the workspace removed in the Store can't be started.
+    if (typeof body.templateId === "string" && (await removedMissionTemplates(gate.workspaceId)).has(body.templateId)) {
+      return Response.json({ error: "This mission template was removed from the workspace. Add it again in the Store." }, { status: 409 });
+    }
     const mission = await startMission(missionDeps(), {
       workspaceId: gate.workspaceId,
       userId: gate.userId,

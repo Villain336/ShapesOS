@@ -12,9 +12,9 @@ export interface TranscribeOptions {
   language?: string;
   /** Whisper-class model name. Env TRANSCRIPTION_MODEL, default "whisper-1". */
   model?: string;
-  // Phase 18.2 (WS=comms): Meet uploads recordings in their own format
-  // (m4a / webm / wav / mp3); the API reads the format from the file name.
-  // Default unchanged: "audio.mp3" / audio/mpeg.
+  // Phase 18.2: recordings in their own format — Meet uploads (m4a / webm /
+  // wav / mp3) and browser voice notes (WebM/Ogg); the API picks the decoder
+  // from the file name's extension. Default unchanged: "audio.mp3" / audio/mpeg.
   fileName?: string;
   mimeType?: string;
 }

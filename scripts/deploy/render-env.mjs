@@ -90,6 +90,10 @@ export const TABLE = [
   ["WEBSITE_HOST", { cls: "value", group: W, value: "shapesos.com" }],
   ["APP_HOST", { cls: "value", group: W, value: "app.shapesos.com" }],
   ["TRUSTED_PROXY_HOPS", { cls: "value", group: W, value: "2", why: "Render's edge sends X-Forwarded-For: <client>, <edge> (verify on the first deploy, RENDER.md step 9)" }],
+  // Phase 18.2 (WS=content): the web service mints collab tokens and tells the
+  // browser where the collab server (shapesos-collab, its own web service) is.
+  ["COLLAB_PUBLIC_URL", { cls: "value", group: W, value: "wss://collab.shapesos.com" }],
+  ["COLLAB_PORT", { cls: "exclude", why: "local + docker compose only (the worker starts the collab server on it); on Render shapesos-collab listens on the PORT Render sets" }],
   ["MARKETR_SELF_HOSTED", { cls: "exclude", why: "hosted deployment" }],
   ["DEPLOYMENT_MODE", { cls: "value", group: S, value: "hosted" }],
 

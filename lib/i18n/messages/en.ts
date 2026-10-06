@@ -9,6 +9,8 @@
 // Never put user data in a catalogue.
 
 import { commsEn } from "./comms.en";
+// Phase 18.2 (WS=content): the core apps' strings live in their own file.
+import { contentEn } from "./content.en";
 
 export const en = {
   common: {
@@ -115,6 +117,11 @@ export const en = {
       "/dashboard/ops": { label: "Operations", description: "Orders, invoices, inventory, projects, helpdesk, team" },
       "/dashboard/office": { label: "Office", description: "Docs, sheets and decks" },
       "/dashboard/files": { label: "Files", description: "Workspace files" },
+      // Phase 18.2 (WS=content)
+      "/dashboard/notes": { label: "Notes", description: "Quick notes, voice notes, notes on any record" },
+      "/dashboard/activity": { label: "Activity monitor", description: "Every run, job and sandbox: cost, time, Stop" },
+      "/dashboard/terminal": { label: "Terminal", description: "A shell on a workspace sandbox" },
+      "/dashboard/store": { label: "Store", description: "Install apps, skills, templates and connectors" },
       // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
       "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
       "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },
@@ -365,6 +372,8 @@ export const en = {
       app: "App",
       // Phase 18.2 (WS=comms)
       mail: "Mail",
+      // Phase 18.2 (WS=content)
+      note: "Note",
     },
   },
 
@@ -585,6 +594,8 @@ export const en = {
       attention: { title: "Needs your attention", description: "Drafts to review, pages losing traffic, competitor moves, alerts" },
       calendar: { title: "Today's calendar", description: "Bookings and connected calendar events for today" },
       inbox: { title: "Inbox", description: "Unread lead conversations (texts and email)" },
+      // Phase 18.2 (WS=content)
+      notes: { title: "Notes", description: "Pinned and recent notes, and a quick note" },
       pipeline: { title: "Pipeline", description: "Open leads and their value by stage" },
       cash: { title: "Cash", description: "Payments in the last 30 days and invoices still open" },
       twin: { title: "Twin", description: "Live numbers from your warehouse, factory or store twin" },
@@ -934,11 +945,16 @@ export const en = {
         "desktop.move": { label: "Move the focused widget", hint: "Arrow keys, while editing" },
         "desktop.resize": { label: "Resize the focused widget", hint: "Shift + arrow keys, while editing" },
         "desktop.remove": { label: "Remove the focused widget", hint: "While editing" },
+        // Phase 18.2 (WS=content)
+        "notes.capture": { label: "Quick note", hint: "From anywhere" },
       },
     },
   },
   // Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
   comms: commsEn,
+
+  // Phase 18.2 (WS=content): Notes, Files, collaboration, Activity Monitor, Terminal, Store.
+  ...contentEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */
