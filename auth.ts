@@ -171,12 +171,15 @@ if (oidc) extraProviders.push(oidc);
 const saml = samlProvider();
 if (saml) extraProviders.push(saml);
 
+/** Phase 18.3: the JWT lifetime, shared with the session registry rows. */
+const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
     // Absolute session lifetime: 12h. Re-auth required after that.
-    maxAge: 12 * 60 * 60,
+    maxAge: SESSION_MAX_AGE_SECONDS,
   },
   providers: [
     Google,
@@ -315,7 +318,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, user, account }) {
-      if (!user?.id || !account) return token;
+      if (!user?.id || !account) {
+        // Phase 18.3 (WS=trust): the session registry. A token whose session
+        // was signed out (Settings → You → Privacy) is refused on its next
+        // read: returning null makes Auth.js clear the cookie. Other sessions
+        // are untouched. lib/auth/session-registry.ts has the rules.
+        if (token?.sub) {
+          const { checkUserSession } = await import("./lib/auth/sessions");
+          if ((await checkUserSession(token)) === "reject") return null;
+        }
+        return token;
+      }
       // A sign-in just completed. Decide full vs pending (second factor).
       const marker = (user as { mfa?: MfaSignInMarker }).mfa;
       let factors: FactorSummary = { totp: false, passkeys: 0 };
@@ -330,7 +343,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           factors = { totp: true, passkeys: 0 };
         }
       }
-      return applySignIn(token, {
+      const signedIn = applySignIn(token, {
         userId: user.id,
         provider: account.provider,
         factors,
@@ -338,6 +351,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         secondFactor: marker?.secondFactor,
         firstFactor: marker?.firstFactor,
       });
+      // Phase 18.3 (WS=trust): a fully signed-in session gets its registry
+      // row (device label + IP prefix, never the token), and its id rides in
+      // the token. Best-effort: without the row the token still works as a
+      // legacy session (covered by "Sign out other sessions").
+      delete signedIn.sid;
+      if (signedIn.sub) {
+        try {
+          const [{ startUserSession }, { headers }] = await Promise.all([import("./lib/auth/sessions"), import("next/headers")]);
+          const h = await headers().catch(() => null);
+          signedIn.sid = await startUserSession({
+            userId: signedIn.sub,
+            provider: account.provider,
+            userAgent: h?.get("user-agent") ?? null,
+            ip: h ? clientIpFromHeaders(h) : null,
+            expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+          });
+        } catch (err) {
+          console.error("[auth] session registry write failed; session continues unlisted:", err instanceof Error ? err.message : err);
+        }
+      }
+      return signedIn;
     },
     async session({ session, token }) {
       const view = sessionView(token, Math.floor(Date.now() / 1000));
