@@ -51,7 +51,9 @@ describe("tabForPushData", () => {
   it("opens the tab the notification is about", () => {
     expect(tabForPushData({ kind: "approval_needed", href: "/dashboard/approvals?source=messaging" })).toBe("approvals");
     expect(tabForPushData({ kind: "approval_decided" })).toBe("approvals");
-    expect(tabForPushData({ kind: "run_failed", href: "/dashboard/runs/r1" })).toBe("missions");
+    // Phase 18.3 (WS=trust): Missions moved under Apps; other kinds open Notifications.
+    expect(tabForPushData({ kind: "run_failed", href: "/dashboard/runs/r1" })).toBe("apps");
+    expect(tabForPushData({ kind: "mention", href: "/dashboard/messages?m=1" })).toBe("notifications");
     expect(tabForPushData({ href: "/dashboard/settings" })).toBeNull();
     expect(tabForPushData(undefined)).toBeNull();
   });
