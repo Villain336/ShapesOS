@@ -316,6 +316,8 @@ export async function runCursorTurn(
   });
   emit({ event: "turn_started", data: { runId, conversationId: runId, ...(mock ? { mock: true as const } : {}) } });
 
+  // Earlier turns of this conversation (text only), read before this one is added.
+  const earlier = req.mode === "agent" ? [] : await history(caller.workspaceId, runId);
   // The timeline: words and a text summary of the screen — never the image.
   await appendAgentRunEvent(caller.workspaceId, runId, {
     type: "note",
@@ -342,7 +344,7 @@ export async function runCursorTurn(
   const elementIds = new Set((req.uiMap ?? []).map((e) => e.id));
   const tags = new CursorTagStream({ screens: req.screenshots, elementIds });
   const messages: ChatMessage[] = [
-    ...(await history(caller.workspaceId, runId)),
+    ...earlier,
     { role: "user", content: cursorUserTurn({ transcript, screens: req.screenshots, uiMap: req.uiMap, app: req.app, mode: req.mode ?? "answer" }) },
   ];
   const usage = { credits: 0, inputTokens: 0, outputTokens: 0 };
@@ -350,9 +352,13 @@ export async function runCursorTurn(
   const proposals: string[] = [];
   let lastElement: string | undefined;
   let spoken = "";
+  let stepStart = false;
 
   const flushTags = (r: { text: string; events: CursorTagEvent[] }) => {
     if (r.text) {
+      // A later step's words start a new sentence after the earlier ones.
+      if (stepStart && spoken && !/\s$/.test(spoken) && !/^\s/.test(r.text)) r = { ...r, text: ` ${r.text}` };
+      stepStart = false;
       spoken += r.text;
       emit({ event: "text_delta", data: { text: r.text } });
     }
@@ -374,6 +380,7 @@ export async function runCursorTurn(
   try {
     for (let step = 1; step <= CURSOR_MAX_STEPS; step++) {
       if (signal?.aborted) break;
+      stepStart = step > 1;
       let final: ChatResponse | null = null;
       for await (const ev of provider.chatStream({
         system: [{ text: CURSOR_SYSTEM_PROMPT, cache: true }],
