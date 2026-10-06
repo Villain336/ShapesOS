@@ -45,6 +45,7 @@ import {
   setBlobBackendForTests,
   sha256Hex,
   signV4,
+  storageDeploymentWarning,
   storageMode,
   type BlobNamespace,
 } from "../storage";
@@ -217,6 +218,16 @@ test("storage mode: local by default, s3 on request, anything else refused", () 
   assert.equal(storageMode(env({})), "local");
   assert.equal(storageMode(env({ MARKETR_STORAGE: " S3 " })), "s3");
   assert.throws(() => storageMode(env({ MARKETR_STORAGE: "nfs" })), /Unknown MARKETR_STORAGE/);
+});
+
+test("boot check: hosted needs shared storage; s3 needs complete settings", () => {
+  assert.equal(storageDeploymentWarning(env({})), null, "a single box on local disk is fine");
+  assert.match(storageDeploymentWarning(env({ DEPLOYMENT_MODE: "hosted" })) ?? "", /invisible to the others/);
+  assert.match(storageDeploymentWarning(env({ DEPLOYMENT_MODE: "hosted", MARKETR_STORAGE: "s3" })) ?? "", /incomplete/);
+  assert.equal(
+    storageDeploymentWarning(env({ DEPLOYMENT_MODE: "hosted", MARKETR_STORAGE: "s3", MARKETR_S3_ENDPOINT: "https://r2", MARKETR_S3_BUCKET: "b", MARKETR_S3_ACCESS_KEY: "k", MARKETR_S3_SECRET_KEY: "s" })),
+    null,
+  );
 });
 
 test("S3 config: static keys, else the AWS chain (env keys or ECS endpoint), else null", async () => {

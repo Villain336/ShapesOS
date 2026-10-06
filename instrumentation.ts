@@ -30,6 +30,14 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const shutdown = await import("./lib/runtime/shutdown");
   if (process.env.NEXT_PHASE !== "phase-production-build") shutdown.installShutdownHandlers();
+  // Deploy PR: a hosted install with per-instance disk storage is broken in
+  // a way nothing else would surface — say so at boot.
+  const { storageDeploymentWarning } = await import("./lib/filesystem/storage");
+  const storageWarning = storageDeploymentWarning(process.env);
+  if (storageWarning) {
+    const { log } = await import("./lib/observability/log");
+    log.error("storage misconfigured for this deployment", { detail: storageWarning });
+  }
   const { otelOptions } = await import("./lib/observability/otel");
   const options = otelOptions(process.env);
   if (options) {

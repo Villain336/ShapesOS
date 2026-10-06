@@ -436,6 +436,28 @@ export function storageMode(env: NodeJS.ProcessEnv = process.env): StorageMode {
   throw new Error(`Unknown MARKETR_STORAGE mode: ${mode}`);
 }
 
+/**
+ * A configuration that cannot work on a hosted (multi-instance) install, or
+ * null. Logged loudly at boot (instrumentation.ts): with local storage each
+ * replica and the worker would see different files.
+ */
+export function storageDeploymentWarning(env: NodeJS.ProcessEnv = process.env): string | null {
+  const hosted = (env.DEPLOYMENT_MODE ?? "").trim().toLowerCase() === "hosted";
+  let mode: StorageMode;
+  try {
+    mode = storageMode(env);
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  if (hosted && mode === "local") {
+    return "DEPLOYMENT_MODE=hosted with MARKETR_STORAGE=local: files written by one instance are invisible to the others. Set MARKETR_STORAGE=s3 and the MARKETR_S3_* settings.";
+  }
+  if (mode === "s3" && !s3ConfigFromEnv(env)) {
+    return "MARKETR_STORAGE=s3 but the bucket settings are incomplete (MARKETR_S3_ENDPOINT, MARKETR_S3_BUCKET and keys or AWS credentials).";
+  }
+  return null;
+}
+
 let cached: StorageAdapter | null = null;
 let cachedS3: S3CompatibleAdapter | null = null;
 let cachedBlobs: BlobBackend | null = null;
