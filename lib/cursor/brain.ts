@@ -127,7 +127,7 @@ export function cursorMockBrain(): MockLlmProvider {
         if (/\bsend\b.*\binvoice\b/i.test(said) && offered.has("ops_send_invoice")) {
           content.push({ type: "tool_use", id: "mock_tu_invoice", name: "ops_send_invoice", input: { invoiceId: "mock-invoice" } });
         } else if (/\bdraft\b/i.test(said) && offered.has("create_content_draft")) {
-          content.push({ type: "tool_use", id: "mock_tu_draft", name: "create_content_draft", input: { keyword: said.slice(0, 80) || "mock draft" } });
+          content.push({ type: "tool_use", id: "mock_tu_draft", name: "create_content_draft", input: { topic: said.slice(0, 80) || "mock draft" } });
         }
         return { content, usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }, costMicroUsd: 0 };
       },
