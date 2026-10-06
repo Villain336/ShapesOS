@@ -246,6 +246,9 @@ export const en = {
       media: "Media buy",
       mail: "Direct mail",
       social: "Social post",
+      // Phase 18.3 (WS=trust)
+      autopilot: "Autopilot",
+      workflow: "Workflow",
     },
   },
 

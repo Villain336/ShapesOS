@@ -241,6 +241,9 @@ export const es: Catalogue = {
       media: "Compra de medios",
       mail: "Correo postal",
       social: "Publicación social",
+      // Phase 18.3 (WS=trust)
+      autopilot: "Piloto automático",
+      workflow: "Flujo de trabajo",
     },
   },
 

@@ -846,6 +846,130 @@ const social: InboxSource = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 18.3 (WS=trust): the 16th and 17th sources — one approvals queue.
+// Both are pending AutopilotItems; a workflow canvas approval gate enqueues
+// its item with sourceRef "workflow_run:<runId>:<nodeId>" (lib/workflow/
+// approvals.ts) so the WorkflowRun waiting_approval resumes or cancels when
+// the item is decided. Decisions go through the EXISTING autopilot routes
+// (/api/autopilot/items/[id]/approve|reject { projectId }), which call
+// approveAutopilotItem / rejectAutopilotItem (kill switch, audit, gate resume).
+// ---------------------------------------------------------------------------
+
+const AUTOPILOT_KIND_LABELS: Record<string, string> = {
+  keyword_brief: "Content brief",
+  decay_refresh: "Content refresh",
+  programmatic_page: "Programmatic page",
+};
+
+/** True for a workflow approval gate's item ("workflow_run:<runId>:<nodeId>"). */
+export function isWorkflowGateRef(sourceRef: string): boolean {
+  return /^workflow_run:[^:]+:[^:]+$/.test(sourceRef);
+}
+
+const AUTOPILOT_SELECT = {
+  id: true,
+  kind: true,
+  sourceRef: true,
+  title: true,
+  reviewNote: true,
+  createdAt: true,
+  projectId: true,
+  project: { select: { name: true } },
+  rule: { select: { name: true } },
+  run: { select: { createdBy: true } },
+} as const;
+
+function autopilotActions(id: string, projectId: string): { approve: InboxAction; deny: InboxAction } {
+  return {
+    approve: post(`/api/autopilot/items/${enc(id)}/approve`, { projectId }),
+    deny: post(`/api/autopilot/items/${enc(id)}/reject`, { projectId }),
+  };
+}
+
+/** Autopilot drafts waiting for review (Phase 14 gate) — editor+ decides. */
+const autopilot: InboxSource = {
+  key: "autopilot",
+  viewRole: "viewer",
+  async load(ctx) {
+    const rows = await ctx.db.autopilotItem.findMany({
+      where: {
+        status: "pending",
+        project: { workspaceId: ctx.viewer.workspaceId },
+        NOT: { sourceRef: { startsWith: "workflow_run:" } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: ctx.limit,
+      select: AUTOPILOT_SELECT,
+    });
+    return rows
+      .filter((r) => !isWorkflowGateRef(r.sourceRef))
+      .map((r) =>
+        makeItem({
+          id: r.id,
+          source: "autopilot",
+          typeLabel: AUTOPILOT_KIND_LABELS[r.kind] ?? "Autopilot draft",
+          title: r.title,
+          detail: [r.rule?.name, r.project?.name].filter(Boolean).join(" · ") || null,
+          requestedBy: r.run?.createdBy && r.run.createdBy !== "workflow" ? r.run.createdBy : "agent:autopilot",
+          createdAt: r.createdAt,
+          risk: r.kind === "programmatic_page" ? "medium" : "low",
+          href: `/dashboard/projects/${enc(r.projectId)}/autopilot`,
+          canDecide: isEditor(ctx.viewer),
+          blockedReason: EDITOR_REASON,
+          agent: "Autopilot",
+          ...autopilotActions(r.id, r.projectId),
+        }),
+      );
+  },
+};
+
+/** Workflow canvas approval gates (a WorkflowRun paused at waiting_approval). */
+const workflow: InboxSource = {
+  key: "workflow",
+  viewRole: "viewer",
+  async load(ctx) {
+    const rows = await ctx.db.autopilotItem.findMany({
+      where: {
+        status: "pending",
+        project: { workspaceId: ctx.viewer.workspaceId },
+        sourceRef: { startsWith: "workflow_run:" },
+      },
+      orderBy: { createdAt: "desc" },
+      take: ctx.limit,
+      select: AUTOPILOT_SELECT,
+    });
+    const gates = rows.filter((r) => isWorkflowGateRef(r.sourceRef));
+    const runIds = gates.map((r) => r.sourceRef.split(":")[1]!);
+    const runs = runIds.length
+      ? await ctx.db.workflowRun.findMany({
+          where: { id: { in: runIds }, project: { workspaceId: ctx.viewer.workspaceId } },
+          select: { id: true, status: true, createdBy: true, triggerKind: true, workflowId: true, workflow: { select: { name: true } } },
+        })
+      : [];
+    const byRun = new Map(runs.map((r) => [r.id, r]));
+    return gates.map((r) => {
+      const run = byRun.get(r.sourceRef.split(":")[1]!);
+      return makeItem({
+        id: r.id,
+        source: "workflow",
+        typeLabel: "Workflow approval gate",
+        title: r.title.replace(/^Workflow approval:\s*/, "") || r.title,
+        detail: [run?.workflow?.name, r.project?.name, r.reviewNote].filter(Boolean).join(" · ") || null,
+        requestedBy: run?.createdBy ?? null,
+        createdAt: r.createdAt,
+        risk: "medium",
+        href: `/dashboard/projects/${enc(r.projectId)}/automations${run ? `?run=${enc(run.id)}` : ""}`,
+        canDecide: isEditor(ctx.viewer),
+        blockedReason: EDITOR_REASON,
+        agent: "Workflow",
+        lines: run ? [{ label: "Started by", detail: run.triggerKind }] : [],
+        ...autopilotActions(r.id, r.projectId),
+      });
+    });
+  },
+};
+
 export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   mission,
   spend,
@@ -862,4 +986,7 @@ export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   media,
   mail,
   social,
+  // Phase 18.3 (WS=trust)
+  autopilot,
+  workflow,
 ];
