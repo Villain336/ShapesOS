@@ -55,7 +55,7 @@ export function installTestHooks(d: TestHookDeps): void {
       d.controller.testOverrides.focusedApp = async () => app;
       d.controller.testOverrides.shapesFocused = false;
     },
-    /** Treat the ShapesOS window as the app in front (no WM focus under Xvfb). */
+    /** Treat the ShapesOS window as the app in front (Xvfb has no window manager to decide focus). */
     focusShapes(): void {
       d.controller.testOverrides.shapesFocused = true;
     },
