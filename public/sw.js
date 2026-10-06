@@ -25,7 +25,7 @@
  *      same-origin link on click.
  */
 
-const VERSION = "2026-10-06.2";
+const VERSION = "2026-10-06.3";
 const STATIC_CACHE = "shapes-static-" + VERSION;
 const META_CACHE = "shapes-meta";
 const DATA_PREFIX = "shapes-data-";
@@ -150,7 +150,9 @@ async function trimStatic() {
 
 async function staticFirst(req) {
   const c = await caches.open(STATIC_CACHE);
-  const hit = await c.match(req);
+  // ignoreVary: the server varies responses on request headers (RSC, encoding)
+  // a script tag never sends the way the precache request did.
+  const hit = await c.match(req, { ignoreVary: true, ignoreSearch: PRECACHE.includes(new URL(req.url).pathname) });
   if (hit) return hit;
   const res = await fetch(req);
   if (res.ok && res.type === "basic" && !isHtml(res)) {
@@ -170,7 +172,7 @@ async function dataNetworkFirst(req) {
     if (res.ok && res.type === "basic" && type.includes("application/json")) await cache.put(req, res.clone());
     return res;
   } catch (err) {
-    const hit = (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true }));
+    const hit = (await cache.match(req, { ignoreVary: true })) || (await cache.match(req, { ignoreSearch: true, ignoreVary: true }));
     if (hit) {
       const headers = new Headers(hit.headers);
       headers.set("x-shapes-offline", "1");
@@ -182,7 +184,7 @@ async function dataNetworkFirst(req) {
 
 async function offlinePage() {
   const c = await caches.open(STATIC_CACHE);
-  const hit = await c.match(OFFLINE_URL);
+  const hit = await c.match(OFFLINE_URL, { ignoreVary: true });
   const body = hit ? await hit.text() : "<!doctype html><title>Offline</title><p>You're offline.</p>";
   return new Response(body, {
     status: 503,
