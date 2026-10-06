@@ -105,6 +105,7 @@ describe("the meeting note, origins, rooms, recording seam", () => {
     assert.equal(tasks?.content?.length, 1);
     assert.equal(tasks?.content?.[0]?.attrs?.checked, false);
     assert.match(noteText(doc, 5_000), /Send deck — Ben/);
+    assert.ok(!doc.content.some((n) => n.type === "paragraph" && !n.content?.length), "no empty paragraphs");
   });
 
   it("calendar refs, room names and the Zoom / Google Meet seam", () => {

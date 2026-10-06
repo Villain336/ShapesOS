@@ -130,17 +130,18 @@ export function summaryPrompt(title: string, transcript: string): string {
  */
 export function notesMarkdown(input: { title: string; when: string; summary: MeetingSummary; transcriptSource: string }): string {
   // One line per item: a model's stray newline must not break a list item.
+  // No blank lines: each would be an empty paragraph in the editor.
   const line = (s: string) => s.replace(/\s+/g, " ").trim();
-  const out: string[] = [`Meeting: ${line(input.title)} · ${input.when}`, "", "## Notes"];
-  for (const p of input.summary.notes.split(/\n{2,}/)) if (p.trim()) out.push(p.trim(), "");
+  const out: string[] = [`Meeting: ${line(input.title)} · ${input.when}`, "## Notes"];
+  for (const p of input.summary.notes.split(/\n{2,}/)) if (p.trim()) out.push(line(p));
   out.push("## Decisions");
   if (input.summary.decisions.length) for (const d of input.summary.decisions) out.push(`- ${line(d)}`);
   else out.push("None recorded.");
-  out.push("", "## Action items");
+  out.push("## Action items");
   if (input.summary.actionItems.length)
     for (const a of input.summary.actionItems) out.push(`[ ] ${line(a.title)}${a.owner ? ` — ${line(a.owner)}` : ""}${a.due ? ` (due ${line(a.due)})` : ""}`);
   else out.push("None recorded.");
-  out.push("", "---", `Written by the meeting agent from the ${input.transcriptSource} transcript (after the call).`);
+  out.push("---", `Written by the meeting agent from the ${input.transcriptSource} transcript (after the call).`);
   return out.join("\n");
 }
 
