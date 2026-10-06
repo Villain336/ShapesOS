@@ -236,3 +236,5 @@ lib/terminal/__tests__/terminal-db.test.ts
 lib/store/__tests__/store-db.test.ts
 # Phase 18.3 (WS=flow): Web Push — push_subscriptions owner-only FORCE RLS (no GUC = nothing; another person can't read, write or remove mine), SSRF guard (only known push-service hosts), sendWebPush against a STUB push service (VAPID JWT verifies, aes128gcm body decrypts in the "browser"), 410/404 delete at once, MAX_FAILURES in a row delete, a success resets, no VAPID keys = nothing sent and why, account deletion removes subscriptions.
 lib/push/__tests__/web-push-db.test.ts
+# Phase 18.3 (WS=flow): Time Machine — admins only; a snapshot is the GDPR workspace export gzipped in object storage with a per-table manifest row (FORCE RLS); restore into a NEW workspace: row counts match per restored table, ids re-keyed with references (FKs, note links, self-references) following, file bytes copied to new storage keys, automations come back off, in-flight runs cancelled, members / queues / billing skipped and listed, the source untouched, both workspaces audited; settings, retention, delete.
+lib/timemachine/__tests__/snapshots-db.test.ts

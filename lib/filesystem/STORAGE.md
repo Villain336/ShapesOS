@@ -69,6 +69,7 @@ or the ECS task role (no IMDS, no SSO profiles).
 | brand-kit / white-label logo routes, `lib/knowledge/contextdev/brandsync.ts`, `lib/brand-logo.ts`, PDF logo embedding | (a) | `storeLogo()` / `loadBrandKitLogoFile()` / `deleteLogo()` in brand-logo.ts; synced logos capped at 5 MB. |
 | `lib/seo/programmatic-service.ts` `regenerateSitemap` | (a) | `sitemaps` namespace (the API route renders live anyway). |
 | `lib/audit/runner.ts` fix snapshots | (a) | `fix-snapshots`; a revert works on any replica. |
+| `lib/timemachine/snapshots.ts` (Phase 18.3, Time Machine) | (a) | `snapshots` namespace, `<workspaceId>/<snapshotId>.json.gz`: the GDPR workspace export, gzipped; the `workspace_snapshots` row is its manifest; restore reads it back into a NEW workspace. |
 | `lib/scheduler/outputStore.ts` `FallbackOutputStore` | (a) | `scheduler-runs` (only when the filesystem service cannot load). |
 | `lib/connectors/local.ts` site working copy (+ `source.ts`, `lib/sites/files.ts`, every IDE / builder / fix-agent / deploy route, `zip.ts`, SEO publishers) | (a) | `WorkingCopyProvider`; `siteWorkingCopy()` returns `LocalDirProvider` on a single box and `BlobDirProvider` with `s3` (parity-tested); site deletion removes only `<site>/working`. |
 | `lib/voice/voiceover.ts`, `scripts/seed-phase13d-shots.mts` | (a) | Used `new LocalDiskAdapter()` directly; now `getStorageAdapter()`. |

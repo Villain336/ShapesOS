@@ -325,6 +325,9 @@ export function filterAutomations(items: AutomationItem[], f: AutomationFilter):
 
 // ── Loader ──────────────────────────────────────────────────────────────────
 
+/** A project is named by its domain. */
+const projectRef = (p: { id: string; domain: string }) => ({ id: p.id, name: p.domain });
+
 export interface AutomationActor {
   workspaceId: string;
   userId: string;
@@ -352,7 +355,7 @@ export async function loadAutomations(actor: AutomationActor, now = new Date()):
           take: 500,
           select: {
             id: true, name: true, status: true, enabled: true, schedule: true, timezone: true, createdBy: true,
-            project: { select: { id: true, name: true } },
+            project: { select: { id: true, domain: true } },
             nodes: { where: { kind: "trigger" }, select: { kind: true, type: true } },
             runs: { orderBy: { startedAt: "desc" }, take: 1, select: { startedAt: true, status: true } },
           },
@@ -367,7 +370,7 @@ export async function loadAutomations(actor: AutomationActor, now = new Date()):
           select: {
             id: true, workspaceId: true, status: true, triggerType: true, cronExpr: true, timezone: true, eventSource: true, nextRunAt: true, createdBy: true,
             skill: { select: { name: true } },
-            project: { select: { id: true, name: true } },
+            project: { select: { id: true, domain: true } },
             runs: { orderBy: { startedAt: "desc" }, take: 1, select: { startedAt: true, status: true } },
           },
         }),
@@ -380,7 +383,7 @@ export async function loadAutomations(actor: AutomationActor, now = new Date()):
           take: 500,
           select: {
             id: true, name: true, source: true, cadence: true, enabled: true,
-            project: { select: { id: true, name: true } },
+            project: { select: { id: true, domain: true } },
             runs: { orderBy: { startedAt: "desc" }, take: 1, select: { startedAt: true, status: true } },
           },
         }),
@@ -405,9 +408,9 @@ export async function loadAutomations(actor: AutomationActor, now = new Date()):
   for (const r of opsRuns) if (!opsLast.has(r.workflowName)) opsLast.set(r.workflowName, { createdAt: r.createdAt, status: r.status });
 
   const items: AutomationItem[] = [
-    ...workflows.map((w) => toWorkflowItem({ ...w, lastRun: w.runs[0] ?? null }, now)),
-    ...schedules.map((s) => toScheduleItem({ ...s, lastRun: s.runs[0] ?? null })),
-    ...autopilot.map((r) => toAutopilotItem({ ...r, lastRun: r.runs[0] ?? null })),
+    ...workflows.map((w) => toWorkflowItem({ ...w, project: projectRef(w.project), lastRun: w.runs[0] ?? null }, now)),
+    ...schedules.map((s) => toScheduleItem({ ...s, project: s.project ? projectRef(s.project) : null, lastRun: s.runs[0] ?? null })),
+    ...autopilot.map((r) => toAutopilotItem({ ...r, project: projectRef(r.project), lastRun: r.runs[0] ?? null })),
     ...toOpsWorkflowItems(opsLast),
     ...bindings.map(toActivepiecesItem),
     ...alertRules.map(toAlertRuleItem),
