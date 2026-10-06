@@ -254,10 +254,9 @@ Run in order; each step must pass before the next.
 
 ## 4c. Studio environment requirements (milestone 22: Porkbun domains)
 
-- **Single-instance limitation:** domain-purchase confirmation tokens live in
-  process memory (5-minute TTL). The purchase confirm MUST hit the same app
-  instance — run a single app container (or sticky sessions) until these move
-  to Redis/shared storage.
+- **Purchase confirmation tokens** (5-minute TTL) live in Postgres
+  (`single_use_tokens`, stored hashed and consumed once), so the confirm may
+  hit any app instance — no sticky sessions needed.
 - **Porkbun:** API keys are entered per-workspace in the Studio → Domains tab
   (encrypted with `MARKETR_CREDENTIALS_KEY`; only the key tail is shown back).
   Porkbun registration uses the account's default registrant contact — the

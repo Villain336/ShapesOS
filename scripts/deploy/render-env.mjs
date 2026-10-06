@@ -100,7 +100,7 @@ export const TABLE = [
   ["REMINDERS_CRON_SECRET", { cls: "generate", group: W }],
   ["AGENT_WORKER", { cls: "value", group: W, value: "external", why: "only shapesos-worker claims agent jobs" }],
   ["AGENT_WORKER_CONCURRENCY", { cls: "value", group: K, value: "6" }],
-  ["KEEP_ALIVE_TIMEOUT", { cls: "value", group: W, value: "310000", notInEnvExample: "read by Next's standalone server.js, documented in .env.example by the deploy-state workstream", why: "above every load balancer idle timeout in front of the app" }],
+  ["KEEP_ALIVE_TIMEOUT", { cls: "value", group: W, value: "310000", why: "above every load balancer idle timeout in front of the app" }],
   ["NODE_OPTIONS", { cls: "exclude", notInEnvExample: "Node runtime flag, set per service in render.yaml", why: "set per service in render.yaml (heap sized to the plan)" }],
   ["RATE_LIMIT_STORE", { cls: "value", group: S, value: "postgres" }],
   ["MARKETR_STORAGE", { cls: "value", group: S, value: "s3" }],
@@ -408,8 +408,21 @@ export const TABLE = [
     (k) => [k, { cls: "exclude", why: "default is right (change in the dashboard only to tune)" }],
   ),
 
+  // --- deploy-state: shared storage credentials and graceful shutdown ------
+  ["MARKETR_BLOB_DIR", { cls: "exclude", why: "local-disk blob root; hosted runs MARKETR_STORAGE=s3" }],
+  ...["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"].map(
+    (k) => [k, { cls: "exclude", why: "Render uses the MARKETR_S3_* keys for R2; on AWS the ECS task role supplies credentials" }],
+  ),
+  ...["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI", "AWS_CONTAINER_AUTHORIZATION_TOKEN"].map(
+    (k) => [k, { cls: "exclude", why: "set by ECS itself for the task role; never set by hand" }],
+  ),
+  ...["SHUTDOWN_GRACE_MS", "SHUTDOWN_HANDOFF_MS"].map(
+    (k) => [k, { cls: "exclude", why: "defaults (25 s / 8 s) fit Render's and ECS's 30 s stop timeout" }],
+  ),
+
   // --- dev, test and eval only ------------------------------------------
-  ...["E2E_BASE_URL", "E2E_ADMIN_EMAIL", "E2E_EDITOR_EMAIL", "E2E_MOCK_OAUTH", "SEED_EMAIL", "MEMORY_TEST_MODE", "GRAPH_WEBHOOK_TEST_SECRETS", "OPS_SCRATCH", "EVAL_HUMAN", "EVAL_RESULTS_PATH", "EVAL_WORKSPACE_ID", "HOME", "FONTCONFIG_FILE",
+  ...["E2E_BASE_URL", "E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD", "E2E_EDITOR_EMAIL",
+    "SMOKE_APP_DATABASE_URL", "SMOKE_PORT_A", "SMOKE_PORT_B", "SMOKE_GRACE_MS", "SMOKE_REAL_S3", "SMOKE_SKIP_WORKER", "E2E_MOCK_OAUTH", "SEED_EMAIL", "MEMORY_TEST_MODE", "GRAPH_WEBHOOK_TEST_SECRETS", "OPS_SCRATCH", "EVAL_HUMAN", "EVAL_RESULTS_PATH", "EVAL_WORKSPACE_ID", "HOME", "FONTCONFIG_FILE",
     "FAKE_MESSAGING_SECRET", "FAKE_MAIL_SECRET", "FAKE_CALLRAIL_SECRET", "FAKE_TELEPHONY_SECRET"].map(
     (k) => [k, { cls: "exclude", why: "dev, test or demo only; never in production" }],
   ),
