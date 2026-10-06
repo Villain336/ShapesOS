@@ -84,7 +84,7 @@ export async function storeCollabDoc(
     if (!doc) return { status: "missing" } as const;
     if (doc.version !== expectedVersion) return { status: "stale", version: doc.version } as const;
     await tx.univerDocCollabState.upsert({
-      where: { docId },
+      where: { docId, workspaceId },
       create: { docId, workspaceId, state },
       update: { state },
     });

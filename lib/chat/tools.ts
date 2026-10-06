@@ -48,6 +48,7 @@ import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/gran
 import { search_workspace } from "@/lib/search/tool";
 // Phase 18.2 (WS=content): the core apps' agent tools (Notes, Files, Activity Monitor, Store).
 import { NOTE_TOOLS } from "@/lib/notes/tools";
+import { FILE_TOOLS } from "@/lib/files/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1064,8 +1065,10 @@ export const TOOLS: ToolDef[] = [
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
-  // Phase 18.2 (WS=content): read_note (Tier 0) / create_note (Tier 1).
+  // Phase 18.2 (WS=content): read_note (Tier 0) / create_note (Tier 1);
+  // list_file_versions (Tier 0) / share_file_link (Tier 2).
   ...NOTE_TOOLS,
+  ...FILE_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {

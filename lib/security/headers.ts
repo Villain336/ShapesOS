@@ -170,7 +170,9 @@ export function isSandboxPreviewPath(pathname: string): boolean {
 /** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
 export function isUserFileRequest(pathname: string, search: URLSearchParams | string = ""): boolean {
   const params = typeof search === "string" ? new URLSearchParams(search) : search;
-  return /^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl");
+  if (/^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl")) return true;
+  // Phase 18.2 (WS=content): a shared file's bytes (/r/file/<token>/raw).
+  return /^\/r\/file\/[^/]+\/raw\/?$/.test(pathname);
 }
 
 /** Which policy a request gets (see header comment). */
