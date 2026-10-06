@@ -69,6 +69,19 @@ export async function register(): Promise<void> {
     const { log } = await import("./lib/observability/log");
     log.error("in-app agent worker failed to start", { err: err instanceof Error ? err.message : String(err) });
   }
+  // Phase 17 (latency): warm the local recall embedder (Growth Memory,
+  // MiniLM via transformers.js) in the background, so the FIRST chat turn's
+  // memory recall does not pay the model load. Off with
+  // MEMORY_WARM_AT_BOOT=0; never during a build. A load failure is logged
+  // and leaves recall to load lazily (and fail honestly) as before.
+  if (process.env.NEXT_PHASE !== "phase-production-build" && (process.env.MEMORY_WARM_AT_BOOT ?? "1").trim() !== "0") {
+    void import("./lib/substrate/memory/embed")
+      .then((m) => m.embedText("warmup"))
+      .catch(async (err) => {
+        const { log } = await import("./lib/observability/log");
+        log.warn("recall embedder warm-up failed (it loads on first use)", { err: err instanceof Error ? err.message : String(err) });
+      });
+  }
   // Agent work this process is running: in-app worker jobs are handed back,
   // inline chat turns hand off to the worker (lib/runtime/agent-drain.ts).
   shutdown.onShutdown("agent-work", async () => {

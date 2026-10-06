@@ -35,6 +35,10 @@ import { autoApprovalFor } from "@/lib/automation/policy";
 import { appendAgentRunEvent, isAgentRunCancelRequested } from "@/lib/agents/runs/service";
 import { abortRun, isRunStopped } from "@/lib/agents/runs/abort";
 import { resolveConnectorTool } from "./connector-tools";
+// Phase 17 (latency, A8): the short-lived cache for pure read tools, and the
+// answer cache it also drops on a write (lib/chat/answer-cache.ts).
+import { isCacheableTool, toolCacheKey, toolResultCache } from "./tool-cache";
+import { answerCache } from "./answer-cache";
 
 export const DELEGATE_TOOL = "delegate_to_subagent";
 /** Phase 16: hand a whole plan to sub-agents that run in parallel (lib/chat/delegation.ts). */
@@ -248,7 +252,17 @@ export async function executeTool(
     call.autoApproved = decision.reason;
   }
   try {
-    const result = await tool.execute(ctx, args);
+    // Phase 17 (A8): a pure read repeated within TOOL_CACHE_TTL_MS is served
+    // from the cache (same workspace, project, tool and arguments); a write
+    // through this gate drops the workspace's cached reads and answers.
+    const cacheKey = tool.kind === "safe" && isCacheableTool(tool.name) ? toolCacheKey({ workspaceId: ctx.workspaceId, projectId: ctx.projectId, tool: tool.name, args }) : null;
+    const hit = cacheKey ? toolResultCache.get(cacheKey) : null;
+    const result = hit ?? (await tool.execute(ctx, args));
+    if (cacheKey && !hit) toolResultCache.set(cacheKey, result);
+    if (tool.kind !== "safe") {
+      toolResultCache.invalidateWorkspace(ctx.workspaceId);
+      answerCache.invalidateWorkspace(ctx.workspaceId);
+    }
     call.status = "executed";
     call.resultSummary = result.summary;
     collectDelegated(call, result);
@@ -260,6 +274,7 @@ export async function executeTool(
       ...ids,
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
+      ...(hit ? { cached: true } : {}),
       // Phase 8: the tool recorded its own timeline event (ship / browser
       // tools); this one only feeds the live stream (isStreamEvent hides it).
       ...(recordedOwnEvent(result) ? { recorded: true } : {}),

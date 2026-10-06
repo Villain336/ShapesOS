@@ -52,6 +52,7 @@ import {
 import { createAguiLogger } from "./logger";
 import { mergeSharedState, type SharedAgentState } from "./shared-state";
 import { sseResponse, type SseOptions } from "@/lib/http/sse";
+import { hasRunProducer, subscribeRunEvents, type LiveRunEvent } from "@/lib/agents/runs/live-events";
 import type { AppliedStateChange } from "./shared-state-db";
 import type { WorkspaceRole } from "@prisma/client";
 import type { AgentTurnInput, AgentTurnOutput, ChatToolCall } from "@/lib/chat/agent";
@@ -108,9 +109,20 @@ export interface AguiAdapterDeps {
   getRunStatus?: (workspaceId: string, runId: string) => Promise<string | null>;
   /** Phase 8: the latest assistant message of the thread (a queued turn's answer). */
   latestAssistantText?: (threadId: string) => Promise<string | null>;
-  /** Phase 8: tail interval (default 200 ms) and cap on one stream (default 30 min). */
+  /**
+   * Phase 8: tail interval (default 200 ms) and cap on one stream (default
+   * 30 min). Phase 17: the poll is the FALLBACK — while the run's loop runs in
+   * this process its events arrive on the in-process bus (lib/agents/runs/
+   * live-events.ts) the moment they are written, and the database is only
+   * read to fill a gap and once at the end.
+   */
   pollMs?: number;
   maxStreamMs?: number;
+  /** Phase 17: the bus (tests inject one); default lib/agents/runs/live-events. */
+  liveEvents?: {
+    subscribe: (runId: string, listener: (event: LiveRunEvent) => void) => () => void;
+    hasProducer: (runId: string) => boolean;
+  };
   /**
    * Deploy PR: told the run cursor (agent run id + timeline seq) before each
    * run event is mapped — the SSE route stamps it as the event id, so a
@@ -308,26 +320,42 @@ export async function* streamChatTurnAgui(
     workspaceId: request.workspaceId,
     projectId: request.projectId,
   };
-  try {
-    const baseline = await loadSharedState(stateCtx);
-    let current = baseline;
-    if (request.incomingState && Object.keys(request.incomingState).length > 0) {
-      const { applied } = await applySharedStateUpdates(stateCtx, baseline, request.incomingState);
-      if (applied.some((a) => !a.skipped)) {
-        current = await loadSharedState(stateCtx);
-      } else {
-        // Nothing was writable — still honor the client's view for
-        // domains the baseline didn't cover (offline-first optimism).
-        current = mergeSharedState(baseline, request.incomingState);
+  const hasIncoming = !!request.incomingState && Object.keys(request.incomingState).length > 0;
+  // Phase 17 (latency): the snapshot is loaded CONCURRENTLY with the turn's
+  // own pre-model work (prompt assembly, recall, connector listing — they
+  // never depend on it); the snapshot is still yielded before any run event
+  // (streamLiveTurn awaits it before it starts tailing). Only when the client
+  // carried state changes in is the apply awaited first, so the agent's tool
+  // calls see the canonical post-apply state.
+  const snapshot = (async (): Promise<AguiEvent | null> => {
+    try {
+      const baseline = await loadSharedState(stateCtx);
+      let current = baseline;
+      if (hasIncoming) {
+        const { applied } = await applySharedStateUpdates(stateCtx, baseline, request.incomingState!);
+        if (applied.some((a) => !a.skipped)) {
+          current = await loadSharedState(stateCtx);
+        } else {
+          // Nothing was writable — still honor the client's view for
+          // domains the baseline didn't cover (offline-first optimism).
+          current = mergeSharedState(baseline, request.incomingState!);
+        }
       }
+      return stamp({ type: EventType.STATE_SNAPSHOT, snapshot: current }, meta);
+    } catch {
+      // No snapshot this turn; the chat itself still streams.
+      return null;
     }
-    yield* emit(stamp({ type: EventType.STATE_SNAPSHOT, snapshot: current }, meta));
-  } catch {
-    // No snapshot this turn; the chat itself still streams.
-  }
+  })();
 
+  if (!deps.runTurn && !hasIncoming) {
+    yield* streamLiveTurn(request, deps, meta, emit, snapshot);
+    return;
+  }
+  const snapshotEvent = await snapshot;
+  if (snapshotEvent) yield* emit(snapshotEvent);
   if (!deps.runTurn) {
-    yield* streamLiveTurn(request, deps, meta, emit);
+    yield* streamLiveTurn(request, deps, meta, emit, null);
     return;
   }
 
@@ -399,21 +427,6 @@ const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
  */
 const TAIL_ENDS = new Set([...TERMINAL, "awaiting_confirmation"]);
 
-function sleepOrSettle(ms: number, settled: Promise<unknown>): Promise<void> {
-  return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    settled.then(
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-    );
-  });
-}
 
 /**
  * The run-timeline tail shared by a live turn (POST /api/agents/chat) and a
@@ -430,6 +443,7 @@ function createRunTail(
   afterSeq = -1,
 ) {
   const listEvents = deps.listRunEvents ?? defaultListRunEvents;
+  const bus = deps.liveEvents ?? { subscribe: subscribeRunEvents, hasProducer: hasRunProducer };
   // While priming a resumed stream (prime() below) the state is rebuilt from
   // events the client already has, so nothing is emitted.
   let silent = false;
@@ -444,6 +458,40 @@ function createRunTail(
     openText: "",
     seenTools: new Set<string>(),
   };
+  // Phase 17: the in-process bus. Events queue here as the loop writes them;
+  // flushLive() maps them in seq order, drain() (the database) fills a gap.
+  const live = {
+    queue: [] as LiveRunEvent[],
+    wake: null as (() => void) | null,
+    unsubscribe: null as (() => void) | null,
+  };
+  const attach = (agentRunId: string) => {
+    if (live.unsubscribe) return;
+    live.unsubscribe = bus.subscribe(agentRunId, (ev) => {
+      live.queue.push(ev);
+      live.wake?.();
+    });
+  };
+  const detach = () => {
+    live.unsubscribe?.();
+    live.unsubscribe = null;
+    live.queue.length = 0;
+  };
+  /** Does the run's loop run in this process (its events come on the bus)? */
+  const producerHere = () => !!st.agentRunId && bus.hasProducer(st.agentRunId);
+  /** Resolve on the next bus event (at once when one is queued), when `settled` settles, or after `ms`. */
+  const wait = (ms: number, settled?: Promise<unknown>) =>
+    new Promise<void>((resolve) => {
+      if (live.queue.length > 0) return resolve();
+      const t = setTimeout(done, ms);
+      live.wake = done;
+      settled?.then(done, done);
+      function done() {
+        clearTimeout(t);
+        if (live.wake === done) live.wake = null;
+        resolve();
+      }
+    });
 
   const closeMsg = function* (): Generator<AguiEvent> {
     if (!st.openMsg) return;
@@ -462,6 +510,21 @@ function createRunTail(
       }
       st.openText += p.text;
       yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: id, delta: p.text } as TextMessageContentEvent, meta));
+      return;
+    }
+    // Phase 17: the model's thinking state (never its text) — a muted status
+    // line in the chat while the model reasons before writing.
+    if (ev.type === "text" && p.kind === "thinking") {
+      yield* emit(
+        stamp(
+          {
+            type: EventType.CUSTOM,
+            name: MARKETR_CUSTOM_NAMES.thinking,
+            value: { step: Number(p.step ?? 0), state: p.state === "ended" ? "ended" : "started" },
+          },
+          meta,
+        ),
+      );
       return;
     }
     const toolUseId = typeof p.toolUseId === "string" ? p.toolUseId : null;
@@ -503,12 +566,32 @@ function createRunTail(
     for (;;) {
       const batch = await listEvents(request.workspaceId, st.agentRunId, st.lastSeq).catch(() => [] as TailedRunEvent[]);
       for (const ev of batch) {
-        st.lastSeq = Math.max(st.lastSeq, ev.seq);
+        if (ev.seq <= st.lastSeq) continue;
+        st.lastSeq = ev.seq;
         // Every AG-UI event derived from run event N carries cursor N.
         deps.onCursor?.(st.agentRunId, st.lastSeq);
         yield* mapEvent(ev);
       }
       if (batch.length < 500) return;
+    }
+  };
+  /**
+   * Phase 17: map the bus events queued since the last flush, in seq order.
+   * One already applied (≤ lastSeq) is skipped; a gap (an event this process
+   * did not see, e.g. written before the subscription) is filled from the
+   * database first, so the client never gets events out of order.
+   */
+  const flushLive = async function* (): AsyncGenerator<AguiEvent> {
+    while (live.queue.length > 0) {
+      const ev = live.queue.shift()!;
+      if (!st.agentRunId || ev.seq <= st.lastSeq) continue;
+      if (ev.seq > st.lastSeq + 1) {
+        yield* drain();
+        if (ev.seq <= st.lastSeq) continue;
+      }
+      st.lastSeq = ev.seq;
+      deps.onCursor?.(st.agentRunId, st.lastSeq);
+      yield* mapEvent(ev);
     }
   };
   /**
@@ -589,16 +672,22 @@ function createRunTail(
     const getStatus = deps.getRunStatus ?? defaultGetRunStatus;
     const pollMs = deps.pollMs ?? 200;
     for (;;) {
-      yield* drain();
+      yield* flushLive();
+      // Phase 17: with the run's loop in this process (the in-app worker on
+      // this replica) the bus carries its events; the database is polled
+      // only when the run works elsewhere.
+      const here = producerHere();
+      if (!here) yield* drain();
       if (deps.shouldReconnect?.()) return "stopped";
       const status = st.agentRunId ? await getStatus(request.workspaceId, st.agentRunId).catch(() => null) : null;
       if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
-      await new Promise((r) => setTimeout(r, Math.max(pollMs, 500)));
+      await wait(here ? Math.max(pollMs, 2_000) : Math.max(pollMs, 500));
     }
+    yield* flushLive();
     yield* drain();
     return "ended";
   };
-  return { st, closeMsg, drain, prime, reconnect, finish, tailUntilEnd };
+  return { st, attach, detach, producerHere, wait, closeMsg, drain, flushLive, prime, reconnect, finish, tailUntilEnd };
 }
 
 /**
@@ -610,12 +699,12 @@ async function* streamLiveTurn(
   deps: AguiAdapterDeps,
   meta: AguiRunMeta,
   emit: (event: AguiEvent) => Generator<AguiEvent>,
+  /** Phase 17: the STATE_SNAPSHOT being loaded alongside the turn (yielded before any run event). */
+  snapshot: Promise<AguiEvent | null> | null,
 ): AsyncGenerator<AguiEvent> {
   const runTracked = deps.runTrackedTurn ?? defaultRunTrackedTurn;
-  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
   const pollMs = deps.pollMs ?? 200;
   const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
-  const runIdAgui = meta.runId;
   const tail = createRunTail(request, deps, meta, emit);
 
   let output: (AgentTurnOutput & { runId: string }) | null = null;
@@ -631,11 +720,18 @@ async function* streamLiveTurn(
       userContent: request.userContent,
       attachmentIds: request.attachmentIds,
     },
-    { onRunCreated: (id) => (tail.st.agentRunId = id) },
+    {
+      onRunCreated: (id) => {
+        tail.st.agentRunId = id;
+        // Phase 17: subscribe before the loop writes its first event.
+        tail.attach(id);
+      },
+    },
   ).then(
     (o) => {
       output = o;
       tail.st.agentRunId = o.runId;
+      tail.attach(o.runId);
     },
     (e: unknown) => {
       failure = e;
@@ -643,16 +739,45 @@ async function* streamLiveTurn(
   );
   void turn.finally(() => (settled = true));
 
-  // While the request runs the turn: tail the run. (When the server drains,
-  // an inline turn hands off to the worker at its next step boundary — see
-  // lib/agents/loop.ts — so it settles as `queued` and we reconnect below.)
-  while (!settled && Date.now() < deadline) {
+  try {
+    // The shared-state snapshot first (it loaded while the turn started).
+    if (snapshot) {
+      const ev = await snapshot;
+      if (ev) yield* emit(ev);
+    }
+    // While the request runs the turn: tail the run. Phase 17: events the loop
+    // writes in this process arrive on the bus at once; the database is
+    // polled only while no producer for the run lives here (the run id is
+    // not known yet, or the work runs elsewhere). (When the server drains,
+    // an inline turn hands off to the worker at its next step boundary — see
+    // lib/agents/loop.ts — so it settles as `queued` and we reconnect below.)
+    while (!settled && Date.now() < deadline) {
+      yield* tail.flushLive();
+      if (!tail.producerHere()) yield* tail.drain();
+      await tail.wait(pollMs, turn);
+    }
+    await turn;
+    yield* tail.flushLive();
     yield* tail.drain();
-    await sleepOrSettle(pollMs, turn);
+    yield* finishLiveTurn(request, deps, meta, emit, tail, deadline, output, failure);
+  } finally {
+    tail.detach();
   }
-  await turn;
-  yield* tail.drain();
+}
 
+/** The end of a live turn: the error, the hand-off tail, or the final reconcile. */
+async function* finishLiveTurn(
+  request: AguiTurnRequest,
+  deps: AguiAdapterDeps,
+  meta: AguiRunMeta,
+  emit: (event: AguiEvent) => Generator<AguiEvent>,
+  tail: ReturnType<typeof createRunTail>,
+  deadline: number,
+  output: (AgentTurnOutput & { runId: string }) | null,
+  failure: unknown,
+): AsyncGenerator<AguiEvent> {
+  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
+  const runIdAgui = meta.runId;
   if (failure) {
     yield* tail.closeMsg();
     yield* emit(
@@ -669,8 +794,8 @@ async function* streamLiveTurn(
     return;
   }
 
-  let finalText = (output as (AgentTurnOutput & { runId: string }) | null)?.assistantText ?? "";
-  if ((output as AgentTurnOutput | null)?.queued && tail.st.agentRunId) {
+  let finalText = output?.assistantText ?? "";
+  if (output?.queued && tail.st.agentRunId) {
     // Handed to the worker: keep tailing until the run ends.
     yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.queued, value: { runId: tail.st.agentRunId } }, meta));
     if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
@@ -678,6 +803,10 @@ async function* streamLiveTurn(
       return;
     }
     finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
+  }
+  // Phase 17: an answer reused from the answer cache is labelled so.
+  if (output?.cached) {
+    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.cached, value: { question: request.userContent.slice(0, 200) } }, meta));
   }
   yield* tail.finish(finalText, request.threadId);
 }
@@ -710,14 +839,22 @@ export async function* resumeChatTurnAgui(request: AguiResumeRequest, deps: Agui
   const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
   const tail = createRunTail(request, deps, meta, emit, request.afterSeq);
   tail.st.agentRunId = request.agentRunId;
-  await tail.prime(request.afterSeq);
-  const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
-  if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
-    yield* tail.reconnect();
-    return;
+  // Phase 17: subscribe first, so nothing written while priming is missed
+  // (a bus event past the cursor is applied after the prime; one at or
+  // before it is skipped).
+  tail.attach(request.agentRunId);
+  try {
+    await tail.prime(request.afterSeq);
+    const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
+    if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
+      yield* tail.reconnect();
+      return;
+    }
+    const finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
+    yield* tail.finish(finalText, request.threadId);
+  } finally {
+    tail.detach();
   }
-  const finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
-  yield* tail.finish(finalText, request.threadId);
 }
 
 /**

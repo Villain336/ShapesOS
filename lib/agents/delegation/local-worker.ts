@@ -11,7 +11,10 @@
 
 import { agentWorkerMode, type EnvLike } from "@/lib/agents/queue/config";
 
-export const DELEGATION_JOB_KINDS = ["subagent_run", "delegation_tick", "delegation_join"] as const;
+// Phase 17 (latency): llm_usage too — the metering outbox rows a process
+// wrote but could not finish (lib/llm/usage.ts) need a sweeper when no agent
+// worker runs.
+export const DELEGATION_JOB_KINDS = ["subagent_run", "delegation_tick", "delegation_join", "llm_usage"] as const;
 
 export function localDelegationWorkerDecision(env: EnvLike = process.env): { start: boolean; reason?: string } {
   if (agentWorkerMode(env) !== "off") return { start: false, reason: "a worker runs agent jobs" };

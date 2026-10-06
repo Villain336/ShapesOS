@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RunTimeline, type TimelineStep } from "@/components/aos";
+import { RunTimeline, aosButton, type TimelineStep } from "@/components/aos";
 import type { AosStatus } from "@/lib/aos/status";
 import { toast, toastError } from "@/lib/ui/feedback";
 
@@ -24,6 +24,8 @@ export function RunTimelinePanel({
   completed,
   control,
   stopRunId,
+  olderCursor = null,
+  runId,
 }: {
   title: string;
   subtitle: string;
@@ -36,9 +38,33 @@ export function RunTimelinePanel({
   control: { missionId: string; can: "pause" | "resume" } | null;
   /** Phase 5: present when the viewer may stop this live run. */
   stopRunId?: string | null;
+  /** Phase 17: the page shows the newest steps; this cursor loads earlier ones (null = none). */
+  olderCursor?: number | null;
+  runId?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  // Phase 17: earlier steps loaded on demand (oldest first), all done by
+  // definition — they precede the page's steps, so `completed` grows by them.
+  const [older, setOlder] = useState<TimelineStep[]>([]);
+  const [cursor, setCursor] = useState<number | null>(olderCursor);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  async function loadOlder() {
+    if (cursor === null || !runId) return;
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(`/api/agent-runs/${encodeURIComponent(runId)}/events?before=${cursor}`, { cache: "no-store" });
+      const body = (await res.json().catch(() => ({}))) as { steps?: TimelineStep[]; before?: number | null; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status}).`);
+      setOlder((prev) => [...(body.steps ?? []), ...prev]);
+      setCursor(body.before ?? null);
+    } catch (e) {
+      toastError("Couldn't load earlier steps", e instanceof Error ? e.message : undefined);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   async function act(action: "pause" | "resume") {
     if (!control) return;
@@ -96,9 +122,19 @@ export function RunTimelinePanel({
           </span>
         ) : undefined
       }
-      steps={steps}
-      completed={completed}
+      steps={older.length ? [...older, ...steps] : steps}
+      completed={completed + older.length}
       busy={busy}
+      footer={
+        cursor !== null ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted">Showing the latest steps. Earlier ones load above.</span>
+            <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className={aosButton({ variant: "secondary", size: "sm" })}>
+              {loadingOlder ? "Loading earlier steps" : "Load earlier steps"}
+            </button>
+          </div>
+        ) : undefined
+      }
       pauseLabel="Pause this mission"
       resumeLabel="Resume this mission"
       onPause={control?.can === "pause" ? () => void act("pause") : undefined}

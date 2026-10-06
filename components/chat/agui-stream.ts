@@ -12,6 +12,8 @@ export interface AguiFrame {
   message?: string;
   toolCallName?: string;
   name?: string;
+  /** CUSTOM events' payload (marketr.thinking { step, state }, marketr.cached { question }). */
+  value?: unknown;
 }
 
 /** One SSE event block as it arrived (comments and `retry:` lines dropped). */
@@ -165,37 +167,103 @@ export interface StreamingTurn {
   error: string | null;
   queued: boolean;
   done: boolean;
+  /** Phase 17: the first frame (RUN_STARTED) arrived — the server took the turn. */
+  started: boolean;
+  /** Phase 17: the model is reasoning before it writes (marketr.thinking). */
+  thinking: boolean;
+  /** Phase 17: the answer was reused from the answer cache (marketr.cached). */
+  cached: boolean;
 }
 
 export function emptyStreamingTurn(): StreamingTurn {
-  return { messages: [], activeTool: null, error: null, queued: false, done: false };
+  return { messages: [], activeTool: null, error: null, queued: false, done: false, started: false, thinking: false, cached: false };
 }
 
 /** Fold one AG-UI frame into the streaming view (returns a new object). */
 export function foldAguiEvent(turn: StreamingTurn, ev: AguiFrame): StreamingTurn {
   switch (ev.type) {
+    case "RUN_STARTED":
+      return turn.started ? turn : { ...turn, started: true };
     case "TEXT_MESSAGE_START":
       if (!ev.messageId || turn.messages.some((m) => m.id === ev.messageId)) return turn;
-      return { ...turn, activeTool: null, messages: [...turn.messages, { id: ev.messageId, text: "" }] };
+      return { ...turn, activeTool: null, thinking: false, messages: [...turn.messages, { id: ev.messageId, text: "" }] };
     case "TEXT_MESSAGE_CONTENT": {
       if (!ev.messageId || !ev.delta) return turn;
       const has = turn.messages.some((m) => m.id === ev.messageId);
       const messages = has
         ? turn.messages.map((m) => (m.id === ev.messageId ? { ...m, text: m.text + ev.delta } : m))
         : [...turn.messages, { id: ev.messageId, text: ev.delta }];
-      return { ...turn, messages };
+      return { ...turn, messages, thinking: false };
     }
     case "TOOL_CALL_START":
-      return { ...turn, activeTool: ev.toolCallName ?? null };
+      return { ...turn, activeTool: ev.toolCallName ?? null, thinking: false };
     case "TOOL_CALL_RESULT":
       return { ...turn, activeTool: null };
-    case "CUSTOM":
-      return ev.name === "marketr.queued" ? { ...turn, queued: true } : turn;
+    case "CUSTOM": {
+      if (ev.name === "marketr.queued") return { ...turn, queued: true };
+      if (ev.name === "marketr.thinking") {
+        const state = (ev.value as { state?: unknown } | null)?.state;
+        return { ...turn, thinking: state === "started" };
+      }
+      if (ev.name === "marketr.cached") return { ...turn, cached: true };
+      return turn;
+    }
     case "RUN_ERROR":
-      return { ...turn, error: ev.message ?? "The agent turn failed", done: true };
+      return { ...turn, error: ev.message ?? "The agent turn failed", done: true, thinking: false };
     case "RUN_FINISHED":
-      return { ...turn, done: true, activeTool: null };
+      return { ...turn, done: true, activeTool: null, thinking: false };
     default:
       return turn;
   }
+}
+
+// ── Phase 17: the optimistic turn (PURE; ChatContext applies it) ────────────
+
+/** The chat panel's message shape (mirrors ChatContext's ChatMessage). */
+export interface TurnMessage {
+  id: string;
+  role: string;
+  content: string;
+  toolCalls: readonly unknown[] | null;
+  createdAt: string;
+}
+
+/** The sent text shows at once (an optimistic user row); nothing waits for the network. */
+export function optimisticSend<M extends TurnMessage>(messages: readonly M[], text: string, opts: { id?: string; now?: () => number } = {}): { messages: M[]; optimisticId: string } {
+  const now = opts.now ?? Date.now;
+  const optimisticId = opts.id ?? `tmp-${now()}`;
+  const row = { id: optimisticId, role: "user", content: text, toolCalls: null, createdAt: new Date(now()).toISOString() } as M;
+  return { messages: [...messages.filter((m) => m.id !== optimisticId), row], optimisticId };
+}
+
+/** The live assistant bubbles of a streaming turn, replacing the previous live ones. */
+export function reconcileLive<M extends TurnMessage>(messages: readonly M[], turn: StreamingTurn, startedAt: string): M[] {
+  const bubbles = turn.messages
+    .filter((m) => m.text.trim())
+    .map((m) => ({ id: `live-${m.id}`, role: "assistant", content: m.text, toolCalls: null, createdAt: startedAt }) as M);
+  return [...messages.filter((m) => !m.id.startsWith("live-")), ...bubbles];
+}
+
+/**
+ * The muted status line under the transcript while a turn is in flight —
+ * agent states only (running), never decoration. Null once the turn is over
+ * or text is streaming (the text itself is the feedback).
+ *   sending   the request left the composer; no frame yet
+ *   working   the server took the turn (RUN_STARTED)
+ *   thinking  the model reasons before it writes
+ *   tool      a tool runs ("Running get_keywords")
+ *   queued    handed to the worker; the stream keeps following it
+ *   cached    reused a recent answer
+ */
+export function liveStatusLine(turn: StreamingTurn | null, sending: boolean): { label: string; live: boolean } | null {
+  if (!sending) return null;
+  const t = turn ?? emptyStreamingTurn();
+  if (t.done) return null;
+  if (t.cached) return { label: "Reusing a recent answer", live: true };
+  if (t.activeTool) return { label: `Running ${t.activeTool.replace(/^connector__/, "").replace(/_/g, " ")}`, live: true };
+  if (t.thinking) return { label: "Thinking", live: true };
+  if (t.messages.some((m) => m.text.trim())) return null;
+  if (t.queued) return { label: "Working in the background", live: true };
+  if (t.started) return { label: "Working", live: true };
+  return { label: "Sending", live: true };
 }

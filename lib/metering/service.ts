@@ -389,6 +389,32 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         // pool — its balance, cap and alert. The event stays on workspaceId.
         const poolId = await resolvePoolWorkspaceId(tx, workspaceId);
 
+        // Phase 17 (latency): a 0-credit event (a BYOK or self-hosted model
+        // call, a value-priced call's tokens) changes no balance and passes
+        // every cap check by definition — it is appended WITHOUT the balance
+        // and cap row locks, so it never queues behind charged calls.
+        if (charge === 0) {
+          const event = await tx.usageEvent.create({
+            data: {
+              workspaceId,
+              projectId,
+              actorId,
+              keyId,
+              action,
+              credits: 0,
+              overageCredits: 0,
+              idempotencyKey,
+              evidenceRef,
+              keySource,
+              waivedCredits,
+              chargedToWorkspaceId: poolId !== workspaceId ? poolId : null,
+              ...llmData,
+            },
+            select: { id: true },
+          });
+          return { result: { ok: true, charged: 0, eventId: event.id }, alert: null };
+        }
+
         // T2: lock balance + cap — concurrent meter() calls serialize here
         // (for a pool: every workspace in the pool serializes on the owner).
         const bal = await lockBalance(tx, poolId);

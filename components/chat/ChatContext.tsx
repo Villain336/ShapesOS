@@ -15,7 +15,7 @@ import {
 } from "react";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { confirmAction } from "@/lib/ui/feedback";
-import { emptyStreamingTurn, foldAguiEvent, streamChatFrames, type StreamingTurn } from "./agui-stream";
+import { emptyStreamingTurn, foldAguiEvent, liveStatusLine, optimisticSend, reconcileLive, streamChatFrames, type StreamingTurn } from "./agui-stream";
 
 export interface ChatThread {
   id: string;
@@ -84,6 +84,13 @@ interface ChatContextValue {
   queueTask: (task: QueuedTask) => void;
   /** Phase 5: the open thread's agent + tool grant. */
   threadTask: ThreadTask | null;
+  /**
+   * Phase 17: the turn in flight — set the moment a message is sent (before
+   * any network wait) and folded from the AG-UI frames as they arrive; the
+   * status line (liveStatus) reads it. Null when nothing is in flight.
+   */
+  liveTurn: StreamingTurn | null;
+  liveStatus: { label: string; live: boolean } | null;
   /** Phase 5: stop whatever the open thread's agent is doing. */
   stop: () => Promise<void>;
   stopping: boolean;
@@ -148,6 +155,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [queuedTask, setQueuedTask] = useState<QueuedTask | null>(null);
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
   const [threadTask, setThreadTask] = useState<ThreadTask | null>(null);
+  const [liveTurn, setLiveTurn] = useState<StreamingTurn | null>(null);
   const [stopping, setStopping] = useState(false);
   const activeIdRef = useRef<string | null>(null);
   activeIdRef.current = activeId;
@@ -287,7 +295,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const s = sessionRef.current;
       if (!text || sendingRef.current || !s || !s.canEdit) return;
       sendingRef.current = true;
+      // Phase 17: first visible feedback at once — the user's turn and the
+      // "Sending" state show before any request leaves (no network wait);
+      // the first frame of the stream reconciles them into "Working".
+      const optimistic = { id: `tmp-${Date.now()}` };
+      setMessages((prev) => optimisticSend(prev, text, { id: optimistic.id }).messages);
+      setSending(true);
+      setLiveTurn(emptyStreamingTurn());
       let threadId = threadIdIn;
+      const failed = (message: string) => {
+        setMessages((prev) => [
+          ...prev.filter((m) => m.id !== optimistic.id && !m.id.startsWith("live-")),
+          { id: `err-${Date.now()}`, role: "assistant", content: `Something went wrong: ${message}`, toolCalls: null, createdAt: new Date().toISOString() },
+        ]);
+      };
       try {
         if (!threadId) {
           const res = await fetch("/api/chat/threads", {
@@ -300,23 +321,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               ...(task?.tools?.length ? { tools: task.tools } : {}),
             }),
           });
-          if (!res.ok) return;
+          if (!res.ok) {
+            failed("could not start a chat");
+            return;
+          }
           const data = await res.json();
           threadId = data.thread.id as string;
           setThreads((prev) => [data.thread, ...prev]);
           setActiveId(threadId);
           setThreadTask(toThreadTask(data.thread));
-          if (!threadIdIn) setMessages([]);
+          // A fresh thread holds only the optimistic turn.
+          setMessages((prev) => prev.filter((m) => m.id === optimistic.id));
         }
-        const optimistic: ChatMessage = {
-          id: `tmp-${Date.now()}`,
-          role: "user",
-          content: text,
-          toolCalls: null,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, optimistic]);
-        setSending(true);
         // Phase 8: the turn streams (AG-UI SSE): the assistant's text shows
         // while it arrives; the thread is re-read at the end for the
         // authoritative rows (tool rows, proposals, the final text).
@@ -331,16 +347,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         });
         if (!res.ok || !res.body) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          setMessages((prev) => [
-            ...prev.filter((m) => m.id !== optimistic.id),
-            {
-              id: `err-${Date.now()}`,
-              role: "assistant",
-              content: `Something went wrong: ${data.error ?? "unknown error"}`,
-              toolCalls: null,
-              createdAt: new Date().toISOString(),
-            },
-          ]);
+          failed(data.error ?? "unknown error");
           return;
         }
         // Attachments were accepted — clear the staged tray.
@@ -348,10 +355,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         let live = emptyStreamingTurn();
         const startedAt = new Date().toISOString();
         const show = (turn: StreamingTurn) => {
-          const bubbles: ChatMessage[] = turn.messages
-            .filter((m) => m.text.trim())
-            .map((m) => ({ id: `live-${m.id}`, role: "assistant", content: m.text, toolCalls: null, createdAt: startedAt }));
-          setMessages((prev) => [...prev.filter((m) => !m.id.startsWith("live-")), ...bubbles]);
+          setLiveTurn(turn);
+          setMessages((prev) => reconcileLive(prev, turn, startedAt));
         };
         // Deploy PR: a server restart mid-turn ends the stream with
         // `reconnect`; streamChatFrames resumes it on another replica from
@@ -384,6 +389,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       } finally {
         sendingRef.current = false;
         setSending(false);
+        setLiveTurn(null);
       }
     },
     [],
@@ -461,6 +467,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         clearPendingAttachments,
         queueTask,
         threadTask,
+        liveTurn,
+        liveStatus: liveStatusLine(liveTurn, sending),
         stop,
         stopping,
         setAutoApprove,

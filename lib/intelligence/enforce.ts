@@ -6,9 +6,12 @@
 
 export {
   enforceStyleRules,
+  enforceAgainstRules,
   checkOutput,
   checkOutputAgainstRules,
   loadActiveStyleRules,
+  loadActiveStyleRulesMemo,
+  invalidateStyleRules,
   StyleRuleBlockedError,
   type EnforceResult,
   type StyleCheckResult,

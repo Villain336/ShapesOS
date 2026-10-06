@@ -104,6 +104,10 @@ import {
 } from "@/lib/agents/loop";
 import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
 import { cancelAgentJobsForRun, enqueueAgentJob } from "@/lib/agents/queue/store";
+// Phase 17 (latency): the run's loop announces itself to the in-process
+// event bus, so a chat stream on this replica forwards its events without
+// polling the database (lib/agents/runs/live-events.ts).
+import { claimRunProducer } from "@/lib/agents/runs/live-events";
 import { inlineBudgetMs } from "@/lib/agents/queue/config";
 // Phase 16: automatic parallel delegation. delegate_tasks and
 // delegate_to_subagent register themselves on import (./delegation).
@@ -142,13 +146,14 @@ import { constitutionSystemPrompt } from "@/lib/expert/constitution";
 // Phase 13B: company-intelligence prompt injection (style rules → voice →
 // knowledge → lessons/preferences → episodes) + fail-closed style-rule
 // enforcement on the delivery path.
-import { buildIntelligenceContext } from "@/lib/intelligence/company/prompt-context";
+import { buildIntelligenceContext, defaultDeps as intelligenceDeps } from "@/lib/intelligence/company/prompt-context";
 import {
   checkOutputAgainstRules,
-  enforceStyleRules,
-  loadActiveStyleRules,
+  enforceAgainstRules,
+  loadActiveStyleRulesMemo,
   StyleRuleBlockedError,
 } from "@/lib/intelligence/enforce";
+import type { StyleRule } from "@prisma/client";
 // Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
 // selectable advisor personas for the Chief Strategy Agent.
 import {
@@ -159,6 +164,9 @@ import {
   personasForSurface,
   type PersonaId,
 } from "@/lib/expert/personas";
+
+// Phase 17 (latency): the in-process answer cache for repeated questions.
+import { answerCache, answerCacheKey, cachedAnswerCall } from "./answer-cache";
 
 export { DELEGATE_TOOL, DELEGATE_TASKS_TOOL, type ChatToolCall } from "./tool-exec";
 
@@ -384,12 +392,25 @@ async function buildAttachmentSection(
 }
 
 // ---------------------------------------------------------------------------
-// Mock-mode rule-based router
+// The slash-command router (mock mode answers everything with it; Phase 17:
+// in live mode a known command is a NO-MODEL fast path through the same tool
+// gate — the deterministic /keywords, /rankings, /alerts, /competitors reads
+// and the proposing commands, which still ask: tiers are unchanged)
 // ---------------------------------------------------------------------------
 
-async function mockTurn(
+/** The commands the router handles (anything else goes to the model when one is live). */
+export const SLASH_COMMANDS = new Set(["/help", "/keywords", "/rankings", "/alerts", "/competitors", "/draft", "/audit", "/report", "/workflow", "/approve"]);
+
+/** Is this message a slash command the router answers without a model? */
+export function isSlashCommand(text: string): boolean {
+  const first = text.trim().toLowerCase().split(/\s+/)[0] ?? "";
+  return SLASH_COMMANDS.has(first);
+}
+
+async function commandTurn(
   ctx: ToolContext,
   userContent: string,
+  live: boolean,
 ): Promise<{ text: string; toolCalls: ChatToolCall[] }> {
   const text = userContent.trim();
   const lower = text.toLowerCase();
@@ -414,7 +435,16 @@ async function mockTurn(
   const first = lower.split(/\s+/)[0];
   switch (first) {
     case "/help":
-      return { text: ["I'm running in mock mode (no LLM key configured), so I answer via slash commands:", "", SLASH_HELP].join("\n"), toolCalls: [] };
+      return {
+        text: [
+          live
+            ? "Slash commands run at once, without the model — type anything else and I'll work on it:"
+            : "I'm running in mock mode (no LLM key configured), so I answer via slash commands:",
+          "",
+          SLASH_HELP,
+        ].join("\n"),
+        toolCalls: [],
+      };
     case "/keywords": {
       const call = await run("get_keywords", { limit: "25" });
       return { text: `**Keywords**\n${formatDetails(call)}`, toolCalls: [call] };
@@ -568,6 +598,8 @@ export interface AgentTurnOutput {
    * queued: true). Its run stays `running`; the join continues it.
    */
   waiting?: boolean;
+  /** Phase 17 (latency): the answer was reused from the answer cache — no model call. */
+  cached?: boolean;
 }
 
 /** Phase 8: the Operator with the code group works in build mode (code workload). */
@@ -601,17 +633,33 @@ async function threadHistory(threadId: string, current: string): Promise<ChatMes
  * stream (require / disclaimer rules can only be judged on the final text,
  * which enforceStyleRules checks before delivery).
  */
-export async function styleStreamGuard(workspaceId: string): Promise<StreamGuard | undefined> {
-  const rules = await loadActiveStyleRules(workspaceId).catch(() => []);
+export async function styleStreamGuard(workspaceId: string, rules?: StyleRule[]): Promise<StreamGuard | undefined> {
+  const loaded = rules ?? (await loadActiveStyleRulesMemo(workspaceId).catch(() => [] as StyleRule[]));
+  return streamGuardFromRules(loaded);
+}
+
+/** The stream guard for already-loaded rules (PURE). */
+export function streamGuardFromRules(rules: readonly StyleRule[]): StreamGuard | undefined {
   const bans = rules.filter((r) => r.kind === "ban" && r.severity === "block");
   if (bans.length === 0) return undefined;
   return (text) => checkOutputAgainstRules(text, bans).violations.some((v) => v.severity === "block");
 }
 
+/**
+ * Phase 17 (latency): the turn's style rules, loaded ONCE (memoized per
+ * workspace, lib/intelligence/company/style-check.ts) and shared by the
+ * prompt's hard constraints, the stream guard and the final enforcement —
+ * three loads before.
+ */
+async function turnStyleRules(workspaceId: string): Promise<StyleRule[]> {
+  return loadActiveStyleRulesMemo(workspaceId).catch(() => [] as StyleRule[]);
+}
+
 /** Phase 13B: fail-closed style-rule enforcement on the delivery path. */
-async function enforceFinalText(text: string, workspaceId: string): Promise<string> {
+async function enforceFinalText(text: string, workspaceId: string, rules?: StyleRule[]): Promise<string> {
   try {
-    await enforceStyleRules(text, workspaceId);
+    const loaded = rules ?? (await turnStyleRules(workspaceId));
+    enforceAgainstRules(checkOutputAgainstRules(text, loaded).violations);
     return text;
   } catch (err) {
     if (err instanceof StyleRuleBlockedError) {
@@ -644,6 +692,8 @@ async function finishLiveTurn(
   input: AgentTurnInput,
   loop: AgentLoopResult,
   extraCalls: ChatToolCall[] = [],
+  /** Phase 17: the turn's style rules (loaded once); loaded here when absent. */
+  rules?: StyleRule[],
 ): Promise<AgentTurnOutput> {
   if (loop.status === "handoff") {
     return { assistantText: "", toolCalls: [...extraCalls, ...loop.calls], threadTitle: null, queued: true };
@@ -677,7 +727,7 @@ async function finishLiveTurn(
   let finalText = loop.finalText;
   if (!finalText) finalText = "I checked everything I could. Let me know if you'd like me to dig deeper.";
   if (!cancelled && loop.status !== "awaiting_confirmation") {
-    finalText = await enforceFinalText(finalText, input.workspaceId);
+    finalText = await enforceFinalText(finalText, input.workspaceId, rules);
   }
   // Phase 16: an action this run proposed in the step that started its
   // sub-agents, still waiting for the user's OK, moves to this (now last)
@@ -761,6 +811,8 @@ async function freshTurnPrompt(
   input: AgentTurnInput,
   trimmed: string,
   deleg: DelegationSettings | null = null,
+  /** Phase 17: the turn's style rules (loaded once); the intelligence layer reuses them. */
+  rules?: StyleRule[],
 ): Promise<{ system: string; messages: ChatMessage[] }> {
   const agentKey = input.agentKey ?? "lead";
   const grant = input.grant ?? null;
@@ -770,7 +822,7 @@ async function freshTurnPrompt(
     buildAttachmentSection(input.projectId, input.threadId, input.attachmentIds),
     // Phase 13B: layered company intelligence (rules → voice → knowledge →
     // lessons/prefs → episodes); degrades to "" when the workspace has none.
-    buildIntelligenceContext(input.workspaceId, trimmed).catch(() => ""),
+    buildIntelligenceContext(input.workspaceId, trimmed, rules ? { ...intelligenceDeps, loadStyleRules: async () => rules } : intelligenceDeps).catch(() => ""),
     threadHistory(input.threadId, trimmed),
   ]);
   // Phase 16: delegation guidance, and the cheap pre-check's nudge for this
@@ -835,6 +887,43 @@ async function continuationState(input: AgentTurnInput, done: readonly ProposalD
   return next;
 }
 
+/**
+ * Phase 17 (latency): the turn's independent pre-model reads. Injectable
+ * (tests prove they run concurrently); the defaults are the real loaders.
+ */
+export interface TurnLoaders {
+  delegationSettings: (workspaceId: string) => Promise<DelegationSettings | null>;
+  isLive: (agentKey: AgentKey, mode: "build" | "default", workspaceId: string) => Promise<boolean>;
+  styleRules: (workspaceId: string) => Promise<StyleRule[]>;
+  connectorTools: (projectId: string, grant: readonly ToolGroup[] | null) => Promise<Awaited<ReturnType<typeof connectorChatTools>>>;
+  pendingProposal: (threadId: string) => Promise<ChatToolCall[] | null>;
+  declineWaiting: (turn: AgentTurnInput) => Promise<number>;
+}
+
+export const defaultTurnLoaders: TurnLoaders = {
+  delegationSettings: (ws) => loadDelegationSettings(ws).catch(() => null),
+  isLive: (agentKey, mode, ws) => agentIsLive(agentKey, mode, ws),
+  styleRules: (ws) => turnStyleRules(ws),
+  connectorTools: (projectId, grant) => connectorChatTools(projectId, grant).catch(() => []),
+  pendingProposal: (threadId) => pendingProposal(threadId),
+  declineWaiting: (turn) => declineWaitingProposals(turn).catch(() => 0),
+};
+
+/** One concurrent round of the turn's pre-model reads (see runAgentTurn). */
+export async function loadTurnInputs(turn: AgentTurnInput, confirming: boolean, loaders: TurnLoaders = defaultTurnLoaders) {
+  const [deleg, live, rules, connectorTools, pending] = await Promise.all([
+    loaders.delegationSettings(turn.workspaceId),
+    loaders.isLive(turn.agentKey ?? "lead", turn.mode ?? "default", turn.workspaceId),
+    loaders.styleRules(turn.workspaceId),
+    loaders.connectorTools(turn.projectId, turn.grant ?? null),
+    // 1. "yes" looks for a pending proposal; any other message declines what
+    //    sub-agents were waiting on (Phase 16: they carry on without it, as
+    //    the proposal said).
+    confirming ? loaders.pendingProposal(turn.threadId) : loaders.declineWaiting(turn).then(() => null),
+  ]);
+  return { deleg, live, rules, connectorTools, pending };
+}
+
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
   const { projectId, threadId, userContent, attachmentIds } = input;
   const trimmed = userContent.trim();
@@ -843,13 +932,22 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   const mode = input.mode ?? turnMode(agentKey, grant);
   const turn: AgentTurnInput = { ...input, agentKey, grant, mode };
   const baseCtx = loopContext(turn);
-  // Phase 16: whether delegate_tasks is offered (Settings → Automation) and how deep.
-  const deleg = await loadDelegationSettings(input.workspaceId).catch(() => null);
+  const confirming = CONFIRM_RE.test(trimmed);
+  // Phase 17 (latency): the pre-model reads are independent of each other
+  // (verified: delegation settings only shape the tool filter; agentIsLive
+  // reads the workspace's model routing; the style rules feed the prompt,
+  // the guard and the final check; the connector listing reads the project's
+  // bindings; the proposal look-up / decline reads the last assistant row,
+  // which none of the others touch) — one concurrent round instead of a
+  // chain of awaits. Phase 16: whether delegate_tasks is offered (Settings →
+  // Automation) and how deep.
+  const { deleg, live, rules, connectorTools, pending } = await loadTurnInputs(turn, confirming);
   const toolFilter = delegationToolFilter({
     autoDelegation: deleg?.autoDelegation ?? true,
     depth: 0,
     maxDepth: deleg?.limits.maxDepth ?? 2,
   });
+  const streamGuard = streamGuardFromRules(rules);
 
   // 0. Phase 8: a worker picking the run up again continues its transcript.
   //    Phase 16: at a delegation join, the sub-agents' results go in first.
@@ -858,33 +956,22 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     if (isLoopState(saved)) {
       const d = await getDelegation(input.workspaceId, input.runId).catch(() => null);
       if (d?.state) applyJoinToState(saved, d.state.plans, { now: Date.now(), maxMs: loopLimitsFromEnv().maxMs });
-      const loop = await runAgentLoop({
-        ctx: baseCtx,
-        state: saved,
-        toolFilter,
-        streamGuard: await styleStreamGuard(input.workspaceId),
-        deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
-      });
-      return finishLiveTurn(turn, loop);
+      const loop = await runAgentLoop({ ctx: baseCtx, state: saved, toolFilter, streamGuard, deps: { connectorTools } });
+      return finishLiveTurn(turn, loop, [], rules);
     }
   }
 
   // 1. Confirmation path: "yes" + a pending proposal → execute it.
-  if (CONFIRM_RE.test(trimmed)) {
-    const pending = await pendingProposal(threadId);
-    if (pending?.length) return confirmPending(turn, baseCtx, pending, toolFilter);
-    // "yes" with nothing pending — fall through to a normal turn.
-  } else {
-    // Phase 16: a new message declines what sub-agents were waiting on (they
-    // carry on without it, as the proposal said).
-    await declineWaitingProposals(turn).catch(() => 0);
-  }
+  //    ("yes" with nothing pending falls through to a normal turn.)
+  if (confirming && pending?.length) return confirmPending(turn, baseCtx, pending, toolFilter, { rules, connectorTools });
 
-  // 2. Mock mode: deterministic rule-based router.
-  if (!(await agentIsLive(agentKey, mode, baseCtx.workspaceId))) {
-    // Attachments still bind to the thread in mock mode.
+  // 2. Phase 17 (A8): a slash command needs no model — in live mode as in
+  //    mock mode it runs straight through the tool gate (tiers unchanged).
+  //    Mock mode: the deterministic rule-based router answers everything.
+  if (!live || isSlashCommand(trimmed)) {
+    // Attachments still bind to the thread.
     await buildAttachmentSection(projectId, threadId, attachmentIds);
-    const { text, toolCalls } = await mockTurn(baseCtx, trimmed);
+    const { text, toolCalls } = await commandTurn(baseCtx, trimmed, live);
     // Persist tool messages for executed reads (mirrors live mode).
     for (const call of toolCalls) {
       if (call.status === "executed") {
@@ -904,11 +991,21 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   }
 
   // 3. Live mode: the native agent loop.
-  if (await stopRequested(baseCtx)) {
+  const [stopped, prompt] = await Promise.all([stopRequested(baseCtx), freshTurnPrompt(turn, trimmed, deleg, rules)]);
+  if (stopped) {
     await saveMessage(threadId, "assistant", STOPPED_TEXT, []);
     return { assistantText: STOPPED_TEXT, toolCalls: [], threadTitle: null, cancelled: true };
   }
-  const prompt = await freshTurnPrompt(turn, trimmed, deleg);
+  // Phase 17 (A8): a repeated FAQ-style question with the SAME model input
+  // (prompt, history, question — the data version is in the prompt) and no
+  // tools or approvals in its earlier answer is answered from the cache.
+  const cacheKey = answerCacheKey({ workspaceId: input.workspaceId, projectId, system: prompt.system, messages: prompt.messages });
+  const cached = cacheKey && !attachmentIds?.length ? answerCache.get(cacheKey) : null;
+  if (cached) {
+    const call = cachedAnswerCall(trimmed);
+    await saveMessage(threadId, "assistant", cached.text, [call]);
+    return { assistantText: cached.text, toolCalls: [call], threadTitle: null, cached: true };
+  }
   const loop = await runAgentLoop({
     ctx: baseCtx,
     system: prompt.system,
@@ -916,10 +1013,14 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     mode,
     handoffAt: input.handoffAt,
     toolFilter,
-    streamGuard: await styleStreamGuard(input.workspaceId),
-    deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
+    streamGuard,
+    deps: { connectorTools },
   });
-  return finishLiveTurn(turn, loop);
+  const out = await finishLiveTurn(turn, loop, [], rules);
+  if (cacheKey && loop.status === "done" && loop.calls.length === 0 && !out.awaitingConfirmation && !out.failed && !out.queued) {
+    answerCache.set(cacheKey, { text: out.assistantText });
+  }
+  return out;
 }
 
 /**
@@ -937,8 +1038,10 @@ async function confirmPending(
   baseCtx: LoopContext,
   pending: ChatToolCall[],
   toolFilter: ((canonical: string) => boolean) | undefined,
+  /** Phase 17: what the turn already loaded (the continuation reuses it). */
+  loaded: { rules: StyleRule[]; connectorTools: Awaited<ReturnType<typeof connectorChatTools>> },
 ): Promise<AgentTurnOutput> {
-  const { workspaceId, threadId, projectId } = turn;
+  const { workspaceId, threadId } = turn;
   const agentKey = turn.agentKey ?? "lead";
   const grant = turn.grant ?? null;
   const mode = turn.mode ?? "default";
@@ -1003,11 +1106,11 @@ async function confirmPending(
         state,
         handoffAt: turn.handoffAt,
         toolFilter,
-        streamGuard: await styleStreamGuard(workspaceId),
-        deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
+        streamGuard: streamGuardFromRules(loaded.rules),
+        deps: { connectorTools: loaded.connectorTools },
       });
       // The confirmed calls (already saved as tool rows) lead the reply's calls.
-      return finishLiveTurn(turn, loop, executed);
+      return finishLiveTurn(turn, loop, executed, loaded.rules);
     }
   }
   const failures = executed.filter((c) => c.status !== "executed");
@@ -1284,6 +1387,7 @@ export async function runTrackedAgentTurn(
   }
 
   const signal = registerRunAbort(run.id);
+  const releaseProducer = claimRunProducer(run.id);
   try {
     const out = await runAgentTurnWithCapture(
       { ...tracked, signal, handoffAt: budget === null ? undefined : Date.now() + budget },
@@ -1302,6 +1406,7 @@ export async function runTrackedAgentTurn(
     await finishAgentRun(input.workspaceId, run.id, isRunStopped(err) ? "cancelled" : "failed").catch(() => undefined);
     throw err;
   } finally {
+    releaseProducer();
     releaseRunAbort(run.id);
   }
 }
@@ -1322,6 +1427,9 @@ export async function continueTrackedAgentTurn(
   if (run.status === "succeeded" || run.status === "failed" || run.status === "cancelled") return empty;
   const tracked: AgentTurnInput & { runId: string } = { ...job, resume: true };
   const signal = registerRunAbort(job.runId);
+  // Phase 17: an in-app worker on a web replica also serves that replica's
+  // chat streams from the bus.
+  const releaseProducer = claimRunProducer(job.runId);
   // The worker's lease signal: losing the lease stops the local work but
   // never finishes the run (the loop treats it as a hand-off).
   const onLeaseLost = () => abortRunWith(job.runId, new LeaseLostError());
@@ -1339,6 +1447,7 @@ export async function continueTrackedAgentTurn(
     await finishAgentRun(job.workspaceId, job.runId, isRunStopped(err) ? "cancelled" : "failed").catch(() => undefined);
     throw err;
   } finally {
+    releaseProducer();
     opts.signal?.removeEventListener("abort", onLeaseLost);
     releaseRunAbort(job.runId);
   }
