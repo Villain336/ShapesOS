@@ -23,6 +23,9 @@ export function notificationStatus(n: Pick<NotificationLike, "kind" | "title">):
       return "needs";
     case "run_failed":
       return "failed";
+    // Phase 18.3 (WS=trust): an agent run finished — the done state.
+    case "run_finished":
+      return "done";
     case "approval_decided":
       // "Ad spend approved" → done; "… denied" is a decision, not a failure.
       return /\bapproved\b/i.test(n.title) ? "done" : null;
@@ -41,6 +44,11 @@ const ACTION_LABELS: Record<string, string> = {
   mention: "Open message",
   direct_message: "Open message",
   reminder_due: "Open reminders",
+  // Phase 18.3 (WS=trust)
+  run_finished: "Open run",
+  invoice_paid: "Open invoice",
+  ticket_assigned: "Open ticket",
+  meeting_starting: "Open calendar",
 };
 
 /** The one action: where the notification points, named for it. Null when it links nowhere. */
