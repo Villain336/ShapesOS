@@ -205,18 +205,18 @@ export function Desktop({
         mode === "move"
           ? placeWidget(base, { ...start, x: start.x + dc, y: start.y + dr })
           : placeWidget(base, { ...start, w: start.w + dc, h: start.h + dr });
+      latest = preview;
       setDrag({ id, mode, preview });
     };
+    let latest: DesktopLayout | null = null;
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      setDrag((d) => {
-        if (d) {
-          const p = d.preview.widgets.find((w) => w.id === id);
-          commit(d.preview, `${mode === "move" ? "Moved" : "Resized"} ${describe(p)}`);
-        }
-        return null;
-      });
+      setDrag(null);
+      if (latest) {
+        const p = latest.widgets.find((w) => w.id === id);
+        commit(latest, `${mode === "move" ? "Moved" : "Resized"} ${describe(p)}`);
+      }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);

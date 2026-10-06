@@ -157,7 +157,20 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
   zernio_account_usage: { month: "2030-01", status: "included" },
   // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
   ops_sites: { grid_w: "10", grid_d: "10" },
+  // Phase 18.1 (WS=desk): owner-only tables (workspace AND app.user_id) —
+  // the rows belong to OWNER, the person GUC set by deskScope below.
+  user_desktop_layouts: { user_id: OWNER },
+  user_recent_items: { user_id: OWNER },
+  desktop_briefings: { user_id: OWNER },
 };
+
+/** The tenant GUC plus the person GUC (lib/desktop/scope.ts) so owner-only tables answer too. */
+function deskScope<T>(ws: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return withWorkspaceScope(ws, async (tx) => {
+    await (tx as Tx).$queryRaw`SELECT set_config('app.user_id', ${OWNER}, true)`;
+    return fn(tx as Tx);
+  });
+}
 
 // Committed rows per table (one is enough; parents are shared).
 const made = new Map<string, Record<string, unknown>>();
@@ -301,7 +314,7 @@ describe("delete leaves nothing behind", () => {
       if (made.has(table)) continue;
       const pending = new Map<string, Record<string, unknown>>();
       try {
-        await withWorkspaceScope(doomed, (tx) => synth(tx as Tx, table, doomed, pending));
+        await deskScope(doomed, (tx) => synth(tx, table, doomed, pending));
         for (const [t, row] of pending) {
           made.set(t, row);
           if (!tables.includes(t)) globalRows.push({ table: t, row });
@@ -318,7 +331,7 @@ describe("delete leaves nothing behind", () => {
     const r = await deleteWorkspace({ userId: OWNER, workspaceId: doomed, confirmName: "Orphan doomed" });
     assert.equal(r.deletedId, doomed);
     const leftovers: string[] = [];
-    await withWorkspaceScope(doomed, async (tx) => {
+    await deskScope(doomed, async (tx) => {
       for (const table of tables) {
         const rows = await tx.$queryRawUnsafe<{ n: number }[]>(
           `SELECT count(*)::int AS n FROM ${q(table)} WHERE "workspace_id" = $1`,
