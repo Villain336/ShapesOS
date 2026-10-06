@@ -370,6 +370,9 @@ enum FileChangeAction {
   store_item_published
   store_publication_accepted
   store_publication_declined
+  // Phase 18.2 (WS=content): a run / job / sandbox / terminal stopped from the
+  // Activity Monitor.
+  process_stopped
 }
 
 // ---------------------------------------------------------------------------

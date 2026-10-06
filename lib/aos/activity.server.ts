@@ -14,7 +14,9 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { checkCap } from "@/lib/metering/service";
 import { deriveAgentTree, type AgentRunInput, type AgentTree, type MissionInput } from "./agents";
 import { runPrompt } from "./runs";
-import { fromSkillRunStatus, type AosStatus } from "./status";
+import { fromAgentRunStatus, fromSkillRunStatus, type AosStatus } from "./status";
+// Phase 18.2 (WS=content): the Activity Monitor model (see the section at the end).
+import { canStopProcess, orderProcesses, type CronLastRun, type ProcessRow, type ProcessSnapshot, type SystemHealth } from "./processes";
 import { readDelegation } from "@/lib/agents/delegation/store";
 import { delegationProgress } from "@/lib/agents/delegation/plan";
 
@@ -244,3 +246,260 @@ export const safeUsageMeter = cache(async (workspaceId: string): Promise<UsageMe
     return null;
   }
 });
+
+// ===========================================================================
+// Phase 18.2 (WS=content): the Activity Monitor — every process in one place.
+// The same activity source as the sidebar / Home (this module), widened from
+// "agent work in the last day" to every run, job, batch, sandbox and terminal
+// session, with cost so far, elapsed time, budget, and who may stop it; plus
+// the system-health numbers. Pure model + formatting in lib/aos/processes.ts.
+// All tenant reads inside withWorkspaceScope with explicit workspaceId.
+// ===========================================================================
+
+
+const PROCESS_WINDOW_MS = DAY_MS;
+const LIVE_RUN = ["queued", "running", "awaiting_confirmation"] as const;
+
+export interface ProcessViewer {
+  userId: string;
+  /** Admin or owner: may stop anyone's process and sees the system-wide health rows. */
+  isAdmin: boolean;
+}
+
+function jobStatus(status: string): ProcessRow["status"] {
+  if (status === "queued") return "queued";
+  if (status === "running") return "running";
+  if (status === "succeeded") return "done";
+  if (status === "failed" || status === "dead") return "failed";
+  return null; // cancelled
+}
+
+function batchStatus(status: string): ProcessRow["status"] {
+  if (status === "pending") return "queued";
+  if (status === "submitted" || status === "ended") return "running";
+  if (status === "delivered" || status === "direct") return "done";
+  if (status === "failed") return "failed";
+  return null;
+}
+
+export async function loadProcesses(workspaceId: string, viewer: ProcessViewer, now = new Date()): Promise<ProcessRow[]> {
+  const since = new Date(now.getTime() - PROCESS_WINDOW_MS);
+  const { loopLimitsFromEnv } = await import("@/lib/agents/loop");
+  const limits = loopLimitsFromEnv();
+  const data = await withWorkspaceScope(workspaceId, async (tx) => {
+    const [runs, jobs, batches, sandboxes, terminals] = await Promise.all([
+      tx.agentRun.findMany({
+        where: { workspaceId, OR: [{ status: { in: [...LIVE_RUN] } }, { createdAt: { gte: since } }] },
+        orderBy: { createdAt: "desc" },
+        take: 80,
+        select: { id: true, kind: true, status: true, startedBy: true, createdAt: true, endedAt: true, agentKey: true, parentRunId: true, agentState: true, missionId: true, cancelRequestedAt: true },
+      }),
+      tx.agentJob.findMany({
+        where: { workspaceId, OR: [{ status: { in: ["queued", "running"] } }, { status: { in: ["failed", "dead"] }, updatedAt: { gte: since } }] },
+        orderBy: { createdAt: "desc" },
+        take: 60,
+        select: { id: true, kind: true, status: true, attempts: true, maxAttempts: true, runAfter: true, heartbeatAt: true, runId: true, lastError: true, createdAt: true, finishedAt: true },
+      }),
+      tx.llmBatchJob.findMany({
+        where: { workspaceId, OR: [{ status: { in: ["pending", "submitted", "ended"] } }, { updatedAt: { gte: since } }] },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { id: true, purpose: true, status: true, model: true, createdAt: true, deliveredAt: true, endedAt: true, updatedAt: true, lastError: true },
+      }),
+      tx.agentRunSandbox.findMany({
+        where: { workspaceId, OR: [{ status: "active" }, { destroyedAt: { gte: since } }] },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: { id: true, runId: true, provider: true, status: true, createdAt: true, destroyedAt: true, run: { select: { startedBy: true } } },
+      }),
+      tx.terminalSession.findMany({
+        where: { workspaceId, OR: [{ status: "active" }, { endedAt: { gte: since } }] },
+        orderBy: { startedAt: "desc" },
+        take: 30,
+        select: { id: true, userId: true, provider: true, status: true, startedAt: true, endedAt: true, _count: { select: { commands: true } } },
+      }),
+    ]);
+    return { runs, jobs, batches, sandboxes, terminals };
+  });
+
+  // Cost so far: the run's llm_tokens usage events (lib/llm/usage.ts evidenceRef "agent_run:<id>").
+  const refs = data.runs.map((r) => `agent_run:${r.id}`);
+  const costs = refs.length
+    ? await withWorkspaceScope(workspaceId, (tx) =>
+        tx.usageEvent.groupBy({ by: ["evidenceRef"], where: { workspaceId, evidenceRef: { in: refs } }, _sum: { llmCostMicroUsd: true } }),
+      )
+    : [];
+  const costBy = new Map(costs.map((c) => [c.evidenceRef ?? "", Number(c._sum.llmCostMicroUsd ?? 0)]));
+  const budget = { costMicroUsd: limits.maxCostMicroUsd, ms: limits.maxMs };
+  const rows: ProcessRow[] = [];
+  const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
+
+  for (const r of data.runs) {
+    const live = (LIVE_RUN as readonly string[]).includes(r.status);
+    rows.push({
+      key: `run:${r.id}`,
+      type: "run",
+      id: r.id,
+      title: runPrompt(r.agentState) ?? r.kind,
+      subtitle: [r.agentKey ?? "lead", r.kind].join(" · "),
+      status: fromAgentRunStatus(r.status),
+      state: r.cancelRequestedAt && live ? "stopping" : r.status,
+      live,
+      startedAt: r.createdAt.toISOString(),
+      endedAt: iso(r.endedAt),
+      costMicroUsd: costBy.get(`agent_run:${r.id}`) ?? 0,
+      budget: r.kind === "chat" || r.kind === "mission" ? budget : null,
+      startedBy: r.startedBy,
+      parentKey: r.parentRunId ? `run:${r.parentRunId}` : null,
+      href: `/dashboard/runs/${encodeURIComponent(r.id)}`,
+      stop: canStopProcess({ live: live && !r.cancelRequestedAt, stoppable: true, startedBy: r.startedBy, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+    });
+  }
+  for (const j of data.jobs) {
+    const live = j.status === "queued" || j.status === "running";
+    // A job working on a run is stopped through its run; a queued job without
+    // one is cancelled; a running one without a run can't be interrupted.
+    const stoppable = !!j.runId || j.status === "queued";
+    rows.push({
+      key: `job:${j.id}`,
+      type: "job",
+      id: j.id,
+      title: j.kind,
+      subtitle: `${j.attempts}/${j.maxAttempts}${j.lastError ? ` · ${j.lastError.slice(0, 120)}` : ""}`,
+      status: jobStatus(j.status),
+      state: j.status,
+      live,
+      startedAt: j.createdAt.toISOString(),
+      endedAt: iso(j.finishedAt),
+      costMicroUsd: null,
+      budget: null,
+      startedBy: null,
+      parentKey: j.runId ? `run:${j.runId}` : null,
+      href: j.runId ? `/dashboard/runs/${encodeURIComponent(j.runId)}` : null,
+      stop: canStopProcess({ live, stoppable, startedBy: null, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+    });
+  }
+  for (const b of data.batches) {
+    const live = ["pending", "submitted", "ended"].includes(b.status);
+    rows.push({
+      key: `batch:${b.id}`,
+      type: "batch",
+      id: b.id,
+      title: b.purpose,
+      subtitle: [b.model, b.lastError?.slice(0, 120)].filter(Boolean).join(" · ") || null,
+      status: batchStatus(b.status),
+      state: b.status,
+      live,
+      startedAt: b.createdAt.toISOString(),
+      endedAt: iso(b.deliveredAt ?? b.endedAt ?? (live ? null : b.updatedAt)),
+      costMicroUsd: null,
+      budget: null,
+      startedBy: null,
+      parentKey: null,
+      href: null,
+      // A submitted batch runs at the provider; it finishes or expires on its own.
+      stop: canStopProcess({ live, stoppable: false, startedBy: null, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+    });
+  }
+  for (const s of data.sandboxes) {
+    const live = s.status === "active";
+    rows.push({
+      key: `sandbox:${s.id}`,
+      type: "sandbox",
+      id: s.id,
+      title: s.provider,
+      subtitle: null,
+      status: live ? "running" : "done",
+      state: s.status,
+      live,
+      startedAt: s.createdAt.toISOString(),
+      endedAt: iso(s.destroyedAt),
+      costMicroUsd: null,
+      budget: null,
+      startedBy: s.run.startedBy,
+      parentKey: `run:${s.runId}`,
+      href: `/dashboard/runs/${encodeURIComponent(s.runId)}`,
+      stop: canStopProcess({ live, stoppable: true, startedBy: s.run.startedBy, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+    });
+  }
+  for (const t of data.terminals) {
+    const live = t.status === "active";
+    rows.push({
+      key: `terminal:${t.id}`,
+      type: "terminal",
+      id: t.id,
+      title: t.provider,
+      subtitle: String(t._count.commands),
+      status: null, // a person's process: neutral, never an agent colour
+      state: t.status,
+      live,
+      startedAt: t.startedAt.toISOString(),
+      endedAt: iso(t.endedAt),
+      costMicroUsd: null,
+      budget: null,
+      startedBy: t.userId,
+      parentKey: null,
+      href: "/dashboard/terminal",
+      stop: canStopProcess({ live, stoppable: true, startedBy: t.userId, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+    });
+  }
+  return orderProcesses(rows);
+}
+
+export async function loadSystemHealth(workspaceId: string, viewer: ProcessViewer, now = new Date()): Promise<SystemHealth> {
+  const since = new Date(now.getTime() - PROCESS_WINDOW_MS);
+  const { agentWorkerMode } = await import("@/lib/agents/queue/config");
+  const q = await withWorkspaceScope(workspaceId, async (tx) => {
+    const [queued, oldest, dead, beat] = await Promise.all([
+      // Waiting = queued and due (a retry backing off isn't waiting yet).
+      tx.agentJob.count({ where: { workspaceId, status: "queued", runAfter: { lte: now } } }),
+      tx.agentJob.findFirst({ where: { workspaceId, status: "queued", runAfter: { lte: now } }, orderBy: { runAfter: "asc" }, select: { runAfter: true } }),
+      tx.agentJob.count({ where: { workspaceId, status: "dead", updatedAt: { gte: since } } }),
+      tx.agentJob.findFirst({ where: { workspaceId, status: "running", heartbeatAt: { not: null } }, orderBy: { heartbeatAt: "desc" }, select: { heartbeatAt: true } }),
+    ]);
+    return { queued, oldest, dead, beat };
+  });
+  let cache: { cacheReadShare24h: number | null; cacheHitPct: number | null } = { cacheReadShare24h: null, cacheHitPct: null };
+  try {
+    const { getAiCostSpeed } = await import("@/lib/metering/ai-health");
+    const ai = await getAiCostSpeed(workspaceId, { days: 1, now });
+    cache = { cacheReadShare24h: ai.cacheReadShare24h, cacheHitPct: ai.cacheHitPct };
+  } catch {
+    // best effort
+  }
+  let cron: CronLastRun[] | null = null;
+  let db: SystemHealth["db"] = null;
+  if (viewer.isAdmin) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      // System-wide (cron_runs is not tenant data: job names and timings only).
+      const latest = await prisma.$queryRaw<Array<{ job: string; status: string; started_at: Date; duration_ms: number | null; error: string | null }>>`
+        SELECT DISTINCT ON (job) job, status::text AS status, started_at, duration_ms, error
+          FROM cron_runs ORDER BY job, started_at DESC`;
+      cron = latest.map((c) => ({ job: c.job, status: c.status, startedAt: c.started_at.toISOString(), durationMs: c.duration_ms, error: c.error ? c.error.slice(0, 200) : null }));
+      const [{ n }] = await prisma.$queryRaw<Array<{ n: number }>>`SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database()`;
+      const [{ max_connections }] = await prisma.$queryRaw<Array<{ max_connections: string }>>`SHOW max_connections`;
+      db = { connections: n, max: Number(max_connections) };
+    } catch {
+      // best effort: cron table or pg_stat_activity unavailable to this role
+    }
+  }
+  const oldestAt = q.oldest ? q.oldest.runAfter.getTime() : null;
+  return {
+    queueDepth: q.queued,
+    oldestQueuedMs: oldestAt !== null ? Math.max(0, now.getTime() - oldestAt) : null,
+    deadJobs24h: q.dead,
+    lastHeartbeatMs: q.beat?.heartbeatAt ? Math.max(0, now.getTime() - q.beat.heartbeatAt.getTime()) : null,
+    workerMode: agentWorkerMode(),
+    cacheReadShare24h: cache.cacheReadShare24h,
+    cacheHitPct: cache.cacheHitPct,
+    cron,
+    db,
+    generatedAt: now.toISOString(),
+  };
+}
+
+export async function loadProcessSnapshot(workspaceId: string, viewer: ProcessViewer, now = new Date()): Promise<ProcessSnapshot> {
+  const [processes, health] = await Promise.all([loadProcesses(workspaceId, viewer, now), loadSystemHealth(workspaceId, viewer, now)]);
+  return { processes, health };
+}

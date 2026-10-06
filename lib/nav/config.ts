@@ -41,6 +41,7 @@ import {
   Mic,
   Network,
   NotebookPen, // Phase 18.2 (WS=content): Notes
+  Gauge, // Phase 18.2 (WS=content): Activity Monitor
   Paintbrush,
   PenLine,
   Phone,
@@ -164,6 +165,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/approvals", label: "Approvals", icon: Inbox, description: "Everything that needs you", keywords: "needs you inbox review approve", badge: "needs-you" },
       { href: "/dashboard/runs", label: "Runs", icon: History, description: "Agent runs and replays", keywords: "replays history executions" },
+      // Phase 18.2 (WS=content): every process in one place (lib/aos/processes.ts).
+      { href: "/dashboard/activity", label: "Activity monitor", icon: Gauge, description: "Every run, job and sandbox: cost, time, Stop", keywords: "activity monitor processes jobs queue cron health stop cost task manager" },
       { href: "/dashboard/assistant", label: "Assistant", icon: MessageSquare, description: "Chat with your agents", keywords: "chat ai help" },
       { href: "/dashboard/missions", label: "Missions", icon: Target, description: "Goals the agents are working on", keywords: "goals growth strategy" },
       { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen, description: "Agent playbooks", keywords: "procedures steps" },

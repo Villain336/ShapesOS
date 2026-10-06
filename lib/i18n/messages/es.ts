@@ -107,6 +107,7 @@ export const es: Catalogue = {
       "/dashboard/files": { label: "Archivos", description: "Archivos del espacio de trabajo" },
       // Phase 18.2 (WS=content)
       "/dashboard/notes": { label: "Notas", description: "Notas rápidas, notas de voz, notas en cualquier registro" },
+      "/dashboard/activity": { label: "Monitor de actividad", description: "Cada ejecución, tarea y entorno aislado: coste, tiempo, Detener" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
