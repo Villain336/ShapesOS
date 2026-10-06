@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { registerExtraTool, type ToolContext, type ToolDef } from "../tools";
 import { executeTool, type ChatToolCall } from "../tool-exec";
 import { CACHEABLE_TOOLS, ToolResultCache, stableJson, toolCacheKey, toolResultCache } from "../tool-cache";
-import { AnswerCache, answerCacheKey, cachedAnswerCall, normalizeQuestion, CACHED_ANSWER_TOOL } from "../answer-cache";
+import { AnswerCache, answerCacheKey, cachedAnswerCall, normalizeQuestion, withoutEpisodes, CACHED_ANSWER_TOOL } from "../answer-cache";
 import { isSlashCommand, SLASH_COMMANDS } from "../agent";
 
 let reads = 0;
@@ -123,10 +123,13 @@ describe("answer cache", () => {
     const k1 = answerCacheKey(base)!;
     assert.equal(answerCacheKey({ ...base, messages: [{ role: "user", content: "  what's my visibility SCORE " }] }), k1, "normalised question");
     assert.notEqual(answerCacheKey({ ...base, system: "PROJECT CONTEXT: 13 keywords" }), k1, "the data version lives in the prompt");
-    assert.notEqual(answerCacheKey({ ...base, messages: [{ role: "user", content: "earlier" }, { role: "assistant", content: "x" }, ...base.messages] }), k1, "a different history");
+    assert.equal(answerCacheKey({ ...base, messages: [{ role: "user", content: "earlier" }, { role: "assistant", content: "x" }, ...base.messages] }), null, "a question inside a conversation is never cached");
     assert.notEqual(answerCacheKey({ ...base, workspaceId: "w2" }), k1);
     assert.equal(answerCacheKey({ ...base, messages: [] }), null);
     assert.equal(normalizeQuestion("Hello?!"), "hello");
+    const withEp = `${base.system}\n\n## EPISODIC CONTEXT — relevant past interactions\npreamble\n<recalled-memory>\n- agent_call: earlier Q\n</recalled-memory>\n\nRULES: x`;
+    assert.equal(withoutEpisodes(withEp), `${base.system}\n\n\n\nRULES: x`);
+    assert.equal(answerCacheKey({ ...base, system: withEp }), answerCacheKey({ ...base, system: withEp.replace("earlier Q", "another Q") }), "recalled episodes are not part of the data version");
   });
 
   it("hit / miss / TTL / LRU / workspace invalidation; a cached answer is labelled", () => {

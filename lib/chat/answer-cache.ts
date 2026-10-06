@@ -4,7 +4,8 @@
 // Key: workspace + project + a hash of the WHOLE model input — the system
 // prompt (project context, company intelligence, recall: the data version is
 // in there, so any change to the data the answer was grounded in changes the
-// key), the thread history and the question itself. Identical input would
+// key) and the normalised question. Only a STANDALONE question (the first
+// message of its thread) is cached; a question inside a conversation is not. Identical input would
 // get the model's same answer (modulo sampling), so the earlier one is
 // reused and the model is not called. Only an answer that used NO tools and
 // raised NO approval is stored (lib/chat/agent.ts decides); a turn with
@@ -18,6 +19,7 @@
 // short-lived (ANSWER_CACHE_TTL_MS).
 
 import { createHash } from "node:crypto";
+import { LAYER_HEADERS, UNTRUSTED_CLOSE } from "@/lib/intelligence/company/prompt-context";
 import type { ChatMessage } from "@/lib/llm/types";
 import type { ChatToolCall } from "./tool-exec";
 
@@ -33,20 +35,37 @@ export function normalizeQuestion(text: string): string {
 
 /**
  * The cache key for a turn's model input, or null when the turn should not
- * use the cache (an empty question).
+ * use the cache: an empty question, or a question asked INSIDE a
+ * conversation (it may lean on the earlier turns — "and last month?" — so
+ * only a standalone question, the first of its thread, is FAQ-style).
  */
 export function answerCacheKey(input: { workspaceId: string; projectId: string; system: string; messages: readonly ChatMessage[] }): string | null {
+  if (input.messages.length !== 1) return null;
   const last = input.messages[input.messages.length - 1];
   const question = last && last.role === "user" && typeof last.content === "string" ? normalizeQuestion(last.content) : "";
   if (!question) return null;
   const history = input.messages.slice(0, -1).map((m) => `${m.role}:${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`);
   const h = createHash("sha256");
-  h.update(input.system);
+  h.update(withoutEpisodes(input.system));
   h.update("\u0000");
   h.update(history.join("\u0001"));
   h.update("\u0000");
   h.update(question);
   return `${input.workspaceId}:${input.projectId}:${h.digest("hex")}`;
+}
+
+/**
+ * The prompt minus its EPISODIC CONTEXT layer (recalled past interactions).
+ * Asking a question records an episode of it, which the next ask recalls —
+ * so with the episodes in the key a repeat could never hit. Episodes are a
+ * memory of earlier Q&A, not the data an answer stands on (project context,
+ * company knowledge, rules, lessons all stay in the key). PURE.
+ */
+export function withoutEpisodes(system: string): string {
+  const start = system.indexOf(LAYER_HEADERS.episodes);
+  if (start < 0) return system;
+  const close = system.indexOf(UNTRUSTED_CLOSE, start);
+  return close < 0 ? system.slice(0, start) : system.slice(0, start) + system.slice(close + UNTRUSTED_CLOSE.length);
 }
 
 export interface CachedAnswer {
