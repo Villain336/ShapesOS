@@ -200,5 +200,13 @@ describe("Notes (DB)", () => {
     assert.match(denied.summary, /No note/, "an agent working for Ben can't read Ana's private note");
     const viaSearch = await search_workspace.execute(toolCtx(ANA, "viewer"), { record: `note:${privateId}` });
     assert.match(viaSearch.summary, /zircophane/);
+    // Integration: asking for the private note as an Office doc or as file
+    // content goes through the note's rule too (no back door for Ben's agent).
+    for (const as of ["doc", "file_content"]) {
+      const sneaky = await search_workspace.execute(toolCtx(BEN, "editor"), { record: `${as}:${privateId}` });
+      assert.doesNotMatch(sneaky.summary, /zircophane/, `${as}: never Ana's private note`);
+      assert.match(sneaky.summary, /No note/);
+    }
+    assert.match((await search_workspace.execute(toolCtx(ANA, "viewer"), { record: `doc:${privateId}` })).summary, /zircophane/, "its maker still reads it");
   });
 });

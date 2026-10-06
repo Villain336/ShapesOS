@@ -51,6 +51,9 @@ async function readRecord(ctx: { workspaceId: string; userId?: string; role?: im
     // Content kinds can be either a file or a doc: fall back to the doc.
     if (!meta && ref.kind === "file_content") return readRecord(ctx, { kind: "doc", id: ref.id });
     if (!meta) return { summary: `No ${ref.kind} ${ref.id} in this workspace.` };
+    // Phase 18.2 integration: a note read as "doc:" / "file_content:" still
+    // goes through the note's own rule (a private note is its maker's alone).
+    if ("kind" in meta && meta.kind === "note") return readRecord(ctx, { kind: "note", id: ref.id });
     const text = await storedText(ctx.workspaceId, isDoc ? { univerDocId: ref.id } : { fileId: ref.id });
     const name = "title" in meta ? meta.title : meta.filename;
     if (!text || !text.text) {
