@@ -100,7 +100,7 @@ async function stubReplica(name: string, shared: Shared, opts: StubOptions = {})
 
     if (url.pathname === "/api/files" && req.method === "POST") {
       const body = await readBody(req);
-      const form = await new Request("http://stub/", { method: "POST", headers: { "content-type": req.headers["content-type"]! }, body }).formData();
+      const form = await new Request("http://stub/", { method: "POST", headers: { "content-type": req.headers["content-type"]! }, body: new Uint8Array(body) }).formData();
       const file = form.get("file") as File;
       const id = `f${bucket.size + 1}`;
       bucket.set(`files/${form.get("workspaceId")}/${id}`, new Uint8Array(await file.arrayBuffer()));

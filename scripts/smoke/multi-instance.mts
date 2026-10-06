@@ -76,7 +76,7 @@ function startProcess(name: string, cmd: string, args: string[], env: NodeJS.Pro
   return { child, exited };
 }
 
-function serverCommand(port: number): { cmd: string; args: string[]; envExtra: NodeJS.ProcessEnv } {
+function serverCommand(port: number): { cmd: string; args: string[]; envExtra: Record<string, string> } {
   const standalone = path.join(ROOT, ".next", "standalone", "server.js");
   if (fs.existsSync(standalone)) {
     return { cmd: process.execPath, args: [standalone], envExtra: { PORT: String(port), HOSTNAME: "127.0.0.1" } };
@@ -114,7 +114,7 @@ async function main() {
   const realS3 = process.env.SMOKE_REAL_S3 === "1";
   const { startFakeS3 } = await import("@/lib/filesystem/fake-s3");
   const fake = realS3 ? null : await startFakeS3({ bucket: "shapes-smoke", accessKeyId: "SMOKEAK", secretAccessKey: "SMOKESK" });
-  const s3Env: NodeJS.ProcessEnv = fake
+  const s3Env: Record<string, string> = fake
     ? {
         MARKETR_S3_ENDPOINT: fake.endpoint,
         MARKETR_S3_BUCKET: "shapes-smoke",

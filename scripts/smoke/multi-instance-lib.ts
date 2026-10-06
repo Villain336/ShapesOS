@@ -90,7 +90,7 @@ export async function uploadOnAFetchOnB(a: Instance, b: Instance, jar: CookieJar
   const form = new FormData();
   form.set("workspaceId", workspaceId);
   form.set("path", "/files");
-  form.set("file", new File([bytes], `smoke-${Date.now()}.txt`, { type: "text/plain" }));
+  form.set("file", new File([new Uint8Array(bytes)], `smoke-${Date.now()}.txt`, { type: "text/plain" }));
   const up = await fetch(`${a.base}/api/files`, { method: "POST", body: form, headers: { cookie: jar.header(), origin: a.base } });
   const upBody = (await up.json().catch(() => ({}))) as { file?: { id?: string } };
   const id = upBody.file?.id;
