@@ -50,6 +50,7 @@ import { search_workspace } from "@/lib/search/tool";
 import { NOTE_TOOLS } from "@/lib/notes/tools";
 import { FILE_TOOLS } from "@/lib/files/tools";
 import { PROCESS_TOOLS } from "@/lib/aos/tools";
+import { STORE_TOOLS } from "@/lib/store/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1067,10 +1068,12 @@ export const TOOLS: ToolDef[] = [
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
   // Phase 18.2 (WS=content): read_note (Tier 0) / create_note (Tier 1);
-  // list_file_versions (Tier 0) / share_file_link (Tier 2); list_processes (Tier 0).
+  // list_file_versions (Tier 0) / share_file_link (Tier 2); list_processes (Tier 0);
+  // list_store_items (Tier 0).
   ...NOTE_TOOLS,
   ...FILE_TOOLS,
   ...PROCESS_TOOLS,
+  ...STORE_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {

@@ -43,6 +43,7 @@ import {
   NotebookPen, // Phase 18.2 (WS=content): Notes
   Gauge, // Phase 18.2 (WS=content): Activity Monitor
   SquareTerminal, // Phase 18.2 (WS=content): Terminal
+  Store, // Phase 18.2 (WS=content): Store
   Paintbrush,
   PenLine,
   Phone,
@@ -174,6 +175,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/missions", label: "Missions", icon: Target, description: "Goals the agents are working on", keywords: "goals growth strategy" },
       { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen, description: "Agent playbooks", keywords: "procedures steps" },
       { href: "/dashboard/actions", label: "Actions", icon: Zap, description: "Connected app actions", keywords: "composio tools connections" },
+      // Phase 18.2 (WS=content): one catalogue of everything installable (lib/store).
+      { href: "/dashboard/store", label: "Store", icon: Store, description: "Install apps, skills, templates and connectors", keywords: "store marketplace install apps skills templates connectors mcp toolkits catalogue" },
       { href: "/dashboard/substrate", label: "Substrate", icon: Brain, description: "Business graph and growth memory", keywords: "graph memory campaigns" },
     ],
   },

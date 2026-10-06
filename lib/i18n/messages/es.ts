@@ -109,6 +109,7 @@ export const es: Catalogue = {
       "/dashboard/notes": { label: "Notas", description: "Notas rápidas, notas de voz, notas en cualquier registro" },
       "/dashboard/activity": { label: "Monitor de actividad", description: "Cada ejecución, tarea y entorno aislado: coste, tiempo, Detener" },
       "/dashboard/terminal": { label: "Consola", description: "Una consola en un entorno aislado del espacio de trabajo" },
+      "/dashboard/store": { label: "Tienda", description: "Instala apps, habilidades, plantillas y conectores" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },

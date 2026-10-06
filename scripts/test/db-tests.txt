@@ -220,3 +220,5 @@ lib/files/__tests__/files-db.test.ts
 lib/aos/__tests__/activity-db.test.ts
 # Phase 18.2 (content): Terminal — on a TEST sandbox provider: no provider → says why, runs nothing; editor+ only; open audited, one live session per person (resume); output streams, the directory carries over, every command recorded (never output); nobody else (no other editor, no admin) can type into it; Ctrl+C records 130; close destroys + audits; idled-out sandboxes close the session; FORCE RLS.
 lib/terminal/__tests__/terminal-db.test.ts
+# Phase 18.2 (content): Store — the catalogue from every registry with this workspace's state; install/remove per workspace through each kind's existing path + permission (registry skill: admin/skills.install; template: admin, hidden from the picker; mini-app: publish/unpublish; Composio toolkit: editor; connectors/MCP → Settings), audited; agency publishing to its own client workspaces only, client admin accept (installed via the same paths) / decline, withdraw, party isolation under FORCE RLS; list_store_items (Tier 0).
+lib/store/__tests__/store-db.test.ts
