@@ -339,6 +339,7 @@ export function Desktop({
             <article
               key={p.id}
               data-widget={p.widget}
+              data-pos={`${p.x},${p.y},${p.w},${p.h}`}
               aria-label={`${def.title} widget`}
               aria-roledescription={editing ? "movable widget" : undefined}
               aria-describedby={editing ? `desk-help` : undefined}

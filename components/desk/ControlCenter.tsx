@@ -103,11 +103,16 @@ export function ControlCenter() {
   );
 
   useEffect(() => {
+    // Mounted twice (desktop top bar + mobile header): only the visible one answers the shortcuts.
+    const visible = () => (triggerRef.current?.getClientRects().length ?? 0) > 0;
     const onOpen = () => {
+      if (!visible()) return;
       setOpen(true);
       void refresh();
     };
-    const onToggleFocus = () => void setFocus(!stateRef.current?.focus.on, 60);
+    const onToggleFocus = () => {
+      if (visible()) void setFocus(!stateRef.current?.focus.on, 60);
+    };
     window.addEventListener(OPEN_CONTROL_CENTER_EVENT, onOpen);
     window.addEventListener(TOGGLE_FOCUS_EVENT, onToggleFocus);
     return () => {
