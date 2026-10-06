@@ -173,6 +173,16 @@ export const TABLE = [
   ["UNSPLASH_ACCESS_KEY", { cls: "paste", group: S }],
   ["COMPOSIO_API_KEY", { cls: "paste", group: S }],
   ["ZERNIO_API_KEY", { cls: "paste", group: S, need: "launch" }],
+  // Phase 19A (WS=server): the agentic cursor's platform keys (ShapesOS is the
+  // key proxy; ShapesOS Desktop never holds one).
+  ["ASSEMBLYAI_API_KEY", { cls: "paste", group: W, why: "cursor speech in (streaming STT tokens)" }],
+  ["DEEPGRAM_API_KEY", { cls: "paste", group: W, why: "cursor speech in, the alternative to AssemblyAI" }],
+  ["ELEVENLABS_API_KEY", { cls: "paste", group: W, why: "cursor spoken answers" }],
+  ["DESKTOP_UPDATE_URL", { cls: "paste", group: W, why: "the R2 public bucket ShapesOS Desktop updates from; /download lists it" }],
+  ["CURSOR_STT_PROVIDER", { cls: "exclude", why: "default: AssemblyAI when its key is set, else Deepgram" }],
+  ["ELEVENLABS_MODEL_ID", { cls: "exclude", why: "default low-latency model" }],
+  ["ELEVENLABS_VOICE_ID", { cls: "exclude", why: "default: each person's choice, else the account's first voice" }],
+  ["OPENAI_TTS_MODEL", { cls: "exclude", why: "default speech model" }],
   ["TWILIO_ACCOUNT_SID", { cls: "paste", group: S }],
   ["TWILIO_AUTH_TOKEN", { cls: "paste", group: S }],
   ["TWILIO_API_KEY", { cls: "paste", group: S }],
