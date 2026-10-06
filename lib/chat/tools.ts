@@ -1349,6 +1349,11 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // unless a rule says Auto-run.
   create_note: "write_internal_note",
   share_file_link: "share_file_externally",
+  // Read-only tools of the core apps: observation kinds (Tier 0 by evaluateTier, like search_workspace).
+  read_note: "read_note",
+  list_file_versions: "list_file_versions",
+  list_processes: "list_processes",
+  list_store_items: "list_store_items",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

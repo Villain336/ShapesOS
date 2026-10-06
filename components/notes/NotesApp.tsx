@@ -519,6 +519,7 @@ function NotePane({
               onBlur={() => {
                 if ((note.folder ?? "") !== folderText.trim()) void saveMeta({ folder: folderText.trim() || null });
               }}
+              data-focus-ring="container"
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-subtle"
             />
           </label>
@@ -534,6 +535,7 @@ function NotePane({
                 const next = tagsText.split(",").map((s) => s.trim()).filter(Boolean);
                 if (next.join(",") !== note.tags.join(",")) void saveMeta({ tags: next });
               }}
+              data-focus-ring="container"
               className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-subtle"
             />
           </label>
