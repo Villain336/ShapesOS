@@ -212,9 +212,10 @@ describe("A2 — tool search and defer_loading", () => {
     assert.equal(new AnthropicLlmProvider("k", "claude-opus-5-5", { client }).supportsToolSearch(), true);
     const openai = new OpenAiCompatibleLlmProvider("k", "gpt-5.5", "http://127.0.0.1:1/v1");
     assert.equal(openai.supportsToolSearch(), false);
-    // Failover: both sides must run it, or the loop's client-side search is used.
+    // Failover reports the primary's answer; the OpenAI fallback sends deferred tools loaded (nothing lost).
     const fo = new FailoverLlmProvider(new AnthropicLlmProvider("k", "claude-opus-5-5", { client }), openai, { workload: "lead", primaryModel: "a", fallbackModel: "b" });
-    assert.equal(fo.supportsToolSearch(), false);
+    assert.equal(fo.supportsToolSearch(), true);
+    assert.equal(new FailoverLlmProvider(openai, new AnthropicLlmProvider("k", "claude-opus-5-5", { client }), { workload: "lead", primaryModel: "b", fallbackModel: "a" }).supportsToolSearch(), false);
   });
 });
 

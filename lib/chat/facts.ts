@@ -18,6 +18,7 @@
 //     FACTS_MAX_CALLS results of at most FACTS_RESULT_CHARS each.
 
 import { prisma } from "@/lib/prisma";
+import { trackBackgroundWork } from "@/lib/runtime/shutdown";
 import { getTool } from "./tools";
 import type { ChatToolCall } from "./tool-exec";
 
@@ -119,7 +120,18 @@ export async function updateThreadFacts(
   }
 }
 
+const inFlight = new Set<Promise<FactsOutcome>>();
+
 /** Fire-and-forget form for the turn (the summary lands before the next turn in practice). */
 export function scheduleThreadFacts(input: { workspaceId: string; projectId: string | null; threadId: string; calls: readonly ChatToolCall[] }): void {
-  void updateThreadFacts(input);
+  if (factsInputs(input.calls).length === 0) return;
+  // A draining server waits for it (the deploy PR's background-work tracker).
+  const p = trackBackgroundWork(updateThreadFacts(input));
+  inFlight.add(p);
+  void p.finally(() => inFlight.delete(p));
+}
+
+/** Wait for every scheduled summary (graceful shutdown, tests). */
+export async function settleThreadFacts(): Promise<void> {
+  while (inFlight.size > 0) await Promise.allSettled([...inFlight]);
 }

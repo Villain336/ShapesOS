@@ -151,7 +151,9 @@ function message(body: AnthropicBody, reply: FakeReply): Record<string, unknown>
   if (reply.text) content.push({ type: "text", text: reply.text });
   for (const c of reply.calls ?? []) content.push({ type: "tool_use", id: `toolu_${++seq}`, name: c.name, input: c.input ?? {} });
   return {
-    id: `msg_fake_${++msgSeq}`,
+    // Unique across processes (as the real API's ids are): the token ledger
+    // is idempotent per response id, so a reused id would replay an old row.
+    id: `msg_fake_${++msgSeq}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     type: "message",
     role: "assistant",
     model: body.model ?? "claude-fake",

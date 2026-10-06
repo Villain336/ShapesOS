@@ -74,12 +74,12 @@ export class FailoverLlmProvider implements LlmProvider {
   }
 
   /**
-   * Phase 17 (A2): deferred tools are offered through server-side search
-   * only when BOTH sides run it — a failover to a provider without it would
-   * otherwise lose the deferred tools mid-turn.
+   * Phase 17 (A2): the primary's answer. Nothing is lost on a failover: a
+   * fallback without tool search ignores ChatToolDef.deferLoading and sends
+   * every tool loaded (more tokens on that one call, the same tools).
    */
   supportsToolSearch(): boolean {
-    return (this.primary.supportsToolSearch?.() ?? false) && (this.fallback.supportsToolSearch?.() ?? false);
+    return this.primary.supportsToolSearch?.() ?? false;
   }
 
   /** Log + remember a failover; returns the human reason. */
