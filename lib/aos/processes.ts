@@ -39,7 +39,7 @@ export interface ProcessRow {
   parentKey: string | null;
   href: string | null;
   /** Can THIS viewer stop it, and if not, why (shown as the button's reason). */
-  stop: { allowed: true } | { allowed: false; reason: "finished" | "not_yours" | "not_stoppable" };
+  stop: { allowed: true } | { allowed: false; reason: "finished" | "not_yours" | "not_stoppable" | "stopping" };
 }
 
 export interface CronLastRun {

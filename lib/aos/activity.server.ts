@@ -352,7 +352,8 @@ export async function loadProcesses(workspaceId: string, viewer: ProcessViewer, 
       startedBy: r.startedBy,
       parentKey: r.parentRunId ? `run:${r.parentRunId}` : null,
       href: `/dashboard/runs/${encodeURIComponent(r.id)}`,
-      stop: canStopProcess({ live: live && !r.cancelRequestedAt, stoppable: true, startedBy: r.startedBy, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+      // Stop already asked: the run ends at its next step (the worker sees cancelRequestedAt).
+      stop: live && r.cancelRequestedAt ? { allowed: false, reason: "stopping" } : canStopProcess({ live, stoppable: true, startedBy: r.startedBy, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
     });
   }
   for (const j of data.jobs) {

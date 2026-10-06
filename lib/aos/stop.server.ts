@@ -24,8 +24,9 @@ export interface StopResult {
   stopped: string[];
 }
 
-function deny(reason: "finished" | "not_yours" | "not_stoppable"): never {
+function deny(reason: "finished" | "not_yours" | "not_stoppable" | "stopping"): never {
   if (reason === "finished") throw new ConflictError("It already finished.");
+  if (reason === "stopping") throw new ConflictError("It is already stopping.");
   if (reason === "not_stoppable") throw new ConflictError("This can't be stopped from here; it finishes on its own.");
   throw new ForbiddenError("Only the person who started it or an admin can stop it.");
 }
@@ -35,7 +36,8 @@ async function stopRun(workspaceId: string, viewer: ProcessViewer, runId: string
     tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { id: true, status: true, startedBy: true, threadId: true, cancelRequestedAt: true } }),
   );
   if (!run) throw new NotFoundError("Run not found.");
-  const live = ["queued", "running", "awaiting_confirmation"].includes(run.status) && !run.cancelRequestedAt;
+  const live = ["queued", "running", "awaiting_confirmation"].includes(run.status);
+  if (live && run.cancelRequestedAt) deny("stopping");
   const verdict = canStopProcess({ live, stoppable: true, startedBy: run.startedBy, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin });
   if (!verdict.allowed) deny(verdict.reason);
   if (run.threadId) {

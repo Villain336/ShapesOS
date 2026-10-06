@@ -131,7 +131,7 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
   }
 
   function stateBadge(row: ProcessRow) {
-    if (row.status) return <StatusBadge status={row.status} size="sm" label={t(`status.${row.status}` as MessageKey)} />;
+    if (row.status) return <StatusBadge status={row.status} size="sm" label={row.state === "stopping" ? t("activityApp.states.stopping") : t(`status.${row.status}` as MessageKey)} />;
     const known = (NEUTRAL_STATES as readonly string[]).includes(row.state);
     return <NeutralBadge size="sm" label={known ? t(`activityApp.states.${row.state}` as MessageKey) : row.state} />;
   }
@@ -166,7 +166,8 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="flex flex-col gap-4">
+        <HealthPanel health={health} isAdmin={isAdmin} formatTime={(iso) => format.date(iso, "time")} formatPercent={(n) => format.number(n, { style: "percent", maximumFractionDigits: 0 })} />
         <section aria-label={t("activityApp.tableLabel")} className="flex min-w-0 flex-col gap-3 rounded-lg bg-paper p-3 shadow-hairline sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
             <Segmented<Show>
@@ -279,7 +280,6 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
           )}
         </section>
 
-        <HealthPanel health={health} isAdmin={isAdmin} formatTime={(iso) => format.date(iso, "time")} formatPercent={(n) => format.number(n, { style: "percent", maximumFractionDigits: 0 })} />
       </div>
     </div>
   );
@@ -301,14 +301,14 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
   ];
   if (health.db) stats.push({ label: t("activityApp.health.db"), value: t("activityApp.health.dbValue", { used: health.db.connections, max: health.db.max }) });
   return (
-    <section aria-labelledby="activity-health" className="flex flex-col gap-4 self-start rounded-lg bg-paper p-4 shadow-hairline">
+    <section aria-labelledby="activity-health" className="flex flex-col gap-4 rounded-lg bg-paper p-4 shadow-hairline">
       <div className="flex items-baseline justify-between gap-2">
         <h2 id="activity-health" className="aos-subheading">
           {t("activityApp.health.title")}
         </h2>
         <span suppressHydrationWarning className="text-xs text-muted">{t("activityApp.health.updated", { time: formatTime(health.generatedAt) })}</span>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map((s) => (
           <div key={s.label} className="min-w-0">
             <dt className="text-xs text-muted">{s.label}</dt>
@@ -319,8 +319,11 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
       </dl>
       {isAdmin ? (
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-ink">{t("activityApp.health.cron")}</h3>
           {health.cron && health.cron.length > 0 ? (
+            <details className="group">
+            <summary className="cursor-pointer rounded-sm text-sm font-semibold text-ink">
+              {t("activityApp.health.cron")} · {health.cron.length}
+            </summary>
             <div className="-mx-1 overflow-x-auto">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
@@ -344,8 +347,11 @@ function HealthPanel({ health, isAdmin, formatTime, formatPercent }: { health: S
                 </tbody>
               </table>
             </div>
+            </details>
           ) : (
-            <p className="text-xs text-muted">{t("activityApp.health.cronNone")}</p>
+            <p className="text-xs text-muted">
+              <span className="font-semibold text-ink">{t("activityApp.health.cron")}</span> · {t("activityApp.health.cronNone")}
+            </p>
           )}
         </div>
       ) : (

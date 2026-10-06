@@ -128,9 +128,10 @@ describe("Activity Monitor (DB)", () => {
     assert.deepEqual(new Set(res.stopped), new Set([`run:${ids.lead}`, `run:${ids.child}`]));
     const runs = await scoped(WS, (tx) => tx.agentRun.findMany({ where: { workspaceId: WS, id: { in: [ids.lead, ids.child] } }, select: { cancelRequestedAt: true, cancelRequestedBy: true } }));
     assert.ok(runs.every((r) => r.cancelRequestedAt && r.cancelRequestedBy === ANA), "requestAgentRunCancel on both");
-    await assert.rejects(stopProcess(WS, ana, `run:${ids.lead}`), /already finished/i, "a second Stop: it is already stopping");
+    await assert.rejects(stopProcess(WS, ana, `run:${ids.lead}`), /already stopping/i, "a second Stop: it is already stopping");
     const rows = await loadProcesses(WS, ana);
     assert.equal(rows.find((r) => r.key === `run:${ids.lead}`)!.state, "stopping");
+    assert.deepEqual(rows.find((r) => r.key === `run:${ids.lead}`)!.stop, { allowed: false, reason: "stopping" });
     // A queued run never started: cancelled outright (requestAgentRunCancel).
     await stopProcess(WS, adm, `run:${ids.queuedRun}`);
     const q = await scoped(WS, (tx) => tx.agentRun.findFirst({ where: { workspaceId: WS, id: ids.queuedRun }, select: { status: true } }));

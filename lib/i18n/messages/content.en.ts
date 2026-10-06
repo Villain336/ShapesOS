@@ -372,6 +372,7 @@ export const contentEn = {
       finished: "Already finished",
       not_yours: "Only the person who started it or an admin can stop it",
       not_stoppable: "Finishes on its own",
+      stopping: "Stopping; it ends at its next step",
     },
     open: "Open",
     emptyLive: "Nothing is running right now.",
