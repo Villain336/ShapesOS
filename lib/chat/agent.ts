@@ -887,6 +887,43 @@ async function continuationState(input: AgentTurnInput, done: readonly ProposalD
   return next;
 }
 
+/**
+ * Phase 17 (latency): the turn's independent pre-model reads. Injectable
+ * (tests prove they run concurrently); the defaults are the real loaders.
+ */
+export interface TurnLoaders {
+  delegationSettings: (workspaceId: string) => Promise<DelegationSettings | null>;
+  isLive: (agentKey: AgentKey, mode: "build" | "default", workspaceId: string) => Promise<boolean>;
+  styleRules: (workspaceId: string) => Promise<StyleRule[]>;
+  connectorTools: (projectId: string, grant: readonly ToolGroup[] | null) => Promise<Awaited<ReturnType<typeof connectorChatTools>>>;
+  pendingProposal: (threadId: string) => Promise<ChatToolCall[] | null>;
+  declineWaiting: (turn: AgentTurnInput) => Promise<number>;
+}
+
+export const defaultTurnLoaders: TurnLoaders = {
+  delegationSettings: (ws) => loadDelegationSettings(ws).catch(() => null),
+  isLive: (agentKey, mode, ws) => agentIsLive(agentKey, mode, ws),
+  styleRules: (ws) => turnStyleRules(ws),
+  connectorTools: (projectId, grant) => connectorChatTools(projectId, grant).catch(() => []),
+  pendingProposal: (threadId) => pendingProposal(threadId),
+  declineWaiting: (turn) => declineWaitingProposals(turn).catch(() => 0),
+};
+
+/** One concurrent round of the turn's pre-model reads (see runAgentTurn). */
+export async function loadTurnInputs(turn: AgentTurnInput, confirming: boolean, loaders: TurnLoaders = defaultTurnLoaders) {
+  const [deleg, live, rules, connectorTools, pending] = await Promise.all([
+    loaders.delegationSettings(turn.workspaceId),
+    loaders.isLive(turn.agentKey ?? "lead", turn.mode ?? "default", turn.workspaceId),
+    loaders.styleRules(turn.workspaceId),
+    loaders.connectorTools(turn.projectId, turn.grant ?? null),
+    // 1. "yes" looks for a pending proposal; any other message declines what
+    //    sub-agents were waiting on (Phase 16: they carry on without it, as
+    //    the proposal said).
+    confirming ? loaders.pendingProposal(turn.threadId) : loaders.declineWaiting(turn).then(() => null),
+  ]);
+  return { deleg, live, rules, connectorTools, pending };
+}
+
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
   const { projectId, threadId, userContent, attachmentIds } = input;
   const trimmed = userContent.trim();
@@ -904,16 +941,7 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   // which none of the others touch) — one concurrent round instead of a
   // chain of awaits. Phase 16: whether delegate_tasks is offered (Settings →
   // Automation) and how deep.
-  const [deleg, live, rules, connectorTools, pending] = await Promise.all([
-    loadDelegationSettings(input.workspaceId).catch(() => null),
-    agentIsLive(agentKey, mode, baseCtx.workspaceId),
-    turnStyleRules(input.workspaceId),
-    connectorChatTools(projectId, grant).catch(() => [] as Awaited<ReturnType<typeof connectorChatTools>>),
-    // 1. "yes" looks for a pending proposal; any other message declines what
-    //    sub-agents were waiting on (Phase 16: they carry on without it, as
-    //    the proposal said).
-    confirming ? pendingProposal(threadId) : declineWaitingProposals(turn).catch(() => 0).then(() => null),
-  ]);
+  const { deleg, live, rules, connectorTools, pending } = await loadTurnInputs(turn, confirming);
   const toolFilter = delegationToolFilter({
     autoDelegation: deleg?.autoDelegation ?? true,
     depth: 0,
