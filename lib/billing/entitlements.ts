@@ -142,6 +142,52 @@ export const ZERNIO_INCLUDED_ACCOUNTS = {
 /** Plans whose included Zernio accounts are one pool shared by the owner's workspaces on that plan. */
 export const ZERNIO_POOLED_PLANS: ReadonlySet<Plan> = new Set<Plan>(["agency"]);
 
+// ── Phase 19A (WS=server): the agentic cursor (ShapesOS Desktop) ──────────
+/**
+ * OWNER KNOBS. Hold-to-talk minutes included per month (speech input on the
+ * platform STT key); each started minute beyond them is metered as
+ * cursor_talk_minute. Agency's minutes are POOLED across the agency's client
+ * workspaces (CURSOR_TALK_POOLED_PLANS, like its credits). self_hosted: your
+ * own keys, never charged (null = unlimited). trial: none included — a
+ * trial's minutes come out of its one-time credit pool.
+ */
+export const CURSOR_TALK_MINUTES_INCLUDED = {
+  self_hosted: null,
+  trial: 0,
+  starter: 60,
+  pro: 300,
+  business: 1_000,
+  agency: 300,
+} as const satisfies Record<Plan, number | null>;
+
+/** Plans whose included talk minutes are one pool shared by the agency's client workspaces. */
+export const CURSOR_TALK_POOLED_PLANS: ReadonlySet<Plan> = new Set<Plan>(["agency"]);
+
+/**
+ * OWNER KNOBS. The highest spend cap (USD) a person may give one cursor
+ * agent-mode run ("do it in the background, max $3"). The run is charged
+ * like any agent run; this only bounds what one sentence can authorise.
+ */
+export const CURSOR_AGENT_MAX_USD_CEILING = {
+  self_hosted: 50,
+  trial: 1,
+  starter: 5,
+  pro: 20,
+  business: 50,
+  agency: 50,
+} as const satisfies Record<Plan, number>;
+
+/** Included talk minutes for a plan (null = unlimited); unknown plans → 0 (fail closed). */
+export function cursorTalkMinutesIncluded(plan: string | null | undefined): number | null {
+  const v = (CURSOR_TALK_MINUTES_INCLUDED as Record<string, number | null>)[plan ?? ""];
+  return v === undefined ? 0 : v;
+}
+
+/** The agent-mode spend-cap ceiling for a plan, USD (unknown plans → the trial's). */
+export function cursorAgentMaxUsdCeiling(plan: string | null | undefined): number {
+  return (CURSOR_AGENT_MAX_USD_CEILING as Record<string, number>)[plan ?? ""] ?? CURSOR_AGENT_MAX_USD_CEILING.trial;
+}
+
 const PRO_FEATURES: readonly Feature[] = ["api_access", "webhooks", "custom_branding", "digital_twin", "payroll", "pos"];
 const BUSINESS_FEATURES: readonly Feature[] = [...PRO_FEATURES, "sso", "scim"];
 

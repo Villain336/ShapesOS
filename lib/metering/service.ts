@@ -713,7 +713,7 @@ export async function getUsageSummary(opts: {
   ]);
   const byAction: Record<string, number> = {};
   const byProject: Record<string, number> = {};
-  const byCategory: Record<CreditCategory, number> = { ai: 0, data: 0, messaging: 0, compute: 0, other: 0 };
+  const byCategory: Record<CreditCategory, number> = { ai: 0, data: 0, messaging: 0, compute: 0, other: 0, cursor: 0 };
   let used = 0;
   for (const r of byActionRows) {
     const c = r._sum.credits ?? 0;

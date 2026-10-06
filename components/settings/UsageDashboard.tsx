@@ -53,16 +53,18 @@ interface SummaryData {
   periodStart: string;
   cap: { allowed: boolean; remaining: number; capCredits: number; poolWorkspaceId?: string };
   /** Phase 15.2 */
-  byCategory?: Record<"ai" | "data" | "messaging" | "compute" | "other", number>;
+  byCategory?: Partial<Record<"ai" | "data" | "messaging" | "compute" | "other" | "cursor", number>>;
   byokSavedCredits?: number;
   pool?: { ownerWorkspaceId: string; role: "owner" | "member"; used: number; byWorkspace?: Record<string, number> };
 }
 
-const CATEGORY_LABELS: Record<"ai" | "data" | "messaging" | "compute" | "other", string> = {
+const CATEGORY_LABELS: Record<"ai" | "data" | "messaging" | "compute" | "other" | "cursor", string> = {
   ai: "AI",
   data: "Data",
   messaging: "Messaging",
   compute: "Compute",
+  // Phase 19A (WS=server): the agentic cursor's talk minutes and spoken answers.
+  cursor: "Cursor",
   other: "Other",
 };
 
