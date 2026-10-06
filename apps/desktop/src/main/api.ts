@@ -9,14 +9,18 @@
 import type {
   AgentActivityResponse,
   AgentRequest,
+  AgentResponse,
   ApprovalCounts,
   ApproveRequest,
+  ApproveResponse,
   CursorSession,
   NotificationsResponse,
   TranscribeToken,
   TurnEvent,
   TurnRequest,
+  VoicesResponse,
 } from "../shared/contract";
+import { expiryMs } from "../shared/contract";
 import { parseTurnEvent, readSse, type SseMessage } from "../shared/sse";
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -48,8 +52,12 @@ async function errorFrom(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message);
 }
 
+/** A session with no expiry (no signing secret on the server) is re-checked after this long. */
+const COOKIE_ONLY_SESSION_TTL_MS = 5 * 60_000;
+
 export class ShapesApi {
   private session: CursorSession | null = null;
+  private sessionAt = 0;
 
   constructor(
     private baseUrl: () => string,
@@ -64,19 +72,29 @@ export class ShapesApi {
     this.session = null;
   }
 
+  /** ms until the cached session should be refreshed (≤ 0 = now). */
+  private sessionLeftMs(): number {
+    if (!this.session) return 0;
+    const exp = expiryMs(this.session.expiresAt);
+    if (Number.isFinite(exp)) return exp - Date.now();
+    return this.sessionAt + COOKIE_ONLY_SESSION_TTL_MS - Date.now();
+  }
+
   private url(path: string): string {
     return `${this.baseUrl()}${path}`;
   }
 
   private headers(json: boolean): Record<string, string> {
     const h: Record<string, string> = { Accept: json ? "application/json" : "*/*", "X-Shapes-Client": "desktop" };
-    if (this.session && Date.parse(this.session.expiresAt) > Date.now() + 15_000) {
+    // The bearer token rides along while it is valid; with no token (server
+    // without a signing secret) the partition's cookie alone authenticates.
+    if (this.session?.token && expiryMs(this.session.expiresAt) > Date.now() + 15_000) {
       h.Authorization = `Bearer ${this.session.token}`;
     }
     return h;
   }
 
-  private async json<T>(method: "GET" | "POST", path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  private async json<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const res = await this.fetchImpl(this.url(path), {
       method,
       headers: { ...this.headers(true), ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
@@ -89,10 +107,11 @@ export class ShapesApi {
 
   /** POST /api/cursor/session; refreshed when under a minute is left. */
   async ensureSession(force = false): Promise<CursorSession> {
-    if (!force && this.session && Date.parse(this.session.expiresAt) - Date.now() > 60_000) return this.session;
+    if (!force && this.session && this.sessionLeftMs() > 60_000) return this.session;
     this.session = null;
     const s = await this.json<CursorSession>("POST", "/api/cursor/session", {});
     this.session = s;
+    this.sessionAt = Date.now();
     return s;
   }
 
@@ -120,7 +139,7 @@ export class ShapesApi {
     }
   }
 
-  approve(req: ApproveRequest): Promise<unknown> {
+  approve(req: ApproveRequest): Promise<ApproveResponse> {
     return this.json("POST", "/api/cursor/approve", req);
   }
 
@@ -136,8 +155,43 @@ export class ShapesApi {
     return res;
   }
 
-  agent(req: AgentRequest): Promise<{ runId: string }> {
+  agent(req: AgentRequest): Promise<AgentResponse> {
     return this.json("POST", "/api/cursor/agent", req);
+  }
+
+  /** GET /api/cursor/voices (Settings shows what the server offers). */
+  voices(): Promise<VoicesResponse> {
+    return this.json("GET", "/api/cursor/voices");
+  }
+
+  /** PUT /api/cursor/voices { voiceId } → { selected } (only an id the provider lists). */
+  setVoice(voiceId: string): Promise<{ selected: { id: string; label: string } | null }> {
+    return this.json("PUT", "/api/cursor/voices", { voiceId });
+  }
+
+  /**
+   * An SSE stream at an absolute URL the server handed us (the labelled mock
+   * STT, GET /api/cursor/mock-stt). Only ever on the configured ShapesOS
+   * origin, so the cookie and bearer token never go anywhere else.
+   */
+  async *sseAt(absoluteUrl: string, signal: AbortSignal): AsyncGenerator<SseMessage> {
+    let target: URL;
+    try {
+      target = new URL(absoluteUrl);
+    } catch {
+      throw new ApiError(400, "bad_url", "The server sent a bad speech URL.");
+    }
+    if (target.origin !== new URL(this.baseUrl()).origin) {
+      throw new ApiError(400, "foreign_origin", "The server sent a speech URL on another site; refused.");
+    }
+    const res = await this.fetchImpl(target.toString(), {
+      method: "GET",
+      headers: { ...this.headers(false), Accept: "text/event-stream" },
+      signal,
+    });
+    if (!res.ok) throw await errorFrom(res);
+    if (!res.body) return;
+    yield* readSse(res.body, signal);
   }
 
   approvalCounts(): Promise<ApprovalCounts> {

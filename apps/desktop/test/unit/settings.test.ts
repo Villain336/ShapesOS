@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatHotkey, HoldDetector, hotkeyProblem, parseHotkey, type HoldSignal } from "../../src/shared/hotkeys";
 import { checkServerUrl, defaultSettings, loadSettings, validateSettings } from "../../src/shared/settings";
-import { floatToPcm16, resample, sttCloseMessage, sttSocket, TranscriptAssembler } from "../../src/shared/stt";
+import { floatToPcm16, resample, sttCloseMessage, sttPlan, TranscriptAssembler } from "../../src/shared/stt";
 import { NotificationDiffer, trayState } from "../../src/shared/tray-state";
 import { updaterConfig } from "../../src/shared/updater-config";
 
@@ -153,14 +153,26 @@ describe("speech-to-text messages", () => {
     expect(m.final).toBe("yes");
   });
 
-  it("builds provider sockets with the token in the query or subprotocol (never a header)", () => {
-    const aai = sttSocket({ provider: "assemblyai", wsUrl: "wss://streaming.assemblyai.com/v3/ws", token: "tok", sampleRate: 16000 });
-    expect(aai?.url).toContain("token=tok");
-    expect(aai?.url).toContain("sample_rate=16000");
-    const dg = sttSocket({ provider: "deepgram", wsUrl: "wss://api.deepgram.com/v1/listen", token: "jwt", sampleRate: 16000 });
-    expect(dg?.protocols).toEqual(["bearer", "jwt"]);
-    expect(sttSocket({ provider: "none", wsUrl: "wss://x", token: "t", sampleRate: 16000 })).toBeNull();
-    expect(sttSocket({ provider: "mock", wsUrl: "https://x", token: "t", sampleRate: 16000 })).toBeNull();
+  it("plans the STT transport from the transcribe-token response (authVia, mock SSE)", () => {
+    const aai = sttPlan({ provider: "assemblyai", wsUrl: "wss://streaming.assemblyai.com/v3/ws", token: "tok", sampleRate: 16000, authVia: "query_token" });
+    expect(aai?.transport).toBe("renderer-ws");
+    expect(aai && "url" in aai ? aai.url : "").toContain("token=tok");
+    expect(aai && "url" in aai ? aai.url : "").toContain("sample_rate=16000");
+    // Deepgram: Authorization header, so the MAIN process opens the socket.
+    const dg = sttPlan({ provider: "deepgram", wsUrl: "wss://api.deepgram.com/v1/listen", token: "jwt", sampleRate: 16000, authVia: "bearer_header" });
+    expect(dg).toMatchObject({ transport: "main-ws", headers: { Authorization: "Bearer jwt" } });
+    expect(dg && "url" in dg ? dg.url : "").not.toContain("jwt");
+    // Without authVia, Deepgram still defaults to the header.
+    expect(sttPlan({ provider: "deepgram", wsUrl: "wss://api.deepgram.com/v1/listen", token: "jwt", sampleRate: 16000 })?.transport).toBe("main-ws");
+    // The labelled mock is an https SSE URL read by main (no microphone).
+    expect(sttPlan({ provider: "mock", wsUrl: "https://app.example.com/api/cursor/mock-stt", token: "t", sampleRate: 16000 })).toEqual({
+      transport: "main-sse",
+      url: "https://app.example.com/api/cursor/mock-stt",
+    });
+    expect(sttPlan({ provider: "none", wsUrl: "wss://x", token: "t", sampleRate: 16000 })).toBeNull();
+    expect(sttPlan({ provider: "assemblyai", wsUrl: "https://x", token: "t", sampleRate: 16000 })).toBeNull();
+    expect(sttPlan({ provider: "assemblyai", wsUrl: "wss://x", token: "", sampleRate: 16000 })).toBeNull();
+    expect(sttPlan({ provider: "deepgram", wsUrl: "not a url", token: "t", sampleRate: 16000 })).toBeNull();
     expect(sttCloseMessage("assemblyai")).toBe('{"type":"Terminate"}');
   });
 

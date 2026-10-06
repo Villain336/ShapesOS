@@ -20,6 +20,8 @@ let assembler = new TranscriptAssembler();
 let closeMsg: string | null = null;
 let finalSent = false;
 let pending: Uint8Array[] = [];
+/** Relay mode: the main process holds the provider socket; we only send PCM. */
+let relay = false;
 
 function sendFinal(error: string | null = null): void {
   if (finalSent) return;
@@ -31,22 +33,26 @@ async function sttStart(s: SttStart): Promise<void> {
   await sttTeardown();
   assembler = new TranscriptAssembler();
   finalSent = false;
-  closeMsg = s.closeMessage;
+  relay = s.mode === "relay";
+  closeMsg = s.mode === "socket" ? s.closeMessage : null;
   pending = [];
   try {
-    ws = s.protocols.length ? new WebSocket(s.url, s.protocols) : new WebSocket(s.url);
-    ws.binaryType = "arraybuffer";
-    ws.onopen = () => {
-      for (const chunk of pending) ws?.send(chunk);
-      pending = [];
-    };
-    ws.onmessage = (e) => {
-      if (typeof e.data !== "string") return;
-      if (assembler.feed(e.data)) desktop.send("audio:stt-update", { text: assembler.live });
-      if (assembler.terminated) sendFinal();
-    };
-    ws.onerror = () => sendFinal("The speech service connection failed.");
-    ws.onclose = () => sendFinal();
+    if (s.mode === "socket") {
+      const sock = s.protocols.length ? new WebSocket(s.url, s.protocols) : new WebSocket(s.url);
+      ws = sock;
+      sock.binaryType = "arraybuffer";
+      sock.onopen = () => {
+        for (const chunk of pending) sock.send(chunk);
+        pending = [];
+      };
+      sock.onmessage = (e) => {
+        if (typeof e.data !== "string") return;
+        if (assembler.feed(e.data)) desktop.send("audio:stt-update", { text: assembler.live });
+        if (assembler.terminated) sendFinal();
+      };
+      sock.onerror = () => sendFinal("The speech service connection failed.");
+      sock.onclose = () => sendFinal();
+    }
 
     stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -58,7 +64,8 @@ async function sttStart(s: SttStart): Promise<void> {
     const rate = ctx.sampleRate;
     node.port.onmessage = (e: MessageEvent<Float32Array>) => {
       const pcm = floatToPcm16(resample(e.data, rate, s.sampleRate));
-      if (ws?.readyState === WebSocket.OPEN) ws.send(pcm);
+      if (relay) desktop.send("audio:pcm", pcm);
+      else if (ws?.readyState === WebSocket.OPEN) ws.send(pcm);
       else if (ws?.readyState === WebSocket.CONNECTING && pending.length < 100) pending.push(pcm);
     };
     source.connect(node);
@@ -82,6 +89,11 @@ async function sttTeardown(): Promise<void> {
 async function sttStop(): Promise<void> {
   // Mic off at once (the key is up); give the provider a moment to flush.
   await sttTeardown();
+  if (relay) {
+    // The main process owns the socket and the final transcript.
+    relay = false;
+    return;
+  }
   if (ws && ws.readyState === WebSocket.OPEN) {
     if (closeMsg) ws.send(closeMsg);
     const sock = ws;

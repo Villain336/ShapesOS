@@ -6,7 +6,7 @@ import { ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { formatHotkey } from "../shared/hotkeys";
-import type { PermissionKind, PermissionStatus, SaveResult, SettingsPayload } from "../shared/ipc";
+import type { PermissionKind, PermissionStatus, SaveResult, SettingsPayload, VoicesResult } from "../shared/ipc";
 import type { DesktopSettings, SettingsErrors } from "../shared/settings";
 import { desktop } from "./bridge";
 
@@ -66,6 +66,39 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
         </button>
       ))}
     </div>
+  );
+}
+
+/** The server's own voice list (GET/PUT /api/cursor/voices); never invented ids. */
+function VoicePicker({ signedIn }: { signedIn: boolean }) {
+  const [v, setV] = useState<VoicesResult | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    void desktop.invoke<VoicesResult>("settings:voices").then(setV);
+  }, [signedIn]);
+  if (!signedIn) return null;
+  if (!v) return <div className="helper">Loading voices…</div>;
+  if (!v.ok) return <div className="helper">{v.error}</div>;
+  if (v.provider === "none") return <div className="helper">Spoken answers aren't configured on this server. Captions still show.</div>;
+  if (!v.voices.length) return <div className="helper">{v.error ?? "Your server didn't list any voices."}</div>;
+  const choose = async (id: string) => {
+    setV({ ...v, selected: id });
+    const r = await desktop.invoke<{ ok: boolean; error?: string }>("settings:set-voice", id);
+    setMsg(r.ok ? "Voice saved" : (r.error ?? "Couldn't save the voice."));
+    setTimeout(() => setMsg(null), 2500);
+  };
+  return (
+    <Field id="voice" label="Voice" helper={msg ?? `From ${label(v.provider)}.`}>
+      <select id="voice" className="select" value={v.selected ?? ""} onChange={(e) => void choose(e.target.value)}>
+        {v.selected ? null : <option value="">Server default</option>}
+        {v.voices.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }
 
@@ -213,14 +246,19 @@ function SettingsApp() {
               {st.providers
                 ? `Speech in: ${label(st.providers.stt)} · Speech out: ${label(st.providers.tts)} · Vision: ${label(st.providers.vision)}`
                 : "Sign in to see what your server offers."}
-              {st.talkMinutes ? ` · ${st.talkMinutes.used} of ${st.talkMinutes.included} talk minutes used this month` : ""}
+              {st.talkMinutes
+                ? st.talkMinutes.included === null
+                  ? ` · ${st.talkMinutes.used} talk minutes used this month (unlimited)`
+                  : ` · ${st.talkMinutes.used} of ${st.talkMinutes.included} talk minutes used this month`
+                : ""}
             </span>
           </div>
-          <button type="button" className="btn btn-secondary aos-press" onClick={() => void desktop.invoke("settings:open-shapes", "/dashboard/settings/cursor")}>
-            Change voice
+          <button type="button" className="btn btn-secondary aos-press" onClick={() => void desktop.invoke("settings:open-shapes", "/dashboard/settings/you/cursor")}>
+            Cursor settings
             <ExternalLink size={16} aria-hidden="true" />
           </button>
         </div>
+        <VoicePicker signedIn={st.signedIn} />
         <Switch label="Speak answers" helper="Captions always show." checked={draft.speakAnswers} onChange={(v) => set("speakAnswers", v)} />
       </section>
 

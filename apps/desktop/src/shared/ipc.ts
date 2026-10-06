@@ -23,7 +23,7 @@ export interface OverlayCard {
   tierLabel: string;
   hint: string;
   voiceApprovable: boolean;
-  /** "pending" | "sending" | "approved" | "rejected" | "failed: <message>" */
+  /** "pending" | "sending" | "approved" | "rejected" | "failed" (approved, but the action failed) */
   status: string;
   x: number;
   y: number;
@@ -57,15 +57,16 @@ export const MAIN_TO_OVERLAY = ["overlay:state"] as const;
 
 // ---- audio (mic → STT socket; TTS playback) -------------------------------
 
-export interface SttStart {
-  url: string;
-  protocols: string[];
-  provider: string;
-  sampleRate: number;
-  closeMessage: string | null;
-}
+/**
+ * "socket": the audio window opens the provider WebSocket itself.
+ * "relay": the main process holds the socket (it needs an Authorization
+ * header); the audio window only sends PCM back on "audio:pcm".
+ */
+export type SttStart =
+  | { mode: "socket"; url: string; protocols: string[]; provider: string; sampleRate: number; closeMessage: string | null }
+  | { mode: "relay"; provider: string; sampleRate: number };
 
-export const AUDIO_TO_MAIN = ["audio:stt-update", "audio:stt-final", "audio:tts-done", "audio:ready"] as const;
+export const AUDIO_TO_MAIN = ["audio:stt-update", "audio:stt-final", "audio:tts-done", "audio:ready", "audio:pcm"] as const;
 export const MAIN_TO_AUDIO = [
   "audio:stt-start",
   "audio:stt-stop",
@@ -92,7 +93,8 @@ export interface SettingsStatus {
   userName: string | null;
   voice: string | null;
   providers: { stt: string; tts: string; vision: string } | null;
-  talkMinutes: { used: number; included: number } | null;
+  /** included null = unlimited (self-hosted). */
+  talkMinutes: { used: number; included: number | null } | null;
   holdKeyAvailable: boolean;
   holdKeyError: string | null;
   updates: { enabled: boolean; reason: string | null; channel: string; state: string };
@@ -115,7 +117,14 @@ export const SETTINGS_INVOKE = [
   "settings:check-updates",
   "settings:open-shapes",
   "settings:reset-exclusions",
+  "settings:voices",
+  "settings:set-voice",
 ] as const;
+
+/** settings:voices → the server's voice list, or why it isn't available. */
+export type VoicesResult =
+  | { ok: true; provider: string; voices: { id: string; label: string }[]; selected: string | null; error: string | null }
+  | { ok: false; error: string };
 export const MAIN_TO_SETTINGS = ["settings:changed"] as const;
 
 export const SEND_CHANNELS: readonly string[] = [...OVERLAY_TO_MAIN, ...AUDIO_TO_MAIN, ...ASK_TO_MAIN];

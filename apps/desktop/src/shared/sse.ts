@@ -126,9 +126,10 @@ export function parseTurnEvent(msg: SseMessage): TurnEvent | null {
   if (!isRec(d)) return null;
   switch (msg.event) {
     case "turn_started":
-      return str(d.runId) && str(d.conversationId)
-        ? { type: "turn_started", runId: d.runId, conversationId: d.conversationId }
-        : null;
+      if (!str(d.runId) || !str(d.conversationId)) return null;
+      return d.mock === true
+        ? { type: "turn_started", runId: d.runId, conversationId: d.conversationId, mock: true }
+        : { type: "turn_started", runId: d.runId, conversationId: d.conversationId };
     case "text_delta":
       return str(d.text) ? { type: "text_delta", text: d.text } : null;
     case "point": {

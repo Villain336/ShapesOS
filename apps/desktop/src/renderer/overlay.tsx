@@ -90,7 +90,7 @@ function Caption({ c }: { c: NonNullable<OverlayState["caption"]> }) {
 }
 
 function ProposalCard({ c }: { c: OverlayCard }) {
-  const done = c.status === "approved" || c.status === "rejected";
+  const done = c.status === "approved" || c.status === "rejected" || c.status === "failed";
   return (
     <Interactive className="card" style={{ left: c.x, top: c.y }} label="Approval needed">
       <div data-testid="proposal" data-approval={c.approvalId} data-status={c.status} data-voice={String(c.voiceApprovable)}>
@@ -110,10 +110,12 @@ function ProposalCard({ c }: { c: OverlayCard }) {
           <div className="card-result">
             {c.status === "approved" ? (
               <span className="aos-shape aos-shape--done" role="img" aria-label="Done" />
+            ) : c.status === "failed" ? (
+              <span className="aos-shape aos-shape--failed" role="img" aria-label="Failed" />
             ) : (
               <span className="aos-shape aos-shape--queued" role="img" aria-label="Rejected" />
             )}
-            {c.status === "approved" ? "Approved" : "Rejected"}
+            {c.status === "approved" ? "Approved" : c.status === "failed" ? "Approved, but it failed" : "Rejected"}
           </div>
         ) : (
           <div className="card-actions">

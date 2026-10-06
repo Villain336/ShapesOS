@@ -1,7 +1,8 @@
 // ShapesOS Desktop smoke: the real Electron app (test build, with the
 // labelled test-only hook) against the FAKE ShapesOS server fixture.
 //
-//   1. launch → the main window loads ShapesOS (fixture) with its cookie
+//   1. launch → the main window loads ShapesOS (fixture) with its cookie;
+//      voice in through the server's labelled mock STT (SSE)
 //   2. simulated hold-to-talk: capture happens only while held
 //   3. a turn streams a `point` → the overlay pointer moves there (screenshot)
 //      (+ an elementId point inside ShapesOS maps through the uiMap)
@@ -92,6 +93,22 @@ test("ShapesOS Desktop against the fake server", async () => {
   // Spotlight action: focus ShapesOS and open ⌘K through the preload bridge.
   await hook("openPalette");
   await expect(main.locator("#palette")).toHaveClass(/open/);
+
+  // Voice in through the server's STT: the amended contract's labelled mock
+  // (an SSE transcript at /api/cursor/mock-stt, read by the main process with
+  // the signed-in session; no microphone under the mock).
+  await hook("useFakeCapture");
+  await hook("setFocusedApp", { name: "TextEdit" });
+  fake.state.mockSttTranscript = "what does this button do";
+  await hook("setTranscript", null);
+  await hook("holdDown");
+  await new Promise((r) => setTimeout(r, 1200));
+  await hook("holdUp");
+  await expect.poll(() => fake.state.turns.at(-1)?.transcript).toBe("what does this button do");
+  expect(fake.state.sttStreams).toBe(1);
+  expect(fake.state.talkSeconds.at(-1)).toBeGreaterThanOrEqual(1); // talkSeconds rides with the turn
+  const sp = await hook<{ sttTransport: string; sttMock: boolean }>("speech");
+  expect(sp).toMatchObject({ sttTransport: "main-sse", sttMock: true });
 
   // 2 ── hold-to-talk: capture only while held (real desktopCapturer under Xvfb).
   await hook("useRealCapture");
@@ -213,6 +230,11 @@ test("ShapesOS Desktop against the fake server", async () => {
   const settings = await windowByUrl("settings.html");
   await expect(settings.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(settings.getByText("Fixture voice (mock)")).toBeVisible();
+  // Voice choice comes from the server (GET/PUT /api/cursor/voices).
+  const voice = settings.locator("select#voice");
+  await expect(voice.locator("option", { hasText: "Verse (fixture)" })).toHaveCount(1);
+  await voice.selectOption("fixture-verse");
+  await expect.poll(() => fake.state.voice?.id).toBe("fixture-verse");
   await settings.emulateMedia({ colorScheme: "light" });
   await settings.screenshot({ path: join(SHOTS, "08-settings-light.png"), fullPage: true });
   await settings.emulateMedia({ colorScheme: "dark" });

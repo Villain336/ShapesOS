@@ -8,7 +8,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, session, type IpcMainEvent
 import { join } from "node:path";
 import type { UiMapEntry } from "../shared/contract";
 import { formatHotkey } from "../shared/hotkeys";
-import { PAGE_CHANNELS, type PermissionKind, type SettingsPayload } from "../shared/ipc";
+import { PAGE_CHANNELS, type PermissionKind, type SettingsPayload, type VoicesResult } from "../shared/ipc";
 import { DEFAULT_EXCLUSIONS } from "../shared/exclusions";
 import { ShapesApi } from "./api";
 import { CursorController } from "./controller";
@@ -194,6 +194,9 @@ function boot(): void {
     if (!internal(e)) return;
     speechIn.final(typeof m?.text === "string" ? m.text : "", typeof m?.error === "string" ? m.error : null);
   });
+  ipcMain.on("audio:pcm", (e, bytes: unknown) => {
+    if (internal(e) && bytes instanceof Uint8Array && bytes.byteLength <= 64 * 1024) speechIn.pcm(bytes);
+  });
   ipcMain.on("audio:tts-done", (e, m: { id?: unknown }) => {
     if (internal(e) && typeof m?.id === "number") speechOut.done(m.id);
   });
@@ -240,6 +243,25 @@ function boot(): void {
   handle("settings:open-system", (k) => openSystemSettings(k as PermissionKind));
   handle("settings:check-updates", () => updater.checkNow());
   handle("settings:open-shapes", (p) => openShapes(typeof p === "string" && p.startsWith("/") ? p : undefined));
+  handle("settings:voices", async (): Promise<VoicesResult> => {
+    try {
+      const v = await api.voices();
+      const voices = Array.isArray(v.voices) ? v.voices.filter((x) => typeof x?.id === "string").slice(0, 200) : [];
+      return { ok: true, provider: String(v.provider ?? "none"), voices, selected: v.selected?.id ?? null, error: v.error ?? null };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Couldn't read the voice list." };
+    }
+  });
+  handle("settings:set-voice", async (id): Promise<{ ok: boolean; error?: string }> => {
+    if (typeof id !== "string" || !id || id.length > 200) return { ok: false, error: "Pick a voice from the list." };
+    try {
+      await api.setVoice(id);
+      await api.ensureSession(true).catch(() => null); // the session carries the voice label
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Couldn't save the voice." };
+    }
+  });
 
   // ---- global shortcuts ----------------------------------------------------------
   // Spotlight: focus ShapesOS and open its ⌘K palette.
@@ -296,7 +318,7 @@ function boot(): void {
 
   if (__TEST_HOOKS__) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    (require("./test-hooks") as typeof import("./test-hooks")).installTestHooks({ controller, overlays, tray, speechOut, holdKey, openSettings, openPalette: spotlight });
+    (require("./test-hooks") as typeof import("./test-hooks")).installTestHooks({ controller, overlays, tray, speechOut, speechIn, holdKey, openSettings, openPalette: spotlight });
   }
 
   app.on("second-instance", () => openShapes());

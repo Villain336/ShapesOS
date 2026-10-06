@@ -15,6 +15,11 @@ export interface FakeState {
   agents: { goal: string; maxUsd: number; runId: string }[];
   proposals: Map<string, { tier: number; destructive: boolean; voiceApprovable: boolean }>;
   tts: number;
+  /** What the labelled mock STT "hears" (GET /api/cursor/mock-stt). */
+  mockSttTranscript: string;
+  sttStreams: number;
+  talkSeconds: (number | null)[];
+  voice: { id: string; label: string } | null;
   notifications: { id: string; kind: string; title: string; body: string | null; href: string | null; readAt: string | null; createdAt: string }[];
 }
 
@@ -99,8 +104,13 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
     agents: [],
     proposals: new Map(),
     tts: 0,
+    mockSttTranscript: "where do I approve a pay run",
+    sttStreams: 0,
+    talkSeconds: [],
+    voice: null,
     notifications: [],
   };
+  const decided = new Set<string>();
   let runSeq = 0;
   let approvalSeq = 0;
 
@@ -120,6 +130,7 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
         const b = await readJson(req);
         if (typeof b.needsYou === "number") state.needsYou = b.needsYou;
         if (Array.isArray(b.notifications)) state.notifications = b.notifications as FakeState["notifications"];
+        if (typeof b.mockSttTranscript === "string") state.mockSttTranscript = b.mockSttTranscript;
       }
       send(res, 200, { ...state, proposals: Object.fromEntries(state.proposals) });
       return;
@@ -134,12 +145,13 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
     }
 
     if (req.method === "POST" && path === "/api/cursor/session") {
+      // As the real server sends it: expiresAt in epoch ms.
       send(res, 200, {
         token: "fixture-token",
-        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+        expiresAt: Date.now() + 10 * 60_000,
         workspaceId: "ws_fixture",
         user: { id: "u_fixture", name: "Fixture Person" },
-        voice: { id: "fixture-voice", label: "Fixture voice (mock)" },
+        voice: state.voice ?? { id: null, label: "Fixture voice (mock)" },
         limits: { talkMinutesIncluded: 60, talkMinutesUsed: 3, byok: false },
         providers: { stt: "mock", tts: "mock", vision: "mock" },
       });
@@ -147,14 +159,53 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
     }
 
     if (req.method === "POST" && path === "/api/cursor/transcribe-token") {
+      // The amended contract's mock: wsUrl is an http(s) SSE URL on this origin.
       send(res, 200, {
         provider: "mock",
-        wsUrl: `ws://127.0.0.1:${(server.address() as { port: number }).port}/api/cursor/mock-stt`,
+        wsUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}/api/cursor/mock-stt`,
         token: "fixture-stt-token",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        expiresAt: Date.now() + 60_000,
         sampleRate: 16000,
         encoding: "pcm_s16le",
+        authVia: "query_token",
+        sessionId: "stt_fixture",
       });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/cursor/mock-stt") {
+      // AssemblyAI-v3-shaped messages, one per data: line, labelled mock.
+      state.sttStreams += 1;
+      res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Shapes-Mock": "1", "X-Fake-ShapesOS": "1" });
+      const words = state.mockSttTranscript.split(" ");
+      const msgs: Record<string, unknown>[] = [{ type: "Begin", mock: true }];
+      for (let i = 1; i <= words.length; i++) msgs.push({ type: "Turn", transcript: words.slice(0, i).join(" "), end_of_turn: i === words.length, mock: true });
+      msgs.push({ type: "Termination", mock: true });
+      for (const m of msgs) {
+        res.write(`event: message\ndata: ${JSON.stringify(m)}\n\n`);
+        await sleep(20);
+      }
+      res.end();
+      return;
+    }
+
+    if (path === "/api/cursor/voices") {
+      const voices = [
+        { id: "fixture-alloy", label: "Alloy (fixture)" },
+        { id: "fixture-verse", label: "Verse (fixture)" },
+      ];
+      if (req.method === "PUT") {
+        const b = await readJson(req);
+        const v = voices.find((x) => x.id === b.voiceId);
+        if (!v) {
+          send(res, 400, { error: { code: "tts_bad_voice", message: "That voice isn't available. Pick one from the list." } });
+          return;
+        }
+        state.voice = v;
+        send(res, 200, { selected: { provider: "mock", ...v } });
+        return;
+      }
+      send(res, 200, { provider: "mock", voices, selected: state.voice ? { provider: "mock", ...state.voice } : null, error: null });
       return;
     }
 
@@ -164,6 +215,7 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
       const shots = Array.isArray(b.screenshots) ? (b.screenshots as { jpegBase64?: string }[]) : [];
       const uiMap = Array.isArray(b.uiMap) ? b.uiMap : [];
       const app = b.app && typeof b.app === "object" ? String((b.app as { name?: string }).name ?? "") : null;
+      state.talkSeconds.push(typeof b.talkSeconds === "number" ? b.talkSeconds : null);
       state.turns.push({
         transcript,
         screenshots: shots.length,
@@ -173,7 +225,8 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
       });
       const emit = sse(res);
       const t = transcript.toLowerCase();
-      emit("turn_started", { runId: `run_turn_${state.turns.length}`, conversationId: "conv_fixture" });
+      // Amended contract: conversationId is the cursor run id; mock: true under the labelled mock brain.
+      emit("turn_started", { runId: "run_cursor_fixture", conversationId: "run_cursor_fixture", mock: true });
       await sleep(30);
       if (/where do i approve/.test(t)) {
         emit("text_delta", { text: "Approvals is in the sidebar. " });
@@ -211,6 +264,12 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
       const id = String(b.approvalId ?? "");
       const p = state.proposals.get(id);
       const rec = { approvalId: id, decision: String(b.decision), via: String(b.via), status: 200 };
+      if (!p && decided.has(id)) {
+        rec.status = 409;
+        state.approvals.push(rec);
+        send(res, 409, { error: { code: "already_decided", message: "Already decided (fixture)" } });
+        return;
+      }
       if (!p) {
         rec.status = 404;
         state.approvals.push(rec);
@@ -226,8 +285,13 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
       }
       state.approvals.push(rec);
       state.proposals.delete(id);
+      decided.add(id);
       if (b.decision === "approve") state.needsYou = Math.max(0, state.needsYou - 1);
-      send(res, 200, { ok: true, decision: b.decision });
+      send(res, 200, {
+        approvalId: id,
+        status: b.decision === "approve" ? "executed" : "rejected",
+        resultSummary: b.decision === "approve" ? "Done (fixture)." : null,
+      });
       return;
     }
 
@@ -252,7 +316,7 @@ export async function startFakeServer(port = 0): Promise<{ url: string; state: F
       }
       const runId = `run_agent_${++runSeq}`;
       state.agents.push({ goal: b.goal, maxUsd, runId });
-      send(res, 200, { runId });
+      send(res, 200, { runId, maxUsd });
       return;
     }
 

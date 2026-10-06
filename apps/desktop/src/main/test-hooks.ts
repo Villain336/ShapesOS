@@ -13,7 +13,7 @@ import type { FocusedApp } from "../shared/exclusions";
 import type { CursorController } from "./controller";
 import type { OverlayManager } from "./overlay-manager";
 import type { TrayController } from "./tray";
-import type { SpeechOut } from "./speech";
+import type { SpeechIn, SpeechOut } from "./speech";
 import type { HoldKeyService } from "./hold-key";
 import { captureScreens } from "./capture";
 
@@ -22,6 +22,7 @@ export interface TestHookDeps {
   overlays: OverlayManager;
   tray: TrayController;
   speechOut: SpeechOut;
+  speechIn: SpeechIn;
   holdKey: HoldKeyService;
   openSettings: () => void;
   openPalette: () => void;
@@ -46,7 +47,7 @@ export function installTestHooks(d: TestHookDeps): void {
     stop(): void {
       d.controller.stop();
     },
-    /** What the microphone "heard" (STT is mocked for this run). null = use real STT. */
+    /** What the microphone "heard" (bypasses STT). null = use the server's STT (the labelled mock here). */
     setTranscript(text: string | null): void {
       d.controller.testOverrides.transcript = text;
     },
@@ -113,7 +114,14 @@ export function installTestHooks(d: TestHookDeps): void {
       await d.controller.clickDecision(approvalId, decision);
     },
     speech() {
-      return { provider: d.speechOut.provider, lastHeader: d.speechOut.lastProviderHeader, lastMock: d.speechOut.lastMock };
+      return {
+        provider: d.speechOut.provider,
+        lastHeader: d.speechOut.lastProviderHeader,
+        lastMock: d.speechOut.lastMock,
+        sttTransport: d.speechIn.currentTransport,
+        sttMock: d.speechIn.lastMock,
+        sttError: d.speechIn.error,
+      };
     },
     holdMode() {
       return { mode: d.holdKey.mode, error: d.holdKey.error };

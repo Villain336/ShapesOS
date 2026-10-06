@@ -171,7 +171,7 @@ export class CursorController {
       }
 
       // Voice in.
-      if (this.testOverrides.transcript === undefined) {
+      if (this.testOverrides.transcript === undefined || this.testOverrides.transcript === null) {
         if (!sess) this.caption(session instanceof ApiError ? session.message : "Can't reach ShapesOS.", "error", false);
         else if (sess.providers.stt === "none") {
           this.caption("Speech-to-text isn't configured on this server. Type instead.", "notice", false);
@@ -203,12 +203,13 @@ export class CursorController {
     const scripted = this.testOverrides.transcript;
     const transcript = scripted !== undefined && scripted !== null ? scripted : await this.d.speechIn.stop();
     const { shots, blockedReason } = await this.capture.release();
+    const talkSeconds = last && last.end ? Math.max(0, Math.round((last.end - last.start) / 1000)) : undefined;
     if (!transcript) {
       this.caption("I didn't catch that. Hold the key while you talk, or type instead.", "notice");
       this.disarmSoon();
       return;
     }
-    await this.utterance(transcript, { shots, blockedReason, ctx, spoken: true });
+    await this.utterance(transcript, { shots, blockedReason, ctx, spoken: true, talkSeconds });
   }
 
   /** The typing fallback: no key held, so no screenshot (the rule). */
@@ -246,7 +247,7 @@ export class CursorController {
 
   private async utterance(
     text: string,
-    o: { shots: Shot[]; blockedReason: string | null; ctx: PressContext | null; spoken: boolean },
+    o: { shots: Shot[]; blockedReason: string | null; ctx: PressContext | null; spoken: boolean; talkSeconds?: number },
   ): Promise<void> {
     // A short answer to a pending card.
     const answer = parseVoiceAnswer(text);
@@ -273,7 +274,7 @@ export class CursorController {
 
   private async runTurn(
     transcript: string,
-    o: { shots: Shot[]; blockedReason: string | null; ctx: PressContext | null },
+    o: { shots: Shot[]; blockedReason: string | null; ctx: PressContext | null; talkSeconds?: number },
   ): Promise<void> {
     this.turnAbort?.abort();
     const abort = new AbortController();
@@ -283,6 +284,8 @@ export class CursorController {
     this.turnCtx = ctx;
     const body: TurnRequest = { transcript, screenshots: o.shots, mode: "answer" };
     if (this.conversationId) body.conversationId = this.conversationId;
+    // How long the key was held: the server meters talk minutes 2…N from it.
+    if (o.talkSeconds !== undefined) body.talkSeconds = o.talkSeconds;
     if (ctx?.app) {
       // An excluded app is named, but its title/URL are not sent.
       body.app = ctx.excluded ? { name: ctx.app.name, isShapesOS: false } : ctx.app;
@@ -442,11 +445,15 @@ export class CursorController {
     this.debug.approvals.push(rec);
     this.d.overlays.updateProposal((c) => ({ ...c, status: "sending" }));
     try {
-      await this.d.api.approve(req);
+      const r = await this.d.api.approve(req);
       rec.status = 200;
-      const done = req.decision === "approve" ? "approved" : "rejected";
-      this.d.overlays.updateProposal((c) => ({ ...c, status: done }));
-      this.caption(say, "notice");
+      // 200 { status: "executed" | "failed" | "rejected", resultSummary }.
+      const failed = r?.status === "failed";
+      const done = failed ? "failed" : req.decision === "approve" ? "approved" : "rejected";
+      const summary = typeof r?.resultSummary === "string" && r.resultSummary.trim() ? r.resultSummary.trim().slice(0, 200) : null;
+      const words = failed ? `Approved, but it failed${summary ? `: ${summary}` : "."}` : summary && req.decision === "approve" ? `${say} ${summary}` : say;
+      this.d.overlays.updateProposal((c) => ({ ...c, status: done, hint: summary ?? c.hint }));
+      this.caption(words, failed ? "error" : "notice");
       this.proposal = null;
       setTimeout(() => {
         if (!this.proposal) this.d.overlays.proposal(null);
@@ -454,13 +461,28 @@ export class CursorController {
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
       rec.status = status;
+      const code = e instanceof ApiError ? e.code : "";
       const msg =
-        e instanceof ApiError && e.code === "voice_not_allowed"
+        code === "voice_not_allowed"
           ? "Click to approve; voice can't approve this."
-          : e instanceof Error
-            ? e.message
-            : "Couldn't send that.";
-      this.d.overlays.updateProposal((c) => ({ ...c, status: "pending", hint: msg }));
+          : code === "already_decided"
+            ? "This was already decided."
+            : code === "expired"
+              ? "This approval expired. Ask again."
+              : code === "not_found"
+                ? "This approval no longer exists."
+                : e instanceof Error
+                  ? e.message
+                  : "Couldn't send that.";
+      // Already decided / expired / gone: the card can't be acted on any more.
+      const final = code === "already_decided" || code === "expired" || code === "not_found";
+      this.d.overlays.updateProposal((c) => ({ ...c, status: final ? "rejected" : "pending", hint: msg }));
+      if (final) {
+        this.proposal = null;
+        setTimeout(() => {
+          if (!this.proposal) this.d.overlays.proposal(null);
+        }, 2500);
+      }
       this.caption(msg, "error");
     }
     void this.d.tray.refresh();
@@ -497,11 +519,13 @@ export class CursorController {
       return;
     }
     try {
-      const { runId } = await this.d.api.agent({ goal, maxUsd: cap.maxUsd, conversationId: this.conversationId });
-      const say = `Started in the background, max ${usd(cap.maxUsd)}. I'll tell you when it's done.${cap.note ? ` ${cap.note}` : ""}`;
+      const r = await this.d.api.agent({ goal, maxUsd: cap.maxUsd, conversationId: this.conversationId });
+      // The server echoes the cap it enforces; trust that over ours.
+      const maxUsd = typeof r.maxUsd === "number" && r.maxUsd > 0 ? r.maxUsd : cap.maxUsd;
+      const say = `Started in the background, max ${usd(maxUsd)}. I'll tell you when it's done.${cap.note ? ` ${cap.note}` : ""}`;
       this.caption(say, "notice");
       this.d.speechOut.say(say);
-      void this.trackAgent(runId, cap.maxUsd, goal);
+      void this.trackAgent(r.runId, maxUsd, goal);
     } catch (e) {
       this.caption(e instanceof Error ? e.message : "Couldn't start the background run.", "error");
     }

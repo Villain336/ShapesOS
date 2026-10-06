@@ -5,17 +5,28 @@
 
 export type SttProvider = "assemblyai" | "deepgram" | "mock" | "none";
 export type TtsProvider = "elevenlabs" | "voicestudio" | "openai" | "mock" | "none";
-export type VisionProvider = "anthropic" | "mock" | "none";
+/** "openai" was added by the WS=server amendment (single-key OpenAI deployments). */
+export type VisionProvider = "anthropic" | "openai" | "mock" | "none";
 
 /** POST /api/cursor/session → 200 */
 export interface CursorSession {
-  token: string;
-  expiresAt: string;
+  /** null when the server has no AUTH_SECRET/NEXTAUTH_SECRET: cookie auth still works. */
+  token: string | null;
+  /** The server sends epoch ms; ISO strings are accepted too (see expiryMs). */
+  expiresAt: number | string | null;
   workspaceId: string;
-  user: { id: string; name: string };
-  voice: { id: string; label: string };
-  limits: { talkMinutesIncluded: number; talkMinutesUsed: number; byok: boolean };
+  user: { id: string; name: string | null };
+  voice: { id: string | null; label: string };
+  /** talkMinutesIncluded null = unlimited (self-hosted). */
+  limits: { talkMinutesIncluded: number | null; talkMinutesUsed: number; byok: boolean };
   providers: { stt: SttProvider; tts: TtsProvider; vision: VisionProvider };
+}
+
+/** An expiry as epoch ms, from epoch ms or an ISO string; NaN when absent or unreadable. */
+export function expiryMs(v: number | string | null | undefined): number {
+  if (typeof v === "number") return Number.isFinite(v) ? v : NaN;
+  if (typeof v === "string" && v) return /^\d+$/.test(v) ? Number(v) : Date.parse(v);
+  return NaN;
 }
 
 /** POST /api/cursor/transcribe-token → 200 */
@@ -23,9 +34,12 @@ export interface TranscribeToken {
   provider: SttProvider;
   wsUrl: string;
   token: string;
-  expiresAt: string;
+  expiresAt: number | string;
   sampleRate: 16000;
   encoding: "pcm_s16le";
+  /** Amendment: AssemblyAI → query_token (`&token=`), Deepgram → bearer_header (from main). */
+  authVia?: "query_token" | "bearer_header";
+  sessionId?: string;
 }
 
 /**
@@ -75,6 +89,8 @@ export interface TurnRequest {
   uiMap?: UiMapEntry[];
   app?: TurnApp;
   mode?: "answer" | "agent";
+  /** Amendment: how long the key was held (minutes 2…N are metered from it). */
+  talkSeconds?: number;
 }
 
 export const TURN_LIMITS = {
@@ -91,7 +107,7 @@ export interface Point2 {
 }
 
 export type TurnEvent =
-  | { type: "turn_started"; runId: string; conversationId: string }
+  | { type: "turn_started"; runId: string; conversationId: string; mock?: boolean }
   | { type: "text_delta"; text: string }
   | { type: "point"; screen: number; x: number; y: number; label: string }
   | { type: "point"; elementId: string; label: string }
@@ -131,7 +147,29 @@ export interface ApproveRequest {
   via: "voice" | "click";
 }
 
-/** POST /api/cursor/agent body → { runId } */
+/** POST /api/cursor/approve → 200 (amendment). 404/409/410/403 are errors. */
+export interface ApproveResponse {
+  approvalId: string;
+  status: "executed" | "failed" | "rejected";
+  resultSummary: string | null;
+}
+
+/** POST /api/cursor/agent → 200 { runId, maxUsd } (maxUsd added by the amendment). */
+export interface AgentResponse {
+  runId: string;
+  maxUsd?: number;
+}
+
+/** GET /api/cursor/voices (amendment). */
+export interface VoicesResponse {
+  provider: string;
+  voices: { id: string; label: string }[];
+  /** The person's saved choice for this provider (the server sends { provider, id, label }). */
+  selected: { id: string; label: string } | null;
+  error: string | null;
+}
+
+/** POST /api/cursor/agent body → { runId, maxUsd } */
 export interface AgentRequest {
   goal: string;
   maxUsd: number;

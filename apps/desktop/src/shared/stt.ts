@@ -6,8 +6,9 @@
 // TranscriptAssembler, which understands:
 //   * AssemblyAI Universal Streaming v3: { type: "Turn", transcript, end_of_turn }
 //   * Deepgram live: { type: "Results", channel.alternatives[0].transcript, is_final }
-//   * the ShapesOS labelled mock (dev/e2e only): { type: "transcript", text, final }
-//     (AssemblyAI-shaped mock messages work too).
+//   * the ShapesOS labelled mock (dev/e2e only): AssemblyAI-v3-shaped
+//     { type: "Begin" | "Turn" | "Termination", transcript, end_of_turn, mock: true }
+//     over SSE (and the older { type: "transcript", text, final } shape).
 
 import type { SttProvider } from "./contract";
 
@@ -85,37 +86,73 @@ export class TranscriptAssembler {
   }
 }
 
-/** The WebSocket URL + subprotocols for a provider (tokens can't go in headers from a browser). */
-export function sttSocket(
-  t: { provider: SttProvider; wsUrl: string; token: string; sampleRate: number },
-): { url: string; protocols: string[] } | null {
+/** How the transcribe-token response says the token travels (contract amendment, 2026-10-06). */
+export type SttAuthVia = "query_token" | "bearer_header";
+
+/**
+ * Where the speech-to-text stream runs, decided from the transcribe-token
+ * response (p19a-contract.md + the WS=server amendment):
+ *   * renderer-ws — the hidden audio window opens the provider WebSocket
+ *     itself, token in the query (AssemblyAI: `&token=`).
+ *   * main-ws — a browser WebSocket can't send headers, so the MAIN process
+ *     opens it with `Authorization: Bearer <token>` (Deepgram) and the audio
+ *     window relays PCM to it over IPC.
+ *   * main-sse — the server's labelled mock (dev/e2e only): `wsUrl` is an
+ *     https SSE URL (GET /api/cursor/mock-stt) of AssemblyAI-v3-shaped
+ *     messages, read by the main process with the signed-in session; no
+ *     microphone is opened.
+ */
+export type SttPlan =
+  | { transport: "renderer-ws"; url: string; protocols: string[] }
+  | { transport: "main-ws"; url: string; headers: Record<string, string> }
+  | { transport: "main-sse"; url: string };
+
+export function sttPlan(t: {
+  provider: SttProvider;
+  wsUrl: string;
+  token: string;
+  sampleRate: number;
+  authVia?: SttAuthVia;
+}): SttPlan | null {
   let u: URL;
   try {
     u = new URL(t.wsUrl);
   } catch {
     return null;
   }
-  if (u.protocol !== "wss:" && u.protocol !== "ws:") return null;
+  const ws = u.protocol === "wss:" || u.protocol === "ws:";
+  const http = u.protocol === "https:" || u.protocol === "http:";
   const set = (k: string, v: string) => {
     if (!u.searchParams.has(k)) u.searchParams.set(k, v);
   };
+  if (!t.token && t.provider !== "mock") return null;
   switch (t.provider) {
     case "assemblyai":
+      if (!ws) return null;
       set("sample_rate", String(t.sampleRate));
       set("encoding", "pcm_s16le");
       set("format_turns", "true");
+      if (t.authVia === "bearer_header") return { transport: "main-ws", url: u.toString(), headers: { Authorization: `Bearer ${t.token}` } };
       set("token", t.token);
-      return { url: u.toString(), protocols: [] };
+      return { transport: "renderer-ws", url: u.toString(), protocols: [] };
     case "deepgram":
+      if (!ws) return null;
       set("encoding", "linear16");
       set("sample_rate", String(t.sampleRate));
       set("channels", "1");
       set("interim_results", "true");
       set("smart_format", "true");
-      return { url: u.toString(), protocols: ["bearer", t.token] };
+      if (t.authVia === "query_token") {
+        set("token", t.token);
+        return { transport: "renderer-ws", url: u.toString(), protocols: [] };
+      }
+      // The contract default for Deepgram: the Authorization header, from main.
+      return { transport: "main-ws", url: u.toString(), headers: { Authorization: `Bearer ${t.token}` } };
     case "mock":
-      set("token", t.token);
-      return { url: u.toString(), protocols: [] };
+      if (http) return { transport: "main-sse", url: u.toString() };
+      if (!ws) return null;
+      if (t.token) set("token", t.token);
+      return { transport: "renderer-ws", url: u.toString(), protocols: [] };
     default:
       return null;
   }
