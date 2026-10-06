@@ -62,10 +62,10 @@ export async function liveKitState(env: NodeJS.ProcessEnv = process.env): Promis
   const { resolveLiveKitConfig } = await import("@/lib/voice/livekit");
   try {
     const cfg = resolveLiveKitConfig(env);
-    if (cfg.mode === "rehearsal") return { configured: false, mode: "rehearsal", reason: "VOICE_LIVEKIT_MODE is rehearsal (the default)." };
+    if (cfg.mode === "rehearsal") return { configured: false, mode: "rehearsal", reason: "VOICE_LIVEKIT_MODE=rehearsal, the default" };
     return { configured: true, mode: cfg.mode, reason: null };
   } catch (err) {
-    return { configured: false, mode: "misconfigured", reason: err instanceof Error ? err.message : "LiveKit is not configured." };
+    return { configured: false, mode: "misconfigured", reason: (err instanceof Error ? err.message : "LiveKit is not configured").replace(/[.\s]+$/, "") };
   }
 }
 
@@ -314,7 +314,7 @@ export async function summarizeMeeting(ctx: MeetCtx, id: string, deps: SummaryDe
   const out = await deps.generate(ctx, summaryPrompt(row.title, row.transcript));
   // Without a live model the provider's mock answers in prose: keep it as a
   // labelled mock summary (never saveable) instead of failing.
-  const parsed = parseMeetingSummary(out.text) ?? (out.live ? null : { notes: out.text.trim().slice(0, 6000) || "Mock summary.", decisions: [], actionItems: [] });
+  const parsed = parseMeetingSummary(out.text) ?? (out.live ? null : { notes: out.text.trim().slice(0, 600) || "Mock summary.", decisions: [], actionItems: [] });
   if (!parsed) throw new HttpError(502, "The meeting agent's answer couldn't be read. Try again.");
   const stored: StoredSummary = { ...parsed, mock: !out.live, at: new Date().toISOString(), by: ctx.userId, applied: null };
   await scoped(ctx, (tx) => tx.meetingSession.update({ where: { id: row.id }, data: { summary: stored as unknown as Prisma.InputJsonValue } }));
