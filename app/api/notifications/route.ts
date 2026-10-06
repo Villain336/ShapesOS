@@ -10,6 +10,7 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { getMembership, forbidden } from "@/lib/authz";
 import { intQuery, parseQuery } from "@/lib/api/validate";
 import { listNotifications, unreadCount } from "@/lib/notifications/store";
+import { releaseHeldNotifications } from "@/lib/desktop/focus.server";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,9 @@ export async function GET(req: Request) {
 
   const q = parseQuery(QuerySchema, new URL(req.url).searchParams);
   if (!q.ok) return q.error;
+
+  // Phase 18.1 (WS=desk): focus ended since the last poll → deliver what it queued.
+  await releaseHeldNotifications(user.id).catch(() => 0);
 
   const scope = { userId: user.id, workspaceId: workspace.id };
   const [notifications, unread] = await Promise.all([

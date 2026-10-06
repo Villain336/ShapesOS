@@ -1037,6 +1037,10 @@ model Workspace {
   outreachWebhookEvents       OutreachWebhookEvent[]
   // Phase 3 (J): in-app notification center (per-user rows + read state).
   notifications               Notification[]
+  // Phase 18.1 (WS=desk): per-user desktop layout + dock, recents, Today briefings.
+  userDesktopLayouts          UserDesktopLayout[]
+  userRecentItems             UserRecentItem[]
+  desktopBriefings            DesktopBriefing[]
   // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
   scimTokens                ScimToken[]
   scimGroups                ScimGroup[]
@@ -15095,9 +15099,15 @@ model Notification {
   sourceId    String?          @map("source_id")
   dedupKey    String?          @map("dedup_key")
   readAt      DateTime?        @map("read_at")
+  // Phase 18.1 (WS=desk): set while the recipient was in focus / do not
+  // disturb when the row was written — the row waits (hidden from the bell,
+  // no push) and is released (heldAt cleared, push sent) when focus ends.
+  // Queued, never dropped (lib/desktop/focus.ts).
+  heldAt      DateTime?        @map("held_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, dedupKey])
+  @@index([userId, heldAt])
   @@index([userId, workspaceId, readAt])
   @@index([userId, workspaceId, createdAt])
   @@index([workspaceId, createdAt])
@@ -17046,4 +17056,103 @@ model CorpusRetrievalUsage {
   lastHitAt DateTime @map("last_hit_at")
 
   @@map("corpus_retrieval_usage")
+}
+
+// ============================================================
+// Phase 18.1 (WS=desk): Home as a desktop, the dock, the Today briefing and
+// the Control Center's per-user state.
+//
+// user_desktop_layouts, user_recent_items and desktop_briefings are FORCE RLS
+// on BOTH the tenant GUC (app.workspace_id) and the person GUC (app.user_id):
+// a row is visible only inside its workspace AND only to the member it
+// belongs to (lib/desktop/scope.ts withUserScope). Sessions without both
+// GUCs see zero rows (fail-closed). They cascade from the workspace.
+// ============================================================
+
+// One row per (workspace, member): the widget grid (zod-validated JSON,
+// lib/desktop/layout.ts), the dock overlay on lib/nav/config.ts (pinned nav
+// hrefs in the member's order — never a second nav list) and the Today
+// briefing opt-in.
+model UserDesktopLayout {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId          String    @map("user_id")
+  // { version: 1, widgets: [{ id, widget, x, y, w, h }] } — null = role default.
+  layout          Json?
+  // { pinned: ["/dashboard/crm", …] } — ordered; unknown hrefs dropped on read.
+  nav             Json?
+  briefingEnabled Boolean   @default(false) @map("briefing_enabled")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@map("user_desktop_layouts")
+}
+
+// The dock's "Recent" section and the ⌃Tab switcher: the last pages and
+// records a member opened (one row per href, visitedAt bumped; pruned to the
+// newest RECENTS_KEEP per member).
+model UserRecentItem {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  href        String
+  title       String
+  // "app" (a nav destination) | "record" (a page below one, with an id)
+  kind        String    @default("app")
+  visitedAt   DateTime  @default(now()) @map("visited_at")
+
+  @@unique([workspaceId, userId, href])
+  @@index([workspaceId, userId, visitedAt])
+  @@map("user_recent_items")
+}
+
+// The agent-written "Today" briefing: one row per member per local day,
+// written once on the background/batch workload (never on page load).
+model DesktopBriefing {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  // The member's local calendar day, YYYY-MM-DD.
+  day         String
+  // pending | ready | failed
+  status      String    @default("pending")
+  body        String?   @db.Text
+  // What it was written from (counts only, never secrets): calendar, needs
+  // you, overnight runs, metrics.
+  sources     Json?
+  model       String?
+  // llm_batch_jobs.idempotency_key when it went through the Batch API.
+  batchKey    String?   @map("batch_key")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  readyAt     DateTime? @map("ready_at")
+
+  @@unique([workspaceId, userId, day])
+  @@index([workspaceId, status])
+  @@map("desktop_briefings")
+}
+
+// Per-person Control Center state, across workspaces (no workspace_id, so no
+// tenant RLS — like user_security; only ever read/written for the session
+// subject). Focus / do not disturb is a person's state; voice and shortcut
+// overrides are stand-ins for WS=find's UserPreference keys "voice.enabled"
+// and "keyboard.shortcuts" until that model merges (lib/desktop/prefs.ts is
+// the narrow UserPrefs seam both sides use).
+model UserDeskState {
+  userId         String    @id @map("user_id")
+  // Focus is on while focusUntil is in the future (always has an end time).
+  focusUntil     DateTime? @map("focus_until")
+  focusStartedAt DateTime? @map("focus_started_at")
+  voiceEnabled   Boolean   @default(false) @map("voice_enabled")
+  // { [shortcutId]: "Ctrl+Shift+K" } — validated against the registry (no clashes).
+  shortcuts      Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_desk_state")
 }
