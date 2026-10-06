@@ -150,6 +150,12 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
 export const EMAIL_TOKEN_TABLE = "email_auth_tokens";
 
 /**
+ * Phase 18.3 (WS=flow): per-person rows in FORCE-RLS tables that have no
+ * workspace (owner-only on app.user_id): Web Push subscriptions.
+ */
+export const PERSONAL_USER_RLS_TABLES: readonly { table: string; column: string }[] = [{ table: "push_subscriptions", column: "user_id" }];
+
+/**
  * Per-user rows in FORCE-RLS tables: deleted inside each remaining
  * workspace's scope (solo workspaces cascade with the workspace itself).
  */
@@ -175,7 +181,7 @@ export const KEEP_REFERENCES: readonly string[] = ["workspaces", "workspace_memb
 
 /** Columns pseudonymized on account deletion (catalog-driven; pure). */
 export function pseudonymizeTargets(catalog: Catalog): { table: string; columns: string[]; rls: boolean }[] {
-  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
+  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...PERSONAL_USER_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
   const out: { table: string; columns: string[]; rls: boolean }[] = [];
   for (const name of [...catalog.keys()].sort()) {
     if (skip.has(name)) continue;
@@ -303,6 +309,12 @@ export async function deleteAccount(opts: {
       }
       // Phase 18.1: owner-only tables answer only to their member (app.user_id).
       await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
+      // Phase 18.3 (WS=flow): person-only FORCE-RLS tables (no workspace):
+      // deleted once with the person GUC set.
+      for (const p of PERSONAL_USER_RLS_TABLES) {
+        if (!catalog.has(p.table)) continue;
+        personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
+      }
       for (const p of PERSONAL_RLS_TABLES) {
         if (!catalog.has(p.table)) continue;
         for (const ws of scopeWorkspaces) {

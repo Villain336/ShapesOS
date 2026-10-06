@@ -234,3 +234,5 @@ lib/aos/__tests__/activity-db.test.ts
 lib/terminal/__tests__/terminal-db.test.ts
 # Phase 18.2 (content): Store — the catalogue from every registry with this workspace's state; install/remove per workspace through each kind's existing path + permission (registry skill: admin/skills.install; template: admin, hidden from the picker; mini-app: publish/unpublish; Composio toolkit: editor; connectors/MCP → Settings), audited; agency publishing to its own client workspaces only, client admin accept (installed via the same paths) / decline, withdraw, party isolation under FORCE RLS; list_store_items (Tier 0).
 lib/store/__tests__/store-db.test.ts
+# Phase 18.3 (WS=flow): Web Push — push_subscriptions owner-only FORCE RLS (no GUC = nothing; another person can't read, write or remove mine), SSRF guard (only known push-service hosts), sendWebPush against a STUB push service (VAPID JWT verifies, aes128gcm body decrypts in the "browser"), 410/404 delete at once, MAX_FAILURES in a row delete, a success resets, no VAPID keys = nothing sent and why, account deletion removes subscriptions.
+lib/push/__tests__/web-push-db.test.ts
