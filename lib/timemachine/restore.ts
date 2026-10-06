@@ -104,7 +104,6 @@ export function insertOrder(tables: string[], catalog: Catalog): string[] {
 /** A new text id: same length class as cuid, never colliding with the old one. */
 export function newTextId(): string {
   return `c${randomBytes(12).toString("hex")}`;
-}`;
 }
 
 /** Rewrite every string that names an old id (deep, JSON included). PURE given the map. */
