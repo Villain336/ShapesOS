@@ -53,6 +53,7 @@ const fakeInput: BriefingInput = {
 async function cleanup() {
   for (const id of [WS, WS2]) await prisma.workspace.deleteMany({ where: { id } });
   await prisma.userDeskState.deleteMany({ where: { userId: { in: USERS } } });
+  await prisma.userPreference.deleteMany({ where: { userId: { in: USERS } } });
 }
 
 before(async () => {
@@ -361,5 +362,28 @@ describe("the UserPrefs seam (voice, shortcuts)", () => {
     await assert.rejects(setUserPreference(EDITOR, "shortcuts", { "Bad-Id": "f1" }), /not a shortcut id/);
     assert.deepEqual((await getUserPreferences(EDITOR)).shortcuts, p.shortcuts, "a refused write changes nothing");
     assert.deepEqual((await getUserPreferences(VIEWER)).shortcuts, {});
+  });
+
+  it("is an adapter over lib/preferences: one row in user_preferences, voice merged, registry checked on read", async () => {
+    const prefs = await import("@/lib/preferences");
+    await prisma.userPreference.deleteMany({ where: { userId: VIEWER } });
+    // 19A's own voice fields survive the desk's toggle.
+    await prefs.setUserPreference(VIEWER, "voice", { voiceId: "alloy" });
+    let p = await setUserPreference(VIEWER, "voice", { enabled: true });
+    assert.deepEqual(p.voice, { enabled: true });
+    assert.deepEqual((await prefs.getUserPreferences(VIEWER)).voice, { voiceId: "alloy", enabled: true });
+    // Shortcuts written by the desk are the "shortcuts" preference.
+    await setUserPreference(VIEWER, "shortcuts", { "control.open": "alt+shift+x" });
+    assert.deepEqual((await prefs.getUserPreferences(VIEWER)).shortcuts, { "control.open": "alt+shift+x" });
+    // A map saved through PATCH /api/preferences only passes the format check;
+    // the desk drops what the registry refuses (an unknown id, a clash with ⌘K).
+    await prefs.setUserPreference(VIEWER, "shortcuts", { "control.open": "alt+shift+x", "no.such_shortcut": "f2", "task.new": "mod+k" });
+    assert.deepEqual((await getUserPreferences(VIEWER)).shortcuts, { "control.open": "alt+shift+x" });
+    // The time zone is the person's preference (UTC callers fall back when null).
+    assert.equal((await getUserPreferences(VIEWER)).timeZone, null);
+    await prefs.setUserPreference(VIEWER, "timeZone", "America/Mexico_City");
+    assert.equal((await getUserPreferences(VIEWER)).timeZone, "America/Mexico_City");
+    assert.equal(await prisma.userPreference.count({ where: { userId: VIEWER } }), 1);
+    await prisma.userPreference.deleteMany({ where: { userId: VIEWER } });
   });
 });

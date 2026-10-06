@@ -6,9 +6,9 @@
 // desktop's own (⌃Tab switcher, "?" cheat-sheet, Control Center, focus,
 // split view, desktop editing). The cheat-sheet renders this list, and
 // rebinding goes through it:
-//   - a member's overrides ({ [id]: "Ctrl+Shift+K" }) are stored as the
-//     "keyboard.shortcuts" preference (lib/desktop/prefs.ts, the UserPrefs
-//     seam shared with WS=find);
+//   - a member's overrides ({ [id]: "mod+shift+k" }) are stored as the
+//     person's "shortcuts" preference (lib/preferences, UserPreference),
+//     through the desk adapter lib/desktop/prefs.ts;
 //   - applyOverrides() REFUSES a binding that clashes with another shortcut
 //     that can be live at the same time, a reserved browser/OS combo, or a
 //     bare navigation key — the API returns the reason and stores nothing;

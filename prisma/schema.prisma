@@ -17146,18 +17146,15 @@ model DesktopBriefing {
 
 // Per-person Control Center state, across workspaces (no workspace_id, so no
 // tenant RLS — like user_security; only ever read/written for the session
-// subject). Focus / do not disturb is a person's state; voice and shortcut
-// overrides are stand-ins for WS=find's UserPreference keys "voice.enabled"
-// and "keyboard.shortcuts" until that model merges (lib/desktop/prefs.ts is
-// the narrow UserPrefs seam both sides use).
+// subject). Focus / do not disturb is a person's STATE, so it lives here;
+// voice and shortcut overrides are PREFERENCES and live in UserPreference
+// ("voice", "shortcuts" — lib/desktop/prefs.ts adapts them for the desk;
+// moved there by migration 20261020300000_p18_integrate_desk_prefs).
 model UserDeskState {
   userId         String    @id @map("user_id")
   // Focus is on while focusUntil is in the future (always has an end time).
   focusUntil     DateTime? @map("focus_until")
   focusStartedAt DateTime? @map("focus_started_at")
-  voiceEnabled   Boolean   @default(false) @map("voice_enabled")
-  // { [shortcutId]: "Ctrl+Shift+K" } — validated against the registry (no clashes).
-  shortcuts      Json?
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 

@@ -1,42 +1,50 @@
-// ShapesOS — Phase 18.1 (WS=desk): the UserPrefs seam for the desk.
+// ShapesOS — Phase 18.1: the desk's view of the person's preferences.
 //
-// WS=find owns per-person preferences (UserPreference, lib/preferences —
-// theme, language, time zone, … and the "shortcuts" and "voice" keys). Until
-// that branch merges, the desk stores the two keys it writes in its own
-// user_desk_state row, behind the SAME narrow interface and key names:
+// Per-person preferences live in ONE place: WS=find's UserPreference
+// (lib/preferences — theme, language, time zone, … and the "shortcuts" and
+// "voice" keys). This file is a thin ADAPTER over that store (it holds no
+// data of its own; user_desk_state keeps only focus / do not disturb, which
+// is state, not a preference):
 //
 //   getUserPreferences(userId) → { shortcuts, voice, timeZone }
 //   setUserPreference(userId, "shortcuts" | "voice", value)
 //
-// Integration: replace this file's body with a re-export of
-// getUserPreferences / setUserPreference from "@/lib/preferences" (the key
-// names, value shapes and the stored shortcut format already match theirs:
-// lower-case "mod+shift+k" bindings keyed by dotted ids; voice is
-// { enabled }), then drop user_desk_state.shortcuts / voice_enabled.
-// timeZone is find's; this stub answers null (callers fall back to UTC).
+// What the adapter adds on top of lib/preferences' own validation:
+//   - shortcuts are checked against the keyboard REGISTRY
+//     (lib/keyboard/shortcuts.ts): an unknown id, a fixed shortcut, a clash
+//     with another live shortcut or a reserved browser combo is refused on
+//     write and dropped on read (a binding saved through PATCH
+//     /api/preferences, which only checks the format, can never break the
+//     keyboard host);
+//   - voice is read as { enabled } and written by merging into the stored
+//     voice object, so fields 19A adds there survive a toggle.
 //
 // `userId` is always the session's own subject (routes never read it from
 // the request).
 
-import { prisma } from "@/lib/prisma";
+import {
+  getUserPreferences as getStoredPreferences,
+  PreferenceError,
+  setUserPreference as setStoredPreference,
+} from "@/lib/preferences";
 import { SHORTCUT_ID_RE, sanitizeOverrides, toStoredBinding } from "@/lib/keyboard/shortcuts";
 
 export interface DeskVoicePrefs {
   enabled: boolean;
 }
 
-/** The subset of WS=find's UserPreferences the desk reads and writes. */
+/** The subset of the person's UserPreferences the desk reads and writes. */
 export interface DeskPreferences {
   /** { [shortcutId]: "mod+shift+k" } — rebinding overrides (stored format). */
   shortcuts: Record<string, string>;
   voice: DeskVoicePrefs;
-  /** IANA zone (WS=find); null = not known here, use UTC. */
+  /** IANA zone from the person's preferences; null = not set yet (callers use UTC). */
   timeZone: string | null;
 }
 
 export type DeskPreferenceKey = "shortcuts" | "voice";
 
-/** The narrow interface shared with WS=find's lib/preferences (same names). */
+/** The narrow interface the desk uses (same names as lib/preferences' UserPrefs). */
 export interface UserPrefs {
   getUserPreferences(userId: string): Promise<DeskPreferences>;
   setUserPreference<K extends DeskPreferenceKey>(userId: string, key: K, value: DeskPreferences[K]): Promise<DeskPreferences>;
@@ -44,8 +52,8 @@ export interface UserPrefs {
 
 export const DEFAULT_DESK_PREFERENCES: DeskPreferences = { shortcuts: {}, voice: { enabled: false }, timeZone: null };
 
-function assertUserId(userId: string): void {
-  if (!userId || typeof userId !== "string") throw new Error("preferences: userId is required");
+export class DeskPreferenceError extends Error {
+  readonly status = 400;
 }
 
 /** Stored shortcuts → the stored format, unknown/fixed/clashing entries dropped. */
@@ -54,18 +62,21 @@ function storedShortcuts(raw: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(canonical).map(([id, c]) => [id, toStoredBinding(c)]));
 }
 
-export async function getUserPreferences(userId: string): Promise<DeskPreferences> {
-  assertUserId(userId);
-  const row = await prisma.userDeskState.findUnique({
-    where: { userId },
-    select: { shortcuts: true, voiceEnabled: true },
-  });
-  if (!row) return { ...DEFAULT_DESK_PREFERENCES, shortcuts: {}, voice: { enabled: false } };
-  return { shortcuts: storedShortcuts(row.shortcuts), voice: { enabled: row.voiceEnabled }, timeZone: null };
+function voiceEnabled(voice: Record<string, unknown> | null | undefined): boolean {
+  return voice?.enabled === true;
 }
 
-export class DeskPreferenceError extends Error {
-  readonly status = 400;
+function toDesk(p: { shortcuts: unknown; voice: Record<string, unknown>; timeZone: string | null }): DeskPreferences {
+  return { shortcuts: storedShortcuts(p.shortcuts), voice: { enabled: voiceEnabled(p.voice) }, timeZone: p.timeZone };
+}
+
+export async function getUserPreferences(userId: string): Promise<DeskPreferences> {
+  try {
+    return toDesk(await getStoredPreferences(userId));
+  } catch (err) {
+    if (err instanceof PreferenceError) throw new DeskPreferenceError(err.message);
+    throw err;
+  }
 }
 
 export async function setUserPreference<K extends DeskPreferenceKey>(
@@ -73,34 +84,30 @@ export async function setUserPreference<K extends DeskPreferenceKey>(
   key: K,
   value: DeskPreferences[K],
 ): Promise<DeskPreferences> {
-  assertUserId(userId);
-  if (key === "voice") {
-    const v = value as DeskVoicePrefs;
-    if (!v || typeof v.enabled !== "boolean") throw new DeskPreferenceError("voice: { enabled: boolean } expected");
-    await prisma.userDeskState.upsert({
-      where: { userId },
-      create: { userId, voiceEnabled: v.enabled },
-      update: { voiceEnabled: v.enabled },
-    });
-  } else if (key === "shortcuts") {
-    const map = value as Record<string, string>;
-    if (!map || typeof map !== "object" || Array.isArray(map)) throw new DeskPreferenceError("shortcuts: an object expected");
-    for (const id of Object.keys(map)) {
-      if (!SHORTCUT_ID_RE.test(id)) throw new DeskPreferenceError(`shortcuts: "${id}" is not a shortcut id`);
+  try {
+    if (key === "voice") {
+      const v = value as DeskVoicePrefs;
+      if (!v || typeof v.enabled !== "boolean") throw new DeskPreferenceError("voice: { enabled: boolean } expected");
+      const current = await getStoredPreferences(userId);
+      return toDesk(await setStoredPreference(userId, "voice", { ...current.voice, enabled: v.enabled }));
     }
-    const clean = storedShortcuts(map);
-    if (Object.keys(clean).length !== Object.keys(map).length) {
-      throw new DeskPreferenceError("shortcuts: some bindings are unknown, fixed or clash with another shortcut");
+    if (key === "shortcuts") {
+      const map = value as Record<string, string>;
+      if (!map || typeof map !== "object" || Array.isArray(map)) throw new DeskPreferenceError("shortcuts: an object expected");
+      for (const id of Object.keys(map)) {
+        if (!SHORTCUT_ID_RE.test(id)) throw new DeskPreferenceError(`shortcuts: "${id}" is not a shortcut id`);
+      }
+      const clean = storedShortcuts(map);
+      if (Object.keys(clean).length !== Object.keys(map).length) {
+        throw new DeskPreferenceError("shortcuts: some bindings are unknown, fixed or clash with another shortcut");
+      }
+      return toDesk(await setStoredPreference(userId, "shortcuts", clean));
     }
-    await prisma.userDeskState.upsert({
-      where: { userId },
-      create: { userId, shortcuts: clean },
-      update: { shortcuts: clean },
-    });
-  } else {
     throw new DeskPreferenceError(`Unknown preference "${String(key)}"`);
+  } catch (err) {
+    if (err instanceof PreferenceError) throw new DeskPreferenceError(err.message);
+    throw err;
   }
-  return getUserPreferences(userId);
 }
 
 export const deskUserPrefs: UserPrefs = { getUserPreferences, setUserPreference };

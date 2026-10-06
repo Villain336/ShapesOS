@@ -5,8 +5,8 @@
 //     A rebinding that clashes with another live shortcut, takes a browser
 //     combo or a bare navigation key is refused with 400 and the reason
 //     (lib/keyboard/shortcuts.ts rebind); nothing is stored.
-// viewer+; the caller's own preferences (lib/desktop/prefs.ts — the UserPrefs
-// seam shared with WS=find's lib/preferences, same key names).
+// viewer+; the caller's own preferences, stored in UserPreference
+// (lib/preferences) through the desk adapter lib/desktop/prefs.ts.
 
 import { errorResponse } from "@/lib/api/errors";
 import { validateBody, z } from "@/lib/api/validate";

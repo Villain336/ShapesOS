@@ -10,7 +10,7 @@
 //   - Resume → unfreezeWorkspace (+ audit).
 //   - Focus / do not disturb → lib/desktop/focus.server.ts.
 //   - Auto-approve → a read-only summary of lib/automation/policy.ts.
-//   - Voice → the "voice" preference (lib/desktop/prefs.ts, for 19A).
+//   - Voice → the person's "voice" preference (lib/preferences via lib/desktop/prefs.ts, for 19A).
 //   - Spend today → the metering ledger (getUsageSummary from midnight UTC).
 
 import { prisma } from "@/lib/prisma";
