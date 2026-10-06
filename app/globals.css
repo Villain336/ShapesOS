@@ -200,12 +200,11 @@ body {
 }
 
 /* Phase 18.1 (density): the shell's own rows follow --aos-row-h. The
- * sidebar's nav and the command palette rows are addressed by their
- * landmark / role so the density preference needs no per-component class. */
-:root.density-compact nav[aria-label="Dashboard"] :is(a, button) {
+ * sidebar's nav is addressed by its data-shell-nav hook (its label is
+ * translated), the palette rows use min-h-row directly. */
+:root.density-compact nav[data-shell-nav] :is(a, button):not([class*="size-"]) {
+  height: var(--aos-row-h);
   min-height: var(--aos-row-h);
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
 }
 
 h1, h2, h3, h4 { text-wrap: balance; }

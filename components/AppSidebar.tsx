@@ -600,7 +600,7 @@ export function SidebarPanel({
             </div>
           )}
         </div>
-        <nav aria-label={t("shell.dashboardNav")} className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
+        <nav data-shell-nav aria-label={t("shell.dashboardNav")} className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
           <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} onNavigate={onNavigate} />
           {extra && !collapsed ? <div className="mt-4 border-t border-night-line pt-3">{extra}</div> : null}
         </nav>

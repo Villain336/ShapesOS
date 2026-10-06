@@ -157,6 +157,15 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
   zernio_account_usage: { month: "2030-01", status: "included" },
   // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
   ops_sites: { grid_w: "10", grid_d: "10" },
+  // Phase 18.1 (find): a Spotlight text row is a file's (search_texts_source_check
+  // pairs source with its key column; the key is filled through FILL_LINKS).
+  search_texts: { source: "file", status: "indexed" },
+};
+
+// Optional foreign keys a CHECK constraint requires for the fixed values above
+// (filled by creating the parent row, like a NOT NULL key).
+const FILL_LINKS: Record<string, readonly string[]> = {
+  search_texts: ["file_id"],
 };
 
 // Committed rows per table (one is enough; parents are shared).
@@ -190,7 +199,7 @@ async function synth(
       let v: unknown;
       if (c.col === "workspace_id") v = ws;
       else if (FIXED_VALUES[table]?.[c.col] !== undefined) v = FIXED_VALUES[table]![c.col];
-      else if (fk && c.notnull && !c.hasdef) {
+      else if (fk && ((c.notnull && !c.hasdef) || FILL_LINKS[table]?.includes(c.col))) {
         const parent = fk.reftable === table ? null : await synth(tx, fk.reftable, ws, pending, depth + 1);
         if (!parent) throw new Error(`self-referencing NOT NULL key ${table}.${c.col}`);
         v = parent[fk.refcol];
