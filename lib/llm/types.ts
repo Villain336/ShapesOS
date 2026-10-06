@@ -109,12 +109,49 @@ export interface ChatToolDef {
   inputSchema: ChatJsonSchema;
   /** Anthropic strict tool use (schema must set additionalProperties: false). */
   strict?: boolean;
+  /**
+   * Phase 17 (A2): not loaded into the model's context up front — the model
+   * finds it with tool search (Anthropic `defer_loading`, server-side). A
+   * provider without tool search gets the tool through the loop's client-side
+   * search_tools fallback instead (lib/agents/loop.ts), never silently
+   * dropped.
+   */
+  deferLoading?: boolean;
 }
+
+/** Phase 17: prompt-cache time-to-live (Anthropic cache_control.ttl). */
+export type ChatCacheTtl = "5m" | "1h";
 
 export interface ChatSystemBlock {
   text: string;
   /** Put a cache breakpoint after this block. */
   cache?: boolean;
+}
+
+/**
+ * Phase 17 (A3): server-side context editing — the provider clears old
+ * tool results itself once the input passes `triggerInputTokens`, keeping
+ * the last `keepToolUses` (Anthropic clear_tool_uses_20250919, beta
+ * context-management-2025-06-27). Where it is not offered, nothing is sent
+ * and meta.notes says so.
+ */
+export interface ChatContextEditing {
+  /** Input tokens of one call above which old tool results are cleared (default 100000). */
+  triggerInputTokens?: number;
+  /** Most recent tool uses whose results are kept (default 3). */
+  keepToolUses?: number;
+  /** Only clear when at least this many tokens go (the cache write must be worth it). */
+  clearAtLeastTokens?: number;
+  /** Tool names whose results are never cleared. */
+  excludeTools?: string[];
+}
+
+/** Phase 17 (A1): wall-clock of one model call, measured by the adapter. */
+export interface ChatTiming {
+  /** Time to the first streamed content delta (null on a non-streaming call). */
+  ttftMs: number | null;
+  /** Request start → final message. */
+  durationMs: number;
 }
 
 /**
@@ -145,10 +182,34 @@ export interface ChatRequest {
   /** Defaults to the workload's effort (router), else the model's default. */
   effort?: ChatEffort;
   thinking?: ChatThinking;
-  /** Cache the system prompt and the tool list (one breakpoint covers both). */
+  /**
+   * Cache the static prefix: a breakpoint on the last loaded tool AND on the
+   * last system block (Phase 17 A1 — the tools survive a system-prompt
+   * change; the API renders tools → system → messages).
+   */
   cache?: boolean;
+  /**
+   * Phase 17 (A1): how long the static prefix stays cached. "1h" for chat
+   * (people pause longer than 5 minutes; cache writes then cost 2× input
+   * instead of 1.25×), "5m" (default) for sub-agents and background work.
+   */
+  cacheTtl?: ChatCacheTtl;
   /** Also cache the growing conversation tail (Anthropic automatic caching). */
   cacheConversation?: boolean;
+  /**
+   * Phase 17 (A2): offer tool search so tools marked deferLoading are found
+   * on demand (Anthropic tool_search_tool_bm25_20251119). Ignored by
+   * providers without it (the loop falls back to client-side search).
+   */
+  toolSearch?: boolean;
+  /** Phase 17 (A3): server-side clearing of old tool results. */
+  contextEditing?: ChatContextEditing;
+  /**
+   * Phase 17 (A4): Anthropic service_tier. "standard_only" keeps background
+   * work off any priority capacity the org pays for; "auto" (the API default)
+   * for people waiting. (Batch work goes through lib/llm/batch.ts instead.)
+   */
+  serviceTier?: "auto" | "standard_only";
   serverTools?: ChatServerTool[];
   /**
    * "auto" (default) | "none" | forced. Forced tool choice is NEVER sent to a
@@ -184,7 +245,10 @@ export interface ChatUsage {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
+  /** Every cache write (5-minute and 1-hour entries together). */
   cacheWriteTokens: number;
+  /** Phase 17: the part of cacheWriteTokens that created 1-hour entries (billed 2× input, not 1.25×). */
+  cacheWrite1hTokens?: number;
 }
 
 export interface ChatResponseMeta {
@@ -194,6 +258,10 @@ export interface ChatResponseMeta {
   notes: string[];
   /** Phase 8: "server" when the provider compacts the context itself. */
   compaction?: "server";
+  /** Phase 17 (A2): "server" when deferred tools were offered through the provider's tool search. */
+  toolSearch?: "server";
+  /** Phase 17 (A3): what server-side context editing cleared on this call. */
+  contextEdits?: Array<{ type: string; clearedInputTokens: number; clearedToolUses?: number }>;
 }
 
 export interface ChatResponse {
@@ -211,6 +279,12 @@ export interface ChatResponse {
   /** Estimated cost in micro-USD (lib/llm/pricing.ts); null when a price is unknown. */
   costMicroUsd: number | null;
   meta: ChatResponseMeta;
+  /** Phase 17 (A1): measured by the adapter (recorded on the usage event). */
+  timing?: ChatTiming;
+  /** Phase 17: the effort actually sent (null = the model's default). */
+  effort?: ChatEffort | null;
+  /** Phase 17 (A4): the service tier the provider reports ("standard" | "priority" | "batch"). */
+  serviceTier?: string | null;
 }
 
 // ── chatStream(): events ────────────────────────────────────────────────────
@@ -258,4 +332,11 @@ export interface LlmProvider {
   chat(req: ChatRequest): Promise<ChatResponse>;
   /** Phase 7: chat() as a stream of typed events; the last event is `final`. */
   chatStream(req: ChatRequest): AsyncIterable<ChatStreamEvent>;
+  /**
+   * Phase 17 (A2): true when this provider (for its model) runs tool search
+   * itself, so ChatToolDef.deferLoading is honoured server-side. Absent or
+   * false → the agent loop offers deferred tools through its own
+   * search_tools tool instead.
+   */
+  supportsToolSearch?(): boolean;
 }

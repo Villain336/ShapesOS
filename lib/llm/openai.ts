@@ -591,6 +591,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
     await assertModelSpendAllowed(opts?.usage, this.keySource, this.name);
     const body = buildChatCompletionsBody(this.model, prompt, opts?.maxTokens ?? DEFAULT_MAX_TOKENS, this.selfHost);
     return this.withRetry(async () => {
+      const startedAt = Date.now();
       const conn = await this.open("/chat/completions", body, signal);
       const json = await this.readJson(conn, signal);
       // Phase 15.2: generate() is metered like chat(); tokens were spent even
@@ -607,6 +608,10 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
           costMicroUsd: estimateCostMicroUsd(this.model, usage),
           responseId: typeof j?.id === "string" ? j.id : null,
           keySource: this.keySource,
+          // Phase 17 (A1): timing on every recorded call.
+          timing: { ttftMs: null, durationMs: Date.now() - startedAt },
+          effort: null,
+          serviceTier: null,
         });
       }
       const choice = (
@@ -647,7 +652,15 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       costMicroUsd: res.costMicroUsd,
       responseId: res.id,
       keySource: this.keySource,
+      timing: res.timing ?? null,
+      effort: res.effort ?? null,
+      serviceTier: res.serviceTier ?? null,
     });
+  }
+
+  /** Phase 17 (A2): no server-side tool search on the Responses API — the loop's client-side search serves deferred tools. */
+  supportsToolSearch(): boolean {
+    return false;
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
@@ -658,6 +671,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       stream: false,
       defaultEffort: this.defaultEffort,
     });
+    const startedAt = Date.now();
     const json = (await this.withRetry(async () => {
       const conn = await this.open("/responses", body, req.signal);
       const j = (await this.readJson(conn, req.signal)) as Record<string, unknown>;
@@ -665,6 +679,8 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       return j;
     }, req.signal)) as ResponsesJson;
     const res = mapResponsesOutput(json, { model: this.model, provider: this.name, req, notes });
+    res.timing = { ttftMs: null, durationMs: Date.now() - startedAt };
+    res.effort = req.effort ?? this.defaultEffort ?? null;
     await this.record(req, res);
     return res;
   }
@@ -678,6 +694,8 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       defaultEffort: this.defaultEffort,
     });
     // Retries cover connecting only; once events flow, a failure surfaces.
+    const startedAt = Date.now();
+    let firstDeltaAt: number | null = null;
     const conn = await this.withRetry(() => this.open("/responses", body, req.signal), req.signal);
     if (!conn.res.body) {
       conn.done();
@@ -690,6 +708,8 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
         for await (const ev of sseEvents(conn.res.body, conn.touch)) {
           const type = String(ev.type ?? "");
           const index = typeof ev.output_index === "number" ? ev.output_index : 0;
+          // Phase 17 (A1): time to the first content delta of any kind.
+          if (firstDeltaAt === null && type.endsWith(".delta")) firstDeltaAt = Date.now();
           if (type === "response.output_item.added") {
             const item = ev.item as ResponsesOutputItem | undefined;
             if (item?.type === "function_call") {
@@ -737,6 +757,8 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
       throw new LlmProviderError({ provider: this.name, kind: "server", detail: "stream ended without a completed response" });
     }
     const res = mapResponsesOutput(terminal, { model: this.model, provider: this.name, req, notes });
+    res.timing = { ttftMs: firstDeltaAt === null ? null : firstDeltaAt - startedAt, durationMs: Date.now() - startedAt };
+    res.effort = req.effort ?? this.defaultEffort ?? null;
     await this.record(req, res);
     yield { type: "message_stop", stopReason: res.stopReason, usage: res.usage };
     yield { type: "final", response: res };

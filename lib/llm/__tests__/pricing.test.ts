@@ -34,6 +34,27 @@ describe("price table", () => {
     }
   });
 
+  it("Phase 17: 1-hour cache writes are 2× input on Anthropic (prompt-caching.md § Economics), none on OpenAI", () => {
+    for (const [m, p] of Object.entries(MODEL_PRICES)) {
+      if (p.source === "anthropic-docs") assert.equal(p.cacheWrite1h, Math.round(p.input! * 2 * 1000) / 1000, m);
+      else assert.equal(p.cacheWrite1h, null, m);
+    }
+    // 1000 writes of which 400 are 1-hour entries, on Opus 5.5: 600×5 + 400×8
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", { ...u(0, 0, 0, 1000), cacheWrite1hTokens: 400 }), 6200);
+    // Without the breakdown every write is priced at the 5-minute rate (never under-billed to 0).
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", u(0, 0, 0, 1000)), 5000);
+    // The 1h share can never exceed the writes.
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", { ...u(0, 0, 0, 100), cacheWrite1hTokens: 500 }), 800);
+  });
+
+  it("Phase 17: a batch-tier call is priced at 50% on every token class (estimate and billing alike)", () => {
+    const usage = u(1000, 500, 10_000, 2000);
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", usage, { serviceTier: "batch" }), 13_000);
+    assert.equal(billableCostMicroUsd("claude-opus-5-5", usage, { serviceTier: "batch" }).costMicroUsd, 13_000);
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", usage, { serviceTier: "standard" }), 26_000);
+    assert.equal(estimateCostMicroUsd("claude-opus-5-5", usage, { serviceTier: "priority" }), 26_000);
+  });
+
   it("OpenAI prices come from OpenAI's own pricing page (Phase 15.2, checked 2026-10-05)", () => {
     for (const m of ["gpt-5.5", "gpt-5.4-nano", "gpt-5-nano", "gpt-5-nano:flex"]) {
       assert.equal(priceFor(m)!.source, "openai-docs", m);

@@ -61,6 +61,11 @@ export class WorkspaceBoundLlmProvider implements LlmProvider {
   chatStream(req: ChatRequest): AsyncIterable<ChatStreamEvent> {
     return this.inner.chatStream({ ...req, usage: req.usage ?? this.context });
   }
+
+  /** Phase 17 (A2): the inner provider's answer. */
+  supportsToolSearch(): boolean {
+    return this.inner.supportsToolSearch?.() ?? false;
+  }
 }
 
 /** Resolve a workload for a workspace (its own keys first). */

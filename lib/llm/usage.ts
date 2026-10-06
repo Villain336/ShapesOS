@@ -37,7 +37,7 @@ import { billableCostMicroUsd, formatMicroUsd } from "./pricing";
 import { LlmProviderError } from "./errors";
 // credits.ts is pure (no DB): safe to import statically from the adapters' graph.
 import { llmTokenCredits as llmTokenCreditsSync } from "@/lib/metering/credits";
-import type { ChatUsage, ChatUsageContext, LlmKeySource } from "./types";
+import type { ChatTiming, ChatUsage, ChatUsageContext, LlmKeySource } from "./types";
 
 export interface ChatUsageRecord {
   context: ChatUsageContext;
@@ -50,19 +50,32 @@ export interface ChatUsageRecord {
   responseId: string | null;
   /** Phase 15: whose key served the call. Default "platform". */
   keySource?: LlmKeySource;
+  /** Phase 17 (A1): wall-clock of the call (ttftMs null on non-streaming calls). */
+  timing?: ChatTiming | null;
+  /** Phase 17: the effort sent (null = model default). */
+  effort?: string | null;
+  /** Phase 17 (A4): the provider-reported service tier ("standard" | "priority" | "batch"). */
+  serviceTier?: string | null;
+}
+
+/** Phase 17: did the call read anything from the prompt cache? */
+export function cacheHit(usage: Pick<ChatUsage, "cacheReadTokens">): boolean {
+  return usage.cacheReadTokens > 0;
 }
 
 /**
  * Phase 15.2: the credits one call is charged and the credits it saved.
  * Pure — the single source of the token-billing rule.
  */
-export function llmCallCharge(rec: Pick<ChatUsageRecord, "model" | "usage" | "keySource"> & { billing?: ChatUsageContext["billing"] }): {
+export function llmCallCharge(
+  rec: Pick<ChatUsageRecord, "model" | "usage" | "keySource" | "serviceTier"> & { billing?: ChatUsageContext["billing"] },
+): {
   credits: number;
   waivedCredits: number;
   billableCostMicroUsd: number;
   priced: boolean;
 } {
-  const { costMicroUsd, priced } = billableCostMicroUsd(rec.model, rec.usage);
+  const { costMicroUsd, priced } = billableCostMicroUsd(rec.model, rec.usage, { serviceTier: rec.serviceTier ?? null });
   const list = llmTokenCreditsSync(costMicroUsd);
   const source = rec.keySource ?? "platform";
   if (rec.billing === "included") return { credits: 0, waivedCredits: 0, billableCostMicroUsd: costMicroUsd, priced };
@@ -86,6 +99,12 @@ export interface RunUsagePayload {
   /** Null when a price is unknown (never guessed). */
   costMicroUsd: number | null;
   usageEventId: string | null;
+  /** Phase 17 (A1): per-call timing and cache outcome. */
+  ttftMs?: number | null;
+  durationMs?: number | null;
+  cacheHit?: boolean;
+  effort?: string | null;
+  serviceTier?: string | null;
 }
 
 export function usageSummary(rec: Pick<ChatUsageRecord, "model" | "usage" | "costMicroUsd">): string {
@@ -124,6 +143,12 @@ async function recordToMetering(rec: ChatUsageRecord): Promise<void> {
       cacheReadTokens: rec.usage.cacheReadTokens,
       cacheWriteTokens: rec.usage.cacheWriteTokens,
       costMicroUsd: rec.costMicroUsd,
+      // Phase 17 (A1): per-call observability on the same row.
+      ttftMs: rec.timing?.ttftMs ?? null,
+      durationMs: rec.timing?.durationMs ?? null,
+      effort: rec.effort ?? null,
+      cacheHit: cacheHit(rec.usage),
+      serviceTier: rec.serviceTier ?? null,
     },
   });
   if (ctx.runId) {
@@ -139,6 +164,11 @@ async function recordToMetering(rec: ChatUsageRecord): Promise<void> {
       cacheWriteTokens: rec.usage.cacheWriteTokens,
       costMicroUsd: rec.costMicroUsd,
       usageEventId: result.ok ? result.eventId : null,
+      ttftMs: rec.timing?.ttftMs ?? null,
+      durationMs: rec.timing?.durationMs ?? null,
+      cacheHit: cacheHit(rec.usage),
+      effort: rec.effort ?? null,
+      serviceTier: rec.serviceTier ?? null,
     };
     await appendAgentRunEvent(ctx.workspaceId, ctx.runId, {
       type: "usage",

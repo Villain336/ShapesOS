@@ -73,6 +73,15 @@ export class FailoverLlmProvider implements LlmProvider {
     return this.meta.fallbackModel;
   }
 
+  /**
+   * Phase 17 (A2): deferred tools are offered through server-side search
+   * only when BOTH sides run it — a failover to a provider without it would
+   * otherwise lose the deferred tools mid-turn.
+   */
+  supportsToolSearch(): boolean {
+    return (this.primary.supportsToolSearch?.() ?? false) && (this.fallback.supportsToolSearch?.() ?? false);
+  }
+
   /** Log + remember a failover; returns the human reason. */
   private noteFailover(e: LlmProviderError): string {
     const reason = `${e.kind}${e.status ? ` (HTTP ${e.status})` : ""}`;

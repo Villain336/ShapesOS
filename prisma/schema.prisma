@@ -4044,6 +4044,16 @@ model UsageEvent {
   llmCacheReadTokens  Int?    @map("llm_cache_read_tokens")
   llmCacheWriteTokens Int?    @map("llm_cache_write_tokens")
   llmCostMicroUsd     BigInt? @map("llm_cost_micro_usd")
+  // Phase 17 (A1, WS=model): per-call observability. Time to the first
+  // streamed token and the call's wall-clock (ms), the effort sent, whether
+  // the prompt cache was read (cache_read > 0) and the provider's service
+  // tier ("standard" | "priority" | "batch"). Null on non-LLM actions and on
+  // rows written before Phase 17.
+  llmTtftMs           Int?     @map("llm_ttft_ms")
+  llmDurationMs       Int?     @map("llm_duration_ms")
+  llmEffort           String?  @map("llm_effort")
+  llmCacheHit         Boolean? @map("llm_cache_hit")
+  llmServiceTier      String?  @map("llm_service_tier")
   // Phase 15 (keys): whose key paid for the call — "platform" (ShapesOS's
   // key, charged in credits), "workspace" (the workspace's own key, BYOK:
   // 0 credits) or "self_host" (a local model). Null for actions without a
