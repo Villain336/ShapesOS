@@ -219,7 +219,7 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
         indexedAt: new Date(),
       };
       const row = existing
-        ? await tx.searchText.update({ where: { id: existing.id }, data })
+        ? await tx.searchText.update({ where: { id: existing.id, workspaceId: target.workspaceId }, data })
         : await tx.searchText.create({ data: { ...data, ...key } });
       await tx.searchTextChunk.deleteMany({ where: { workspaceId: target.workspaceId, searchTextId: row.id } });
       if (chunks.length) {

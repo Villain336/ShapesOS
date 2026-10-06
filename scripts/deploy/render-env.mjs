@@ -345,6 +345,10 @@ export const TABLE = [
   ["NEMO_DATA_DESIGNER_ENDPOINT", { cls: "exclude", why: "not used on hosted" }],
   ["MEMORY_WORKER_ROLE", { cls: "exclude", why: "the memory pass runs as the app role with in-session budgets (no extra DB login on Render)" }],
   ["MEMORY_MODEL_CACHE", { cls: "exclude", why: "default cache dir" }],
+  // Phase 18.1 (find): Spotlight (lib/search). Defaults are right on hosted.
+  ["SPOTLIGHT_SEMANTIC", { cls: "exclude", why: "default on: meaning-search uses the cached local MiniLM" }],
+  ["SPOTLIGHT_INDEX_ON_WRITE", { cls: "exclude", why: "default on: uploads index their text in the background" }],
+  ["SEARCH_INDEX_BATCH", { cls: "exclude", why: "default 200 per search-index cron run is right" }],
   ["MARKETR_MAX_BROWSER_RECORDINGS", { cls: "exclude", why: "default is right" }],
   ["POS_TERMINAL_MOCK", { cls: "exclude", why: "demo/test only" }],
   ["VIBE_CLIENT_ID", { cls: "exclude", why: "bring-your-own media buying" }],
