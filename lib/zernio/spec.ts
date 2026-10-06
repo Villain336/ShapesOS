@@ -343,3 +343,34 @@ export interface ZernioUsageMetering {
 export function isZernioId(v: unknown): v is string {
   return typeof v === "string" && /^[a-f0-9]{24}$/i.test(v);
 }
+
+// Phase 18.2 (WS=comms): the inbox (social DMs) documents ShapesOS reads
+// (listInboxConversations / getInboxConversationMessages, spec v1.217.1).
+export interface ZernioInboxConversation {
+  id: string;
+  platform: string;
+  accountId: string;
+  accountUsername?: string;
+  participantId?: string;
+  participantName?: string;
+  participantPicture?: string | null;
+  lastMessage?: string;
+  updatedTime?: string;
+  status?: "active" | "archived";
+  unreadCount?: number | null;
+  url?: string | null;
+}
+
+export interface ZernioInboxMessage {
+  id: string;
+  conversationId?: string;
+  accountId?: string;
+  platform?: string;
+  message?: string;
+  senderId?: string;
+  senderName?: string | null;
+  direction?: "incoming" | "outgoing";
+  createdAt?: string;
+  attachments?: { type?: string; url?: string; filename?: string | null }[];
+  isDeleted?: boolean;
+}

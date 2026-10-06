@@ -26,6 +26,8 @@ import {
   Target,
   Wallet,
   Warehouse,
+  // Phase 18.2 (WS=comms)
+  ListTodo,
 } from "lucide-react";
 
 export type DeskRole = "viewer" | "editor" | "admin" | "owner";
@@ -53,6 +55,8 @@ export const WIDGET_IDS = [
   "key-numbers",
   "projects",
   "suggestions",
+  // Phase 18.2 (WS=comms): the Reminders app's open to-dos.
+  "reminders",
 ] as const;
 
 export type WidgetId = (typeof WIDGET_IDS)[number];
@@ -174,7 +178,8 @@ export const WIDGETS: Readonly<Record<WidgetId, WidgetDef>> = Object.freeze({
     minSize: { w: 3, h: 3 },
     maxSize: { w: 6, h: 8 },
     minRole: "viewer",
-    href: "/dashboard/calls",
+    // Phase 18.2 (WS=comms): "Open" goes to the Calendar app.
+    href: "/dashboard/calendar",
     source: "booking + Google/Outlook calendar connector reads",
   },
   inbox: {
@@ -260,6 +265,19 @@ export const WIDGETS: Readonly<Record<WidgetId, WidgetDef>> = Object.freeze({
     minRole: "viewer",
     href: "/dashboard/projects",
     source: "the Overview's suggestions",
+  },
+  // Phase 18.2 (WS=comms)
+  reminders: {
+    id: "reminders",
+    title: "Reminders",
+    description: "Your open to-dos, the soonest due first",
+    icon: ListTodo,
+    defaultSize: { w: 4, h: 3 },
+    minSize: { w: 3, h: 3 },
+    maxSize: { w: 6, h: 8 },
+    minRole: "viewer",
+    href: "/dashboard/reminders",
+    source: "ops_tasks without a project, assigned to the member (lib/comms/reminders.ts)",
   },
 });
 

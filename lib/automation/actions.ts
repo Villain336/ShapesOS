@@ -154,6 +154,15 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // Off (lib/automation/policy.ts DEFAULT_BEHAVIORS).
   { action: "slack_reply", label: "Reply in Slack", description: "Post the agent's answer (and status messages) back into the Slack thread that asked. Ask first holds each reply for your OK in ShapesOS.", group: "slack" },
   { action: "slack_placeholder", label: "Say a reply is waiting", description: "While a Slack reply waits for your OK, post a one-line note in the thread. Off by default.", group: "slack", control: "switch" },
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  // Reminders are the person's own to-dos — Tier 1 (TIER1_KINDS).
+  { action: "create_reminder", label: "Add a reminder", description: "Add a to-do with a due time to the person's own Reminders list." },
+  { action: "complete_reminder", label: "Complete a reminder", description: "Tick one of the person's own reminders done." },
+  // Contacts: merging two people's cards (each record stays in its own app) — Tier 1.
+  // Mail: drafting a reply is a draft (Tier 0); a social DM is external (Tier 2).
+  { action: "draft_mail_reply", label: "Draft a mail reply", description: "Write a reply into the person's Mail drafts (nothing is sent)." },
+  { action: "send_social_dm", label: "Send a social DM", description: "Reply to a customer in a social DM (Instagram, Messenger, WhatsApp …) through Zernio.", group: "connectors" },
+  { action: "confirm_contact_merge", label: "Merge contacts", description: "Confirm a merge suggestion so two contact cards become one (the records stay in their own apps; a person can unlink).", group: "ops" },
 ];
 
 

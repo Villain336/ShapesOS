@@ -140,6 +140,11 @@ export async function gatherBriefingInput(workspaceId: string, userId: string, n
     if (cash.overdueInvoices > 0) metrics.push({ label: "Overdue invoices", value: String(cash.overdueInvoices) });
   }
   if (inbox && inbox.unreadThreads > 0) metrics.push({ label: "Unread conversations", value: String(inbox.unreadThreads) });
+  // Phase 18.2 (WS=comms): meeting prep from the Calendar app's sources + Contacts (best-effort).
+  const nextMeetings = await import("@/lib/comms/calendar/prep.server")
+    .then((m) => m.nextMeetingsPrep({ workspaceId, userId, timeZone: tz, now }))
+    .then((list) => list.map((m) => ({ time: fmtTime(m.start, tz), title: m.title, prep: m.prep })))
+    .catch(() => undefined);
   return {
     language,
     memberName: member?.name ?? null,
@@ -157,6 +162,7 @@ export async function gatherBriefingInput(workspaceId: string, userId: string, n
       highlights: [...failed.slice(0, 3).map((r) => `Failed — ${runLabel(r)}`), ...finished.slice(0, 2).map((r) => `Finished — ${runLabel(r)}`)],
     },
     metrics,
+    ...(nextMeetings ? { nextMeetings } : {}),
   };
 }
 

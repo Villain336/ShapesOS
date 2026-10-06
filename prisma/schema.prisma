@@ -353,6 +353,16 @@ enum FileChangeAction {
   // the approved extra-seat ceiling (summaries carry counts and prices only).
   seat_charge_confirmed
   seat_ceiling_changed
+  // Phase 18.2 (WS=comms): a person confirmed / rejected a contact merge or
+  // unlinked a record; sent mail from the Mail app; saved a calendar event;
+  // created / revoked a private calendar feed.
+  contact_merge_confirmed
+  contact_merge_rejected
+  contact_unlinked
+  mail_sent
+  calendar_event_saved
+  calendar_feed_created
+  calendar_feed_revoked
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,6 +1139,18 @@ model Workspace {
   // Phase 18.1 (WS=find): Spotlight's text index (file contents, docs).
   searchTexts                 SearchText[]
   searchTextChunks            SearchTextChunk[]
+  // Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet.
+  chatChannels                ChatChannel[]
+  teamChatMessages            TeamChatMessage[]
+  chatChannelMembers          ChatChannelMember[]
+  userPresences               UserPresence[]
+  mailThreadCaches            MailThreadCache[]
+  mailDrafts                  MailDraft[]
+  calendarFeedTokens          CalendarFeedToken[]
+  contactIdentities           ContactIdentity[]
+  contactIdentityLinks        ContactIdentityLink[]
+  contactMergeSuggestions     ContactMergeSuggestion[]
+  meetingSessions             MeetingSession[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -3423,31 +3445,76 @@ model AiChatMessage {
   @@map("ai_chat_messages")
 }
 
+// Phase 18.2 (WS=comms): the Messages app. The original one-channel-per-
+// project chat is kind "project"; the Messages app adds workspace channels
+// (public or private) and direct messages (kind "dm", one per set of people:
+// dmKey). Both tables carry workspace_id (backfilled from the project) and
+// are FORCE RLS on app.workspace_id (migration 20261021100000).
+enum ChatChannelKind {
+  project
+  channel
+  dm
+}
+
 model ChatChannel {
-  id        String  @id @default(cuid())
-  projectId String  @unique @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name      String  @default("Project chat")
+  id            String          @id @default(cuid())
+  workspaceId   String          @map("workspace_id")
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind          ChatChannelKind @default(project)
+  // Set only for kind "project" (still one channel per project).
+  projectId     String?         @unique @map("project_id")
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String          @default("Project chat")
+  topic         String?
+  // kind "channel": invite-only (only members see it); public channels are open to every member.
+  isPrivate     Boolean         @default(false) @map("is_private")
+  // kind "dm": the sorted member keys joined with "|" (one DM per set of people).
+  dmKey         String?         @map("dm_key")
+  createdBy     String?         @map("created_by")
+  archivedAt    DateTime?       @map("archived_at")
+  lastMessageAt DateTime        @default(now()) @map("last_message_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   messages TeamChatMessage[]
+  members  ChatChannelMember[]
 
+  @@unique([workspaceId, dmKey])
+  @@index([workspaceId, kind, lastMessageAt])
   @@map("chat_channels")
 }
 
 model TeamChatMessage {
-  id         String      @id @default(cuid())
-  channelId  String      @map("channel_id")
-  channel    ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  userId     String      @map("user_id")
+  id          String           @id @default(cuid())
+  // Phase 18.2 (WS=comms): tenant column (backfilled from the channel's project).
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String           @map("channel_id")
+  channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  // Phase 18.2: a reply in a thread points at the thread's first message.
+  parentId    String?          @map("parent_id")
+  parent      TeamChatMessage? @relation("TeamChatThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     TeamChatMessage[] @relation("TeamChatThread")
+  // The author's subject id; an agent's message carries "agent:<key>".
+  userId      String           @map("user_id")
   // Denormalized display-name snapshot (email or name at send time).
-  authorName String      @map("author_name")
-  body       String      @db.Text
+  authorName  String           @map("author_name")
+  // Phase 18.2: user | agent | system
+  authorKind  String           @default("user") @map("author_kind")
+  agentKey    String?          @map("agent_key")
+  body        String           @db.Text
+  // Phase 18.2: mentioned members ("user:<id>") and agents ("agent:<key>").
+  mentions    String[]         @default([])
+  // Phase 18.2: an agent message's run, chat thread and proposals
+  // ({ runId, chatThreadId, projectId, proposals, decision }).
+  meta        Json?
+  editedAt    DateTime?        @map("edited_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([channelId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([parentId, createdAt])
   @@map("team_chat_messages")
 }
 
@@ -9823,8 +9890,10 @@ model OpsTask {
   id              String          @id @default(cuid())
   workspaceId     String          @map("workspace_id")
   workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  projectId       String          @map("project_id")
-  project         OpsProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Phase 18.2 (WS=comms): NULL = a personal reminder (the Reminders app:
+  // no project, assigned to its owner; never listed with project tasks).
+  projectId       String?         @map("project_id")
+  project         OpsProject?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   title           String
   description     String?         @db.Text
   stage           OpsTaskStage    @default(todo)
@@ -9836,6 +9905,12 @@ model OpsTask {
   completedAt     DateTime?       @map("completed_at")
   // Phase 10 (portal): shown to linked clients in the client portal.
   clientVisible   Boolean         @default(false) @map("client_visible")
+  // Phase 18.2 (WS=comms): reminders repeat daily | weekly | monthly (NULL =
+  // once); reminderNotifiedAt marks the due notification of the current
+  // occurrence; sourceRef links where it came from ("meeting:<id>").
+  repeatRule         String?      @map("repeat_rule")
+  reminderNotifiedAt DateTime?    @map("reminder_notified_at")
+  sourceRef          String?      @map("source_ref")
   createdBy       String?         @map("created_by")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
@@ -9844,6 +9919,7 @@ model OpsTask {
 
   @@index([workspaceId, projectId, stage])
   @@index([workspaceId, assigneeId, stage])
+  @@index([workspaceId, dueAt])
   @@map("ops_tasks")
 }
 
@@ -15088,6 +15164,10 @@ enum NotificationKind {
   alert_fired
   run_failed
   invite_accepted
+  // Phase 18.2 (WS=comms): Messages and Reminders.
+  mention
+  direct_message
+  reminder_due
 }
 
 model Notification {
@@ -17258,4 +17338,246 @@ model SearchTextChunk {
   @@unique([searchTextId, idx])
   @@index([workspaceId])
   @@map("search_text_chunks")
+}
+
+// ============================================================================
+// Phase 18.2 (WS=comms): the communication apps — Mail, Calendar, Contacts,
+// Messages, Meet (Reminders reuse OpsTask; Notes are WS=content's). Every
+// table carries workspace_id, cascades from workspaces and is FORCE RLS on
+// app.workspace_id (migration 20261021100000_p182_comms_apps). None of them
+// is a second source of truth: mail stays in Gmail / Outlook / the CRM
+// ledger / Zernio, people stay in their four stores, events in their
+// calendars — these rows are caches, links and the apps' own state.
+// ============================================================================
+
+// Messages: who is in a channel (private channels and DMs: only members see
+// them) and each member's read cursor. memberKey is "user:<subject>" for a
+// person and "agent:<key>" for an agent member (agents are members too).
+model ChatChannelMember {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String      @map("channel_id")
+  channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  memberKey   String      @map("member_key")
+  userId      String?     @map("user_id")
+  agentKey    String?     @map("agent_key")
+  // owner | member
+  role        String      @default("member")
+  lastReadAt  DateTime?   @map("last_read_at")
+  joinedAt    DateTime    @default(now()) @map("joined_at")
+
+  @@unique([channelId, memberKey])
+  @@index([workspaceId, userId])
+  @@map("chat_channel_members")
+}
+
+// Messages: presence — a last-seen heartbeat per member per workspace
+// (Postgres, so every replica agrees; "active 5 m ago").
+model UserPresence {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+
+  @@unique([workspaceId, userId])
+  @@map("user_presence")
+}
+
+// Mail: thread HEADERS cached per mailbox for listing speed (subject,
+// people, dates, provider labels) — never bodies or snippets; bodies are
+// fetched from the provider when a thread is opened. Archive, read state and
+// ShapesOS tags are the Mail app's own state (the connectors' scopes are
+// read-only for mail state). A Gmail / Outlook mailbox is personal: only
+// owner_user_id (the member who connected it) sees it in the Mail app.
+model MailThreadCache {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connectionId    String    @map("connection_id")
+  ownerUserId     String    @map("owner_user_id")
+  // gmail | outlook
+  source          String
+  // Gmail threadId / Outlook conversationId.
+  externalId      String    @map("external_id")
+  // The newest message id (what a reply answers).
+  latestMessageId String?   @map("latest_message_id")
+  subject         String
+  fromName        String?   @map("from_name")
+  fromEmail       String?   @map("from_email")
+  participants    String[]  @default([])
+  lastMessageAt   DateTime  @map("last_message_at")
+  messageCount    Int       @default(1) @map("message_count")
+  unread          Boolean   @default(false)
+  archived        Boolean   @default(false)
+  // Provider labels / folder (Gmail label ids, the Outlook folder).
+  labels          String[]  @default([])
+  // Labels the person applied in ShapesOS (incl. accepted suggestions).
+  tags            String[]  @default([])
+  // The inbox agent's suggested labels and one-paragraph summary.
+  suggestedTags   String[]  @default([]) @map("suggested_tags")
+  summary         String?   @db.Text
+  summarizedAt    DateTime? @map("summarized_at")
+  fetchedAt       DateTime  @default(now()) @map("fetched_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, connectionId, externalId])
+  @@index([workspaceId, ownerUserId, archived, lastMessageAt])
+  @@map("mail_thread_cache")
+}
+
+// Mail: compose state — a person's draft, or an agent's drafted reply (the
+// inbox agent drafts; sending is a person's click, or an agent's send that
+// went through the send tool's tier gate). status: draft | sent | discarded | failed.
+model MailDraft {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // The person whose draft it is (whose mailbox sends it).
+  userId           String    @map("user_id")
+  // gmail | outlook | crm | social
+  source           String
+  connectionId     String?   @map("connection_id")
+  // The thread it answers (Mail app thread key), null for a new message.
+  threadKey        String?   @map("thread_key")
+  replyToMessageId String?   @map("reply_to_message_id")
+  to               String?
+  cc               String?
+  subject          String?
+  body             String    @db.Text
+  // person | agent
+  origin           String    @default("person")
+  agentKey         String?   @map("agent_key")
+  runId            String?   @map("run_id")
+  status           String    @default("draft")
+  sentAt           DateTime? @map("sent_at")
+  error            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, userId, status])
+  @@index([workspaceId, threadKey])
+  @@map("mail_drafts")
+}
+
+// Calendar: a member's private ICS subscribe feed. The URL carries a random
+// token; only its sha256 is stored. Revoking stamps revoked_at (the URL then
+// 404s); a new feed means a new token.
+model CalendarFeedToken {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  tokenHash   String    @unique @map("token_hash")
+  // The last 4 characters, to tell feeds apart in Settings.
+  hint        String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  @@index([workspaceId, userId])
+  @@map("calendar_feed_tokens")
+}
+
+// Contacts: one address book as an identity-link layer. Every record in the
+// four people stores (crm_leads, ops_contacts, connector_agent_persons,
+// funding_contacts) is linked to exactly one identity: its own, until a
+// person CONFIRMS a merge suggestion (never automatic). The identity's
+// name / emails / phones / companies are a search cache of its records.
+model ContactIdentity {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  displayName String    @map("display_name")
+  emails      String[]  @default([])
+  phones      String[]  @default([])
+  companies   String[]  @default([])
+  recordCount Int       @default(1) @map("record_count")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  links ContactIdentityLink[]
+
+  @@index([workspaceId, displayName])
+  @@map("contact_identities")
+}
+
+model ContactIdentityLink {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  identityId  String          @map("identity_id")
+  identity    ContactIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  // lead | ops_contact | connector_person | funding_contact
+  recordKind  String          @map("record_kind")
+  recordId    String          @map("record_id")
+  // sync (the record's own identity) | merge (a person confirmed it)
+  linkedVia   String          @default("sync") @map("linked_via")
+  confirmedBy String?         @map("confirmed_by")
+  confirmedAt DateTime?       @map("confirmed_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@unique([workspaceId, recordKind, recordId])
+  @@index([identityId])
+  @@map("contact_identity_links")
+}
+
+// A suggested merge between two records believed to be one person. Keyed by
+// the record pair (canonical order), so a rejection is remembered whatever
+// the identities later become. status: pending | confirmed | rejected | stale.
+model ContactMergeSuggestion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  aKind       String    @map("a_kind")
+  aId         String    @map("a_id")
+  bKind       String    @map("b_kind")
+  bId         String    @map("b_id")
+  score       Float
+  reasons     String[]  @default([])
+  status      String    @default("pending")
+  // agent | sync — who proposed it.
+  proposedVia String    @default("sync") @map("proposed_via")
+  decidedBy   String?   @map("decided_by")
+  decidedAt   DateTime? @map("decided_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, aKind, aId, bKind, bId])
+  @@index([workspaceId, status, score])
+  @@map("contact_merge_suggestions")
+}
+
+// Meet: one video / voice call (a LiveKit room) and what the meeting agent
+// made of it: the transcript (post-call), notes, decisions and action items
+// (action items become reminders / OpsTasks; the notes are a Notes-ready
+// Office doc, univer_docs, linked by notes_doc_id).
+model MeetingSession {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title            String
+  roomName         String    @unique @map("room_name")
+  // adhoc | calendar | channel
+  origin           String    @default("adhoc")
+  // "google:<eventId>" / "outlook:<eventId>" / "booking:<id>" / a channel id
+  originRef        String?   @map("origin_ref")
+  startedBy        String    @map("started_by")
+  // open | ended
+  status           String    @default("open")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  endedAt          DateTime? @map("ended_at")
+  transcript       String?   @db.Text
+  // none | recording | uploaded | pasted
+  transcriptSource String    @default("none") @map("transcript_source")
+  // { notes, decisions[], actionItems[{ title, owner?, due? }] , model }
+  summary          Json?
+  notesDocId       String?   @map("notes_doc_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, startedAt])
+  @@map("meeting_sessions")
 }

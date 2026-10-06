@@ -61,6 +61,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "Scheduled skills fire on the next tick after nextRunAt; every minute keeps them on time (the tick catches up missed slots once).",
     timeoutMs: SHORT,
   },
+  {
+    // Phase 18.2 (WS=comms): reminders that came due → one notification per occurrence.
+    key: "comms-reminders",
+    path: "/api/cron/comms-reminders",
+    cron: "* * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. A reminder set for 09:00 should arrive at 09:00, so the sweep runs every minute; each occurrence notifies once (dedup key + reminder_notified_at).",
+    timeoutMs: SHORT,
+  },
 
   // --- Every 5–15 minutes -------------------------------------------------
   { key: "newsletter", path: "/api/cron/newsletter", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
@@ -155,6 +164,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     cron: "*/10 * * * *",
     source: "picked",
     note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
+    timeoutMs: SHORT,
+  },
+  // Phase 18.2 (WS=comms): Contacts — link new people records, refresh merge suggestions.
+  {
+    key: "comms-contacts",
+    path: "/api/cron/comms-contacts",
+    cron: "10,40 * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. Opening Contacts syncs on demand, so the sweep only keeps the address book and Spotlight current for workspaces nobody opened; twice an hour, off the busy :00 and :30 minutes. Suggestions only — nothing merges without a person.",
     timeoutMs: SHORT,
   },
   // Phase 13 (twincore): digital twin conditions → alerts + editor notifications.

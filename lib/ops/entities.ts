@@ -91,6 +91,13 @@ export interface OpsEntityDef {
    * Reads, edits and closing out existing records are never blocked.
    */
   createEntitlement?: Feature;
+  // ---- Phase 18.2 (WS=comms) ----
+  /**
+   * Rows of the table this entity does NOT own, kept out of the generic
+   * list and PATCH (e.g. ops_tasks without a project are personal
+   * reminders — lib/comms/reminders.ts — never shown to or edited by others).
+   */
+  scopeWhere?: Record<string, unknown>;
 }
 
 export interface OpsEntityHooks {
@@ -863,6 +870,8 @@ const taskDef: OpsEntityDef = {
   }).strict(),
   patchable: true,
   filterable: ["projectId", "stage", "assigneeId", "priority"],
+  // Phase 18.2 (WS=comms): project-less tasks are personal reminders.
+  scopeWhere: { projectId: { not: null } },
   gatedTransitions: [],
   summarize: (r) => `task "${r.title}" → ${r.stage}`,
   hooks: {

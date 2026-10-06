@@ -33,6 +33,8 @@ export const RECORD_KINDS = [
   "ticket",
   "deal",
   "app",
+  // Phase 18.2 (WS=comms): the member's own mail threads (the Mail app).
+  "mail",
 ] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -61,6 +63,7 @@ export const RECORD_KIND_LABELS: Record<RecordKind, string> = {
   ticket: "Ticket",
   deal: "Deal",
   app: "App",
+  mail: "Mail",
 };
 
 /** How a result matched (Spotlight shows these; the ranking blends them). */
@@ -116,4 +119,8 @@ export const KIND_ALIASES: Record<string, readonly RecordKind[]> = {
   deals: ["deal"],
   app: ["app"],
   apps: ["app"],
+  // Phase 18.2 (WS=comms)
+  mail: ["mail"],
+  email: ["mail", "inbox_message"],
+  emails: ["mail", "inbox_message"],
 };

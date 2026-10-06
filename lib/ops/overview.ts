@@ -41,7 +41,8 @@ export async function getOpsOverview(tx: Tx, workspaceId: string): Promise<OpsOv
     }),
     tx.opsTicket.count({ where: { workspaceId, status: active } }),
     tx.opsTicket.count({ where: { workspaceId, status: active, slaBreachedAt: { not: null } } }),
-    tx.opsTask.count({ where: { workspaceId, stage: { notIn: ["done", "cancelled"] } } }),
+    // Phase 18.2: project tasks only (project-less tasks are personal reminders).
+    tx.opsTask.count({ where: { workspaceId, projectId: { not: null }, stage: { notIn: ["done", "cancelled"] } } }),
   ]);
   const paymentsLast30dCents = paymentsNetCents(payments.map((p) => ({ kind: p.kind, sumCents: p._sum.amountCents ?? 0 })));
   return { ...summary, openOrders, activeProjects, paymentsLast30dCents, openTickets, breachedTickets, openTasks };

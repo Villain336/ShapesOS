@@ -48,6 +48,10 @@ export const NOTIFICATION_KINDS = [
   "alert_fired",
   "run_failed",
   "invite_accepted",
+  // Phase 18.2 (WS=comms): Messages and Reminders.
+  "mention",
+  "direct_message",
+  "reminder_due",
 ] as const;
 export type NotificationKindPref = (typeof NOTIFICATION_KINDS)[number];
 

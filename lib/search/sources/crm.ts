@@ -5,6 +5,7 @@
 
 import { Prisma } from "@prisma/client";
 import { tableSearch } from "../sql";
+import { ftsVector } from "../fts";
 import type { SearchSource } from "../types";
 import { money } from "./util";
 
@@ -35,27 +36,50 @@ export const lead: SearchSource = {
   ],
 };
 
+// Phase 18.2 (WS=comms): "contact" is the Contacts app's address book — ONE
+// result per person (lib/comms/contacts: an identity links that person's
+// lead, Ops contact, Network and funding records). Matches the person's
+// name, emails, phones and companies, and words in their Ops contacts'
+// notes. Ops contacts the address book has not linked yet (created since
+// its last sync) still show up as themselves, so nothing is ever missing.
 export const contact: SearchSource = {
   kind: "contact",
   minRole: "viewer",
   modes: ["name", "text"],
-  query: (tx, ctx) =>
-    tableSearch(tx, ctx, {
-      from: "ops_contacts t LEFT JOIN ops_companies c ON c.id = t.company_id AND c.workspace_id = t.workspace_id",
+  query: async (tx, ctx) => {
+    const ocVec = ftsVector("ops_contacts", "oc");
+    const inNotes = `FROM contact_identity_links l JOIN ops_contacts oc ON oc.id = l.record_id AND oc.workspace_id = l.workspace_id WHERE l.identity_id = t.id AND l.workspace_id = t.workspace_id AND l.record_kind = 'ops_contact' AND ${ocVec} @@ qq.tq`;
+    const people = await tableSearch(tx, ctx, {
+      from: "contact_identities t",
       scope: Prisma.sql`t.workspace_id = ${ctx.workspaceId}`,
-      select: "t.id, t.name AS title, concat_ws(' · ', nullif(t.title, ''), c.name, nullif(t.email, '')) AS sub, NULL::text AS extra, NULL::int AS n, t.updated_at AS updated_at",
+      select:
+        "t.id, t.display_name AS title, concat_ws(' · ', nullif(array_to_string(t.companies, ', '), ''), t.emails[1], t.phones[1]) AS sub, 'person'::text AS extra, t.record_count AS n, t.updated_at AS updated_at",
+      nameMatch: "(t.display_name || ' ' || array_to_string(t.emails, ' ') || ' ' || array_to_string(t.phones, ' ') || ' ' || array_to_string(t.companies, ' '))",
+      nameSim: "t.display_name",
+      fts: null,
+      extra: { match: `EXISTS (SELECT 1 ${inNotes})`, rank: `SELECT max(ts_rank_cd(${ocVec}, qq.tq)) ${inNotes}` },
+      snippetSource: `(SELECT oc.notes ${inNotes} ORDER BY ts_rank_cd(${ocVec}, qq.tq) DESC LIMIT 1)`,
+    });
+    const unlinked = await tableSearch(tx, ctx, {
+      from: "ops_contacts t LEFT JOIN ops_companies c ON c.id = t.company_id AND c.workspace_id = t.workspace_id",
+      scope: Prisma.sql`t.workspace_id = ${ctx.workspaceId} AND NOT EXISTS (SELECT 1 FROM contact_identity_links l WHERE l.workspace_id = t.workspace_id AND l.record_kind = 'ops_contact' AND l.record_id = t.id)`,
+      select: "t.id, t.name AS title, concat_ws(' · ', nullif(t.title, ''), c.name, nullif(t.email, '')) AS sub, 'ops_contact'::text AS extra, NULL::int AS n, t.updated_at AS updated_at",
       nameMatch: "(t.name || ' ' || coalesce(t.email, '') || ' ' || coalesce(t.phone, ''))",
       nameSim: "t.name",
       fts: { table: "ops_contacts", alias: "t" },
       snippetSource: "t.notes",
-    }),
-  hit: (r) => ({
-    id: r.id,
-    title: r.title ?? "Contact",
-    subtitle: r.sub || null,
-    href: `/dashboard/crm?tab=contacts&contact=${encodeURIComponent(r.id)}`,
-  }),
-  actions: [{ id: "create_deal", tool: "ops_create_deal", instruction: "Open a deal for this contact (this asks before it writes)." }],
+    });
+    return [...people, ...unlinked];
+  },
+  hit: (r) =>
+    r.extra === "person"
+      ? { id: r.id, title: r.title ?? "Contact", subtitle: r.sub || null, href: `/dashboard/contacts/${encodeURIComponent(r.id)}` }
+      : { id: r.id, title: r.title ?? "Contact", subtitle: r.sub || null, href: `/dashboard/crm?tab=contacts&contact=${encodeURIComponent(r.id)}` },
+  actions: [
+    { id: "create_deal", tool: "ops_create_deal", instruction: "Open a deal for this contact (this asks before it writes)." },
+    // Phase 18.2 (WS=comms)
+    { id: "suggest_merge", tool: "suggest_merge", instruction: "Look for other records of this same person across leads, contacts, the network and funding, and suggest merges for a person to confirm (never merge yourself)." },
+  ],
 };
 
 export const company: SearchSource = {

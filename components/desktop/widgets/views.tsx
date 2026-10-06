@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   TrendingUp,
   TriangleAlert,
+  // Phase 18.2 (WS=comms)
+  AlarmClock,
 } from "lucide-react";
 import { AgentCard, LeadAgentCard, LiveActivity, StatusShape } from "@/components/aos";
 import ProjectCreateForm from "@/components/ProjectCreateForm";
@@ -39,6 +41,7 @@ import type {
   NeedsYouData,
   PipelineData,
   ProjectsData,
+  RemindersData,
   RunningData,
   SuggestionIcon,
   SuggestionsData,
@@ -539,6 +542,48 @@ function SuggestionsView({ data, i18n: { t } }: ViewProps<SuggestionsData>) {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 18.2 (WS=comms): Reminders
+// ---------------------------------------------------------------------------
+
+function RemindersView({ data, i18n: { t, locale } }: ViewProps<RemindersData>) {
+  if (data.items.length === 0) {
+    return (
+      <Empty
+        title={t("comms.reminders.emptyTitle")}
+        action={
+          <Link href="/dashboard/reminders" className="text-sm font-semibold text-ink hover:underline">
+            {t("comms.reminders.add")}
+          </Link>
+        }
+      >
+        {t("comms.reminders.widgetEmpty")}
+      </Empty>
+    );
+  }
+  const dateFmt = new Intl.DateTimeFormat(INTL_LOCALE[locale] ?? INTL_LOCALE[DEFAULT_LOCALE], { timeZone: data.timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="px-2 pb-1 text-sm text-muted">{t("comms.reminders.widgetCount", { count: data.open })}</p>
+      <ul className="flex flex-col">
+        {data.items.map((r) => (
+          <li key={r.id}>
+            <RowLink href={`/dashboard/reminders?reminder=${encodeURIComponent(r.id)}`}>
+              <AlarmClock aria-hidden className="size-4 shrink-0 text-muted" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-base font-medium text-ink">{r.title}</span>
+                <span className={`block truncate text-sm ${r.overdue ? "font-semibold text-ink" : "text-muted"}`}>
+                  {r.dueAt ? `${r.overdue ? `${t("comms.reminders.overdue")} · ` : ""}${dateFmt.format(new Date(r.dueAt))}` : t("comms.reminders.noDue")}
+                </span>
+              </span>
+            </RowLink>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 /** Every widget's view, keyed by id (the registry test checks completeness). */
 export const WIDGET_VIEWS: { [K in WidgetId]: (props: ViewProps<WidgetDataMap[K]>) => ReactNode } = {
@@ -556,6 +601,8 @@ export const WIDGET_VIEWS: { [K in WidgetId]: (props: ViewProps<WidgetDataMap[K]
   "key-numbers": KeyNumbersView,
   projects: ProjectsView,
   suggestions: SuggestionsView,
+  // Phase 18.2 (WS=comms)
+  reminders: RemindersView,
 };
 
 /** Render one widget's loaded data (or its "couldn't load" line, already translated by the loader). */

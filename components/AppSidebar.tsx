@@ -73,6 +73,8 @@ import { useMemo } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { localizeNavGroups } from "@/lib/nav/i18n";
 import { navText } from "@/lib/i18n";
+// Phase 18.2 (WS=comms): the Messages row shows its unread count.
+import { useMessagesUnread } from "@/components/comms/useMessagesUnread";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
@@ -341,7 +343,7 @@ function NavRow({
   item,
   active,
   collapsed,
-  count,
+  count: countProp,
   pinned,
   onTogglePin,
   onNavigate,
@@ -356,8 +358,14 @@ function NavRow({
 }) {
   const Icon = item.icon;
   const { t } = useI18n(); // p18-find i18n
+  // Phase 18.2 (WS=comms): an "unread-messages" row counts unread Messages
+  // (a plain count, not "waiting on you": it never takes the needs colour).
+  const unreadRow = item.badge === "unread-messages";
+  const unread = useMessagesUnread(unreadRow);
+  const count = unreadRow ? unread : countProp;
+  const countLabel = unreadRow ? t("comms.messages.unreadLabel", { count }) : t("shell.approvalsWaiting", { count });
   if (collapsed) {
-    const tip = count > 0 ? t("shell.waitingOnYou", { label: item.label, count }) : item.label;
+    const tip = count > 0 ? (unreadRow ? `${item.label}: ${countLabel}` : t("shell.waitingOnYou", { label: item.label, count })) : item.label;
     return (
       <li>
         <RailTip label={tip}>
@@ -372,7 +380,7 @@ function NavRow({
             )}
           >
             <Icon aria-hidden className="size-[18px]" />
-            {count > 0 ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-ink" /> : null}
+            {count > 0 ? <span aria-hidden className={cn("absolute top-2 right-2 size-2 rounded-full ring-2 ring-ink", unreadRow ? "bg-paper" : "bg-needs")} /> : null}
           </Link>
         </RailTip>
       </li>
@@ -392,7 +400,7 @@ function NavRow({
       >
         <Icon aria-hidden className="size-[18px] shrink-0" />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        {count > 0 ? <CountBadge count={count} tone="needs" label={t("shell.approvalsWaiting", { count })} /> : null}
+        {count > 0 ? <CountBadge count={count} tone={unreadRow ? (active ? "ink" : "paper") : "needs"} label={countLabel} /> : null}
       </Link>
       {onTogglePin ? (
         <button

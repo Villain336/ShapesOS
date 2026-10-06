@@ -8,6 +8,8 @@
 // Sentence case, the product's own words (docs/design/DESIGN.md "Writing").
 // Never put user data in a catalogue.
 
+import { commsEn } from "./comms.en";
+
 export const en = {
   common: {
     save: "Save",
@@ -85,6 +87,13 @@ export const en = {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Mail", description: "One inbox: mail, lead conversations, social DMs" },
+      "/dashboard/messages": { label: "Messages", description: "Team channels, direct messages and your agents" },
+      "/dashboard/meet": { label: "Meet", description: "Video calls, with notes from the meeting agent" },
+      "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
+      "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
+      "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
       "/dashboard/projects": { label: "SEO projects", description: "Sites, keywords, rankings, content" },
@@ -93,7 +102,7 @@ export const en = {
       "/dashboard/reviews": { label: "Reviews", description: "Review requests and replies" },
       "/dashboard/authority": { label: "Authority", description: "Outreach, PR, listings, AEO" },
       "/dashboard/media": { label: "Media", description: "Media buying and spend pools" },
-      "/dashboard/mail": { label: "Direct mail", description: "Postcards and EDDM" },
+      "/dashboard/direct-mail": { label: "Direct mail", description: "Postcards and EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reallocation, recycling, test lab" },
       "/dashboard/calls": { label: "Calls", description: "Call tracking and bookings" },
       "/dashboard/attribution": { label: "Attribution", description: "What drove revenue" },
@@ -169,6 +178,9 @@ export const en = {
       alert_fired: "Alerts",
       run_failed: "Failed runs",
       invite_accepted: "Team",
+      mention: "Mentions",
+      direct_message: "Direct messages",
+      reminder_due: "Reminders",
     },
   },
 
@@ -310,6 +322,9 @@ export const en = {
         close_ticket: "Close if resolved",
         summarize: "Summarize",
         seo_audit: "Run an SEO audit",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Find other records of this person",
+        draft_mail_reply: "Draft a reply",
       },
     },
   },
@@ -348,6 +363,8 @@ export const en = {
       ticket: "Ticket",
       deal: "Deal",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Mail",
     },
   },
 
@@ -473,6 +490,9 @@ export const en = {
         alert_fired: "Alerts",
         run_failed: "Failed runs",
         invite_accepted: "Invites accepted",
+        mention: "Mentions of you",
+        direct_message: "Direct messages",
+        reminder_due: "Reminders due",
       },
       workspaceDefaults: "Workspace-wide defaults are in Workspace → Notifications.",
     },
@@ -571,6 +591,8 @@ export const en = {
       "key-numbers": { title: "Key numbers", description: "Projects, keywords, content and visibility at a glance" },
       projects: { title: "Projects", description: "Your SEO projects, with a form to add one" },
       suggestions: { title: "Win this week", description: "The shortest path to more traffic" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Reminders", description: "Your open to-dos, the soonest due first" },
     },
     desktop: {
       region: "Desktop",
@@ -915,6 +937,8 @@ export const en = {
       },
     },
   },
+  // Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+  comms: commsEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

@@ -338,3 +338,44 @@ export async function graphUpdateEvent(auth: TokenSource, id: string, f: EventFi
   );
   return graphEvent(e ?? {});
 }
+
+// ---------------------------------------------------------------------------
+// Phase 18.2 (WS=comms): one conversation's messages for the Mail app's
+// thread view (bodies as text; returned for the open thread, never stored).
+//   GET /me/messages?$filter=conversationId eq '<id>'   (scope Mail.Read)
+// Ordered oldest first client-side (Graph refuses some filter + orderby mixes).
+// ---------------------------------------------------------------------------
+
+export async function graphListConversation(
+  auth: TokenSource,
+  conversationId: string,
+  deps: LiveDeps = {},
+): Promise<(GraphMessageSummary & { to: string[]; cc: string[]; bodyText: string })[]> {
+  if (!/^[A-Za-z0-9=_+\-/]{8,400}$/.test(conversationId)) throw new Error("conversationId must be a Graph conversation id.");
+  const res = await liveRequest<{ value?: (RawMessage & { ccRecipients?: { emailAddress?: { address?: string } }[] })[] }>(
+    {
+      provider: PROVIDER,
+      url: `${GRAPH_API}/me/messages`,
+      query: {
+        $filter: `conversationId eq '${conversationId.replace(/'/g, "''")}'`,
+        $top: 50,
+        $select: "id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,conversationId,isRead,body",
+      },
+      headers: { Prefer: 'outlook.body-content-type="text"' },
+      auth,
+    },
+    deps,
+  );
+  return (res?.value ?? [])
+    .map((m) => {
+      const content = String(m.body?.content ?? "");
+      const bodyText = (m.body?.contentType ?? "").toLowerCase() === "html" ? htmlToText(content) : content;
+      return {
+        ...summary(m),
+        to: (m.toRecipients ?? []).map((r) => String(r.emailAddress?.address ?? "")).filter(Boolean),
+        cc: (m.ccRecipients ?? []).map((r) => String(r.emailAddress?.address ?? "")).filter(Boolean),
+        bodyText: bodyText.slice(0, 50_000),
+      };
+    })
+    .sort((a, b) => String(a.receivedAt ?? "").localeCompare(String(b.receivedAt ?? "")));
+}

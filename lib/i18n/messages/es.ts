@@ -4,6 +4,7 @@
 // de frase. Nombres de producto (ShapesOS, CRM, CAD, MCP) sin traducir.
 
 import type { Catalogue } from "./en";
+import { commsEs } from "./comms.es";
 
 export const es: Catalogue = {
   common: {
@@ -82,6 +83,13 @@ export const es: Catalogue = {
       "/dashboard": { label: "Resumen", description: "Inicio: lo que necesita atención" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Correo", description: "Una bandeja: correo, conversaciones con leads, mensajes sociales" },
+      "/dashboard/messages": { label: "Mensajes", description: "Canales del equipo, mensajes directos y tus agentes" },
+      "/dashboard/meet": { label: "Reuniones", description: "Videollamadas, con notas del agente de reuniones" },
+      "/dashboard/calendar": { label: "Calendario", description: "Tus calendarios, reservas y eventos" },
+      "/dashboard/contacts": { label: "Contactos", description: "Una libreta de direcciones para todas las personas que conoces" },
+      "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
       "/dashboard/prospects": { label: "Prospectos", description: "Listas de prospectos y enriquecimiento" },
       "/dashboard/nurture": { label: "Seguimiento", description: "Secuencias de seguimiento y difusiones" },
       "/dashboard/projects": { label: "Proyectos SEO", description: "Sitios, palabras clave, posiciones, contenido" },
@@ -90,7 +98,7 @@ export const es: Catalogue = {
       "/dashboard/reviews": { label: "Reseñas", description: "Solicitudes de reseñas y respuestas" },
       "/dashboard/authority": { label: "Autoridad", description: "Difusión, prensa, directorios, AEO" },
       "/dashboard/media": { label: "Medios", description: "Compra de medios y bolsas de gasto" },
-      "/dashboard/mail": { label: "Correo postal", description: "Postales y EDDM" },
+      "/dashboard/direct-mail": { label: "Correo postal", description: "Postales y EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reasignación, reciclaje, laboratorio de pruebas" },
       "/dashboard/calls": { label: "Llamadas", description: "Seguimiento de llamadas y reservas" },
       "/dashboard/attribution": { label: "Atribución", description: "Qué generó ingresos" },
@@ -165,6 +173,9 @@ export const es: Catalogue = {
       alert_fired: "Alertas",
       run_failed: "Ejecuciones fallidas",
       invite_accepted: "Equipo",
+      mention: "Menciones",
+      direct_message: "Mensajes directos",
+      reminder_due: "Recordatorios",
     },
   },
 
@@ -306,6 +317,9 @@ export const es: Catalogue = {
         close_ticket: "Cerrar si está resuelto",
         summarize: "Resumir",
         seo_audit: "Hacer una auditoría SEO",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Buscar otros registros de esta persona",
+        draft_mail_reply: "Redactar una respuesta",
       },
     },
   },
@@ -344,6 +358,8 @@ export const es: Catalogue = {
       ticket: "Ticket",
       deal: "Oportunidad",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Correo",
     },
   },
 
@@ -469,6 +485,9 @@ export const es: Catalogue = {
         alert_fired: "Alertas",
         run_failed: "Ejecuciones fallidas",
         invite_accepted: "Invitaciones aceptadas",
+        mention: "Menciones a ti",
+        direct_message: "Mensajes directos",
+        reminder_due: "Recordatorios pendientes",
       },
       workspaceDefaults: "Los valores por defecto de todo el espacio de trabajo están en Espacio de trabajo → Notificaciones.",
     },
@@ -561,6 +580,8 @@ export const es: Catalogue = {
       "key-numbers": { title: "Cifras clave", description: "Proyectos, palabras clave, contenido y visibilidad de un vistazo" },
       projects: { title: "Proyectos", description: "Tus proyectos SEO, con un formulario para añadir uno" },
       suggestions: { title: "Gana esta semana", description: "El camino más corto hacia más tráfico" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Recordatorios", description: "Tus tareas pendientes, primero las que vencen antes" },
     },
     desktop: {
       region: "Escritorio",
@@ -904,4 +925,6 @@ export const es: Catalogue = {
       },
     },
   },
+  // Phase 18.2 (WS=comms): Correo, Calendario, Contactos, Mensajes, Reuniones, Recordatorios.
+  comms: commsEs,
 };

@@ -38,6 +38,8 @@ import {
   Megaphone,
   MessageSquare,
   MessagesSquare,
+  MessageSquareText, // Phase 18.2 (comms): Messages
+  Video, // Phase 18.2 (comms): Meet
   Mic,
   Network,
   Paintbrush,
@@ -57,6 +59,11 @@ import {
   Target,
   UserSearch,
   Zap,
+  // Phase 18.2 (WS=comms): the communication apps.
+  ListTodo,
+  BookUser,
+  CalendarDays,
+  Mailbox,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
@@ -75,7 +82,8 @@ export interface NavItem {
    */
   activePrefix?: string;
   /** Slot for a live count pill rendered next to the label. */
-  badge?: "needs-you";
+  // Phase 18.2 (comms): "unread-messages" = the Messages app's unread count.
+  badge?: "needs-you" | "unread-messages";
   /**
    * Phase 18.1 (WS=desk): lowest workspace role that sees the item (the page
    * itself enforces the same role). Absent = every member. The dock overlay
@@ -100,6 +108,13 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "home",
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, description: "Home: what needs attention", keywords: "home dashboard main" },
+      // Phase 18.2 (WS=comms): the everyday communication apps.
+      { href: "/dashboard/mail", label: "Mail", icon: Mail, description: "One inbox: mail, lead conversations, social DMs", keywords: "email inbox gmail outlook messages dms compose reply unread" },
+      { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText, description: "Team channels, direct messages and your agents", keywords: "chat channels dm direct message threads team slack mention agents", badge: "unread-messages" },
+      { href: "/dashboard/meet", label: "Meet", icon: Video, description: "Video calls, with notes from the meeting agent", keywords: "video call meeting conference room livekit transcript notes action items zoom" },
+      { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, description: "Your calendars, bookings and events", keywords: "schedule agenda meetings events google outlook ics find time availability" },
+      { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, description: "One address book for everyone you know", keywords: "people address book person contact cards duplicates merge leads network investors" },
+      { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },
     ],
   },
   {
@@ -117,7 +132,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/reviews", label: "Reviews", icon: Star, description: "Review requests and replies", keywords: "ratings reputation" },
       { href: "/dashboard/authority", label: "Authority", icon: Globe, description: "Outreach, PR, listings, AEO", keywords: "outreach pr listings aeo backlinks" },
       { href: "/dashboard/media", label: "Media", icon: Megaphone, description: "Media buying and spend pools", keywords: "ads advertising spend dooh radio" },
-      { href: "/dashboard/mail", label: "Direct mail", icon: Mail, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
+      { href: "/dashboard/direct-mail", label: "Direct mail", icon: Mailbox, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw, description: "Reallocation, recycling, test lab", keywords: "reallocation recycling ctv dsp tests" },
       { href: "/dashboard/calls", label: "Calls", icon: Phone, description: "Call tracking and bookings", keywords: "phone tracking numbers bookings" },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },
