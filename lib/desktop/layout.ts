@@ -283,6 +283,10 @@ export function defaultLayoutFor(role: string | null | undefined): DesktopLayout
  * back to the role default when nothing usable is left.
  */
 export function sanitizeLayout(stored: unknown, role: string | null | undefined): DesktopLayout {
+  // A layout that is still valid comes back exactly as the member left it
+  // (gaps included) — the reload must show what they arranged.
+  const exact = validateLayout(stored, role);
+  if (exact.ok) return exact.layout.widgets.length ? exact.layout : defaultLayoutFor(role);
   const raw = (stored && typeof stored === "object" ? (stored as { widgets?: unknown }).widgets : null) ?? null;
   if (!Array.isArray(raw)) return defaultLayoutFor(role);
   const seen = new Set<WidgetId>();

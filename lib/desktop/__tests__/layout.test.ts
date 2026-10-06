@@ -161,6 +161,14 @@ describe("sanitizeLayout (reading a stored layout)", () => {
     assert.ok(validateLayout(l, "owner").ok);
   });
 
+  it("a valid stored layout comes back exactly (gaps kept, no re-compaction)", () => {
+    const withGap = moveBy(defaultLayoutFor("owner"), "agents", 0, 3);
+    const gapped = { version: 1 as const, widgets: withGap.widgets.map((w) => (w.id === "projects" ? { ...w, y: w.y + 4 } : w)) };
+    assert.ok(validateLayout(gapped, "owner").ok);
+    assert.deepEqual(sanitizeLayout(gapped, "owner"), gapped);
+    assert.deepEqual(sanitizeLayout(JSON.parse(JSON.stringify(gapped)), "owner"), gapped, "after a JSON round trip");
+  });
+
   it("falls back to the role default when nothing usable is stored", () => {
     assert.deepEqual(sanitizeLayout(null, "editor"), defaultLayoutFor("editor"));
     assert.deepEqual(sanitizeLayout({ widgets: [] }, "editor"), defaultLayoutFor("editor"));

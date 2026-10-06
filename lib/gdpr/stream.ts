@@ -8,6 +8,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
+import { USER_GUC } from "@/lib/desktop/scope";
 import { q, type ColumnInfo, type TableInfo } from "./catalog";
 
 export const PAGE_SIZE = 500;
@@ -23,6 +24,8 @@ export async function* scopedRows(opts: {
   predicate: string;
   params: unknown[];
   gucWorkspaceId: string | null;
+  /** Phase 18.1: also set app.user_id (owner-only tables answer only to their member). */
+  gucUserId?: string | null;
   pageSize?: number;
 }): AsyncGenerator<string> {
   const { table, columns, predicate, params } = opts;
@@ -50,7 +53,7 @@ export async function* scopedRows(opts: {
     const strip = pkCols.map((_, i) => ` - '__k${i}'`).join("") + (projection ? "" : " - '__empty'");
     const keys = pkCols.map((_, i) => `x."__k${i}"::text AS "k${i}"`).join(", ");
     const sql = `SELECT (to_jsonb(x)${strip})::text AS j${keys ? `, ${keys}` : ""} FROM (${inner}) x`;
-    const rows = await inScope(opts.gucWorkspaceId, (tx) =>
+    const rows = await inScope(opts.gucWorkspaceId, opts.gucUserId ?? null, (tx) =>
       tx.$queryRawUnsafe<Record<string, string>[]>(sql, ...p),
     );
     for (const r of rows) yield r.j!;
@@ -65,10 +68,16 @@ export async function* scopedRows(opts: {
 }
 
 /** Run fn in a short transaction with the tenant GUC set (or unset). */
-export async function inScope<T>(workspaceId: string | null, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+export async function inScope<T>(
+  workspaceId: string | null,
+  userId: string | null,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
   return prisma.$transaction(
     async (tx) => {
       if (workspaceId) await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${workspaceId}, true)`;
+      // Phase 18.1 (WS=desk): the person GUC for owner-only tables (lib/desktop/scope.ts).
+      if (userId) await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
       return fn(tx);
     },
     { maxWait: 10_000, timeout: 60_000 },
