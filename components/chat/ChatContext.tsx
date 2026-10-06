@@ -15,7 +15,7 @@ import {
 } from "react";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { confirmAction } from "@/lib/ui/feedback";
-import { emptyStreamingTurn, foldAguiEvent, readSseFrames, type StreamingTurn } from "./agui-stream";
+import { emptyStreamingTurn, foldAguiEvent, streamChatFrames, type StreamingTurn } from "./agui-stream";
 
 export interface ChatThread {
   id: string;
@@ -353,7 +353,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             .map((m) => ({ id: `live-${m.id}`, role: "assistant", content: m.text, toolCalls: null, createdAt: startedAt }));
           setMessages((prev) => [...prev.filter((m) => !m.id.startsWith("live-")), ...bubbles]);
         };
-        for await (const frame of readSseFrames(res.body)) {
+        // Deploy PR: a server restart mid-turn ends the stream with
+        // `reconnect`; streamChatFrames resumes it on another replica from
+        // the last event id (GET /api/agents/chat/stream).
+        const frames = streamChatFrames(res.body, {
+          fetchResume: (url, lastEventId) =>
+            fetch(url, { headers: lastEventId ? { "Last-Event-ID": lastEventId } : {}, cache: "no-store" }),
+        });
+        for await (const frame of frames) {
           const next = foldAguiEvent(live, frame);
           if (next !== live) {
             live = next;

@@ -8,7 +8,10 @@
 // block is null and the UI says so.
 //
 // All files live under data/corpus/ (gitignored runtime data — the
-// manifest.json is the only committed version record).
+// manifest.json is the only committed version record). Deploy PR: the
+// retrieval counters live in Postgres (corpus_retrieval_usage) whenever a
+// database is configured — one atomic upsert per retrieval, exact across
+// replicas; the JSON file remains only for installs without a database.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -70,7 +73,7 @@ function usagePath(): string {
   return path.join(corpusDir(), "retrieval-usage.json");
 }
 
-export function readRetrievalUsage(): Map<string, UsageRecord> {
+function readRetrievalUsageFile(): Map<string, UsageRecord> {
   try {
     const p = usagePath();
     if (!fs.existsSync(p)) return new Map();
@@ -85,11 +88,46 @@ export function readRetrievalUsage(): Map<string, UsageRecord> {
   }
 }
 
+const useDb = () => !!process.env.DATABASE_URL?.trim();
+
+/** Per-source counters from Postgres (or the file without a database). Never throws. */
+export async function readRetrievalUsage(): Promise<Map<string, UsageRecord>> {
+  if (!useDb()) return readRetrievalUsageFile();
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const rows = await prisma.corpusRetrievalUsage.findMany();
+    return new Map(rows.map((r) => [r.sourceId, { hits: r.hits, lastHit: r.lastHitAt.toISOString() }]));
+  } catch {
+    return new Map();
+  }
+}
+
 /** Increment per-source retrieval counters. Never throws. */
-export function recordRetrievalHits(sourceIds: string[]): void {
+export async function recordRetrievalHits(sourceIds: string[]): Promise<void> {
+  const ids = sourceIds.filter(Boolean);
+  if (!ids.length) return;
+  if (!useDb()) return recordRetrievalHitsFile(ids);
+  try {
+    const counts = new Map<string, number>();
+    for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const keys = [...counts.keys()];
+    const hits = keys.map((k) => counts.get(k)!);
+    const { prisma } = await import("@/lib/prisma");
+    await prisma.$executeRaw`
+      INSERT INTO "corpus_retrieval_usage" ("source_id", "hits", "last_hit_at")
+      SELECT k, h, now() FROM unnest(${keys}::text[], ${hits}::int[]) AS t(k, h)
+      ON CONFLICT ("source_id") DO UPDATE
+        SET "hits" = "corpus_retrieval_usage"."hits" + EXCLUDED."hits", "last_hit_at" = EXCLUDED."last_hit_at"`;
+  } catch {
+    /* usage tracking is best-effort; retrieval must never fail because of it */
+  }
+}
+
+/** File fallback (no database): increment per-source retrieval counters. Never throws. */
+function recordRetrievalHitsFile(sourceIds: string[]): void {
   try {
     if (!sourceIds.length) return;
-    const usage = readRetrievalUsage();
+    const usage = readRetrievalUsageFile();
     const now = new Date().toISOString();
     for (const id of sourceIds) {
       if (!id) continue;

@@ -51,6 +51,7 @@ import type {
 } from "./types";
 import { DockerApiError, DockerClient } from "./docker-api";
 import { sandboxConfig, type SandboxConfig } from "./config";
+import { deploymentMode } from "@/lib/billing/trial";
 import { DockerDemuxer, OutputCollector } from "./output";
 import { resolveSandboxPath } from "./paths";
 import { firstFileInTar, tarSingleFile } from "./tar";
@@ -540,6 +541,16 @@ export class DockerSandboxProvider implements SandboxProvider {
   }
 
   async available(): Promise<{ ok: true } | { ok: false; reason: string }> {
+    // Deploy PR (class c — single-host only): a Docker sandbox, its preview
+    // port and its checkpoint tarballs (SANDBOX_SNAPSHOT_DIR) all live on one
+    // Docker host. A hosted install runs several web replicas and a worker
+    // with no shared disk, so it uses a hosted provider instead.
+    if (deploymentMode() === "hosted") {
+      return {
+        ok: false,
+        reason: "Docker sandboxes are single-host (containers and checkpoints live on one machine). On a hosted install set SANDBOX_PROVIDER=e2b or daytona.",
+      };
+    }
     const sock = this.cfg.docker.socketPath;
     if (!sock) return { ok: false, reason: "DOCKER_HOST must be a unix socket (unix:///var/run/docker.sock); TCP Docker hosts are not supported." };
     const st = await stat(sock).catch(() => null);

@@ -30,8 +30,9 @@ export interface CreateAgentRunInput extends AgentRunLinkage {
 }
 
 export interface AttachRecordingInput {
+  /** Blob refs (deploy PR) or, on rows written before it, filesystem paths. */
   videoPath: string | null;
-  tracePath: string;
+  tracePath: string | null;
   stepCount: number;
   sizeBytes: number;
   retentionUntil: Date;
@@ -98,6 +99,37 @@ export async function appendAgentRunEvent(
       },
     });
   });
+}
+
+/**
+ * Deploy PR: the last page a task's browser tools opened, from the run
+ * timeline (the `browser` events the tools link onto the calling run carry
+ * { tool, url }). The tools keep an in-process copy as a cache; this is the
+ * answer on any other instance (a turn handed to the worker, another web
+ * replica). Thread-scoped when the task has a thread, else run-scoped.
+ */
+export async function lastBrowserPageForTask(
+  workspaceId: string,
+  task: { threadId?: string | null; runId?: string | null },
+): Promise<string | null> {
+  if (!task.threadId && !task.runId) return null;
+  const rows = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: {
+        workspaceId,
+        type: "browser",
+        run: task.threadId ? { threadId: task.threadId } : { id: task.runId! },
+      },
+      orderBy: [{ createdAt: "desc" }, { seq: "desc" }],
+      take: 25,
+      select: { payload: true },
+    }),
+  );
+  for (const r of rows) {
+    const p = (r.payload ?? {}) as Record<string, unknown>;
+    if (typeof p.tool === "string" && p.tool.startsWith("browser_") && typeof p.url === "string" && p.url) return p.url;
+  }
+  return null;
 }
 
 /** Convenience: append an `agui` protocol event to the timeline. */

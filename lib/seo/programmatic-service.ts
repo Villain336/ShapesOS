@@ -4,8 +4,7 @@
 // sitemap regeneration, and audit logging. The pure substitution/hashing
 // logic lives in ./programmatic.ts.
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { blobPath, blobPut, encodeBlobSegment } from "@/lib/filesystem/storage";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { renderSitemapXml } from "./sitemap";
@@ -495,10 +494,6 @@ export async function discardProgrammaticPages(args: {
 // Sitemap
 // ---------------------------------------------------------------------------
 
-function sitemapStorageDir(): string {
-  return process.env.SITEMAP_STORAGE_DIR ?? join(process.cwd(), ".data", "sitemaps");
-}
-
 export async function buildSitemapXml(projectId: string): Promise<{ xml: string; count: number }> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -521,12 +516,14 @@ export async function buildSitemapXml(projectId: string): Promise<{ xml: string;
   return { xml, count: pages.length };
 }
 
-/** Regenerate the project's sitemap.xml after publish. Stored on disk. */
+/**
+ * Regenerate the project's sitemap.xml after publish. Stored in the shared
+ * blob store (namespace "sitemaps", <projectId>.xml — deploy PR; with
+ * MARKETR_STORAGE=local that is SITEMAP_STORAGE_DIR / .data/sitemaps as
+ * before). `path` is the blob ref.
+ */
 export async function regenerateSitemap(projectId: string): Promise<{ path: string; count: number }> {
   const { xml, count } = await buildSitemapXml(projectId);
-  const dir = sitemapStorageDir();
-  await mkdir(dir, { recursive: true });
-  const path = join(dir, `${projectId}.xml`);
-  await writeFile(path, xml, "utf8");
+  const path = await blobPut("sitemaps", blobPath(`${encodeBlobSegment(projectId)}.xml`), xml, "application/xml");
   return { path, count };
 }

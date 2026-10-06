@@ -78,7 +78,10 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 # Runtime state directories (compose mounts named volumes here). Created and
 # owned by the app user so a fresh named volume inherits that ownership and is
 # writable: .data (reports, logos, site copies, local files), .run-artifacts
-# (agent run recordings), data/corpus (knowledge corpus).
+# (agent run recordings), data/corpus (knowledge corpus). Only used with
+# MARKETR_STORAGE=local (a single box); with several instances set
+# MARKETR_STORAGE=s3 and nothing persistent is written here
+# (lib/filesystem/STORAGE.md).
 RUN mkdir -p /app/.data /app/.run-artifacts /app/data/corpus \
  && chown -R nextjs:nodejs /app/.data /app/.run-artifacts /app/data
 COPY --from=builder /app/public ./public
@@ -90,4 +93,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Deploy PR: Node's keep-alive above the load balancer's idle timeout (AWS ALB
+# 300 s) so the LB never reuses a socket Node already closed. SSE streams ping
+# every 15 s and drain on SIGTERM (lib/runtime/shutdown.ts, SHUTDOWN_GRACE_MS).
+ENV KEEP_ALIVE_TIMEOUT=310000
 CMD ["node", "server.js"]

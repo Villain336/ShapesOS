@@ -20,7 +20,6 @@ import {
   compileReport, getReport, listReports, setReportStatus,
 } from "../lib/authority/intelligence/reports";
 import { renderIntelligencePdf } from "../lib/authority/intelligence/pdf";
-import { promises as fs } from "node:fs";
 import { runAllAudits } from "../lib/authority/intelligence/audits/index";
 import { deriveOpportunities } from "../lib/authority/intelligence/opportunities";
 import { compilePlan, reprioritize } from "../lib/authority/intelligence/plan";
@@ -129,15 +128,18 @@ async function main() {
 
   // PDF renders end-to-end on the house takumi stack (glyph-safe).
   try {
-    const pdfUrl = await renderIntelligencePdf({
+    // Deploy PR: the PDF is stored in the shared blob store (pdfUrl is a blob ref).
+    const { pdfUrl, bytes } = await renderIntelligencePdf({
+      workspaceId: wsId,
       reportId: report.id, brandName: "Battery Brand", domain: "example.com",
       audits: bundle.audits, opportunities: bundle.opportunities, plan: bundle.plan,
       generatedAt: bundle.generatedAt,
     });
-    const stat = await fs.stat(pdfUrl);
-    if (stat.size > 10000) ok(`PDF rendered (${stat.size} bytes)`);
-    else bad("pdf", `too small: ${stat.size}`);
-    await fs.unlink(pdfUrl).catch(() => {});
+    const { deleteStoredRef, readStoredRef } = await import("@/lib/filesystem/storage");
+    const stored = await readStoredRef(pdfUrl, "reports");
+    if (bytes.length > 10000 && stored?.equals(bytes)) ok(`PDF rendered and stored (${bytes.length} bytes)`);
+    else bad("pdf", `too small or not stored: ${bytes.length}`);
+    await deleteStoredRef(pdfUrl, "reports").catch(() => {});
   } catch (e) {
     bad("pdf", e instanceof Error ? e.message : String(e));
   }

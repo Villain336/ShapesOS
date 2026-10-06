@@ -17,14 +17,22 @@
 // that, gitignore them and treat the manifest as the version record.
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { CorpusChunk, CorpusManifest } from "./types";
 
 export type CorpusAsset = "main" | "by-sa";
 
-/** Override for tests / ops: CORPUS_DIR. */
+/**
+ * Override for tests / ops: CORPUS_DIR. Deploy PR: with MARKETR_STORAGE=s3
+ * (several instances, no shared disk) the default is a per-instance READ
+ * CACHE of the published snapshot (./sync.ts ensureCorpusFresh), not the
+ * repo's data/corpus.
+ */
 export function corpusDir(): string {
-  return process.env.CORPUS_DIR ?? path.join(process.cwd(), "data", "corpus");
+  if (process.env.CORPUS_DIR) return process.env.CORPUS_DIR;
+  if ((process.env.MARKETR_STORAGE ?? "").trim().toLowerCase() === "s3") return path.join(os.tmpdir(), "shapes-corpus");
+  return path.join(process.cwd(), "data", "corpus");
 }
 
 export function assetDir(asset: CorpusAsset): string {

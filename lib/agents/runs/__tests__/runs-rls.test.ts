@@ -47,7 +47,12 @@ const stubLauncher: BrowserLauncher = {
   launch: async () => ({
     newContext: async () => ({
       tracingStart: async () => undefined,
-      tracingStop: async () => undefined,
+      // Like Playwright: stopping the trace writes trace.zip (deploy PR: the
+      // lifecycle then publishes it to shared storage).
+      tracingStop: async (tracePath: string) => {
+        const { promises: fs } = await import("node:fs");
+        await fs.writeFile(tracePath, "fake-trace-bytes");
+      },
       newPage: async () => ({ goto: async () => undefined }),
       close: async () => undefined,
       videoPath: async () => null,
@@ -178,7 +183,7 @@ describe("agent run persistence + RLS (scratch DB)", () => {
     );
     assert.equal(result.status, "succeeded");
     assert.equal(result.stepCount, 1);
-    assert.ok(result.tracePath.endsWith("trace.zip"));
+    assert.ok(result.tracePath?.endsWith("trace.zip"));
 
     const run = await getAgentRun(WS_A, result.runId);
     assert.ok(run);

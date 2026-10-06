@@ -9,6 +9,7 @@
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { loadManifest } from "@/lib/intelligence/corpus/store";
+import { ensureCorpusFresh } from "@/lib/intelligence/corpus/sync";
 import { buildCorpusGraph } from "@/lib/intelligence/corpus/graph";
 import { listProposed, removalIdMap } from "@/lib/intelligence/corpus/proposals";
 import { loadEvalSummary, readRetrievalUsage } from "@/lib/intelligence/corpus/activity";
@@ -21,12 +22,13 @@ export async function GET() {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   if (!(await requireWorkspaceRole(user.id, workspace.id, "viewer"))) return forbidden();
 
+  await ensureCorpusFresh(); // shared installs: refresh this instance's read cache
   const manifest = loadManifest();
   if (!manifest) return Response.json({ error: "Corpus manifest not found" }, { status: 404 });
 
   // Audit data — all real: eval results file, retrieval-usage counter.
   const evalSummary = loadEvalSummary();
-  const usage = readRetrievalUsage();
+  const usage = await readRetrievalUsage();
   const graph = buildCorpusGraph(manifest, listProposed(), removalIdMap(), {
     eval: evalSummary
       ? {

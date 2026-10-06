@@ -3,12 +3,15 @@
 # the RLS batteries are meaningful. Everything else runs in: npm test
 lib/adplatforms/__tests__/spend-store-scope.test.ts
 lib/agents/agui/__tests__/adapter.test.ts
+lib/agents/runs/__tests__/recording-blobs-db.test.ts
 lib/agents/runs/__tests__/retention-eval.test.ts
 lib/agents/runs/__tests__/retention-sweep.test.ts
 lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/agents/runs/__tests__/watch-relay-db.test.ts
+lib/api/__tests__/shared-state-db.test.ts
 lib/approvals/__tests__/inbox-db.test.ts
 lib/auth/__tests__/member-roles.test.ts
 lib/auth/__tests__/signup-mode.test.ts
@@ -180,3 +183,4 @@ lib/chat/__tests__/delegation-billing-db.test.ts
 lib/zernio/__tests__/zernio-db.test.ts
 # Phase 15.4 (zernio): the /api/zernio routes (session stubbed) on the labelled FAKE Zernio — viewers read without creating a profile; admins connect; the callback works only for the user the state was signed for and records only accounts on that workspace's profile; OpenAI Ads keys pass through unstored; "use in every project" idempotent; the metering cron skips without a live key.
 lib/zernio/__tests__/zernio-routes-db.test.ts
+lib/runtime/__tests__/agent-drain-db.test.ts

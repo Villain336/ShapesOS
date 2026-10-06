@@ -21,12 +21,17 @@
 //
 // Scheduling: POST /api/cron/recording-retention (host cron + CRON_SECRET,
 // daily; a signed-in editor can also trigger it for their own workspace).
+//
+// Deploy PR: new recordings are blob refs in the shared store (namespace
+// "run-recordings", under the workspace's own prefix); rows from before it
+// hold a path inside the artifact root. Both are located with
+// locateRecording() (fail-closed on anything else), so the sweep and the
+// storage rollup work the same on every replica.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { ARTIFACT_ROOT } from "./recorder";
+import { deleteRecordingFile, locateRecording, recordingSize } from "./artifacts";
 
 export interface SweepRowResult {
   runId: string;
@@ -83,27 +88,8 @@ export function isSweepCandidate(
   return !rec.pinned && rec.videoPath != null && rec.videoPath !== "" && rec.retentionUntil < now;
 }
 
-/**
- * Resolve a stored artifact path inside the artifact root. Returns null
- * (fail-closed) when the stored path escapes the root.
- */
-export function resolveRecordingPath(storedPath: string, artifactRoot: string): string | null {
-  const root = path.resolve(artifactRoot);
-  const abs = path.isAbsolute(storedPath)
-    ? path.resolve(storedPath)
-    : path.resolve(root, storedPath);
-  if (abs !== root && !abs.startsWith(root + path.sep)) return null;
-  return abs;
-}
-
-async function statBytes(absPath: string): Promise<number | null> {
-  try {
-    const st = await fs.stat(absPath);
-    return st.isFile() ? st.size : null;
-  } catch {
-    return null;
-  }
-}
+/** Resolve a legacy stored path inside the artifact root (null = escapes). */
+export { resolveRecordingPath } from "./artifacts";
 
 /**
  * Sweep expired, unpinned recordings: drop videos, keep traces.
@@ -151,8 +137,8 @@ export async function sweepExpiredRecordings(opts?: SweepOptions): Promise<Sweep
           continue;
         }
 
-        const abs = resolveRecordingPath(c.videoPath!, artifactRoot);
-        if (!abs) {
+        const loc = locateRecording(c.videoPath!, c.workspaceId, artifactRoot);
+        if (!loc) {
           report.skipped.push({
             runId: c.runId,
             workspaceId: c.workspaceId,
@@ -161,10 +147,10 @@ export async function sweepExpiredRecordings(opts?: SweepOptions): Promise<Sweep
           continue;
         }
 
-        const before = await statBytes(abs);
+        const before = await recordingSize(loc).catch(() => null);
         if (before !== null) {
           try {
-            await fs.unlink(abs);
+            await deleteRecordingFile(loc);
           } catch (err) {
             report.skipped.push({
               runId: c.runId,
@@ -249,8 +235,8 @@ export async function getRecordingStorage(
       [r.tracePath, "trace"],
     ] as const) {
       if (!stored) continue;
-      const abs = resolveRecordingPath(stored, root);
-      const size = abs ? await statBytes(abs) : null;
+      const loc = locateRecording(stored, workspaceId, root);
+      const size = loc ? await recordingSize(loc).catch(() => null) : null;
       if (size === null) {
         missingFileCount += 1;
       } else if (kind === "video") {

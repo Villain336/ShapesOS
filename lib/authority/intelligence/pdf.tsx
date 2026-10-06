@@ -1,13 +1,13 @@
 // Marketr — Phase 6 I1: Intelligence Report document (PDF) on the house stack.
 //
 // Builds a pdfcn React tree with @/lib/pdf-primitives and renders it with
-// @/lib/pdf/renderer (takumi). Saved to .data/reports/intelligence-<id>.pdf
-// and the IntelligenceReport row's pdfUrl is updated.
+// @/lib/pdf/renderer (takumi). Saved to the shared blob store (namespace
+// "reports", <workspaceId>/intelligence-<id>.pdf — deploy PR) and the
+// IntelligenceReport row's pdfUrl holds the blob ref.
 
 import React from "react";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { prisma } from "@/lib/prisma";
+import { blobPath, blobPut, encodeBlobSegment } from "@/lib/filesystem/storage";
 import { renderPdf } from "@/lib/pdf/renderer";
 import { Document, Page, View, Text } from "@/lib/pdf-primitives";
 import type { AuditResult, Completeness, RevenueOpportunity, GrowthPlan } from "./types";
@@ -154,20 +154,22 @@ function ReportDocument(props: {
 }
 
 export async function renderIntelligencePdf(input: {
+  workspaceId: string;
   reportId: string; brandName: string; domain: string | null;
   audits: AuditResult[]; opportunities: RevenueOpportunity[]; plan: GrowthPlan;
   generatedAt: string;
-}): Promise<string> {
+}): Promise<{ pdfUrl: string; bytes: Buffer }> {
   const element = <ReportDocument {...input} />;
-  const pdf = await renderPdf(element);
-  const dir = path.join(process.cwd(), ".data", "reports");
-  await fs.mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `intelligence-${input.reportId}.pdf`);
-  await fs.writeFile(filePath, pdf);
-  const pdfUrl = path.relative(process.cwd(), filePath);
+  const bytes = Buffer.from(await renderPdf(element));
+  const pdfUrl = await blobPut(
+    "reports",
+    blobPath(encodeBlobSegment(input.workspaceId), `intelligence-${encodeBlobSegment(input.reportId)}.pdf`),
+    bytes,
+    "application/pdf",
+  );
   await prisma.intelligenceReport.update({
     where: { id: input.reportId },
     data: { pdfUrl },
   });
-  return pdfUrl;
+  return { pdfUrl, bytes };
 }

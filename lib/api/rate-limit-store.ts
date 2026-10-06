@@ -232,6 +232,89 @@ export function maybeCleanup(store: CounterStore, now: number): void {
   void store.cleanup(now).catch((err) => storeWarn("cleanup", err));
 }
 
+// ---------------------------------------------------------------------------
+// Generic shared fixed window (Deploy PR): one primitive for every small
+// limiter that used to keep a per-process Map (public storefront and event
+// endpoints, the review landing page, the bundle redeem endpoint, the
+// Pixabay proxy, the data-room magic-link resend throttle, the GDPR export
+// slot, inbound-webhook replay protection). Shared store when configured;
+// on a store error or timeout it FAILS OPEN TO THE PER-PROCESS WINDOW (the
+// Phase 6 policy: a database blip must not take these endpoints down, and a
+// per-process limit still applies).
+// ---------------------------------------------------------------------------
+
+export interface WindowRule {
+  limit: number;
+  windowMs: number;
+}
+
+export interface SharedWindowHit {
+  allowed: boolean;
+  /** Hits in the current window, this one included. */
+  count: number;
+  retryAfterMs: number;
+  /** Which counter answered. */
+  source: "shared" | "local";
+}
+
+// Per-process fallback (bounded: oldest key evicted past 10k).
+const localCounts = new Map<string, { n: number; start: number }>();
+
+function localWindowHit(key: string, windowMs: number, now: number): { n: number; start: number } {
+  const cur = localCounts.get(key);
+  if (!cur || now - cur.start >= windowMs) {
+    const fresh = { n: 1, start: now };
+    localCounts.delete(key);
+    localCounts.set(key, fresh);
+    if (localCounts.size > 10_000) {
+      const oldest = localCounts.keys().next().value;
+      if (oldest) localCounts.delete(oldest);
+    }
+    return fresh;
+  }
+  cur.n += 1;
+  return cur;
+}
+
+/** Fixed-window check-and-increment on `key`, shared across replicas when the store is. */
+export async function sharedWindowHit(key: string, rule: WindowRule, now: number = Date.now()): Promise<SharedWindowHit> {
+  const { limit, windowMs } = rule;
+  const store = sharedCounterStore();
+  if (store) {
+    try {
+      const hit = await withStoreTimeout(store.hit(key, windowMs, now));
+      maybeCleanup(store, now);
+      return {
+        allowed: hit.count <= limit,
+        count: hit.count,
+        retryAfterMs: hit.count <= limit ? 0 : Math.max(0, hit.windowStart + windowMs - now),
+        source: "shared",
+      };
+    } catch (err) {
+      storeWarn("window-hit", err);
+    }
+  }
+  const h = localWindowHit(key, windowMs, now);
+  return { allowed: h.n <= limit, count: h.n, retryAfterMs: h.n <= limit ? 0 : Math.max(0, h.start + windowMs - now), source: "local" };
+}
+
+/** Forget a window (a lease released, a test resetting state). */
+export async function releaseSharedWindow(key: string): Promise<void> {
+  localCounts.delete(key);
+  const store = sharedCounterStore();
+  if (!store) return;
+  try {
+    await withStoreTimeout(store.clear([key]));
+  } catch (err) {
+    storeWarn("window-clear", err);
+  }
+}
+
+/** Test seam: drop every per-process fallback window. */
+export function __resetLocalWindows(): void {
+  localCounts.clear();
+}
+
 let lastWarnAt = 0;
 /** Log store failures, at most once a minute so an outage doesn't flood the log. */
 export function storeWarn(op: string, err: unknown): void {

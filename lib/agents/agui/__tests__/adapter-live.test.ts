@@ -5,7 +5,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { EventType, assertAguiSequence, MARKETR_CUSTOM_NAMES, type AguiEvent } from "../events";
-import { streamChatTurnAgui, type TailedRunEvent } from "../adapter";
+import { aguiStreamResponse, resumeChatTurnAgui, streamChatTurnAgui, type TailedRunEvent } from "../adapter";
 import type { AgentTurnOutput } from "@/lib/chat/agent";
 
 const REQ = { projectId: "p", workspaceId: "ws", userId: "u", role: "editor" as const, threadId: "th", userContent: "hi", runId: "agui1" };
@@ -105,5 +105,75 @@ describe("AG-UI live stream", () => {
     });
     assertAguiSequence(events);
     assert.equal(events[events.length - 1]!.type, EventType.RUN_ERROR);
+  });
+});
+
+describe("AG-UI stream across a server restart (deploy PR)", () => {
+  it("a draining server ends a handed-off turn's tail with marketr.reconnect at a clean boundary", async () => {
+    const tl = timeline();
+    let draining = false;
+    const cursors: Array<[string, number]> = [];
+    const events = await collect({
+      listRunEvents: tl.list,
+      getRunStatus: async () => "running",
+      onCursor: (r, seq) => cursors.push([r, seq]),
+      shouldReconnect: () => draining,
+      runTrackedTurn: async (_i, { onRunCreated }) => {
+        onRunCreated("run7");
+        tl.push("text", { kind: "text_delta", step: 1, text: "Work" });
+        tl.push("text", { kind: "text_delta", step: 1, text: "ing" });
+        draining = true; // SIGTERM arrives; the turn was handed to the worker
+        return { assistantText: "", toolCalls: [], threadTitle: null, queued: true, runId: "run7" };
+      },
+    });
+    const last = events[events.length - 1] as { type: string; name?: string; value?: Record<string, unknown> };
+    assert.equal(last.type, EventType.CUSTOM);
+    assert.equal(last.name, MARKETR_CUSTOM_NAMES.reconnect);
+    assert.deepEqual(last.value, { runId: "run7", after: 1, aguiRunId: "agui1" });
+    assert.ok(!events.some((e) => e.type === EventType.RUN_FINISHED), "the turn is not over: the client resumes it");
+    assert.deepEqual(cursors, [["run7", 0], ["run7", 1]], "the cursor moves before each run event is mapped");
+  });
+
+  it("resumeChatTurnAgui continues the same messages after the cursor and finishes the turn", async () => {
+    const tl = timeline();
+    tl.push("text", { kind: "text_delta", step: 1, text: "Work" }); // seq 0 (already delivered)
+    tl.push("text", { kind: "text_delta", step: 1, text: "ing" }); // seq 1 (already delivered)
+    tl.push("text", { kind: "text_delta", step: 1, text: " done." }); // seq 2 (new)
+    const out: AguiEvent[] = [];
+    for await (const e of resumeChatTurnAgui(
+      { workspaceId: "ws", threadId: "th", agentRunId: "run7", aguiRunId: "agui1", afterSeq: 1 },
+      { listRunEvents: tl.list, getRunStatus: async () => "succeeded", latestAssistantText: async () => "Working done.", logSink: () => undefined, pollMs: 5 },
+    ))
+      out.push(e);
+    const contents = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CONTENT) as Array<{ messageId: string; delta: string }>;
+    assert.equal(contents[0]!.delta, " done.", "nothing at or before the cursor is replayed");
+    assert.equal(contents[0]!.messageId, "agui1:msg:run7:1", "same message id as the original stream");
+    assert.equal(out[out.length - 1]!.type, EventType.RUN_FINISHED);
+  });
+
+  it("the SSE response stamps the run cursor as the event id and turns marketr.reconnect into `event: reconnect`", async () => {
+    const tl = timeline();
+    const res = aguiStreamResponse(
+      (hooks) =>
+        streamChatTurnAgui(REQ, {
+          loadSharedState: async () => ({}),
+          logSink: () => undefined,
+          pollMs: 5,
+          listRunEvents: tl.list,
+          getRunStatus: async () => "running",
+          onCursor: hooks.onCursor,
+          shouldReconnect: () => true,
+          runTrackedTurn: async (_i, { onRunCreated }) => {
+            onRunCreated("run8");
+            tl.push("text", { kind: "text_delta", step: 1, text: "Hi" });
+            return { assistantText: "", toolCalls: [], threadTitle: null, queued: true, runId: "run8" };
+          },
+        }),
+      { sse: { register: () => () => undefined } },
+    );
+    const text = await res.text();
+    assert.match(text, /^retry: 2000\n\n/);
+    assert.match(text, /id: run8:0\ndata: \{"type":"TEXT_MESSAGE_CONTENT"/);
+    assert.match(text, /event: reconnect\ndata: \{"runId":"run8","after":0,"aguiRunId":"agui1"\}\n\n$/);
   });
 });

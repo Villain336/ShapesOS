@@ -232,7 +232,7 @@ describe("p13 digital twin (real Postgres, app role)", () => {
         if (i >= 0) {
           const raw = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          if (raw.startsWith(":")) continue;
+          if (raw.startsWith(":") || raw.startsWith("retry:")) continue;
           const event = /^event: (.*)$/m.exec(raw)![1]!;
           const data = JSON.parse(/^data: (.*)$/m.exec(raw)![1]!);
           frames.push({ event, data });
@@ -263,7 +263,7 @@ describe("p13 digital twin (real Postgres, app role)", () => {
     const first = await siteSnapshot(WS, siteId);
     const stream = twinLiveStream(first, { snapshot: () => siteSnapshot(WS, siteId), stillAllowed: async () => false, pollMs: 20, maxMs: 2000 });
     const text = await new Response(stream).text();
-    assert.match(text, /^event: snapshot/);
+    assert.match(text, /^retry: \d+\n\nevent: snapshot/);
     assert.match(text, /event: end\ndata: \{"reason":"access-revoked"\}/);
   });
 

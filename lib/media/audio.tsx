@@ -11,8 +11,7 @@
 // - Acast self-serve: from $250 (managed $10k–15k)
 // - AudioGo: $250 minimum (reaches iHeart/SiriusXM/Cumulus/Audacy streaming)
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { blobGetFirst, blobPath, blobPut, encodeBlobSegment, localBlobDir, workspaceBlobPath } from "@/lib/filesystem/storage";
 import { createHash } from "node:crypto";
 import type { ReactElement } from "react";
 import { Document, Page, View, Text as SpanText } from "@/lib/pdf-primitives";
@@ -183,10 +182,18 @@ export function planAudioBuy(input: AudioPlanInput): AudioBudget {
 // Generated brief (PDF) — the handoff artifact for self-serve execution.
 // ---------------------------------------------------------------------------
 
+/**
+ * Local directory of the "audio-briefs" blob namespace (MARKETR_STORAGE=local;
+ * AUDIO_BRIEF_STORAGE_DIR, default .data/audio-briefs). Deploy PR: briefs are
+ * stored through the shared blob layer as <workspaceId>/<buyId>.pdf.
+ */
 export function audioBriefStorageDir(): string {
-  const override = (process.env.AUDIO_BRIEF_STORAGE_DIR ?? "").trim();
-  if (override) return override;
-  return path.join(process.cwd(), ".data", "audio-briefs");
+  return localBlobDir("audio-briefs");
+}
+
+/** The stored audio brief PDF (new workspace-scoped key, then the legacy one). */
+export async function readAudioBriefPdf(workspaceId: string, buyId: string): Promise<Buffer | null> {
+  return blobGetFirst("audio-briefs", [workspaceBlobPath(workspaceId, `${buyId}.pdf`), blobPath(`${encodeBlobSegment(buyId)}.pdf`)]);
 }
 
 function SectionTitle({ children }: { children: string }) {
@@ -425,10 +432,7 @@ export async function generateAudioBriefPdf(opts: {
   });
   const pdf = await renderPdf(element);
   const briefSha256 = createHash("sha256").update(pdf).digest("hex");
-  const dir = audioBriefStorageDir();
-  await fs.mkdir(dir, { recursive: true });
-  const pdfPath = path.join(dir, `${buy.id}.pdf`);
-  await fs.writeFile(pdfPath, pdf);
+  const pdfPath = await blobPut("audio-briefs", workspaceBlobPath(buy.workspaceId, `${buy.id}.pdf`), Buffer.from(pdf), "application/pdf");
   const pdfUrl = `/api/media/audio/briefs/${buy.id}/pdf`;
   return { pdfBytes: Buffer.from(pdf), pdfPath, pdfUrl, briefSha256 };
 }

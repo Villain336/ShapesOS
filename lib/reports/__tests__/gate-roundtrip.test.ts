@@ -15,7 +15,7 @@
 
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { promises as fs } from "node:fs";
+import { deleteStoredRef, readStoredRef } from "@/lib/filesystem/storage";
 
 import type { PrismaClient } from "@prisma/client";
 import {
@@ -86,7 +86,7 @@ function sourcelessFigure(key: string): ReportFigure {
 const renderedPdfs: string[] = [];
 after(async () => {
   for (const p of renderedPdfs) {
-    await fs.unlink(p).catch(() => undefined);
+    await deleteStoredRef(p, "report-engine").catch(() => undefined);
   }
 });
 
@@ -145,7 +145,7 @@ describe("report send gate round-trip", () => {
     renderedPdfs.push(rendered.pdfPath as string);
 
     // Prove the bytes are a real PDF with the source pointers inside.
-    const bytes = await fs.readFile(rendered.pdfPath as string);
+    const bytes = (await readStoredRef(rendered.pdfPath as string, "report-engine"))!;
     assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
     assert.ok(bytes.length > 10_000, `PDF suspiciously small: ${bytes.length} bytes`);
 
