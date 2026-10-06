@@ -21,7 +21,7 @@ const saved = { ...process.env };
 
 function writeCorpus(dir: string, version: number, chunkText: string, proposals: string[] = []) {
   fs.mkdirSync(path.join(dir, "main"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ corpus_version: version, sources: [] }));
+  fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ corpusVersion: version, sources: [] }));
   fs.writeFileSync(
     path.join(dir, "main", "chunks.jsonl"),
     JSON.stringify({ id: `c${version}`, text: chunkText, embedding: [1, 0], provenance: { sourceId: "s1", sourceTitle: "S", author: "A", license: "CC-BY-4.0" } }) + "\n",
@@ -82,7 +82,7 @@ describe("shared corpus snapshot", () => {
 
     assert.equal(await ensureCorpusFresh({ force: true }), "synced");
     assert.equal(corpusDir(), path.join(tmp, "instance-b-cache"));
-    assert.equal(loadManifest()!.corpus_version, 1);
+    assert.equal(loadManifest()!.corpusVersion, 1);
     assert.equal(loadChunks("main")[0]!.text, "first");
     assert.deepEqual(listProposed().map((p) => p.id), ["p-one"]);
     assert.equal(await ensureCorpusFresh({ force: true }), "fresh", "unchanged manifest → nothing downloaded");
@@ -92,7 +92,7 @@ describe("shared corpus snapshot", () => {
     const pub2 = await publishCorpusSnapshot(source);
     assert.deepEqual(pub2.removed, ["proposed/p-one.json"], "stale proposals are removed remotely");
     assert.equal(await ensureCorpusFresh({ force: true }), "synced");
-    assert.equal(loadManifest()!.corpus_version, 2);
+    assert.equal(loadManifest()!.corpusVersion, 2);
     assert.equal(loadChunks("main")[0]!.text, "second");
     assert.deepEqual(listProposed(), []);
     assert.ok(fake.requests.every((r) => r.signed));

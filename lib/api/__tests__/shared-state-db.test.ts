@@ -163,7 +163,7 @@ describe("limiters count across instances (shared counter store)", () => {
     otherInstance();
     const again = await checkReplay("shopify", body, `${RUN}-delivery-1`, null);
     assert.equal(again.ok, false);
-    assert.match(again.ok ? "" : again.reason, /replay/);
+    assert.match(again.ok ? "" : String(again.reason), /replay/);
     // Concurrent copies of one delivery: exactly one is accepted.
     const both = await Promise.all([checkReplay("meta", body, `${RUN}-delivery-2`, null), checkReplay("meta", body, `${RUN}-delivery-2`, null)]);
     assert.deepEqual(both.map((r) => r.ok).sort(), [false, true]);

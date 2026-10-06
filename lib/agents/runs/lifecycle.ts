@@ -27,6 +27,7 @@ import {
   appendAguiEvent,
   attachAgentRunRecording,
   finishAgentRun,
+  getAgentRun,
 } from "./service";
 
 export { RecorderBusyError };
@@ -191,7 +192,10 @@ export async function executeBrowserRun(
       const s = await recorder.stop();
       if (s.tracePath) {
         const published = await publishStopped(workspaceId, runId, recorder.artifactDir, s);
-        if (published.traceRef || published.videoRef) {
+        // A second stop() after a successful publish finds no files left —
+        // never overwrite the refs already attached with nulls.
+        const existing = await getAgentRun(workspaceId, runId).catch(() => null);
+        if (published.traceRef || published.videoRef || !existing?.recording) {
           await attachAgentRunRecording(workspaceId, runId, {
             videoPath: published.videoRef,
             tracePath: published.traceRef,

@@ -238,10 +238,11 @@ describe("process drain (lib/runtime/shutdown.ts)", () => {
   });
 
   it("grace and hand-off windows come from the environment, clamped", () => {
-    assert.equal(shutdownGraceMs({}), 25_000);
-    assert.equal(shutdownGraceMs({ SHUTDOWN_GRACE_MS: "40000" }), 40_000);
-    assert.equal(shutdownGraceMs({ SHUTDOWN_GRACE_MS: "5" }), 1_000);
-    assert.equal(shutdownHandoffMs({}), 8_000);
-    assert.equal(shutdownHandoffMs({ SHUTDOWN_GRACE_MS: "3000" }), 3_000, "never past the grace period");
+    const env = (e: Record<string, string>) => e as unknown as NodeJS.ProcessEnv;
+    assert.equal(shutdownGraceMs(env({})), 25_000);
+    assert.equal(shutdownGraceMs(env({ SHUTDOWN_GRACE_MS: "40000" })), 40_000);
+    assert.equal(shutdownGraceMs(env({ SHUTDOWN_GRACE_MS: "5" })), 1_000);
+    assert.equal(shutdownHandoffMs(env({})), 8_000);
+    assert.equal(shutdownHandoffMs(env({ SHUTDOWN_GRACE_MS: "3000" })), 3_000, "never past the grace period");
   });
 });

@@ -211,23 +211,25 @@ test("namespaces map onto the historic local directories (and their env override
   }
 });
 
+const env = (e: Record<string, string>) => e as unknown as NodeJS.ProcessEnv;
+
 test("storage mode: local by default, s3 on request, anything else refused", () => {
-  assert.equal(storageMode({}), "local");
-  assert.equal(storageMode({ MARKETR_STORAGE: " S3 " }), "s3");
-  assert.throws(() => storageMode({ MARKETR_STORAGE: "nfs" }), /Unknown MARKETR_STORAGE/);
+  assert.equal(storageMode(env({})), "local");
+  assert.equal(storageMode(env({ MARKETR_STORAGE: " S3 " })), "s3");
+  assert.throws(() => storageMode(env({ MARKETR_STORAGE: "nfs" })), /Unknown MARKETR_STORAGE/);
 });
 
 test("S3 config: static keys, else the AWS chain (env keys or ECS endpoint), else null", async () => {
   const base = { MARKETR_S3_ENDPOINT: "https://acct.r2.cloudflarestorage.com/", MARKETR_S3_BUCKET: "shapesos-files" };
-  assert.equal(s3ConfigFromEnv({ ...base }), null, "no credentials → fail closed");
-  assert.equal(s3ConfigFromEnv({ MARKETR_S3_BUCKET: "b", MARKETR_S3_ACCESS_KEY: "k", MARKETR_S3_SECRET_KEY: "s" }), null, "no endpoint");
-  const stat = s3ConfigFromEnv({ ...base, MARKETR_S3_ACCESS_KEY: "k", MARKETR_S3_SECRET_KEY: "s" })!;
+  assert.equal(s3ConfigFromEnv(env({ ...base })), null, "no credentials → fail closed");
+  assert.equal(s3ConfigFromEnv(env({ MARKETR_S3_BUCKET: "b", MARKETR_S3_ACCESS_KEY: "k", MARKETR_S3_SECRET_KEY: "s" })), null, "no endpoint");
+  const stat = s3ConfigFromEnv(env({ ...base, MARKETR_S3_ACCESS_KEY: "k", MARKETR_S3_SECRET_KEY: "s" }))!;
   assert.equal(stat.endpoint, "https://acct.r2.cloudflarestorage.com");
   assert.equal(stat.accessKey, "k");
   assert.equal(stat.forcePathStyle, true);
-  const env = s3ConfigFromEnv({ ...base, AWS_ACCESS_KEY_ID: "AK", AWS_SECRET_ACCESS_KEY: "SK", AWS_SESSION_TOKEN: "T" })!;
-  assert.equal(env.accessKey, "");
-  assert.deepEqual(await env.credentials!(), { accessKeyId: "AK", secretAccessKey: "SK", sessionToken: "T" });
+  const viaEnv = s3ConfigFromEnv(env({ ...base, AWS_ACCESS_KEY_ID: "AK", AWS_SECRET_ACCESS_KEY: "SK", AWS_SESSION_TOKEN: "T" }))!;
+  assert.equal(viaEnv.accessKey, "");
+  assert.deepEqual(await viaEnv.credentials!(), { accessKeyId: "AK", secretAccessKey: "SK", sessionToken: "T" });
 
   // ECS task role: fetched once, cached until 5 min before expiry.
   let calls = 0;
@@ -239,7 +241,7 @@ test("S3 config: static keys, else the AWS chain (env keys or ECS endpoint), els
     return new Response(JSON.stringify({ AccessKeyId: "ASIA1", SecretAccessKey: "sec", Token: "sess", Expiration: "2026-10-05T01:00:00Z" }));
   }) as unknown as typeof fetch;
   const chain = awsCredentialChain(
-    { AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: "/v2/credentials/abc", AWS_CONTAINER_AUTHORIZATION_TOKEN: "tok" },
+    env({ AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: "/v2/credentials/abc", AWS_CONTAINER_AUTHORIZATION_TOKEN: "tok" }),
     fakeFetch,
     () => now,
   )!;
@@ -251,7 +253,7 @@ test("S3 config: static keys, else the AWS chain (env keys or ECS endpoint), els
   now = Date.parse("2026-10-05T00:56:00Z");
   await chain();
   assert.equal(calls, 2, "refreshed inside the 5-minute window");
-  assert.equal(awsCredentialChain({}), null);
+  assert.equal(awsCredentialChain(env({})), null);
 });
 
 test("ListObjectsV2 parser: contents, common prefixes, entities, continuation", () => {
