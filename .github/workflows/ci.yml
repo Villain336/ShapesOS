@@ -87,6 +87,12 @@ jobs:
       - name: DB-backed tests (as non-superuser app role)
         run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npm run test:db
 
+      # Phase 17 (model): the prompt-cache probe — real chat turns against a
+      # FAKE Anthropic server (no key, no cost); fails on a cache breaker in
+      # the tools + system prefix or a missing 1h breakpoint.
+      - name: Prompt-cache probe (Phase 17)
+        run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npx tsx scripts/verify/prompt-cache.mts
+
       - name: Launch-readiness battery (F6)
         run: npx tsx scripts/verify-phase7-launch.mts
 
