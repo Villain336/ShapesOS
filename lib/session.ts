@@ -15,6 +15,7 @@
 // workspace". Every route still enforces its own RBAC per workspace — the
 // cookie is a preference, not a capability.
 
+import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "./prisma";
 import { InviteRequiredError, mayProvisionWorkspace } from "./auth/signup";
@@ -43,23 +44,33 @@ async function activeWorkspaceIdFromCookie(): Promise<string | null> {
   }
 }
 
-export async function requireUser() {
+// Phase 17 (latency): requireUser, getAccessibleWorkspaces and
+// getOrCreateWorkspace are wrapped in React cache(): ONE read per request
+// even when the layout, the page and its components all ask (they did, three
+// to six times a render). cache() is request-scoped — React keeps the memo
+// on the request's own cache scope — and outside a request scope (scripts,
+// tests, background work) it calls straight through, so nothing is ever
+// shared across requests or users.
+
+export const requireUser = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) return null;
   return session.user;
-}
+});
 
 /** All workspaces the user can access (owned or member), newest first. */
-export async function getAccessibleWorkspaces(userId: string) {
+export const getAccessibleWorkspaces = cache(async (userId: string) => {
   return prisma.workspace.findMany({
     where: {
       OR: [{ ownerUserId: userId }, { members: { some: { userId } } }],
     },
     orderBy: { createdAt: "desc" },
   });
-}
+});
 
-export async function getOrCreateWorkspace(
+export const getOrCreateWorkspace = cache(getOrCreateWorkspaceUncached);
+
+async function getOrCreateWorkspaceUncached(
   userId: string,
   email?: string | null,
 ) {
