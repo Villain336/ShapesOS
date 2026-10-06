@@ -69,9 +69,9 @@ const ROUTES = [
   // studio
   ['/dashboard/studio', 'studio'],
   // mail
-  ['/dashboard/mail', 'mail'],
-  ['/dashboard/mail/eddm', 'mail-eddm'],
-  ['/dashboard/mail/reconciliation', 'mail-reconciliation'],
+  ['/dashboard/direct-mail', 'mail'],
+  ['/dashboard/direct-mail/eddm', 'mail-eddm'],
+  ['/dashboard/direct-mail/reconciliation', 'mail-reconciliation'],
   // media
   ['/dashboard/media', 'media'],
   [`/dashboard/media/approvals/${APPR}`, 'media-approvals-id'],

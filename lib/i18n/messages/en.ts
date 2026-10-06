@@ -93,7 +93,7 @@ export const en = {
       "/dashboard/reviews": { label: "Reviews", description: "Review requests and replies" },
       "/dashboard/authority": { label: "Authority", description: "Outreach, PR, listings, AEO" },
       "/dashboard/media": { label: "Media", description: "Media buying and spend pools" },
-      "/dashboard/mail": { label: "Direct mail", description: "Postcards and EDDM" },
+      "/dashboard/direct-mail": { label: "Direct mail", description: "Postcards and EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reallocation, recycling, test lab" },
       "/dashboard/calls": { label: "Calls", description: "Call tracking and bookings" },
       "/dashboard/attribution": { label: "Attribution", description: "What drove revenue" },

@@ -19,8 +19,8 @@ const out = '/home/hatch/workspace/marketr/previews';
 // Fresh filenames per the iOS-caching rule.
 const shots = [
   { route: '/dashboard/studio', slug: 'phase4-studio' },
-  { route: '/dashboard/mail', slug: 'phase4-mail' },
-  { route: '/dashboard/mail/eddm', slug: 'phase4-eddm' },
+  { route: '/dashboard/direct-mail', slug: 'phase4-mail' },
+  { route: '/dashboard/direct-mail/eddm', slug: 'phase4-eddm' },
 ];
 
 async function capture(device) {

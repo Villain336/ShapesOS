@@ -90,7 +90,7 @@ export const es: Catalogue = {
       "/dashboard/reviews": { label: "Reseñas", description: "Solicitudes de reseñas y respuestas" },
       "/dashboard/authority": { label: "Autoridad", description: "Difusión, prensa, directorios, AEO" },
       "/dashboard/media": { label: "Medios", description: "Compra de medios y bolsas de gasto" },
-      "/dashboard/mail": { label: "Correo postal", description: "Postales y EDDM" },
+      "/dashboard/direct-mail": { label: "Correo postal", description: "Postales y EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reasignación, reciclaje, laboratorio de pruebas" },
       "/dashboard/calls": { label: "Llamadas", description: "Seguimiento de llamadas y reservas" },
       "/dashboard/attribution": { label: "Atribución", description: "Qué generó ingresos" },

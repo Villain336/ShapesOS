@@ -776,7 +776,7 @@ const mail: InboxSource = {
         requestedBy: null,
         createdAt: r.createdAt,
         risk: r.maxSpendCents >= 100_000 ? "high" : "medium",
-        href: "/dashboard/mail",
+        href: "/dashboard/direct-mail",
         canDecide: isEditor(ctx.viewer),
         blockedReason: EDITOR_REASON,
         approve: post(`/api/mail/approvals/${enc(r.id)}`, { decision: "approve" }),
