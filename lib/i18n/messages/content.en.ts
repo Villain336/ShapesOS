@@ -325,6 +325,7 @@ export const contentEn = {
       batch: "Batches",
       sandbox: "Sandboxes",
       terminal: "Terminals",
+      cron: "Scheduled jobs",
     },
     typeLabels: {
       run: "Agent run",
@@ -332,6 +333,7 @@ export const contentEn = {
       batch: "Batch",
       sandbox: "Sandbox",
       terminal: "Terminal",
+      cron: "Scheduled job",
     },
     tableLabel: "Processes",
     columns: {
@@ -352,6 +354,10 @@ export const contentEn = {
       active: "Open",
       destroyed: "Closed",
       expired: "Expired",
+      running: "Running",
+      ok: "OK",
+      failed: "Failed",
+      timeout: "Timed out",
     },
     terminalCommands: "{count, plural, one {# command} other {# commands}}",
     system: "System",

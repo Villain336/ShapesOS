@@ -52,7 +52,7 @@ async function stopRun(workspaceId: string, viewer: ProcessViewer, runId: string
 
 /** Stop one process by its Activity Monitor key ("run:<id>", "job:<id>", …). */
 export async function stopProcess(workspaceId: string, viewer: ProcessViewer, key: string): Promise<StopResult> {
-  const m = /^(run|job|batch|sandbox|terminal):([A-Za-z0-9_-]{1,64})$/.exec(key ?? "");
+  const m = /^(run|job|batch|sandbox|terminal|cron):([A-Za-z0-9_-]{1,64})$/.exec(key ?? "");
   if (!m) throw new BadRequestError("Unknown process.");
   const [, type, id] = m as unknown as [string, string, string];
   let stopped: string[] = [];

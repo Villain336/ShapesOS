@@ -36,7 +36,7 @@ const ana = { userId: ANA, isAdmin: false };
 const ben = { userId: BEN, isAdmin: false };
 const adm = { userId: ADM, isAdmin: true };
 
-const ids = { lead: "", child: "", queuedRun: "", otherRun: "", jobQueued: "", jobRunning: "", jobOnRun: "", jobRunOwner: "", terminal: "" };
+const ids = { lead: "", child: "", queuedRun: "", otherRun: "", jobQueued: "", jobRunning: "", jobOnRun: "", jobRunOwner: "", terminal: "", cron: "" };
 
 async function scoped<T>(ws: string, fn: (tx: Parameters<Parameters<typeof withWorkspaceScope>[1]>[0]) => Promise<T>): Promise<T> {
   return withWorkspaceScope(ws, fn);
@@ -72,10 +72,13 @@ before(async () => {
     });
     Object.assign(ids, { lead: lead.id, child: child.id, queuedRun: queuedRun.id, jobQueued: jobQueued.id, jobRunning: jobRunning.id, jobOnRun: jobOnRun.id, jobRunOwner: jobRunOwner.id, terminal: terminal.id });
   });
+  // A scheduled job run (cron_runs is system-wide).
+  ids.cron = (await prisma.cronRun.create({ data: { job: `p182a-job-${RUN}`, scheduledFor: new Date(), status: "running" } })).id;
   ids.otherRun = (await scoped(OTHER, (tx) => tx.agentRun.create({ data: { workspaceId: OTHER, kind: "chat", status: "running", startedBy: ANA } }))).id;
 });
 
 after(async () => {
+  await prisma.cronRun.deleteMany({ where: { job: `p182a-job-${RUN}` } });
   await prisma.workspace.deleteMany({ where: { id: { in: [WS, OTHER] } } });
   await prisma.$disconnect();
 });
@@ -98,6 +101,12 @@ describe("Activity Monitor (DB)", () => {
     const asAdmin = await loadProcesses(WS, adm);
     assert.deepEqual(asAdmin.find((r) => r.key === `terminal:${ids.terminal}`)!.stop, { allowed: true }, "an admin can");
     assert.deepEqual(rows.find((r) => r.key === `job:${ids.jobRunning}`)!.stop, { allowed: false, reason: "not_stoppable" });
+    // Scheduled jobs: admins only, neutral, not stoppable from here.
+    assert.ok(!keys.includes(`cron:${ids.cron}`), "members don't see the system-wide scheduled jobs");
+    const cron = asAdmin.find((r) => r.key === `cron:${ids.cron}`)!;
+    assert.ok(cron, "admins do");
+    assert.deepEqual([cron.status, cron.state, cron.live, cron.stop.allowed], [null, "running", true, false]);
+    await assert.rejects(stopProcess(WS, adm, `cron:${ids.cron}`), /can't be stopped from here/);
   });
 
   it("health: queue depth, the oldest waiting job, jobs out of retries, heartbeat", async () => {

@@ -6,13 +6,15 @@
 // Every process the workspace has in one list: agent runs (with their
 // delegated sub-agent runs nested under them), queued/running agent jobs
 // (incl. the llm_usage outbox and the llm_batch state machine), Message
-// Batches, code sandboxes and terminal sessions. Status colour + shape only
+// Batches, code sandboxes, terminal sessions and — for admins — the scheduled
+// (cron) job runs, which are system-wide. Status colour + shape only
 // for AGENT work (runs, jobs, batches, sandboxes); a person's terminal and the
 // cron jobs are neutral (DESIGN.md: colour means agent state).
 
 import type { AosStatus } from "./status";
 
-export type ProcessType = "run" | "job" | "batch" | "sandbox" | "terminal";
+/** cron = a scheduled job run (system-wide; admins only; neutral — not agent work). */
+export type ProcessType = "run" | "job" | "batch" | "sandbox" | "terminal" | "cron";
 
 export interface ProcessRow {
   /** "<type>:<id>" — stable across refreshes. */

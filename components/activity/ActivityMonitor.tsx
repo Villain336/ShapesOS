@@ -24,8 +24,8 @@ import type { MessageKey } from "@/lib/i18n";
 
 type Show = "live" | "all";
 type TypeFilter = "all" | ProcessType;
-const TYPES: TypeFilter[] = ["all", "run", "job", "batch", "sandbox", "terminal"];
-const NEUTRAL_STATES = ["cancelled", "stopping", "ended", "active", "destroyed", "expired"] as const;
+const TYPES: TypeFilter[] = ["all", "run", "job", "batch", "sandbox", "terminal", "cron"];
+const NEUTRAL_STATES = ["cancelled", "stopping", "ended", "active", "destroyed", "expired", "running", "ok", "failed", "timeout"] as const;
 
 export interface ActivityMonitorProps {
   initial: ProcessSnapshot;
@@ -98,7 +98,7 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
   }, [processes, show, type]);
   const counts = useMemo(() => {
     const base = show === "live" ? processes.filter((p) => p.live) : processes;
-    const c: Record<TypeFilter, number> = { all: base.length, run: 0, job: 0, batch: 0, sandbox: 0, terminal: 0 };
+    const c: Record<TypeFilter, number> = { all: base.length, run: 0, job: 0, batch: 0, sandbox: 0, terminal: 0, cron: 0 };
     for (const p of base) c[p.type] += 1;
     return c;
   }, [processes, show]);
@@ -178,7 +178,7 @@ export function ActivityMonitor({ initial, people, isAdmin }: ActivityMonitorPro
               ]}
             />
             <div role="group" aria-label={t("activityApp.typeFilter")} className="flex flex-wrap gap-1.5">
-              {TYPES.map((ty) => (
+              {TYPES.filter((ty) => ty !== "cron" || isAdmin).map((ty) => (
                 <FilterPill key={ty} selected={type === ty} onClick={() => setType(ty)} count={counts[ty]}>
                   {t(`activityApp.types.${ty}` as MessageKey)}
                 </FilterPill>

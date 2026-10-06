@@ -326,6 +326,7 @@ export const contentEs: Catalogue<typeof contentEn> = {
       batch: "Lotes",
       sandbox: "Entornos aislados",
       terminal: "Consolas",
+      cron: "Tareas programadas",
     },
     typeLabels: {
       run: "Ejecución de agente",
@@ -333,6 +334,7 @@ export const contentEs: Catalogue<typeof contentEn> = {
       batch: "Lote",
       sandbox: "Entorno aislado",
       terminal: "Consola",
+      cron: "Tarea programada",
     },
     tableLabel: "Procesos",
     columns: {
@@ -353,6 +355,10 @@ export const contentEs: Catalogue<typeof contentEn> = {
       active: "Abierto",
       destroyed: "Cerrado",
       expired: "Caducado",
+      running: "En curso",
+      ok: "Correcta",
+      failed: "Fallida",
+      timeout: "Agotó el tiempo",
     },
     terminalCommands: "{count, plural, one {# comando} other {# comandos}}",
     system: "Sistema",

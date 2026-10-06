@@ -443,6 +443,42 @@ export async function loadProcesses(workspaceId: string, viewer: ProcessViewer, 
       stop: canStopProcess({ live, stoppable: true, startedBy: t.userId, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
     });
   }
+  // Scheduled jobs (cron_runs is system-wide, not tenant data: job names and
+  // timings only) — admins see what is running and what failed in the window.
+  if (viewer.isAdmin) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const crons = await prisma.cronRun.findMany({
+        where: { startedAt: { gte: since }, status: { in: ["running", "failed", "timeout"] } },
+        orderBy: { startedAt: "desc" },
+        take: 30,
+        select: { id: true, job: true, status: true, startedAt: true, finishedAt: true, httpStatus: true, error: true },
+      });
+      for (const c of crons) {
+        const live = c.status === "running";
+        rows.push({
+          key: `cron:${c.id}`,
+          type: "cron",
+          id: c.id,
+          title: c.job,
+          subtitle: [c.httpStatus ? `HTTP ${c.httpStatus}` : null, c.error?.slice(0, 120)].filter(Boolean).join(" · ") || null,
+          status: null, // a scheduled job: neutral, never an agent colour
+          state: c.status,
+          live,
+          startedAt: c.startedAt.toISOString(),
+          endedAt: iso(c.finishedAt),
+          costMicroUsd: null,
+          budget: null,
+          startedBy: null,
+          parentKey: null,
+          href: null,
+          stop: canStopProcess({ live, stoppable: false, startedBy: null, viewerId: viewer.userId, viewerIsAdmin: viewer.isAdmin }),
+        });
+      }
+    } catch {
+      // best effort: cron_runs unavailable to this role
+    }
+  }
   return orderProcesses(rows);
 }
 
