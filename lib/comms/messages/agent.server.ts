@@ -123,7 +123,16 @@ export function channelPrompt(m: { authorName: string; where: string; text: stri
 export function proposalViews(calls: readonly ChatToolCall[] | null): AgentMeta["proposals"] {
   return (calls ?? [])
     .filter((c) => c.status === "pending_confirmation")
-    .map((c) => ({ tool: c.tool, summary: (c.resultSummary ?? c.tool).slice(0, 400), autoAction: c.autoAction ?? null }));
+    .map((c) => ({ tool: c.tool, summary: (argsLine(c.args) || c.resultSummary || c.tool).slice(0, 400), autoAction: c.autoAction ?? null }));
+}
+
+/** What a call will do, from its arguments: "title: Send the deck · dueAt: 2026-10-07T15:00". PURE. */
+export function argsLine(args: Record<string, unknown> | null | undefined): string {
+  return Object.entries(args ?? {})
+    .filter(([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+    .slice(0, 3)
+    .map(([k, v]) => `${k}: ${String(v).replace(/\s+/g, " ").slice(0, 120)}`)
+    .join(" · ");
 }
 
 export type ChannelAgentOutcome =

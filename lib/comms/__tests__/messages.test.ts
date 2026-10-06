@@ -122,6 +122,11 @@ describe("the channel agent's turn", () => {
     ]);
     assert.deepEqual(views, [{ tool: "create_reminder", summary: "Proposed create_reminder", autoAction: "create_reminder" }]);
     assert.deepEqual(proposalViews(null), []);
+    assert.deepEqual(
+      proposalViews([{ tool: "create_reminder", args: { title: "Send  the deck", dueAt: "2026-10-07T15:00:00Z", extra: { x: 1 } }, status: "pending_confirmation", resultSummary: "Proposed create_reminder" }])[0]!.summary,
+      "title: Send the deck · dueAt: 2026-10-07T15:00:00Z",
+      "the card says what will happen",
+    );
     assert.equal(deferralDelayMs(0), 20_000);
     assert.equal(deferralDelayMs(10), 300_000);
   });
