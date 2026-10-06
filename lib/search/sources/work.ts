@@ -18,7 +18,8 @@ export const doc: SearchSource = {
   query: (tx, ctx) =>
     tableSearch(tx, ctx, {
       from: "univer_docs t",
-      scope: Prisma.sql`t.workspace_id = ${ctx.workspaceId}`,
+      // Phase 18.2 (WS=content): notes (kind "note") are their own source (./notes.ts).
+      scope: Prisma.sql`t.workspace_id = ${ctx.workspaceId} AND t.kind <> 'note'`,
       select: "t.id, t.title AS title, t.kind AS sub, t.share_state AS extra, NULL::int AS n, t.updated_at AS updated_at",
       nameMatch: "t.title",
       fts: { table: "univer_docs", alias: "t" },
@@ -46,7 +47,8 @@ export const file: SearchSource = {
       nameMatch: "(t.filename || ' ' || t.logical_path)",
       nameSim: "t.filename",
     }),
-  hit: (r) => ({ id: r.id, title: r.title ?? "File", subtitle: r.sub, href: "/dashboard/files", ref: { fileId: r.id } }),
+  // Phase 18.2 (WS=content): Files opens the file's preview (?file=).
+  hit: (r) => ({ id: r.id, title: r.title ?? "File", subtitle: r.sub, href: `/dashboard/files?file=${encodeURIComponent(r.id)}`, ref: { fileId: r.id } }),
   actions: [{ id: "summarize", tool: "create_content_draft", instruction: "Read this file and summarize it in five bullet points." }],
 };
 

@@ -18,10 +18,13 @@ import {
   Kanban,
   Key,
   MessagesSquare,
+  Pin,
   Rocket,
   ShieldCheck,
   TrendingUp,
   TriangleAlert,
+  // Phase 18.2 (WS=comms)
+  AlarmClock,
 } from "lucide-react";
 import { AgentCard, LeadAgentCard, LiveActivity, StatusShape } from "@/components/aos";
 import ProjectCreateForm from "@/components/ProjectCreateForm";
@@ -39,13 +42,17 @@ import type {
   NeedsYouData,
   PipelineData,
   ProjectsData,
+  RemindersData,
   RunningData,
   SuggestionIcon,
   SuggestionsData,
   TwinData,
   WidgetDataMap,
   WorkCard,
+  NotesWidgetData,
 } from "@/lib/desktop/loaders.server";
+// Phase 18.2 (WS=content): the Notes widget's quick-note button (client).
+import { QuickNoteButton } from "@/components/notes/QuickNoteButton";
 import { BriefingBody } from "./BriefingBody";
 // Phase 18.1 (integration): every view gets the person's translator + locale
 // (app/dashboard/page.tsx → getI18n); English when rendered without one.
@@ -539,6 +546,85 @@ function SuggestionsView({ data, i18n: { t } }: ViewProps<SuggestionsData>) {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 18.2 (WS=comms): Reminders
+// ---------------------------------------------------------------------------
+
+function RemindersView({ data, i18n: { t, locale } }: ViewProps<RemindersData>) {
+  if (data.items.length === 0) {
+    return (
+      <Empty
+        title={t("comms.reminders.emptyTitle")}
+        action={
+          <Link href="/dashboard/reminders" className="text-sm font-semibold text-ink hover:underline">
+            {t("comms.reminders.add")}
+          </Link>
+        }
+      >
+        {t("comms.reminders.widgetEmpty")}
+      </Empty>
+    );
+  }
+  const dateFmt = new Intl.DateTimeFormat(INTL_LOCALE[locale] ?? INTL_LOCALE[DEFAULT_LOCALE], { timeZone: data.timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="px-2 pb-1 text-sm text-muted">{t("comms.reminders.widgetCount", { count: data.open })}</p>
+      <ul className="flex flex-col">
+        {data.items.map((r) => (
+          <li key={r.id}>
+            <RowLink href={`/dashboard/reminders?reminder=${encodeURIComponent(r.id)}`}>
+              <AlarmClock aria-hidden className="size-4 shrink-0 text-muted" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-base font-medium text-ink">{r.title}</span>
+                <span className={`block truncate text-sm ${r.overdue ? "font-semibold text-ink" : "text-muted"}`}>
+                  {r.dueAt ? `${r.overdue ? `${t("comms.reminders.overdue")} · ` : ""}${dateFmt.format(new Date(r.dueAt))}` : t("comms.reminders.noDue")}
+                </span>
+              </span>
+            </RowLink>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 18.2 (WS=content): Notes
+// ---------------------------------------------------------------------------
+
+function NotesView({ data, i18n: { t } }: ViewProps<NotesWidgetData>) {
+  const quick = <QuickNoteButton label={t("notes.widget.quickNote")} />;
+  if (data.notes.length === 0) {
+    return (
+      <Empty title={t("notes.widget.emptyTitle")} action={quick}>
+        {t("notes.widget.emptyBody")}
+      </Empty>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <ul className="flex flex-col">
+        {data.notes.map((n) => (
+          <li key={n.id}>
+            <RowLink href={`/dashboard/notes?note=${encodeURIComponent(n.id)}`}>
+              {n.pinned ? <Pin aria-hidden className="size-4 shrink-0 text-muted" /> : <FileText aria-hidden className="size-4 shrink-0 text-muted" />}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-base font-medium text-ink">{n.title}</span>
+                <span className="block truncate text-sm text-muted">
+                  {n.ago}
+                  {n.preview ? ` · ${n.preview}` : ""}
+                </span>
+              </span>
+            </RowLink>
+          </li>
+        ))}
+      </ul>
+      <div className="px-2 pt-1">{quick}</div>
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
 
 /** Every widget's view, keyed by id (the registry test checks completeness). */
 export const WIDGET_VIEWS: { [K in WidgetId]: (props: ViewProps<WidgetDataMap[K]>) => ReactNode } = {
@@ -556,6 +642,9 @@ export const WIDGET_VIEWS: { [K in WidgetId]: (props: ViewProps<WidgetDataMap[K]
   "key-numbers": KeyNumbersView,
   projects: ProjectsView,
   suggestions: SuggestionsView,
+  // Phase 18.2 (WS=comms)
+  reminders: RemindersView,
+  notes: NotesView,
 };
 
 /** Render one widget's loaded data (or its "couldn't load" line, already translated by the loader). */

@@ -22,6 +22,8 @@ Cloudflare (DNS, proxy, SSL Full (strict), rate-limit rule)
                           │ private network
                     shapesos-worker (worker image: agent jobs)
                           │
+   collab.shapesos.com ► shapesos-collab (worker image: live co-editing, ONE instance, wss)
+                          │
                     shapesos-db (Postgres 16, 2 CPU / 8 GB, private only, PITR 7 days)
    shapesos-migrate (migrate image, one-off job per release) ─┘
    shapesos-backup  (nightly: Render export → R2)
@@ -51,6 +53,7 @@ Cloudflare (DNS, proxy, SSL Full (strict), rate-limit rule)
 3. **Secret** (Settings → Secrets and variables → Actions → Secrets): `RENDER_API_KEY` — Render → Account settings → API keys → Create.
 4. **Variables** (same page → Variables), filled in after step 5:
    - `RENDER_WEB_SERVICE_ID` (`srv-…`), `RENDER_WORKER_SERVICE_ID` (`srv-…`), `RENDER_MIGRATE_SERVICE_ID` (`crn-…`): the id is in each service's dashboard URL.
+   - `RENDER_COLLAB_SERVICE_ID` (`srv-…` of `shapesos-collab`, Phase 18.2): optional; while it is unset `release.yml` skips the collab deploy.
    - `APP_URL`: `https://app.shapesos.com`.
 
 ## 3. Let Render pull the images (GHCR credential)
@@ -291,7 +294,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (254 keys)</summary>
+<details><summary>Not set on Render, on purpose (255 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -303,6 +306,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | docker compose only (files go to Cloudflare R2) | `MINIO_ROOT_USER` |
 | docker compose only (Render sets PORT) | `APP_PORT` |
 | nothing in the app reads it; no Redis on Render | `REDIS_URL` |
+| local + docker compose only (the worker starts the collab server on it); on Render shapesos-collab listens on the PORT Render sets | `COLLAB_PORT` |
 | hosted deployment | `MARKETR_SELF_HOSTED` |
 | default http://127.0.0.1:$PORT is right | `CRON_RUNNER_ORIGIN` |
 | set per service in render.yaml (heap sized to the plan) | `NODE_OPTIONS` |
@@ -470,6 +474,17 @@ Restore drill (quarterly, and after major upgrades):
 - **Logs**: Render → Integrations → Observability → Log Streams → default destination (syslog TLS or HTTPS to your log provider). Streams don't count as bandwidth ([log streams](https://render.com/docs/log-streams)). The app logs one JSON line per event.
 - **Errors**: set `SENTRY_DSN` (shared group) for error reports; `OTEL_EXPORTER_OTLP_ENDPOINT` for traces.
 - **Notifications**: Workspace settings → Notifications → deploy failures and service events to email or Slack.
+
+## Live collaboration (Phase 18.2)
+
+Notes are co-edited live through a Hocuspocus (yjs WebSocket) server, `scripts/collab.mts` → `lib/collab/server.ts`, on the worker image.
+
+- **Where it runs: its own web service, `shapesos-collab`, not the worker.** Browsers open a WebSocket to it, and a Render background worker takes no inbound traffic ([background workers](https://render.com/docs/background-workers)); the web service exposes one port and is the Next app, so it can't host a second server either. Locally and in Docker Compose the same server runs as the `collab` service (or inside the worker when `COLLAB_PORT` is set).
+- **Exactly one instance** (`numInstances: 1`, no autoscaling). Hocuspocus shares a document across processes only through its Redis extension; there is no Redis here. Postgres is the durable store: the yjs state (`univer_doc_collab_states`) and the note's JSON snapshot (`univer_docs.snapshot`) are written 2 s after typing stops (at most every 10 s), so a restart loses at most the last few seconds of keystrokes and every editor reconnects.
+- **Domain**: add `collab.shapesos.com` (CNAME to the service, like `app.`). The web service's `COLLAB_PUBLIC_URL` (env group `shapesos-web`) is `wss://collab.shapesos.com`. Cloudflare proxies WebSockets on every plan; the editors' awareness pings keep the connection busy well inside its 100 s idle limit.
+- **Auth**: the app mints a 5-minute token per connection (`/api/collab/token`, signed with the shared `AUTH_SECRET`), naming one note and whether the connection may write; viewers' connections are read-only on the server.
+- **Deploys and shutdown**: `release.yml` deploys the worker image to it after the worker (`--collab-service`). On SIGTERM it stores every live document, then closes the connections; editors reconnect to the new instance on their own (`maxShutdownDelaySeconds: 60`).
+- **Health**: `GET /health` → `{ ok, documents, connections }`.
 
 ## 14. Scaling and build capacity
 

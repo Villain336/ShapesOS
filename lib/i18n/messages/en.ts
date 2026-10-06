@@ -8,6 +8,10 @@
 // Sentence case, the product's own words (docs/design/DESIGN.md "Writing").
 // Never put user data in a catalogue.
 
+import { commsEn } from "./comms.en";
+// Phase 18.2 (WS=content): the core apps' strings live in their own file.
+import { contentEn } from "./content.en";
+
 export const en = {
   common: {
     save: "Save",
@@ -85,6 +89,13 @@ export const en = {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Mail", description: "One inbox: mail, lead conversations, social DMs" },
+      "/dashboard/messages": { label: "Messages", description: "Team channels, direct messages and your agents" },
+      "/dashboard/meet": { label: "Meet", description: "Video calls, with notes from the meeting agent" },
+      "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
+      "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
+      "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
       "/dashboard/projects": { label: "SEO projects", description: "Sites, keywords, rankings, content" },
@@ -93,7 +104,7 @@ export const en = {
       "/dashboard/reviews": { label: "Reviews", description: "Review requests and replies" },
       "/dashboard/authority": { label: "Authority", description: "Outreach, PR, listings, AEO" },
       "/dashboard/media": { label: "Media", description: "Media buying and spend pools" },
-      "/dashboard/mail": { label: "Direct mail", description: "Postcards and EDDM" },
+      "/dashboard/direct-mail": { label: "Direct mail", description: "Postcards and EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reallocation, recycling, test lab" },
       "/dashboard/calls": { label: "Calls", description: "Call tracking and bookings" },
       "/dashboard/attribution": { label: "Attribution", description: "What drove revenue" },
@@ -106,6 +117,11 @@ export const en = {
       "/dashboard/ops": { label: "Operations", description: "Orders, invoices, inventory, projects, helpdesk, team" },
       "/dashboard/office": { label: "Office", description: "Docs, sheets and decks" },
       "/dashboard/files": { label: "Files", description: "Workspace files" },
+      // Phase 18.2 (WS=content)
+      "/dashboard/notes": { label: "Notes", description: "Quick notes, voice notes, notes on any record" },
+      "/dashboard/activity": { label: "Activity monitor", description: "Every run, job and sandbox: cost, time, Stop" },
+      "/dashboard/terminal": { label: "Terminal", description: "A shell on a workspace sandbox" },
+      "/dashboard/store": { label: "Store", description: "Install apps, skills, templates and connectors" },
       // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
       "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
       "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },
@@ -169,6 +185,9 @@ export const en = {
       alert_fired: "Alerts",
       run_failed: "Failed runs",
       invite_accepted: "Team",
+      mention: "Mentions",
+      direct_message: "Direct messages",
+      reminder_due: "Reminders",
     },
   },
 
@@ -310,6 +329,9 @@ export const en = {
         close_ticket: "Close if resolved",
         summarize: "Summarize",
         seo_audit: "Run an SEO audit",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Find other records of this person",
+        draft_mail_reply: "Draft a reply",
       },
     },
   },
@@ -348,6 +370,10 @@ export const en = {
       ticket: "Ticket",
       deal: "Deal",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Mail",
+      // Phase 18.2 (WS=content)
+      note: "Note",
     },
   },
 
@@ -473,6 +499,9 @@ export const en = {
         alert_fired: "Alerts",
         run_failed: "Failed runs",
         invite_accepted: "Invites accepted",
+        mention: "Mentions of you",
+        direct_message: "Direct messages",
+        reminder_due: "Reminders due",
       },
       workspaceDefaults: "Workspace-wide defaults are in Workspace → Notifications.",
     },
@@ -565,12 +594,16 @@ export const en = {
       attention: { title: "Needs your attention", description: "Drafts to review, pages losing traffic, competitor moves, alerts" },
       calendar: { title: "Today's calendar", description: "Bookings and connected calendar events for today" },
       inbox: { title: "Inbox", description: "Unread lead conversations (texts and email)" },
+      // Phase 18.2 (WS=content)
+      notes: { title: "Notes", description: "Pinned and recent notes, and a quick note" },
       pipeline: { title: "Pipeline", description: "Open leads and their value by stage" },
       cash: { title: "Cash", description: "Payments in the last 30 days and invoices still open" },
       twin: { title: "Twin", description: "Live numbers from your warehouse, factory or store twin" },
       "key-numbers": { title: "Key numbers", description: "Projects, keywords, content and visibility at a glance" },
       projects: { title: "Projects", description: "Your SEO projects, with a form to add one" },
       suggestions: { title: "Win this week", description: "The shortest path to more traffic" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Reminders", description: "Your open to-dos, the soonest due first" },
     },
     desktop: {
       region: "Desktop",
@@ -912,9 +945,16 @@ export const en = {
         "desktop.move": { label: "Move the focused widget", hint: "Arrow keys, while editing" },
         "desktop.resize": { label: "Resize the focused widget", hint: "Shift + arrow keys, while editing" },
         "desktop.remove": { label: "Remove the focused widget", hint: "While editing" },
+        // Phase 18.2 (WS=content)
+        "notes.capture": { label: "Quick note", hint: "From anywhere" },
       },
     },
   },
+  // Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+  comms: commsEn,
+
+  // Phase 18.2 (WS=content): Notes, Files, collaboration, Activity Monitor, Terminal, Store.
+  ...contentEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

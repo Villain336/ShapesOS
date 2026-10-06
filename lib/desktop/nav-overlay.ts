@@ -25,7 +25,11 @@ export const NavPrefsSchema = z.object({
 
 /** Drop unknown hrefs, gated items and duplicates; cap at MAX_PINS. Never throws. */
 export function sanitizeNavPrefs(raw: unknown, role: string | null | undefined, groups: NavGroup[] = NAV_GROUPS): NavPrefs {
-  const parsed = NavPrefsSchema.safeParse(raw);
+  // Over-long input is cut to the schema's bound, not thrown away: with the
+  // 18.2 apps the nav has more items than MAX_PINS * 4, so "pin everything"
+  // must still keep the first MAX_PINS that are visible.
+  const capped = raw && typeof raw === "object" && Array.isArray((raw as { pinned?: unknown }).pinned) ? { ...(raw as object), pinned: (raw as { pinned: unknown[] }).pinned.slice(0, MAX_PINS * 4) } : raw;
+  const parsed = NavPrefsSchema.safeParse(capped);
   if (!parsed.success) return { pinned: [] };
   const items = new Map(allNavItems(groups).map((i) => [i.href, i]));
   const out: string[] = [];

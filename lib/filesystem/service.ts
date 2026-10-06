@@ -61,6 +61,8 @@ export interface PublicFile {
   createdBy: string;
   createdAt: string;
   trashedAt: string | null;
+  /** Phase 18.2 (WS=content): the current version number. */
+  version: number;
 }
 
 function toPublic(f: {
@@ -74,6 +76,7 @@ function toPublic(f: {
   createdBy: string;
   createdAt: Date;
   trashedAt: Date | null;
+  version?: number;
 }): PublicFile {
   return {
     id: f.id,
@@ -86,6 +89,7 @@ function toPublic(f: {
     createdBy: f.createdBy,
     createdAt: f.createdAt.toISOString(),
     trashedAt: f.trashedAt ? f.trashedAt.toISOString() : null,
+    version: f.version ?? 1,
   };
 }
 
@@ -420,14 +424,19 @@ export async function deleteFile(args: {
     throw new FsError("invalid_state", "Only trashed files can be permanently deleted. Trash it first.");
   }
   const adapter = getStorageAdapter();
+  // Phase 18.2 (WS=content): a purge frees every previous version too.
+  const { versionBlobsOf } = await import("./versions");
+  const versions = await versionBlobsOf(args.workspaceId, [row.id]);
+  const versionBytes = versions.reduce((n, v) => n + v.sizeBytes, 0);
   await prisma.$transaction(async (tx) => {
     await tx.workspaceFile.delete({ where: { id: row.id } });
     await tx.workspaceQuota.update({
       where: { workspaceId: args.workspaceId },
-      data: { usedBytes: { decrement: BigInt(row.sizeBytes) } },
+      data: { usedBytes: { decrement: BigInt(row.sizeBytes + versionBytes) } },
     });
   });
   await adapter.delete(row.storageKey);
+  for (const v of versions) await adapter.delete(v.storageKey).catch(() => {});
 }
 
 /** Current quota (row created eagerly with the 10 GB default). */
@@ -476,16 +485,21 @@ export async function purgeExpiredTrash(now = new Date()): Promise<{ purged: num
     take: 500,
   });
   const adapter = getStorageAdapter();
+  // Phase 18.2 (WS=content): previous versions go with the file.
+  const { versionBlobsOf } = await import("./versions");
   let purged = 0;
   for (const row of expired) {
+    const versions = await versionBlobsOf(row.workspaceId, [row.id]).catch(() => []);
+    const versionBytes = versions.reduce((n, v) => n + v.sizeBytes, 0);
     await prisma.$transaction(async (tx) => {
       await tx.workspaceFile.delete({ where: { id: row.id } });
       await tx.workspaceQuota.updateMany({
         where: { workspaceId: row.workspaceId },
-        data: { usedBytes: { decrement: BigInt(row.sizeBytes) } },
+        data: { usedBytes: { decrement: BigInt(row.sizeBytes + versionBytes) } },
       });
     });
     await adapter.delete(row.storageKey).catch(() => {});
+    for (const v of versions) await adapter.delete(v.storageKey).catch(() => {});
     purged++;
   }
   return { purged };

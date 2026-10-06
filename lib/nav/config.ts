@@ -38,8 +38,14 @@ import {
   Megaphone,
   MessageSquare,
   MessagesSquare,
+  MessageSquareText, // Phase 18.2 (comms): Messages
+  Video, // Phase 18.2 (comms): Meet
   Mic,
   Network,
+  NotebookPen, // Phase 18.2 (WS=content): Notes
+  Gauge, // Phase 18.2 (WS=content): Activity Monitor
+  SquareTerminal, // Phase 18.2 (WS=content): Terminal
+  Store, // Phase 18.2 (WS=content): Store
   Paintbrush,
   PenLine,
   Phone,
@@ -57,6 +63,11 @@ import {
   Target,
   UserSearch,
   Zap,
+  // Phase 18.2 (WS=comms): the communication apps.
+  ListTodo,
+  BookUser,
+  CalendarDays,
+  Mailbox,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
@@ -75,7 +86,8 @@ export interface NavItem {
    */
   activePrefix?: string;
   /** Slot for a live count pill rendered next to the label. */
-  badge?: "needs-you";
+  // Phase 18.2 (comms): "unread-messages" = the Messages app's unread count.
+  badge?: "needs-you" | "unread-messages";
   /**
    * Phase 18.1 (WS=desk): lowest workspace role that sees the item (the page
    * itself enforces the same role). Absent = every member. The dock overlay
@@ -100,6 +112,13 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "home",
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, description: "Home: what needs attention", keywords: "home dashboard main" },
+      // Phase 18.2 (WS=comms): the everyday communication apps.
+      { href: "/dashboard/mail", label: "Mail", icon: Mail, description: "One inbox: mail, lead conversations, social DMs", keywords: "email inbox gmail outlook messages dms compose reply unread" },
+      { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText, description: "Team channels, direct messages and your agents", keywords: "chat channels dm direct message threads team slack mention agents", badge: "unread-messages" },
+      { href: "/dashboard/meet", label: "Meet", icon: Video, description: "Video calls, with notes from the meeting agent", keywords: "video call meeting conference room livekit transcript notes action items zoom" },
+      { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, description: "Your calendars, bookings and events", keywords: "schedule agenda meetings events google outlook ics find time availability" },
+      { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, description: "One address book for everyone you know", keywords: "people address book person contact cards duplicates merge leads network investors" },
+      { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },
     ],
   },
   {
@@ -117,7 +136,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/reviews", label: "Reviews", icon: Star, description: "Review requests and replies", keywords: "ratings reputation" },
       { href: "/dashboard/authority", label: "Authority", icon: Globe, description: "Outreach, PR, listings, AEO", keywords: "outreach pr listings aeo backlinks" },
       { href: "/dashboard/media", label: "Media", icon: Megaphone, description: "Media buying and spend pools", keywords: "ads advertising spend dooh radio" },
-      { href: "/dashboard/mail", label: "Direct mail", icon: Mail, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
+      { href: "/dashboard/direct-mail", label: "Direct mail", icon: Mailbox, description: "Postcards and EDDM", keywords: "postcards eddm letters" },
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw, description: "Reallocation, recycling, test lab", keywords: "reallocation recycling ctv dsp tests" },
       { href: "/dashboard/calls", label: "Calls", icon: Phone, description: "Call tracking and bookings", keywords: "phone tracking numbers bookings" },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },
@@ -143,6 +162,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/ops", label: "Operations", icon: Building2, description: "Orders, invoices, inventory, projects, helpdesk, team", keywords: "ops erp orders payments promotions invoices inventory warehouses purchasing projects tasks timesheets helpdesk tickets team hr leave recruiting workflows" },
       { href: "/dashboard/office", label: "Office", icon: Briefcase, description: "Docs, sheets and decks", keywords: "documents spreadsheets slides" },
       { href: "/dashboard/files", label: "Files", icon: Folder, description: "Workspace files", keywords: "uploads storage" },
+      // Phase 18.2 (WS=content): Notes (UniverDoc kind "note"; lib/notes).
+      { href: "/dashboard/notes", label: "Notes", icon: NotebookPen, description: "Quick notes, voice notes, notes on any record", keywords: "notes notebook memo jot capture voice meeting notes" },
+      // Phase 18.2 (WS=content): a shell on a workspace sandbox (lib/terminal); editor+ like the route.
+      { href: "/dashboard/terminal", label: "Terminal", icon: SquareTerminal, description: "A shell on a workspace sandbox", keywords: "terminal shell console bash sandbox command line", minRole: "editor" },
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine, description: "Signature envelopes", keywords: "signature contracts documenso" },
       { href: "/dashboard/legal", label: "Legal", icon: Scale, description: "Licenses, filings, compliance", keywords: "compliance obligations permits tax" },
       { href: "/dashboard/insurance", label: "Insurance", icon: ShieldCheck, description: "Policies and renewals", keywords: "policies coverage renewals" },
@@ -161,10 +184,14 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/approvals", label: "Approvals", icon: Inbox, description: "Everything that needs you", keywords: "needs you inbox review approve", badge: "needs-you" },
       { href: "/dashboard/runs", label: "Runs", icon: History, description: "Agent runs and replays", keywords: "replays history executions" },
+      // Phase 18.2 (WS=content): every process in one place (lib/aos/processes.ts).
+      { href: "/dashboard/activity", label: "Activity monitor", icon: Gauge, description: "Every run, job and sandbox: cost, time, Stop", keywords: "activity monitor processes jobs queue cron health stop cost task manager" },
       { href: "/dashboard/assistant", label: "Assistant", icon: MessageSquare, description: "Chat with your agents", keywords: "chat ai help" },
       { href: "/dashboard/missions", label: "Missions", icon: Target, description: "Goals the agents are working on", keywords: "goals growth strategy" },
       { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen, description: "Agent playbooks", keywords: "procedures steps" },
       { href: "/dashboard/actions", label: "Actions", icon: Zap, description: "Connected app actions", keywords: "composio tools connections" },
+      // Phase 18.2 (WS=content): one catalogue of everything installable (lib/store).
+      { href: "/dashboard/store", label: "Store", icon: Store, description: "Install apps, skills, templates and connectors", keywords: "store marketplace install apps skills templates connectors mcp toolkits catalogue" },
       { href: "/dashboard/substrate", label: "Substrate", icon: Brain, description: "Business graph and growth memory", keywords: "graph memory campaigns" },
     ],
   },

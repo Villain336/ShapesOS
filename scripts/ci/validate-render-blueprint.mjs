@@ -29,6 +29,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SCHEMA_URL = "https://render.com/schema/render.yaml.json";
 const IMAGE_RE = /^ghcr\.io\/villain336\/shapesos-(runner|worker|migrate|backup):[A-Za-z0-9._-]+$/;
 export const REGISTRY_CREDENTIAL = "ghcr-shapesos";
+/** Phase 18.2: web services that run their own server instead of Next (entry → the file that answers the health check). */
+export const NON_NEXT_WEB_SERVERS = { "scripts/collab.mts": "lib/collab/server.ts" };
 
 function loadDeps() {
   const req = createRequire(join(ROOT, "infra", "aws", "package.json"));
@@ -93,8 +95,14 @@ export function semanticProblems(doc, repoRoot = ROOT) {
     if (s.type === "web") {
       const hc = s.healthCheckPath ?? "";
       const route = join(repoRoot, "app", ...hc.split("/").filter(Boolean), "route.ts");
+      // Phase 18.2: a web service that is not the Next app (the collab
+      // server) answers its health check in its own code.
+      const ownServer = Object.entries(NON_NEXT_WEB_SERVERS).find(([entry]) => (s.dockerCommand ?? "").includes(entry));
       if (!hc) problems.push(`${where}: needs a healthCheckPath`);
-      else if (!existsSync(route)) problems.push(`${where}: health check ${hc} has no route (${route.slice(repoRoot.length + 1)})`);
+      else if (ownServer) {
+        const src = existsSync(join(repoRoot, ownServer[1])) ? readFileSync(join(repoRoot, ownServer[1]), "utf8") : "";
+        if (!src.includes(`"${hc}"`)) problems.push(`${where}: health check ${hc} is not answered by ${ownServer[1]}`);
+      } else if (!existsSync(route)) problems.push(`${where}: health check ${hc} has no route (${route.slice(repoRoot.length + 1)})`);
     }
     for (const m of (s.dockerCommand ?? "").matchAll(/\b(scripts\/[\w./-]+\.(?:sh|mjs|mts))\b/g)) {
       if (!existsSync(join(repoRoot, m[1]))) problems.push(`${where}: dockerCommand uses ${m[1]}, which does not exist`);

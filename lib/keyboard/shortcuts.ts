@@ -233,6 +233,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = Object.freeze([
   { id: "desktop.move", label: "Move the focused widget", group: "Desktop", combo: "ArrowLeft", scope: "desktop-edit", owner: "desk", rebindable: false, hint: "Arrow keys, while editing" },
   { id: "desktop.resize", label: "Resize the focused widget", group: "Desktop", combo: "Shift+ArrowRight", scope: "desktop-edit", owner: "desk", rebindable: false, hint: "Shift + arrow keys, while editing" },
   { id: "desktop.remove", label: "Remove the focused widget", group: "Desktop", combo: "Delete", scope: "desktop-edit", owner: "desk", rebindable: false, hint: "While editing" },
+  // Phase 18.2 (WS=content): Notes quick capture from anywhere. ⌘⇧N belongs to
+  // the browser (a new private window — RESERVED_COMBOS), so the default is
+  // ⌥⇧N, next to the desk's other ⌥⇧ shortcuts; rebindable like them.
+  { id: "notes.capture", label: "Quick note", group: "General", combo: "Alt+Shift+N", scope: "global", owner: "desk", rebindable: true, hint: "From anywhere" },
 ] satisfies ShortcutDef[]);
 
 export const SHORTCUTS_BY_ID: ReadonlyMap<string, ShortcutDef> = new Map(SHORTCUTS.map((s) => [s.id, s]));

@@ -40,6 +40,8 @@ import { EmptyState } from "@/components/vault/EmptyState";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
 import { buttonVariants } from "@/components/vault/atoms/button-variants";
 import { cn } from "@/lib/utils";
+// Phase 18.2 (WS=content): a record's notes.
+import { RecordNotes } from "@/components/notes/RecordNotes";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +236,9 @@ export default async function ProjectPage({
           )}
         </CardBody>
       </Card>
+
+      {/* Phase 18.2 (WS=content): the notes linked to this project. */}
+      <RecordNotes kind="project" id={project.id} label={project.domain} />
     </div>
   );
 }

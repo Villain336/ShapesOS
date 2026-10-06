@@ -168,6 +168,8 @@ services:
       # Phase 8: the `worker` service below runs queued agent work; the app
       # only enqueues. (internal = the app runs it itself; off = no queue.)
       AGENT_WORKER: ${AGENT_WORKER:-external}
+      # Phase 18.2: where the browser reaches the `collab` service below.
+      COLLAB_PUBLIC_URL: ${COLLAB_PUBLIC_URL:-ws://localhost:1235}
     volumes:
       # On-disk state that is not in the files bucket: report/brief PDFs,
       # brand logos, site working copies, fix snapshots, sitemaps, scheduler
@@ -210,6 +212,29 @@ services:
     volumes:
       - marketr-data:/app/.data
       - marketr-run-artifacts:/app/.run-artifacts
+
+  # Phase 18.2: live collaboration (Notes co-editing; scripts/collab.mts →
+  # lib/collab/server.ts) on the worker image. Exactly ONE — never scale it:
+  # without Redis two collab processes can't share a document. Browsers
+  # connect to it directly (COLLAB_PUBLIC_URL on the app).
+  collab:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    command: ["node", "node_modules/tsx/dist/cli.mjs", "scripts/collab.mts"]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${APP_DB_USER:-marketr_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      COLLAB_PORT: "1235"
+    ports:
+      - "${APP_BIND_ADDR:-127.0.0.1}:1235:1235"
 
   # Phase 4a: scheduled database backups (scripts/ops/backup.sh --loop).
   # pg_dump custom format into the marketr-backups volume every

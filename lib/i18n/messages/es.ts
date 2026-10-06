@@ -4,6 +4,9 @@
 // de frase. Nombres de producto (ShapesOS, CRM, CAD, MCP) sin traducir.
 
 import type { Catalogue } from "./en";
+import { commsEs } from "./comms.es";
+// Phase 18.2 (WS=content): las apps de este flujo, en su propio archivo.
+import { contentEs } from "./content.es";
 
 export const es: Catalogue = {
   common: {
@@ -82,6 +85,13 @@ export const es: Catalogue = {
       "/dashboard": { label: "Resumen", description: "Inicio: lo que necesita atención" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
+      // Phase 18.2 (WS=comms)
+      "/dashboard/mail": { label: "Correo", description: "Una bandeja: correo, conversaciones con leads, mensajes sociales" },
+      "/dashboard/messages": { label: "Mensajes", description: "Canales del equipo, mensajes directos y tus agentes" },
+      "/dashboard/meet": { label: "Reuniones", description: "Videollamadas, con notas del agente de reuniones" },
+      "/dashboard/calendar": { label: "Calendario", description: "Tus calendarios, reservas y eventos" },
+      "/dashboard/contacts": { label: "Contactos", description: "Una libreta de direcciones para todas las personas que conoces" },
+      "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
       "/dashboard/prospects": { label: "Prospectos", description: "Listas de prospectos y enriquecimiento" },
       "/dashboard/nurture": { label: "Seguimiento", description: "Secuencias de seguimiento y difusiones" },
       "/dashboard/projects": { label: "Proyectos SEO", description: "Sitios, palabras clave, posiciones, contenido" },
@@ -90,7 +100,7 @@ export const es: Catalogue = {
       "/dashboard/reviews": { label: "Reseñas", description: "Solicitudes de reseñas y respuestas" },
       "/dashboard/authority": { label: "Autoridad", description: "Difusión, prensa, directorios, AEO" },
       "/dashboard/media": { label: "Medios", description: "Compra de medios y bolsas de gasto" },
-      "/dashboard/mail": { label: "Correo postal", description: "Postales y EDDM" },
+      "/dashboard/direct-mail": { label: "Correo postal", description: "Postales y EDDM" },
       "/dashboard/flywheel": { label: "Flywheel", description: "Reasignación, reciclaje, laboratorio de pruebas" },
       "/dashboard/calls": { label: "Llamadas", description: "Seguimiento de llamadas y reservas" },
       "/dashboard/attribution": { label: "Atribución", description: "Qué generó ingresos" },
@@ -103,6 +113,11 @@ export const es: Catalogue = {
       "/dashboard/ops": { label: "Operaciones", description: "Pedidos, facturas, inventario, proyectos, soporte, equipo" },
       "/dashboard/office": { label: "Oficina", description: "Documentos, hojas y presentaciones" },
       "/dashboard/files": { label: "Archivos", description: "Archivos del espacio de trabajo" },
+      // Phase 18.2 (WS=content)
+      "/dashboard/notes": { label: "Notas", description: "Notas rápidas, notas de voz, notas en cualquier registro" },
+      "/dashboard/activity": { label: "Monitor de actividad", description: "Cada ejecución, tarea y entorno aislado: coste, tiempo, Detener" },
+      "/dashboard/terminal": { label: "Consola", description: "Una consola en un entorno aislado del espacio de trabajo" },
+      "/dashboard/store": { label: "Tienda", description: "Instala apps, habilidades, plantillas y conectores" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
@@ -165,6 +180,9 @@ export const es: Catalogue = {
       alert_fired: "Alertas",
       run_failed: "Ejecuciones fallidas",
       invite_accepted: "Equipo",
+      mention: "Menciones",
+      direct_message: "Mensajes directos",
+      reminder_due: "Recordatorios",
     },
   },
 
@@ -306,6 +324,9 @@ export const es: Catalogue = {
         close_ticket: "Cerrar si está resuelto",
         summarize: "Resumir",
         seo_audit: "Hacer una auditoría SEO",
+        // Phase 18.2 (WS=comms)
+        suggest_merge: "Buscar otros registros de esta persona",
+        draft_mail_reply: "Redactar una respuesta",
       },
     },
   },
@@ -344,6 +365,10 @@ export const es: Catalogue = {
       ticket: "Ticket",
       deal: "Oportunidad",
       app: "App",
+      // Phase 18.2 (WS=comms)
+      mail: "Correo",
+      // Phase 18.2 (WS=content)
+      note: "Nota",
     },
   },
 
@@ -469,6 +494,9 @@ export const es: Catalogue = {
         alert_fired: "Alertas",
         run_failed: "Ejecuciones fallidas",
         invite_accepted: "Invitaciones aceptadas",
+        mention: "Menciones a ti",
+        direct_message: "Mensajes directos",
+        reminder_due: "Recordatorios pendientes",
       },
       workspaceDefaults: "Los valores por defecto de todo el espacio de trabajo están en Espacio de trabajo → Notificaciones.",
     },
@@ -555,12 +583,16 @@ export const es: Catalogue = {
       attention: { title: "Requiere tu atención", description: "Borradores por revisar, páginas que pierden tráfico, movimientos de la competencia, alertas" },
       calendar: { title: "Calendario de hoy", description: "Reservas y eventos de los calendarios conectados para hoy" },
       inbox: { title: "Bandeja de entrada", description: "Conversaciones con leads sin leer (mensajes y correo)" },
+      // Phase 18.2 (WS=content)
+      notes: { title: "Notas", description: "Notas fijadas y recientes, y una nota rápida" },
       pipeline: { title: "Embudo", description: "Leads abiertos y su valor por etapa" },
       cash: { title: "Caja", description: "Pagos de los últimos 30 días y facturas aún abiertas" },
       twin: { title: "Gemelo", description: "Cifras en vivo del gemelo de tu almacén, fábrica o tienda" },
       "key-numbers": { title: "Cifras clave", description: "Proyectos, palabras clave, contenido y visibilidad de un vistazo" },
       projects: { title: "Proyectos", description: "Tus proyectos SEO, con un formulario para añadir uno" },
       suggestions: { title: "Gana esta semana", description: "El camino más corto hacia más tráfico" },
+      // Phase 18.2 (WS=comms)
+      reminders: { title: "Recordatorios", description: "Tus tareas pendientes, primero las que vencen antes" },
     },
     desktop: {
       region: "Escritorio",
@@ -901,7 +933,14 @@ export const es: Catalogue = {
         "desktop.move": { label: "Mover el widget enfocado", hint: "Flechas, mientras editas" },
         "desktop.resize": { label: "Cambiar el tamaño del widget enfocado", hint: "Mayús + flechas, mientras editas" },
         "desktop.remove": { label: "Quitar el widget enfocado", hint: "Mientras editas" },
+        // Phase 18.2 (WS=content)
+        "notes.capture": { label: "Nota rápida", hint: "Desde cualquier parte" },
       },
     },
   },
+  // Phase 18.2 (WS=comms): Correo, Calendario, Contactos, Mensajes, Reuniones, Recordatorios.
+  comms: commsEs,
+
+  // Phase 18.2 (WS=content): Notas, Archivos, colaboración, Monitor de actividad, Terminal, Tienda.
+  ...contentEs,
 };

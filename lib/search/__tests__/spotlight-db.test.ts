@@ -11,6 +11,10 @@
 //     gate gets nothing; trashed files vanish
 //   - ranking: an exact name beats a text-only hit; websearch syntax (phrase,
 //     exclusion, kind: filter) works
+//   - Phase 18.2 kinds (integration): "mail" is personal (only the
+//     mailbox's owner, never without a user); "note" — a private note is its
+//     maker's alone (by title or by the words inside), a shared note is
+//     everyone's; both stay in their workspace
 //   - the index is idempotent (backfill twice = no change) and a changed
 //     doc re-indexes; the agents' search_workspace tool returns the same hits
 //     and reads a file's text by record id
@@ -90,6 +94,13 @@ async function seed(ws: string, tag: string) {
     await tx.opsTicketMessage.create({ data: { workspaceId: ws, ticketId: ticket.id, direction: "inbound", body: `The obsidian tray keeps jamming every morning ${tag}` } });
     await tx.miniApp.create({ data: { workspaceId: ws, slug: `vendors-${tag}`, name: `Quillon vendors ${tag}`, draftSpec: {}, published: true, version: 1, createdBy: ANA } });
     const draft = await tx.miniApp.create({ data: { workspaceId: ws, slug: `drafty-${tag}`, name: `Quillon drafts ${tag}`, draftSpec: {}, published: false, createdBy: ANA } });
+    // Phase 18.2 (integration): the Mail app's thread cache (personal) and Notes.
+    for (const [owner, subject] of [[ANA, `Lapislazuli invoice ${tag}`], [BEN, `Lapislazuli payslip ${tag}`]] as const) {
+      await tx.mailThreadCache.create({ data: { workspaceId: ws, connectionId: `conn-${tag}`, ownerUserId: owner, source: "gmail", externalId: `t-${owner}-${tag}`, subject, fromName: "Rhea", lastMessageAt: new Date() } });
+    }
+    const noteDoc = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+    await tx.univerDoc.create({ data: { workspaceId: ws, kind: "note", title: `Standup ${tag}`, snapshot: noteDoc(`Codeword peridotite, shared ${tag}`), shareState: "workspace", createdBy: BEN } });
+    await tx.univerDoc.create({ data: { workspaceId: ws, kind: "note", title: `Diary ${tag}`, snapshot: noteDoc(`Codeword peridotite, private ${tag}`), shareState: "private", createdBy: BEN } });
     if (ws === WS) draftAppSlug = draft.slug;
     const d = await tx.univerDoc.create({
       data: { workspaceId: ws, kind: "doc", title: `Board memo ${tag}`, snapshot: buildDocSnapshot({ title: "Board memo", paragraphs: [`We expect strong revenue next quarter. Codeword saffronite ${tag}.`] }) as object },
@@ -180,6 +191,27 @@ describe("Spotlight (DB)", () => {
     assert.equal((await spotlight(WS, "owner", "zinnia", {})).hits.filter((h) => h.kind === "chat_message").length, 0);
   });
 
+  it("mail is personal: Ana finds her own threads, never Ben's; no user = no mail", async () => {
+    const ana = await spotlight(WS, "owner", "Lapislazuli", { userId: ANA, kinds: ["mail"] });
+    assert.deepEqual(ana.hits.map((h) => h.title), ["Lapislazuli invoice mine"]);
+    assert.match(ana.hits[0]!.href, /^\/dashboard\/mail\?thread=gmail%3Aconn-mine%3A/);
+    const ben = await spotlight(WS, "owner", "Lapislazuli", { userId: BEN, kinds: ["mail"] });
+    assert.deepEqual(ben.hits.map((h) => h.title), ["Lapislazuli payslip mine"], "even an owner never reads another member's mailbox");
+    assert.equal((await spotlight(WS, "owner", "Lapislazuli", {})).hits.length, 0);
+  });
+
+  it("notes: a private note is its maker's alone (title and inside words); a shared note is everyone's", async () => {
+    const titles = async (userId: string | undefined, q: string) => (await spotlight(WS, "viewer", q, { userId, kinds: ["note"] })).hits.map((h) => h.title).sort();
+    assert.deepEqual(await titles(BEN, "peridotite"), ["Diary mine", "Standup mine"], "found by the words inside");
+    assert.deepEqual(await titles(ANA, "peridotite"), ["Standup mine"], "never someone else's private note");
+    assert.deepEqual(await titles(ANA, "Diary"), [], "not by title either");
+    assert.deepEqual(await titles(undefined, "peridotite"), ["Standup mine"]);
+    // A note is never an Office doc or file content (it shows once, as a note).
+    const all = await spotlight(WS, "owner", "peridotite", { userId: BEN });
+    assert.ok(all.hits.every((h) => h.kind === "note"), JSON.stringify(all.hits.map((h) => h.kind)));
+    assert.ok(all.hits.every((h) => h.href.startsWith("/dashboard/notes?note=")));
+  });
+
   it("drafts: a viewer never sees an unpublished app; an editor does", async () => {
     const viewer = await spotlight(WS, "viewer", "Quillon", { kinds: ["app"] });
     assert.deepEqual(viewer.hits.map((h) => h.title), ["Quillon vendors mine"]);
@@ -191,7 +223,7 @@ describe("Spotlight (DB)", () => {
     // Every OTHER record carries the word "theirs"; nothing in WS does.
     const theirsThere = await spotlight(OTHER, "owner", "theirs", { userId: ANA, perKind: 20 });
     const kindsThere = new Set(theirsThere.hits.map((h) => h.kind));
-    for (const k of ["lead", "file_content", "inbox_message", "chat_message", "contact", "company", "deal", "person", "ticket", "app", "project"]) {
+    for (const k of ["lead", "file_content", "inbox_message", "chat_message", "contact", "company", "deal", "person", "ticket", "app", "project", "mail", "note"]) {
       assert.ok(kindsThere.has(k as never), `seeded ${k} in the other workspace: ${[...kindsThere].join(",")}`);
     }
     const here = await spotlight(WS, "owner", "theirs", { userId: ANA, perKind: 20, semantic: "off" });

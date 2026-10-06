@@ -40,6 +40,7 @@ import {
 import { DESKTOP_EDIT_EVENT } from "@/components/desktop/Desktop";
 import { SPLIT_COMMAND_EVENT, type SplitCommand } from "./SplitView";
 import { ShortcutsDialog } from "./ShortcutsDialog";
+import { NOTE_CAPTURE_EVENT } from "@/components/notes/events";
 
 const SEQUENCE_WINDOW_MS = 1200;
 const MODIFIER_KEYS: Record<string, "Control" | "Alt" | "Meta" | "Shift"> = { ctrl: "Control", alt: "Alt", mod: "Control", shift: "Shift" };
@@ -116,6 +117,10 @@ export function ShortcutHost({ initialOverrides }: { initialOverrides: Record<st
         case "desktop.edit":
           if (path !== "/dashboard") return false;
           fire(DESKTOP_EDIT_EVENT);
+          return true;
+        // Phase 18.2 (WS=content): Notes quick capture (components/notes/QuickCapture.tsx).
+        case "notes.capture":
+          fire(NOTE_CAPTURE_EVENT, {});
           return true;
         default:
           if (SPLIT_COMMANDS[def.id] && path === "/dashboard/split") {

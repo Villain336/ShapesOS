@@ -100,6 +100,7 @@ describe("record search (DB)", () => {
     assert.deepEqual(await searchRecords(WS, null, "zephyrine"), []);
     const onlyLeads = await searchRecords(WS, "viewer", "zephyrine", { kinds: ["lead"] });
     assert.ok(onlyLeads.length > 0 && onlyLeads.every((h) => h.kind === "lead"));
-    assert.equal(RECORD_KINDS.length, 23);
+    // Phase 18.2: +2 — comms' personal "mail" kind (Mail app threads) and content's "note".
+    assert.equal(RECORD_KINDS.length, 25);
   });
 });

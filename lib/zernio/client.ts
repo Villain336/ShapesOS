@@ -44,6 +44,8 @@ import {
   type ZernioTimelineRow,
   type ZernioUsageMetering,
   type ZernioValidateResult,
+  type ZernioInboxConversation,
+  type ZernioInboxMessage,
 } from "./spec";
 
 export class ZernioError extends ConnectorApiError {
@@ -527,6 +529,45 @@ export class ZernioClient {
       throw new ZernioError({ operationId: "uploadMedia", code: "provider_unreachable", message: "The Zernio media upload could not be reached." });
     }
     if (!res.ok) throw new ZernioError({ operationId: "uploadMedia", code: "provider_error", message: `The Zernio media upload failed (HTTP ${res.status}).`, status: res.status });
+  }
+
+  // ── Inbox (Phase 18.2, WS=comms: the Mail app's social DMs) ─────────────
+  // Spec "Messages" group (v1.217.1). Reads retry like every read; a send is
+  // a write with an Idempotency-Key (a retry after a lost response replays
+  // instead of sending twice). Callers scope every call to the workspace's
+  // profile and mirrored accounts (lib/comms/mail/social.server.ts).
+
+  /** listInboxConversations — GET /v1/inbox/conversations?profileId=… */
+  async listInboxConversations(q: { profileId: string; platform?: string; status?: "active" | "archived"; limit?: number; cursor?: string; accountId?: string }): Promise<{ conversations: ZernioInboxConversation[]; nextCursor: string | null }> {
+    const r = await this.call<{ data?: ZernioInboxConversation[]; pagination?: { nextCursor?: string | null } }>({
+      operationId: "listInboxConversations", method: "GET", path: "/v1/inbox/conversations", query: { ...q, sortOrder: "desc" }, kind: "read",
+    });
+    return { conversations: r.data?.data ?? [], nextCursor: r.data?.pagination?.nextCursor ?? null };
+  }
+
+  /** getInboxConversationMessages — GET /v1/inbox/conversations/{id}/messages?accountId=… (side-effect free). */
+  async getInboxConversationMessages(conversationId: string, q: { accountId: string; limit?: number; sortOrder?: "asc" | "desc" }): Promise<ZernioInboxMessage[]> {
+    const r = await this.call<{ messages?: ZernioInboxMessage[] }>({
+      operationId: "getInboxConversationMessages", method: "GET", path: `/v1/inbox/conversations/${encodeURIComponent(conversationId)}/messages`,
+      query: { accountId: q.accountId, limit: q.limit ?? 100, sortOrder: q.sortOrder ?? "asc" }, kind: "read",
+    });
+    return r.data?.messages ?? [];
+  }
+
+  /** sendInboxMessage — POST /v1/inbox/conversations/{id}/messages { accountId, message } (Idempotency-Key). */
+  async sendInboxMessage(conversationId: string, body: { accountId: string; message: string }, idempotencyKey: string): Promise<{ messageId: string | null }> {
+    const r = await this.call<{ success?: boolean; data?: { messageId?: string } }>({
+      operationId: "sendInboxMessage", method: "POST", path: `/v1/inbox/conversations/${encodeURIComponent(conversationId)}/messages`, body, kind: "write", idempotencyKey,
+    });
+    return { messageId: r.data?.data?.messageId ?? null };
+  }
+
+  /** markConversationRead — POST /v1/inbox/conversations/{id}/read { accountId } (a person opened it). */
+  async markConversationRead(conversationId: string, body: { accountId: string }): Promise<{ markedCount: number }> {
+    const r = await this.call<{ markedCount?: number }>({
+      operationId: "markConversationRead", method: "POST", path: `/v1/inbox/conversations/${encodeURIComponent(conversationId)}/read`, body, kind: "write",
+    });
+    return { markedCount: r.data?.markedCount ?? 0 };
   }
 
   // ── Usage ──────────────────────────────────────────────────────────────

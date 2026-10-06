@@ -47,7 +47,7 @@ describe("catalogue parity", () => {
 
   it("no message is empty and es is actually translated where it should be", () => {
     for (const [key, v] of ES) assert.ok(v.trim().length > 0, `es ${key} is empty`);
-    const same = [...EN].filter(([k, v]) => ES.get(k) === v && /[a-z]{4,}/.test(v) && !/ShapesOS|CRM|CAD|MCP|API|SEO|Webhooks|Playbooks?|Flywheel|Clips|Apps|Social|Legal|General|Lead|Ticket|Chats|English|Español/.test(v));
+    const same = [...EN].filter(([k, v]) => ES.get(k) === v && /[a-z]{4,}/.test(v) && !/ShapesOS|CRM|CAD|MCP|API|SEO|Webhooks|Playbooks?|Flywheel|Clips|Apps|Social|Legal|General|Lead|Ticket|Chats|English|Español|Gmail|Outlook|Google/.test(v));
     assert.ok(same.length < 8, `untranslated es strings: ${same.map(([k]) => k).join(", ")}`);
   });
 

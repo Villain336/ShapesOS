@@ -23,6 +23,10 @@ import { invoice, opsProject, ticket } from "./ops";
 import { app, bomLine, cadProject, client, dataset, doc, envelope, file, legalDocument, mission, project, socialPost } from "./work";
 import { chatMessage, person } from "./people";
 import { fileContent } from "./content";
+// Phase 18.2 (WS=comms)
+import { mail } from "./comms";
+// Phase 18.2 (WS=content): Notes.
+import { note } from "./notes";
 
 export const SOURCES: readonly SearchSource[] = [
   lead,
@@ -48,6 +52,10 @@ export const SOURCES: readonly SearchSource[] = [
   ticket,
   deal,
   app,
+  // Phase 18.2 (WS=comms)
+  mail,
+  // Phase 18.2 (WS=content)
+  note,
 ];
 
 export const SOURCE_BY_KIND: ReadonlyMap<RecordKind, SearchSource> = new Map(SOURCES.map((s) => [s.kind, s]));

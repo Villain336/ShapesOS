@@ -57,6 +57,8 @@ import { SkipLink } from "@/components/a11y/SkipLink";
 import { TimeZoneSync } from "@/components/preferences/TimeZoneSync";
 import { getI18n } from "@/lib/i18n/server";
 import { getShellState } from "@/lib/preferences/server";
+// Phase 18.2 (WS=content): Notes quick capture (⌥⇧N from anywhere).
+import { QuickCapture } from "@/components/notes/QuickCapture";
 
 export default async function DashboardLayout({
   children,
@@ -148,6 +150,7 @@ export default async function DashboardLayout({
         <ChatProvider>
           <CommandBar workspaceId={workspace.id} />
           <NewTaskDialog />
+          <QuickCapture />
           <FeedbackHost />
           <RecentsTracker />
           <PaneBridge initialOverrides={prefs.shortcuts} />
@@ -171,6 +174,7 @@ export default async function DashboardLayout({
         <ShortcutHost initialOverrides={prefs.shortcuts} />
         <CommandBar workspaceId={workspace.id} />
         <NewTaskDialog />
+        <QuickCapture />
         <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />

@@ -34,7 +34,13 @@ export function parseRecordRef(v: unknown): { kind: RecordKind; id: string } | n
   return { kind: m[1] as RecordKind, id: m[2]! };
 }
 
-async function readRecord(ctx: { workspaceId: string }, ref: { kind: RecordKind; id: string }): Promise<ToolResult> {
+async function readRecord(ctx: { workspaceId: string; userId?: string; role?: import("@prisma/client").WorkspaceRole }, ref: { kind: RecordKind; id: string }): Promise<ToolResult> {
+  // Phase 18.2 (WS=content): a note, as the person the agent works for sees it.
+  if (ref.kind === "note") {
+    if (!ctx.userId || !ctx.role) return { summary: "Reading a note needs the person the agent works for." };
+    const { read_note } = await import("@/lib/notes/tools");
+    return read_note.execute(ctx as Parameters<typeof read_note.execute>[0], { note: ref.id });
+  }
   if (ref.kind === "file" || ref.kind === "file_content" || ref.kind === "doc") {
     const isDoc = ref.kind === "doc";
     const meta = await withWorkspaceScope(ctx.workspaceId, async (tx) =>
@@ -45,6 +51,9 @@ async function readRecord(ctx: { workspaceId: string }, ref: { kind: RecordKind;
     // Content kinds can be either a file or a doc: fall back to the doc.
     if (!meta && ref.kind === "file_content") return readRecord(ctx, { kind: "doc", id: ref.id });
     if (!meta) return { summary: `No ${ref.kind} ${ref.id} in this workspace.` };
+    // Phase 18.2 integration: a note read as "doc:" / "file_content:" still
+    // goes through the note's own rule (a private note is its maker's alone).
+    if ("kind" in meta && meta.kind === "note") return readRecord(ctx, { kind: "note", id: ref.id });
     const text = await storedText(ctx.workspaceId, isDoc ? { univerDocId: ref.id } : { fileId: ref.id });
     const name = "title" in meta ? meta.title : meta.filename;
     if (!text || !text.text) {
@@ -69,7 +78,7 @@ async function readRecord(ctx: { workspaceId: string }, ref: { kind: RecordKind;
       .join("\n");
     return { summary: `Ticket #${t.number} ${t.subject} (${t.status}, ${t.priority}) from ${t.requesterEmail ?? "unknown"}:\n${thread}`, details: { record: ref } };
   }
-  return { summary: `Use search_workspace with a query to find this ${ref.kind}; reading it by id is supported for files, docs and tickets.` };
+  return { summary: `Use search_workspace with a query to find this ${ref.kind}; reading it by id is supported for files, docs, notes and tickets.` };
 }
 
 export const search_workspace: ToolDef = {

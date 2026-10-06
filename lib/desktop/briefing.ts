@@ -46,6 +46,11 @@ export interface BriefingInput {
   metrics: { label: string; value: string }[];
   /** Phase 18.1 (integration): the member's language preference ("en" | "es"); English when unset. */
   language?: string | null;
+  /**
+   * Phase 18.2 (WS=comms): the next meetings with what ShapesOS knows about
+   * their people (lib/comms/calendar/prep.server.ts) — absent when not gathered.
+   */
+  nextMeetings?: { time: string; title: string; prep: string[] }[];
 }
 
 /** Languages the briefing can be written in (the shell's languages, lib/i18n). */
@@ -60,6 +65,7 @@ export function briefingSources(input: BriefingInput): Record<string, number | b
     overnightFinished: input.overnight.finished,
     overnightFailed: input.overnight.failed,
     metrics: input.metrics.length,
+    ...(input.nextMeetings ? { nextMeetings: input.nextMeetings.length } : {}),
   };
 }
 
@@ -99,6 +105,17 @@ export function buildBriefingPrompt(input: BriefingInput): string {
     "",
     "Key numbers:",
     lines(input.metrics.map((m) => `${m.label}: ${m.value}`), "- none available"),
+    // Phase 18.2 (WS=comms): meeting prep — who is in the next meetings and the last thing that happened with them.
+    ...(input.nextMeetings
+      ? [
+          "",
+          "Next meetings (prep — mention the first one and anything the member should know about its people):",
+          lines(
+            input.nextMeetings.map((m) => `${m.time} ${m.title}${m.prep.length ? ` · ${m.prep.join("; ")}` : ""}`),
+            "- no meetings coming up",
+          ),
+        ]
+      : []),
   ].join("\n");
 }
 

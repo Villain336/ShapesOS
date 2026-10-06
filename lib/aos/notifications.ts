@@ -37,6 +37,10 @@ const ACTION_LABELS: Record<string, string> = {
   approval_decided: "Open",
   alert_fired: "Open",
   invite_accepted: "Open team",
+  // Phase 18.2 (WS=comms)
+  mention: "Open message",
+  direct_message: "Open message",
+  reminder_due: "Open reminders",
 };
 
 /** The one action: where the notification points, named for it. Null when it links nowhere. */

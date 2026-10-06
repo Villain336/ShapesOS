@@ -46,6 +46,13 @@ import { generate_image } from "@/lib/images/tool";
 import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
 // Phase 18.1 (WS=find): Spotlight for agents — the same search people run in ⌘K.
 import { search_workspace } from "@/lib/search/tool";
+// Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+import { COMMS_TOOLS, COMMS_TOOL_ACTION, COMMS_TOOL_GROUP } from "@/lib/comms/tools";
+// Phase 18.2 (WS=content): the core apps' agent tools (Notes, Files, Activity Monitor, Store).
+import { NOTE_TOOLS } from "@/lib/notes/tools";
+import { FILE_TOOLS } from "@/lib/files/tools";
+import { PROCESS_TOOLS } from "@/lib/aos/tools";
+import { STORE_TOOLS } from "@/lib/store/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1062,6 +1069,15 @@ export const TOOLS: ToolDef[] = [
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOLS,
+  // Phase 18.2 (WS=content): read_note (Tier 0) / create_note (Tier 1);
+  // list_file_versions (Tier 0) / share_file_link (Tier 2); list_processes (Tier 0);
+  // list_store_items (Tier 0).
+  ...NOTE_TOOLS,
+  ...FILE_TOOLS,
+  ...PROCESS_TOOLS,
+  ...STORE_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
@@ -1216,6 +1232,17 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
   web_scrape: "web",
   web_crawl: "web",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_GROUP,
+  // Phase 18.2 (WS=content): the core apps' agent tools (lib/notes/tools.ts,
+  // lib/files/tools.ts, lib/aos/tools.ts, lib/store/tools.ts). Reads are
+  // workspace; writing a note is content; sharing a file link is content.
+  read_note: "workspace",
+  create_note: "content",
+  list_file_versions: "workspace",
+  share_file_link: "content",
+  list_processes: "workspace",
+  list_store_items: "workspace",
 };
 
 /**
@@ -1322,6 +1349,19 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
   web_scrape: "fetch_web_pages",
   web_crawl: "fetch_web_pages",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_ACTION,
+  // Phase 18.2 (WS=content): a note is internal and reversible — Tier 1
+  // (TIER1_KINDS: asks unless an automation rule lets it run). A share link
+  // hands a file to people outside the workspace — Tier 2, always asks
+  // unless a rule says Auto-run.
+  create_note: "write_internal_note",
+  share_file_link: "share_file_externally",
+  // Read-only tools of the core apps: observation kinds (Tier 0 by evaluateTier, like search_workspace).
+  read_note: "read_note",
+  list_file_versions: "list_file_versions",
+  list_processes: "list_processes",
+  list_store_items: "list_store_items",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

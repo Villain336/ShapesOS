@@ -510,7 +510,7 @@ export function startOfUtcDay(d: Date): Date {
 }
 
 // ---------------------------------------------------------------------------
-// Ledger read for the /dashboard/mail "Nurture mail" tab
+// Ledger read for the /dashboard/direct-mail "Nurture mail" tab
 // ---------------------------------------------------------------------------
 
 export interface NurtureMailPieceRow {

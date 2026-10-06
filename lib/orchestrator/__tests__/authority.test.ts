@@ -194,8 +194,11 @@ describe("TIER1_KINDS is conservative", () => {
   it("contains only owned-channel / internal kinds", () => {
     // Phase 13 (twincore): the two internal digital-twin site operations.
     const internalSiteOps = new Set(["book_dock", "assign_equipment"]);
+    // Phase 18.2 (WS=comms): the person's own reminders and contact-card
+    // merges (internal links between records; reversible by unlinking).
+    const personalItems = new Set(["create_reminder", "complete_reminder", "confirm_contact_merge"]);
     for (const k of TIER1_KINDS) {
-      if (internalSiteOps.has(k)) continue;
+      if (internalSiteOps.has(k) || personalItems.has(k)) continue;
       assert.match(k, /owned|internal|listing/, `unexpected Tier 1 kind: ${k}`);
     }
   });

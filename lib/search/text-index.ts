@@ -27,6 +27,7 @@
 
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getStorageAdapter } from "@/lib/filesystem/storage";
 import { extractTextFromUpload } from "@/lib/datasetbuilder/extract";
@@ -106,7 +107,11 @@ export async function extractUniverText(kind: string, snapshot: unknown): Promis
   try {
     const { docSnapshotToParagraphs, sheetSnapshotToSheets } = await import("@/lib/univer/export");
     let text = "";
-    if (kind === "doc") {
+    if (kind === "note") {
+      // Phase 18.2 (WS=content): notes are Tiptap JSON (lib/notes/content.ts).
+      const { noteText } = await import("@/lib/notes/content");
+      text = noteText(snapshot);
+    } else if (kind === "doc") {
       text = docSnapshotToParagraphs(snapshot as Parameters<typeof docSnapshotToParagraphs>[0]).map((p) => p.text).join("\n");
     } else if (kind === "sheet") {
       text = sheetSnapshotToSheets(snapshot as Parameters<typeof sheetSnapshotToSheets>[0])
@@ -175,7 +180,9 @@ export interface IndexOptions {
 }
 
 export interface IndexResult {
-  status: TextStatus | "unchanged" | "missing";
+  // Phase 18.2 (WS=content): "superseded" = the record changed while this run
+  // extracted it (a new file version / a newer save); the newer run writes.
+  status: TextStatus | "unchanged" | "missing" | "superseded";
   chunks: number;
   embedded: number;
 }
@@ -185,6 +192,12 @@ interface Target {
   source: "file" | "doc";
   fileId?: string;
   univerDocId?: string;
+  /**
+   * Phase 18.2 (WS=content): is what was extracted still the record's current
+   * content? Checked inside the write transaction, so two index runs racing
+   * (a file's first upload and its next version) can't leave the older text.
+   */
+  stillCurrent?: (tx: Prisma.TransactionClient) => Promise<boolean>;
 }
 
 /** Write (or replace) one record's text + chunks. Idempotent on content hash. */
@@ -217,6 +230,7 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
         error: extracted.error ?? null,
         indexedAt: new Date(),
       };
+      if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
       const row = existing
         ? await tx.searchText.update({ where: { id: existing.id, workspaceId: target.workspaceId }, data })
         : await tx.searchText.create({ data: { ...data, ...key } });
@@ -230,6 +244,7 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
     },
     { timeoutMs: 30_000 },
   );
+  if (id === null) return { status: "superseded", chunks: 0, embedded: 0 };
   const embedded = opts.embed !== false && chunks.length ? await embedPending(target.workspaceId, id, opts.embedder) : 0;
   return { status: extracted.status, chunks: chunks.length, embedded };
 }
@@ -283,16 +298,37 @@ export async function indexFileText(workspaceId: string, fileId: string, opts: I
     const bytes = await getStorageAdapter().get(row.storageKey);
     extracted = bytes ? await extractFileText(row.filename, row.mimeType, bytes) : { status: "failed", text: "", extractor: null, error: "file bytes not found in storage" };
   }
-  return writeIndex({ workspaceId, source: "file", fileId }, extracted, opts);
+  const storageKey = row.storageKey;
+  return writeIndex(
+    {
+      workspaceId,
+      source: "file",
+      fileId,
+      // Phase 18.2: a newer version replaced the bytes meanwhile → leave it to that run.
+      stillCurrent: async (tx) => (await tx.workspaceFile.findFirst({ where: { id: fileId, workspaceId }, select: { storageKey: true } }))?.storageKey === storageKey,
+    },
+    extracted,
+    opts,
+  );
 }
 
 /** Index one Office doc's text (idempotent). */
 export async function indexUniverDocText(workspaceId: string, docId: string, opts: IndexOptions = {}): Promise<IndexResult> {
   const doc = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.findFirst({ where: { id: docId, workspaceId }, select: { id: true, kind: true, snapshot: true } }),
+    tx.univerDoc.findFirst({ where: { id: docId, workspaceId }, select: { id: true, kind: true, snapshot: true, version: true } }),
   );
   if (!doc) return { status: "missing", chunks: 0, embedded: 0 };
-  return writeIndex({ workspaceId, source: "doc", univerDocId: docId }, await extractUniverText(doc.kind, doc.snapshot), opts);
+  return writeIndex(
+    {
+      workspaceId,
+      source: "doc",
+      univerDocId: docId,
+      // Phase 18.2: a newer save (live collaboration saves often) supersedes this run.
+      stillCurrent: async (tx) => (await tx.univerDoc.findFirst({ where: { id: docId, workspaceId }, select: { version: true } }))?.version === doc.version,
+    },
+    await extractUniverText(doc.kind, doc.snapshot),
+    opts,
+  );
 }
 
 // The write hooks (scheduleFileTextIndex / scheduleUniverDocTextIndex) live in

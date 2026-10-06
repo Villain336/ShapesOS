@@ -170,7 +170,9 @@ export function isSandboxPreviewPath(pathname: string): boolean {
 /** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
 export function isUserFileRequest(pathname: string, search: URLSearchParams | string = ""): boolean {
   const params = typeof search === "string" ? new URLSearchParams(search) : search;
-  return /^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl");
+  if (/^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl")) return true;
+  // Phase 18.2 (WS=content): a shared file's bytes (/r/file/<token>/raw).
+  return /^\/r\/file\/[^/]+\/raw\/?$/.test(pathname);
 }
 
 /** Which policy a request gets (see header comment). */
@@ -213,7 +215,10 @@ export function buildSecurityHeaders(opts: { hsts: boolean }): Array<{ key: stri
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {
       key: "Permissions-Policy",
-      value: "camera=(), microphone=(), geolocation=(), payment=()",
+      // Phase 18.2 (WS=content): voice notes record in the browser, so the
+      // microphone is allowed for this origin only (self) — never for
+      // embedded third-party frames. Camera, location and payment stay off.
+      value: "camera=(), microphone=(self), geolocation=(), payment=()",
     },
     ...(opts.hsts
       ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]

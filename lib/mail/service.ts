@@ -515,7 +515,7 @@ export async function requestApproval(
     source: "mail",
     sourceId: approval.id,
     title: `${campaign.name ?? "Direct mail campaign"} · ${estimate.sendablePieces} pieces`,
-    href: "/dashboard/mail",
+    href: "/dashboard/direct-mail",
     requestedBy: opts?.requestedBy ?? null,
   });
   return { approval, estimate };
@@ -562,7 +562,7 @@ export async function decideApproval(
     decision: decision === "approve" ? "approved" : "denied",
     decidedBy: approverId,
     requestedBy: approval.approverId ?? approval.campaign.createdBy ?? null,
-    href: "/dashboard/mail",
+    href: "/dashboard/direct-mail",
   });
   return updated;
 }

@@ -12,6 +12,8 @@
 #                     cron (one replica claims each slot via an advisory lock).
 #   shapesos-worker   agent worker (Dockerfile `worker` target): claims agent
 #                     jobs (SKIP LOCKED leases); scale it for heavy runs.
+#   shapesos-collab   Phase 18.2: live collaboration (Notes co-editing) on the
+#                     worker image, ONE instance (collab.shapesos.com, wss).
 #   shapesos-migrate  holds the `migrate` image and the database OWNER URL;
 #                     release.yml runs `sh scripts/db/migrate.sh` on it as a
 #                     one-off job before web and worker deploy. Its schedule is
@@ -119,6 +121,47 @@ services:
       - fromGroup: shapesos-db-app
       - fromGroup: shapesos-shared
       - fromGroup: shapesos-worker
+
+  # Phase 18.2 (WS=content): live collaboration (Notes co-editing,
+  # scripts/collab.mts → lib/collab/server.ts). A WEB service, not a worker:
+  # browsers open a WebSocket to it, and Render background workers take no
+  # inbound traffic. Exactly ONE instance — Hocuspocus spreads a document
+  # across processes only through Redis, which this stack doesn't have;
+  # Postgres is its durable store. Same worker image; release.yml deploys it
+  # with --collab-service. SIGTERM stores every live document first.
+  - type: web
+    name: shapesos-collab
+    runtime: image
+    image:
+      url: ghcr.io/villain336/shapesos-worker:latest
+      creds:
+        fromRegistryCreds:
+          name: ghcr-shapesos
+    region: virginia
+    plan: 0.5c-512mb
+    numInstances: 1
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 60
+    dockerCommand: sh scripts/deploy/with-runtime-env.sh node node_modules/tsx/dist/cli.mjs scripts/collab.mts
+    domains:
+      - collab.shapesos.com
+    envVars:
+      - key: SHAPESOS_DB_HOST
+        fromDatabase:
+          name: shapesos-db
+          property: host
+      - key: SHAPESOS_DB_PORT
+        fromDatabase:
+          name: shapesos-db
+          property: port
+      - key: SHAPESOS_DB_NAME
+        fromDatabase:
+          name: shapesos-db
+          property: database
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384
+      - fromGroup: shapesos-db-app
+      - fromGroup: shapesos-shared
 
   - type: cron
     name: shapesos-migrate
@@ -284,6 +327,8 @@ envVarGroups:
         value: "app.shapesos.com"
       - key: TRUSTED_PROXY_HOPS
         value: "2"
+      - key: COLLAB_PUBLIC_URL
+        value: "wss://collab.shapesos.com"
       - key: CRON_RUNNER
         value: "internal"
       - key: CRON_SECRET
