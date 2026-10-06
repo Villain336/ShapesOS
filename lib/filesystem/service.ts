@@ -26,7 +26,7 @@ import { getStorageAdapter } from "./storage";
 import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditEvent } from "@/lib/auditlog";
 // Phase 18.1 (WS=find): Spotlight indexes the text inside each new file.
-import { scheduleFileTextIndex } from "@/lib/search/text-index";
+import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 
 export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
 export const TRASH_RETENTION_DAYS = 30;

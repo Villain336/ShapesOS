@@ -33,7 +33,6 @@ import { extractTextFromUpload } from "@/lib/datasetbuilder/extract";
 import { readXlsx } from "@/lib/documents/xlsx";
 import { toVectorLiteral, embedText } from "@/lib/substrate/memory/embed";
 import { log } from "@/lib/observability/log";
-import { spotlightEmbedderLoaded } from "./semantic";
 
 export const TEXT_INDEX_LIMITS = {
   /** Files larger than this are recorded as too_large (the upload cap is 25 MB). */
@@ -296,40 +295,10 @@ export async function indexUniverDocText(workspaceId: string, docId: string, opt
   return writeIndex({ workspaceId, source: "doc", univerDocId: docId }, await extractUniverText(doc.kind, doc.snapshot), opts);
 }
 
-/**
- * Run indexing after the current request without making it wait. In a Next
- * request this uses after() (the platform keeps the work alive past the
- * response); elsewhere (scripts, workers, tests) it runs detached. Failures
- * are logged; the backfill script repairs anything missed.
- */
-export function scheduleTextIndex(job: () => Promise<unknown>, label: string): void {
-  const run = () =>
-    job().catch((err) => log.warn("search text index failed", { label, error: err instanceof Error ? err.message : String(err) }));
-  void (async () => {
-    try {
-      const { after } = await import("next/server");
-      after(run);
-    } catch {
-      void run();
-    }
-  })();
-}
-
-// On write, the text is indexed at once (full text works immediately). The
-// chunks are embedded right away only when this process already has the
-// model loaded (any Spotlight search loads it); otherwise the search-index
-// cron (/api/cron/search-index) embeds them, so an upload never pays for a
-// model load. SPOTLIGHT_INDEX_ON_WRITE=off turns the write hook off (the
-// cron and the backfill script still index).
-export function scheduleFileTextIndex(workspaceId: string, fileId: string): void {
-  if (process.env.SPOTLIGHT_INDEX_ON_WRITE === "off") return;
-  scheduleTextIndex(() => indexFileText(workspaceId, fileId, { embed: spotlightEmbedderLoaded() }), `file:${fileId}`);
-}
-
-export function scheduleUniverDocTextIndex(workspaceId: string, docId: string): void {
-  if (process.env.SPOTLIGHT_INDEX_ON_WRITE === "off") return;
-  scheduleTextIndex(() => indexUniverDocText(workspaceId, docId, { embed: spotlightEmbedderLoaded() }), `doc:${docId}`);
-}
+// The write hooks (scheduleFileTextIndex / scheduleUniverDocTextIndex) live in
+// ./text-index-schedule.ts so the routes that write files never bundle this
+// module; re-exported here for existing callers and tests.
+export { scheduleTextIndex, scheduleFileTextIndex, scheduleUniverDocTextIndex } from "./text-index-schedule";
 
 export interface BackfillSummary {
   files: { scanned: number; indexed: number; unchanged: number; skipped: number; failed: number };
@@ -371,14 +340,4 @@ export async function backfillTextIndex(opts: { workspaceId?: string; force?: bo
 }
 
 /** The stored text of a record, for agents ("ask about this"). Null when not indexed. */
-export async function storedText(workspaceId: string, key: { fileId?: string; univerDocId?: string }, maxChars = 6_000): Promise<{ status: string; text: string | null; truncated: boolean } | null> {
-  const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.searchText.findFirst({
-      where: { workspaceId, ...(key.fileId ? { fileId: key.fileId } : { univerDocId: key.univerDocId }) },
-      select: { status: true, content: true, truncated: true },
-    }),
-  );
-  if (!row) return null;
-  const text = row.content ? row.content.slice(0, maxChars) : null;
-  return { status: row.status, text, truncated: row.truncated || (row.content?.length ?? 0) > maxChars };
-}
+export { storedText } from "./stored-text";

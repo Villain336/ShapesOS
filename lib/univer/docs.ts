@@ -7,7 +7,7 @@
 
 import { prisma } from "@/lib/prisma";
 // Phase 18.1 (WS=find): Spotlight indexes each doc's text on create / save.
-import { scheduleUniverDocTextIndex } from "@/lib/search/text-index";
+import { scheduleUniverDocTextIndex } from "@/lib/search/text-index-schedule";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   isUniverDocKind,
