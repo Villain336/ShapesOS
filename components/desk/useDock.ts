@@ -25,11 +25,21 @@ export function notifyDockChanged(next?: Partial<DockState>) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(DOCK_CHANGED_EVENT, { detail: next ?? null }));
 }
 
+// One read serves every mounted dock (the sidebar and the ⌃Tab switcher both
+// listen for DOCK_CHANGED_EVENT): concurrent callers share the request in
+// flight instead of each spending a request from the per-user read budget.
+let dockInFlight: Promise<DockState | null> | null = null;
+
 function fetchDock(): Promise<DockState | null> {
-  return fetch("/api/desk/dock", { cache: "no-store" })
+  if (dockInFlight) return dockInFlight;
+  dockInFlight = fetch("/api/desk/dock", { cache: "no-store" })
     .then((res) => (res.ok ? (res.json() as Promise<DockState>) : null))
     .then((b) => (b ? { pinned: b.pinned ?? [], recents: b.recents ?? [] } : null))
-    .catch(() => null); // keep the last good dock
+    .catch(() => null) // keep the last good dock
+    .finally(() => {
+      dockInFlight = null;
+    });
+  return dockInFlight;
 }
 
 export function useDock(initial: DockState | null) {

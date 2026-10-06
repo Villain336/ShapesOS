@@ -36,10 +36,19 @@ async function call<T>(url: string, init: RequestInit, t: Translator): Promise<T
   return body;
 }
 
+// Control Center is mounted twice (desktop top bar + mobile header): the two
+// share one request in flight instead of each spending one.
+let controlInFlight: Promise<ControlState | null> | null = null;
+
 function fetchControl(): Promise<ControlState | null> {
-  return fetch("/api/desk/control", { cache: "no-store" })
+  if (controlInFlight) return controlInFlight;
+  controlInFlight = fetch("/api/desk/control", { cache: "no-store" })
     .then((res) => (res.ok ? (res.json() as Promise<ControlState>) : null))
-    .catch(() => null); // keep the last good state
+    .catch(() => null) // keep the last good state
+    .finally(() => {
+      controlInFlight = null;
+    });
+  return controlInFlight;
 }
 
 export function useControlState() {
