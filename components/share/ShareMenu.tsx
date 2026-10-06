@@ -382,7 +382,7 @@ export function ShareMenuContent({
   return (
     <>
       {step === "channels" ? (
-        <div>
+        <div role="menu" aria-label={t("flow.share.pickChannel")}>
           <MenuRow
             icon={ArrowLeft}
             label={t("flow.share.back")}
@@ -410,7 +410,7 @@ export function ShareMenuContent({
           ))}
         </div>
       ) : (
-        <div aria-busy={busy || undefined}>
+        <div role="menu" aria-label={t("flow.share.title", { title: record.title })} aria-busy={busy || undefined}>
           <MenuLabel>{t("flow.share.sendTo")}</MenuLabel>
           {apps.map((x) => (
             <MenuRow

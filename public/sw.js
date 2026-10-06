@@ -25,7 +25,7 @@
  *      same-origin link on click.
  */
 
-const VERSION = "2026-10-06.3";
+const VERSION = "2026-10-06.4";
 const STATIC_CACHE = "shapes-static-" + VERSION;
 const META_CACHE = "shapes-meta";
 const DATA_PREFIX = "shapes-data-";

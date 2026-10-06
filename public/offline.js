@@ -44,7 +44,7 @@
     return n;
   }
   function fmt(s, vars) { return String(s).replace(/\{(\w+)\}/g, function (_, k) { return vars[k] != null ? vars[k] : ""; }); }
-  function readJson(cache, url) { return cache.match(url).then(function (r) { return r ? r.json() : null; }).catch(function () { return null; }); }
+  function readJson(cache, url) { return cache.match(url, { ignoreVary: true }).then(function (r) { return r ? r.json() : null; }).catch(function () { return null; }); }
 
   function readQueue() {
     try { var v = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
