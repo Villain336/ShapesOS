@@ -28,6 +28,11 @@ export function RecentsTracker() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ href, title: document.title }),
         });
+        // Always read the body: an unread response keeps its HTTP/1.1
+        // connection busy, and with a visit on every navigation the browser's
+        // six connections per host run out (later requests then queue
+        // forever — found by the Phase 18.1 production smoke).
+        await res.text().catch(() => "");
         if (res.ok) notifyDockChanged();
       } catch {
         // a missed visit is harmless

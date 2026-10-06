@@ -246,11 +246,13 @@ function connectorIcon(key: string, name: string): UICommand["icon"] {
 
 async function postAudit(payload: AuditPayload): Promise<void> {
   try {
-    await fetch("/api/command/audit", {
+    const res = await fetch("/api/command/audit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    // Release the connection (an unread body keeps it busy).
+    await res.text().catch(() => "");
   } catch {
     // Audit is best-effort from the client; the route itself is append-only.
   }

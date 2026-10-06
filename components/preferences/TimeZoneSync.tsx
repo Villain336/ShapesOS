@@ -27,7 +27,10 @@ export function TimeZoneSync({ needed }: { needed: boolean }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ timeZone: zone }),
     })
-      .then((res) => {
+      .then(async (res) => {
+        // Read the body so the connection is released (an unread response
+        // holds one of the browser's six per-host connections).
+        await res.text().catch(() => "");
         if (res.ok) router.refresh();
       })
       .catch(() => {

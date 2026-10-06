@@ -45,6 +45,8 @@ export function useNotifications(limit = 8) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    // Release the connection (an unread body keeps it busy).
+    await res.text().catch(() => "");
     if (!res.ok) return;
     // The shared list is now stale for every mounted bell.
     invalidateShared(`/api/notifications?limit=${limit}`);
