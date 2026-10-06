@@ -85,7 +85,7 @@ export function SessionsPanel({ initial, currentListed }: { initial: SessionView
                     </span>
                   </td>
                   <td className={`${tdCls} whitespace-nowrap text-muted`}>{format.date(s.createdAt, "dateTime")}</td>
-                  <td className={`${tdCls} whitespace-nowrap text-muted`}>{format.relative(s.lastSeenAt)}</td>
+                  <td className={`${tdCls} whitespace-nowrap text-muted`}>{format.date(s.lastSeenAt, "dateTime")}</td>
                   <td className={`${tdCls} font-mono text-xs text-muted`}>{s.ipPrefix ?? "—"}</td>
                   <td className={`${tdCls} text-right`}>
                     <button
@@ -144,7 +144,7 @@ export function DevicesPanel({ initial }: { initial: Array<Pick<PushDeviceView, 
             <span className="min-w-0 flex-1">
               <span className="block font-medium text-ink">{name}</span>
               <span className="block text-xs text-muted">
-                {t("trust.privacy.devices.lastSeen")} {format.relative(d.lastSeenAt)}
+                {t("trust.privacy.devices.lastSeen")} {format.date(d.lastSeenAt, "dateTime")}
               </span>
             </span>
             <button type="button" disabled={busy === d.id} onClick={() => void remove(d.id)} aria-label={t("trust.privacy.devices.removeLabel", { device: name })} className={aosButton({ variant: "secondary", size: "xs" })}>
