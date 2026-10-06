@@ -221,6 +221,21 @@ describe("process drain (lib/runtime/shutdown.ts)", () => {
     assert.equal(beginDrain("SIGTERM"), drained, "idempotent");
   });
 
+  it("waits the flush window after draining before it exits (the last frames must reach the socket)", async () => {
+    const s = reader(sseStream(async (ch) => void (await new Promise((r) => ch.signal.addEventListener("abort", r))), { clock: fakeClock().clock }));
+    await tick();
+    let exitCode: number | null = null;
+    const started = Date.now();
+    const drained = beginDrain("SIGTERM", { graceMs: 5_000, flushMs: 80, exit: (c) => (exitCode = c), log: () => undefined });
+    await s.ended;
+    assert.match(s.text(), /event: reconnect/);
+    await tick();
+    assert.equal(exitCode, null, "not in the same tick as the last stream closing");
+    await drained;
+    assert.equal(exitCode, 0);
+    assert.ok(Date.now() - started >= 75, "exited only after the flush window");
+  });
+
   it("exits at the deadline when work does not finish", async () => {
     void trackBackgroundWork(new Promise(() => undefined));
     let exitCode: number | null = null;

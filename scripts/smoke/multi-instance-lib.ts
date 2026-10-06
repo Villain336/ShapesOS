@@ -92,9 +92,11 @@ export async function uploadOnAFetchOnB(a: Instance, b: Instance, jar: CookieJar
   form.set("path", "/files");
   form.set("file", new File([new Uint8Array(bytes)], `smoke-${Date.now()}.txt`, { type: "text/plain" }));
   const up = await fetch(`${a.base}/api/files`, { method: "POST", body: form, headers: { cookie: jar.header(), origin: a.base } });
-  const upBody = (await up.json().catch(() => ({}))) as { file?: { id?: string } };
+  const upBody = (await up.json().catch(() => ({}))) as { file?: { id?: string }; error?: string };
   const id = upBody.file?.id;
-  const checks: Check[] = [{ name: "upload a workspace file through A", ok: up.status === 201 && !!id, detail: `status ${up.status}` }];
+  const checks: Check[] = [
+    { name: "upload a workspace file through A", ok: up.status === 201 && !!id, detail: `status ${up.status}${upBody.error ? ` (${upBody.error})` : ""}` },
+  ];
   if (!id) return checks;
   const down = await fetch(`${b.base}/api/files/${encodeURIComponent(id)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`, {
     headers: { cookie: jar.header() },

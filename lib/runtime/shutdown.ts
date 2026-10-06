@@ -128,7 +128,19 @@ export interface DrainOptions {
   exit?: (code: number) => void;
   log?: (msg: string, fields?: Record<string, unknown>) => void;
   now?: () => number;
+  /**
+   * After everything drained, wait this long before exit (default
+   * SHUTDOWN_FLUSH_MS). A stream's last frames — the `event: reconnect` —
+   * are only enqueued when its producer finishes; exiting in the same tick
+   * dropped them before the socket wrote them (caught by the two-instance
+   * smoke). Next's own SIGTERM handler still exits first once its HTTP
+   * server has closed, which happens after every response is flushed.
+   */
+  flushMs?: number;
 }
+
+/** Flush window between "everything drained" and exit. */
+export const SHUTDOWN_FLUSH_MS = 1_000;
 
 /**
  * Start draining (idempotent). Resolves when every stream and tracked task
@@ -176,6 +188,15 @@ export function beginDrain(reason: DrainReason, opts: DrainOptions = {}): Promis
       openStreams: state.streams.size,
       background: state.background.size,
     });
+    if (how === "done" && opts.exit) {
+      const flushMs = Math.max(0, opts.flushMs ?? SHUTDOWN_FLUSH_MS);
+      return new Promise<void>((resolve) =>
+        setTimeout(() => {
+          opts.exit?.(0);
+          resolve();
+        }, flushMs),
+      );
+    }
     opts.exit?.(0);
   });
   return state.finished;

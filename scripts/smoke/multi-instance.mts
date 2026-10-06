@@ -167,7 +167,10 @@ async function main() {
   // 4. Session + storage.
   checks.push(await signIn(a.base, jar, email, password));
   checks.push(await sessionOn(b, jar, email));
-  const bytes = new Uint8Array(randomBytes(64 * 1024));
+  // Real text (the upload safety check rejects bytes that don't match the
+  // .txt extension), unique per run and large enough to span several chunks.
+  const line = `multi-instance smoke ${randomBytes(8).toString("hex")} — the quick brown fox jumps over the lazy dog\n`;
+  const bytes = new TextEncoder().encode(line.repeat(Math.ceil((64 * 1024) / line.length)));
   checks.push(...(await uploadOnAFetchOnB(a, b, jar, ids.workspaceId, bytes)));
   const objectsBefore = fake ? fake.objects.size : 0;
   checks.push(...(await siteOnAReadOnB(a, b, jar, ids.projectId)));
