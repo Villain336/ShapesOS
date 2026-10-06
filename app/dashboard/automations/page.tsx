@@ -10,7 +10,6 @@ import { getMembership } from "@/lib/authz";
 import { getI18n } from "@/lib/i18n/server";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { loadAutomations } from "@/lib/automations/list";
-import { actionCatalog, triggerCatalog } from "@/lib/automations/catalog";
 import { AutomationsApp } from "@/components/automations/AutomationsApp";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +26,12 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
   const membership = await getMembership(user.id, workspace.id);
   if (!membership) redirect("/dashboard");
   const actor = { workspaceId: workspace.id, userId: user.id, role: membership.role };
-  const [data, skills] = await Promise.all([
+  // Lazy: the action catalogue walks the whole agent tool registry, which the
+  // production build should not compile into this page's static graph.
+  const [data, skills, { actionCatalog, triggerCatalog }] = await Promise.all([
     loadAutomations(actor),
     withWorkspaceScope(workspace.id, (tx) => tx.skill.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, take: 200 })),
+    import("@/lib/automations/catalog"),
   ]);
   const sp = await searchParams;
   const item = typeof sp.item === "string" && sp.item.length <= 200 ? sp.item : null;

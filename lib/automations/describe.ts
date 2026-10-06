@@ -28,7 +28,8 @@ import { allTools, type ToolDef } from "@/lib/chat/tools";
 import { actionEntryForTool } from "./catalog";
 export { workflowGraphBody } from "./model";
 
-export const DRAFT_TEXT_MAX = 2000;
+import { DRAFT_TEXT_MAX } from "./limits";
+export { DRAFT_TEXT_MAX };
 const MAX_DRAFT_NODES = 12;
 
 export interface DraftContext {

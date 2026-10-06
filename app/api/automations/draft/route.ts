@@ -10,7 +10,8 @@
 import { errorResponse } from "@/lib/api/errors";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { prisma } from "@/lib/prisma";
-import { DRAFT_TEXT_MAX, draftAutomation } from "@/lib/automations/describe";
+// Lazy (in the handler): the drafter validates against the whole agent tool registry.
+import { DRAFT_TEXT_MAX } from "@/lib/automations/limits";
 import { flowGuard, readJsonObject } from "../_lib";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
       withWorkspaceScope(ctx.workspaceId, (tx) => tx.skill.findMany({ where: { workspaceId: ctx.workspaceId }, select: { id: true, name: true, description: true }, take: 50 })),
       prisma.userPreference.findUnique({ where: { userId: ctx.userId }, select: { timeZone: true } }).catch(() => null),
     ]);
-    const { getLlmProviderForWorkspace } = await import("@/lib/llm/workspace");
+    const [{ getLlmProviderForWorkspace }, { draftAutomation }] = await Promise.all([import("@/lib/llm/workspace"), import("@/lib/automations/describe")]);
     const llm = await getLlmProviderForWorkspace("lead", { workspaceId: ctx.workspaceId, actorId: ctx.userId });
     const result = await draftAutomation(
       text,
