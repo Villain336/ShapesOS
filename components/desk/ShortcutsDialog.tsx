@@ -186,7 +186,7 @@ export function ShortcutsDialog({
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[60] bg-ink/40" />
+        <Dialog.Backdrop className="fixed inset-0 z-[60] bg-night/40" />
         <Dialog.Popup
           data-testid="shortcuts-dialog"
           className="fixed top-[8vh] left-1/2 z-[61] flex max-h-[84vh] w-[min(720px,calc(100vw-32px))] -translate-x-1/2 flex-col overflow-hidden rounded-lg bg-paper text-ink shadow-overlay"

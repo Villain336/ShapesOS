@@ -193,7 +193,7 @@ export function AppSwitcher({ role, initialDock }: { role?: string | null; initi
   if (!open) return null;
   const activeId = entries[active] ? `switcher-opt-${active}` : undefined;
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-ink/40 px-4 pt-[12vh]" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-night/40 px-4 pt-[12vh]" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div role="dialog" aria-modal="true" aria-labelledby="switcher-title" className="w-full max-w-[520px] overflow-hidden rounded-lg bg-paper shadow-overlay" data-testid="app-switcher">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <ArrowLeftRight className="size-4 text-muted" aria-hidden />

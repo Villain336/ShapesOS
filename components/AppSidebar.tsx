@@ -206,7 +206,7 @@ function WorkspaceMenu({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block text-[17px] leading-5 font-extrabold stretch-display tracking-heading text-paper">ShapesOS</span>
+              <span className="block text-[1.0625rem] leading-5 font-extrabold stretch-display tracking-heading text-paper">ShapesOS</span>
               <span className="block truncate text-xs text-night-muted">{current?.name ?? t("shell.workspace")}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-night-soft" aria-hidden />
@@ -921,7 +921,7 @@ export function MobileNav({
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-paper px-4 md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2.5" aria-label={t("shell.home")}>
         <LogoMark size={26} />
-        <span className="text-[17px] font-extrabold stretch-display tracking-heading text-ink">ShapesOS</span>
+        <span className="text-[1.0625rem] font-extrabold stretch-display tracking-heading text-ink">ShapesOS</span>
       </Link>
       <div className="flex items-center gap-1.5">
         {lead ? (
