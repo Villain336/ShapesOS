@@ -238,6 +238,61 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
 }
 
 /**
+ * Phase 17 (latency): one page of a run's TIMELINE events (streamed text and
+ * usage bookkeeping excluded), NEWEST first, before a seq cursor. The run
+ * page shows the newest page and loads older ones on demand ("Load earlier
+ * steps") instead of reading every event of a long run. `before` = the
+ * cursor for the next (older) page, null when this was the oldest.
+ */
+export const RUN_EVENTS_PAGE = 100;
+const NOT_TIMELINE: AgentRunEventType[] = ["text", "usage"];
+
+export async function listAgentRunEventsPage(
+  workspaceId: string,
+  runId: string,
+  opts: { beforeSeq?: number | null; limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(Math.floor(opts.limit ?? RUN_EVENTS_PAGE), 1), 500);
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const where = {
+      runId,
+      workspaceId,
+      type: { notIn: NOT_TIMELINE },
+      ...(typeof opts.beforeSeq === "number" ? { seq: { lt: opts.beforeSeq } } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      tx.agentRunEvent.findMany({ where, orderBy: { seq: "desc" }, take: limit + 1 }),
+      typeof opts.beforeSeq === "number"
+        ? Promise.resolve(null)
+        : tx.agentRunEvent.count({ where: { runId, workspaceId, type: { notIn: NOT_TIMELINE } } }),
+    ]);
+    const more = rows.length > limit;
+    const events = more ? rows.slice(0, limit) : rows;
+    return { events, before: more ? events[events.length - 1]!.seq : null, total };
+  });
+}
+
+/** Phase 17: only the run's events of these types (usage totals) or payload kinds (the sandbox console). */
+export async function listAgentRunEventsWhere(
+  workspaceId: string,
+  runId: string,
+  filter: { types?: AgentRunEventType[]; payloadKindPrefix?: string },
+) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: {
+        runId,
+        workspaceId,
+        ...(filter.types ? { type: { in: filter.types } } : {}),
+        ...(filter.payloadKindPrefix ? { payload: { path: ["kind"], string_starts_with: filter.payloadKindPrefix } } : {}),
+      },
+      orderBy: { seq: "asc" },
+      take: 5_000,
+    }),
+  );
+}
+
+/**
  * Phase 8: the run's events after a sequence number, in order (bounded) —
  * how the AG-UI SSE route tails a run as it works, in this process or on a
  * worker.

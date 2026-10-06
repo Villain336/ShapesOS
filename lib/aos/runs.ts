@@ -182,18 +182,14 @@ export interface TimelineModel {
   neutral: boolean;
 }
 
-export function runTimeline(input: {
-  /** prisma AgentRunStatus. */
-  status: string;
-  events: readonly RunEventInput[];
-  upcoming?: readonly UpcomingStep[];
-  /** Mission approvals still pending (live runs then show Needs you). */
-  pendingApprovals?: number;
-  clock?: (d: Date) => string;
-}): TimelineModel {
-  const clock = input.clock ?? clockTime;
-  const events = [...input.events].sort((a, b) => a.seq - b.seq);
-  const steps: TimelineStep[] = events.map((e) => {
+/**
+ * Recorded run events → timeline steps, oldest first. Phase 17: shared by
+ * the run page and the "Load earlier steps" route (older pages are mapped
+ * the same way). PURE.
+ */
+export function eventSteps(input: readonly RunEventInput[], clock: (d: Date) => string = clockTime): TimelineStep[] {
+  const events = [...input].sort((a, b) => a.seq - b.seq);
+  return events.map((e) => {
     const tool = toolCallFromPayload(e.payload) ?? undefined;
     const err = scalar(rec(e.payload).error);
     return {
@@ -207,6 +203,18 @@ export function runTimeline(input: {
       asksFirstLabel: e.type === "gate" ? "Waited for your approval" : undefined,
     };
   });
+}
+
+export function runTimeline(input: {
+  /** prisma AgentRunStatus. */
+  status: string;
+  events: readonly RunEventInput[];
+  upcoming?: readonly UpcomingStep[];
+  /** Mission approvals still pending (live runs then show Needs you). */
+  pendingApprovals?: number;
+  clock?: (d: Date) => string;
+}): TimelineModel {
+  const steps = eventSteps(input.events, input.clock ?? clockTime);
   const aos = runStatus(input.status, input.pendingApprovals ?? 0);
   const live = aos === "running" || aos === "needs";
   const upcoming: TimelineStep[] = live || aos === "queued"

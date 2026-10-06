@@ -188,3 +188,5 @@ lib/runtime/__tests__/agent-drain-db.test.ts
 lib/llm/__tests__/usage-outbox-db.test.ts
 # Phase 17 (latency): ops overview payments as one SQL aggregate per kind == the in-memory sum (5,200 seeded rows, beyond the old 5,000-row read), RLS-scoped.
 lib/ops/__tests__/overview-payments-db.test.ts
+# Phase 17 (latency): run-event pagination (newest first, seq cursor, every timeline event once, text/usage excluded, RLS).
+lib/agents/runs/__tests__/events-page-db.test.ts
