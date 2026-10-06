@@ -165,6 +165,10 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
   // Phase 18.1 (find): a Spotlight text row is a file's (search_texts_source_check
   // pairs source with its key column; the key is filled through FILL_LINKS).
   search_texts: { source: "file", status: "indexed" },
+  // Phase 18.2 (comms, at integration): a channel's kind decides its keys
+  // (chat_channels_kind_project_check / _kind_dm_check) — a plain workspace
+  // channel needs neither a project nor a DM key.
+  chat_channels: { kind: "channel" },
 };
 
 // Optional foreign keys a CHECK constraint requires for the fixed values above
