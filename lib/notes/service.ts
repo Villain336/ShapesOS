@@ -32,6 +32,7 @@
 // for Spotlight and audits "note_created". `content` (Tiptap JSON) may be
 // passed instead of `body`.
 
+import { isUnlinkableKind, UNLINKABLE_REASON } from "./linkable";
 import type { Prisma, WorkspaceRole } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { roleAtLeast } from "@/lib/authz";
@@ -61,13 +62,8 @@ export const NOTE_SHARE_STATES = ["private", "workspace"] as const;
 export type NoteShareState = (typeof NOTE_SHARE_STATES)[number];
 export const NOTE_LINKS_MAX = 25;
 const RECORD_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-/**
- * Kinds a note never links to. "mail" (Phase 18.2 comms) is PERSONAL — a
- * member's own mailbox threads (Spotlight shows them to their owner only) —
- * and a note can be shared with the workspace, so a link (and its label, the
- * subject) would leak it.
- */
-export const UNLINKABLE_KINDS: readonly RecordKind[] = ["mail"];
+// Personal kinds a note never links to: lib/notes/linkable.ts (re-exported).
+export { UNLINKABLE_KINDS } from "./linkable";
 
 export interface NoteActor {
   workspaceId: string;
@@ -219,7 +215,7 @@ export function normalizeLinks(links: unknown): Array<{ kind: RecordKind; id: st
     const kind = String((l as NoteLinkInput)?.kind ?? "");
     const id = String((l as NoteLinkInput)?.id ?? "");
     if (!(RECORD_KINDS as readonly string[]).includes(kind)) throw new BadRequestError(`Unknown record kind "${kind.slice(0, 40)}".`);
-    if ((UNLINKABLE_KINDS as readonly string[]).includes(kind)) throw new BadRequestError("Mail threads are personal, so a note can't link to one.");
+    if (isUnlinkableKind(kind)) throw new BadRequestError(UNLINKABLE_REASON[kind as RecordKind] ?? "That record is personal, so a note can't link to it.");
     if (!RECORD_ID_RE.test(id)) throw new BadRequestError("A record id is 1-64 letters, digits, - or _.");
     const rawLabel = (l as NoteLinkInput)?.label;
     const label = typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.replace(/\s+/g, " ").trim().slice(0, 200) : null;

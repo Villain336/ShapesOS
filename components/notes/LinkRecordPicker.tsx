@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
+import { isUnlinkableKind } from "@/lib/notes/linkable";
 
 export interface PickedRecord {
   kind: string;
@@ -39,8 +40,8 @@ export function LinkRecordPicker({ onPick, exclude = [] }: { onPick: (r: PickedR
       fetch(`/api/search/records?q=${encodeURIComponent(query)}&limit=4`, { signal: ctl.signal, cache: "no-store" })
         .then((r) => (r.ok ? r.json() : { results: [] }))
         .then((body: { results: PickedRecord[] }) => {
-          // Not notes themselves, and not personal mail threads (lib/notes/service UNLINKABLE_KINDS).
-          const list = (body.results ?? []).filter((r) => r.kind !== "note" && r.kind !== "mail" && !exclude.some((e) => e.kind === r.kind && e.id === r.id)).slice(0, 12);
+          // Not notes themselves, and not personal records (mail threads, Assistant chats: lib/notes/linkable.ts).
+          const list = (body.results ?? []).filter((r) => r.kind !== "note" && !isUnlinkableKind(r.kind) && !exclude.some((e) => e.kind === r.kind && e.id === r.id)).slice(0, 12);
           setResults(list);
           setActive(0);
         })

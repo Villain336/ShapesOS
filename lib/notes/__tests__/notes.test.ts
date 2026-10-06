@@ -101,6 +101,7 @@ describe("note links", () => {
     assert.throws(() => normalizeLinks([{ kind: "users", id: "x" }]), /Unknown record kind/);
     assert.throws(() => normalizeLinks([{ kind: "lead", id: "a b" }]), /record id/);
     assert.throws(() => normalizeLinks([{ kind: "mail", id: "t1", label: "Re: salary" }]), /personal/, "a member's own mail threads never link to a (shareable) note");
+    assert.throws(() => normalizeLinks([{ kind: "chat_message", id: "m1", label: "My raise question" }]), /Assistant chats are personal/, "a member's own Assistant chats never link to a (shareable) note");
     assert.throws(() => normalizeLinks(Array.from({ length: 26 }, (_, i) => ({ kind: "lead", id: `l${i}` }))), /at most 25/);
   });
   it("every record kind opens somewhere real", () => {
