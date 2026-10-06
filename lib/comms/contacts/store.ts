@@ -171,7 +171,7 @@ export async function syncContactIdentities(db: Db, workspaceId: string, now = n
       result.linked++;
     } catch {
       // A concurrent sync linked it first: drop ours, keep theirs.
-      await db.contactIdentity.delete({ where: { id: identity.id } }).catch(() => undefined);
+      await db.contactIdentity.delete({ where: { id: identity.id, workspaceId } }).catch(() => undefined);
       const theirs = await db.contactIdentityLink.findFirst({ where: { workspaceId, recordKind: r.kind, recordId: r.id }, select: { identityId: true } });
       if (theirs) identityOf.set(key, theirs.identityId);
     }
@@ -255,7 +255,7 @@ export async function syncContactIdentities(db: Db, workspaceId: string, now = n
     const stillWanted = wanted.has(`${s.aKind}:${s.aId}|${s.bKind}:${s.bId}`);
     if (sameIdentity || missing || !stillWanted) {
       // An agent's or person's proposal stays until decided unless it became moot.
-      const proposed = await db.contactMergeSuggestion.findUnique({ where: { id: s.id }, select: { proposedVia: true } });
+      const proposed = await db.contactMergeSuggestion.findUnique({ where: { id: s.id, workspaceId }, select: { proposedVia: true } });
       if (!sameIdentity && !missing && proposed?.proposedVia !== "sync") continue;
       await db.contactMergeSuggestion.update({ where: { id: s.id, workspaceId }, data: { status: "stale" } });
       result.staled++;
@@ -296,7 +296,7 @@ export async function listIdentities(db: Db, opts: { workspaceId: string; q?: st
   }
   const [rows, total] = await Promise.all([
     db.contactIdentity.findMany({
-      where,
+      where: { ...where, workspaceId: opts.workspaceId },
       orderBy: [{ displayName: "asc" }, { id: "asc" }],
       take: limit,
       skip: Math.max(0, opts.offset ?? 0),
@@ -562,8 +562,8 @@ export async function listSuggestions(
     filter = { ...filter, OR: [...sides.map((s) => ({ aKind: s.kind, aId: s.id })), ...sides.map((s) => ({ bKind: s.kind, bId: s.id }))] };
   }
   const [rows, total] = await Promise.all([
-    db.contactMergeSuggestion.findMany({ where: filter, orderBy: [{ score: "desc" }, { createdAt: "asc" }], take: limit }),
-    db.contactMergeSuggestion.count({ where: filter }),
+    db.contactMergeSuggestion.findMany({ where: { ...filter, workspaceId: opts.workspaceId }, orderBy: [{ score: "desc" }, { createdAt: "asc" }], take: limit }),
+    db.contactMergeSuggestion.count({ where: { ...filter, workspaceId: opts.workspaceId } }),
   ]);
   const keys = rows.flatMap((r) => [
     { kind: r.aKind as ContactRecordKind, id: r.aId },
@@ -632,7 +632,7 @@ export async function proposeMerge(
     return { suggestion: view, outcome: "exists" };
   }
   const row = existing
-    ? await db.contactMergeSuggestion.update({ where: { id: existing.id }, data: { status: "pending", score: evidence.score, reasons: evidence.reasons, proposedVia: opts.via, decidedBy: null, decidedAt: null } })
+    ? await db.contactMergeSuggestion.update({ where: { id: existing.id, workspaceId: opts.workspaceId }, data: { status: "pending", score: evidence.score, reasons: evidence.reasons, proposedVia: opts.via, decidedBy: null, decidedAt: null } })
     : await db.contactMergeSuggestion.create({ data: { ...key, score: evidence.score, reasons: evidence.reasons, status: "pending", proposedVia: opts.via } });
   const view = (await listSuggestions(db, { workspaceId: opts.workspaceId, identityId: ia, limit: 200 })).items.find((s) => s.id === row.id) ?? null;
   return { suggestion: view, outcome: "proposed" };
@@ -678,7 +678,7 @@ export async function confirmSuggestion(db: Db, opts: { workspaceId: string; sug
       data: { linkedVia: "merge", confirmedBy: opts.userId, confirmedAt: now },
     });
   }
-  await db.contactMergeSuggestion.update({ where: { id: s.id }, data: { status: "confirmed", decidedBy: opts.userId, decidedAt: now } });
+  await db.contactMergeSuggestion.update({ where: { id: s.id, workspaceId: opts.workspaceId }, data: { status: "confirmed", decidedBy: opts.userId, decidedAt: now } });
   await refreshIdentity(db, opts.workspaceId, ia);
   return { identityId: ia };
 }
@@ -689,7 +689,7 @@ export async function rejectSuggestion(db: Db, opts: { workspaceId: string; sugg
   if (!s) throw new ContactsError(404, "Suggestion not found.");
   if (s.status !== "pending") throw new ContactsError(409, `This suggestion was already ${s.status}.`);
   const now = opts.now ?? new Date();
-  await db.contactMergeSuggestion.update({ where: { id: s.id }, data: { status: "rejected", decidedBy: opts.userId, decidedAt: now } });
+  await db.contactMergeSuggestion.update({ where: { id: s.id, workspaceId: opts.workspaceId }, data: { status: "rejected", decidedBy: opts.userId, decidedAt: now } });
   // "Not the same person" is about the two PEOPLE: remember it for every
   // record pair across them, so it holds even if one of them is later split.
   if (!isContactRecordKind(s.aKind) || !isContactRecordKind(s.bKind)) return;
@@ -728,7 +728,7 @@ export async function unlinkRecord(db: Db, opts: { workspaceId: string; identity
   const rec = recs.get(`${opts.kind}:${opts.id}`);
   const s = identitySummary(rec ? [rec] : []);
   const fresh = await db.contactIdentity.create({ data: { workspaceId: opts.workspaceId, displayName: s.displayName.slice(0, 300), emails: s.emails, phones: s.phones, companies: s.companies, recordCount: 1 }, select: { id: true } });
-  await db.contactIdentityLink.update({ where: { id: link.id }, data: { identityId: fresh.id, linkedVia: "sync", confirmedBy: null, confirmedAt: null } });
+  await db.contactIdentityLink.update({ where: { id: link.id, workspaceId: opts.workspaceId }, data: { identityId: fresh.id, linkedVia: "sync", confirmedBy: null, confirmedAt: null } });
   for (const o of others) {
     const [p, q] = orderPair({ kind: opts.kind as string, id: opts.id }, { kind: o.recordKind, id: o.recordId });
     const key = { workspaceId: opts.workspaceId, aKind: p.kind, aId: p.id, bKind: q.kind, bId: q.id };

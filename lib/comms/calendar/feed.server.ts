@@ -79,7 +79,7 @@ export async function resolveFeed(workspaceId: string, token: string, now = new 
     if (!member && !owner) return null;
     // Last used: at most once an hour (feeds poll often).
     if (!row.lastUsedAt || now.getTime() - row.lastUsedAt.getTime() > 3_600_000) {
-      await tx.calendarFeedToken.update({ where: { id: row.id }, data: { lastUsedAt: now } });
+      await tx.calendarFeedToken.update({ where: { id: row.id, workspaceId }, data: { lastUsedAt: now } });
     }
     return { userId: row.userId };
   });

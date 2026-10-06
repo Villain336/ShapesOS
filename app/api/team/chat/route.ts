@@ -95,7 +95,7 @@ export async function POST(req: Request) {
   // Auto-create the per-project channel.
   const channel = await withWorkspaceScope(project.workspaceId, (tx) =>
     tx.chatChannel.upsert({
-      where: { projectId: project.id },
+      where: { projectId: project.id, workspaceId: project.workspaceId },
       update: {},
       create: { workspaceId: project.workspaceId, kind: "project", projectId: project.id, name: `${project.domain} chat` },
       select: { id: true },

@@ -170,7 +170,7 @@ async function postAgentMessage(input: {
         meta: (input.meta ?? undefined) as object | undefined,
       },
     });
-    await tx.chatChannel.update({ where: { id: input.channelId }, data: { lastMessageAt: row.createdAt } });
+    await tx.chatChannel.update({ where: { id: input.channelId, workspaceId: input.workspaceId }, data: { lastMessageAt: row.createdAt } });
     return messageView(row);
   });
 }
@@ -187,7 +187,7 @@ async function runTurnJob(payload: ChannelAgentJobPayload, deps: ChannelAgentDep
     if (!message) return null;
     const channel = await tx.chatChannel.findFirst({ where: { id: message.channelId, workspaceId } });
     if (!channel) return null;
-    const member = await tx.chatChannelMember.findUnique({ where: { channelId_memberKey: { channelId: channel.id, memberKey: userKey(payload.requestedBy) } } });
+    const member = await tx.chatChannelMember.findUnique({ where: { channelId_memberKey: { channelId: channel.id, memberKey: userKey(payload.requestedBy) }, workspaceId } });
     const root = message.parentId ?? message.id;
     const thread = await tx.teamChatMessage.findMany({ where: { workspaceId, OR: [{ id: root }, { parentId: root }] }, orderBy: { createdAt: "asc" }, take: 200 });
     return { message, channel, canSee: canSee(channel, !!member), root, thread };
@@ -293,7 +293,7 @@ async function setDecision(workspaceId: string, messageId: string, update: (meta
     const next = update(meta);
     if (!next) return null;
     // Optimistic: only if nobody changed it since we read it.
-    const n = await tx.teamChatMessage.updateMany({ where: { id: row.id, editedAt: row.editedAt }, data: { meta: next as object, editedAt: new Date() } });
+    const n = await tx.teamChatMessage.updateMany({ where: { id: row.id, workspaceId, editedAt: row.editedAt }, data: { meta: next as object, editedAt: new Date() } });
     return n.count === 1 ? next : null;
   });
 }

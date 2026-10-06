@@ -134,7 +134,7 @@ export function canSee(channel: Pick<ChannelRow, "kind" | "isPrivate">, isMember
 export async function channelFor(tx: Tx, ctx: MessagesCtx, channelId: string) {
   const channel = await tx.chatChannel.findFirst({ where: { id: channelId, workspaceId: ctx.workspaceId }, select: CHANNEL_SELECT });
   if (!channel) throw new HttpError(404, "Channel not found.");
-  const me = await tx.chatChannelMember.findUnique({ where: { channelId_memberKey: { channelId, memberKey: userKey(ctx.userId) } } });
+  const me = await tx.chatChannelMember.findUnique({ where: { channelId_memberKey: { channelId, memberKey: userKey(ctx.userId) }, workspaceId: ctx.workspaceId } });
   if (!canSee(channel, !!me)) throw new HttpError(404, "Channel not found.");
   return { channel, me };
 }
@@ -191,7 +191,7 @@ export async function listChannels(ctx: MessagesCtx, opts: { includeArchived?: b
     });
     const dmIds = rows.filter((r) => r.kind === "dm").map((r) => r.id);
     const dmMembers = dmIds.length
-      ? await tx.chatChannelMember.findMany({ where: { channelId: { in: dmIds } }, select: { channelId: true, memberKey: true, userId: true, agentKey: true, role: true } })
+      ? await tx.chatChannelMember.findMany({ where: { workspaceId: ctx.workspaceId, channelId: { in: dmIds } }, select: { channelId: true, memberKey: true, userId: true, agentKey: true, role: true } })
       : [];
     const people = new Map((await workspaceMembers(ctx.workspaceId)).map((m) => [m.userId, m]));
     const unread = await unreadByChannel(tx, ctx);
@@ -226,7 +226,7 @@ export async function listChannels(ctx: MessagesCtx, opts: { includeArchived?: b
 export async function channelMembers(ctx: MessagesCtx, channelId: string): Promise<ChannelMemberView[]> {
   return scoped(ctx, async (tx) => {
     await channelFor(tx, ctx, channelId);
-    const rows = await tx.chatChannelMember.findMany({ where: { channelId }, orderBy: { joinedAt: "asc" }, take: 500 });
+    const rows = await tx.chatChannelMember.findMany({ where: { channelId, workspaceId: ctx.workspaceId }, orderBy: { joinedAt: "asc" }, take: 500 });
     const people = new Map((await workspaceMembers(ctx.workspaceId)).map((m) => [m.userId, m]));
     return rows.map((m) => ({ key: m.memberKey, kind: m.agentKey ? ("agent" as const) : ("user" as const), userId: m.userId, agentKey: m.agentKey, label: memberLabel(m, people), role: m.role }));
   });
@@ -295,7 +295,7 @@ export async function joinChannel(ctx: MessagesCtx, channelId: string): Promise<
     if (channel.kind === "dm" || (channel.kind === "channel" && channel.isPrivate)) throw new HttpError(400, "Ask a member to add you.");
     if (channel.archivedAt) throw new HttpError(409, "This channel is archived.");
     await tx.chatChannelMember.upsert({
-      where: { channelId_memberKey: { channelId, memberKey: userKey(ctx.userId) } },
+      where: { channelId_memberKey: { channelId, memberKey: userKey(ctx.userId) }, workspaceId: ctx.workspaceId },
       create: { workspaceId: ctx.workspaceId, channelId, memberKey: userKey(ctx.userId), userId: ctx.userId, lastReadAt: new Date() },
       update: {},
     });
@@ -307,7 +307,7 @@ export async function leaveChannel(ctx: MessagesCtx, channelId: string): Promise
     const { channel, me } = await channelFor(tx, ctx, channelId);
     if (channel.kind === "dm") throw new HttpError(400, "You can't leave a direct message.");
     if (!me) return;
-    await tx.chatChannelMember.delete({ where: { id: me.id } });
+    await tx.chatChannelMember.delete({ where: { id: me.id, workspaceId: ctx.workspaceId } });
   });
 }
 
@@ -343,7 +343,7 @@ export async function updateChannel(ctx: MessagesCtx, channelId: string, patch: 
     }
     if (patch.topic !== undefined) data.topic = patch.topic?.trim().slice(0, 250) || null;
     if (patch.archived !== undefined) data.archivedAt = patch.archived ? new Date() : null;
-    await tx.chatChannel.update({ where: { id: channelId }, data });
+    await tx.chatChannel.update({ where: { id: channelId, workspaceId: ctx.workspaceId }, data });
   });
 }
 
@@ -352,7 +352,7 @@ export async function markRead(ctx: MessagesCtx, channelId: string): Promise<voi
   await scoped(ctx, async (tx) => {
     const { channel, me } = await channelFor(tx, ctx, channelId);
     const now = new Date();
-    if (me) await tx.chatChannelMember.update({ where: { id: me.id }, data: { lastReadAt: now } });
+    if (me) await tx.chatChannelMember.update({ where: { id: me.id, workspaceId: ctx.workspaceId }, data: { lastReadAt: now } });
     else if (channel.kind === "project")
       await tx.chatChannelMember.create({ data: { workspaceId: ctx.workspaceId, channelId, memberKey: userKey(ctx.userId), userId: ctx.userId, lastReadAt: now } });
   });
@@ -458,9 +458,9 @@ export function messageView(m: MessageRow, replies?: { count: number; last: Date
   };
 }
 
-async function replyStats(tx: Tx, ids: string[]): Promise<Map<string, { count: number; last: Date | null }>> {
+async function replyStats(tx: Tx, workspaceId: string, ids: string[]): Promise<Map<string, { count: number; last: Date | null }>> {
   if (!ids.length) return new Map();
-  const rows = await tx.teamChatMessage.groupBy({ by: ["parentId"], where: { parentId: { in: ids } }, _count: { _all: true }, _max: { createdAt: true } });
+  const rows = await tx.teamChatMessage.groupBy({ by: ["parentId"], where: { workspaceId, parentId: { in: ids } }, _count: { _all: true }, _max: { createdAt: true } });
   return new Map(rows.map((r) => [r.parentId!, { count: r._count._all, last: r._max.createdAt }]));
 }
 
@@ -473,7 +473,7 @@ export async function listMessages(ctx: MessagesCtx, channelId: string, opts: { 
       const root = await tx.teamChatMessage.findFirst({ where: { id: opts.thread, channelId, workspaceId: ctx.workspaceId, parentId: null } });
       if (!root) throw new HttpError(404, "Thread not found.");
       const replies = await tx.teamChatMessage.findMany({ where: { parentId: root.id, workspaceId: ctx.workspaceId }, orderBy: { createdAt: "asc" }, take: 500 });
-      const stats = await replyStats(tx, [root.id]);
+      const stats = await replyStats(tx, ctx.workspaceId, [root.id]);
       return { messages: [messageView(root, stats.get(root.id)), ...replies.map((r) => messageView(r))], hasMore: false };
     }
     const rows = await tx.teamChatMessage.findMany({
@@ -482,7 +482,7 @@ export async function listMessages(ctx: MessagesCtx, channelId: string, opts: { 
       take: limit + 1,
     });
     const page = rows.slice(0, limit).reverse();
-    const stats = await replyStats(tx, page.map((r) => r.id));
+    const stats = await replyStats(tx, ctx.workspaceId, page.map((r) => r.id));
     return { messages: page.map((r) => messageView(r, stats.get(r.id))), hasMore: rows.length > limit };
   });
 }
@@ -533,7 +533,7 @@ export async function postMessage(ctx: MessagesCtx, channelId: string, input: { 
     if (!me) {
       await tx.chatChannelMember.create({ data: { workspaceId: ctx.workspaceId, channelId, memberKey: userKey(ctx.userId), userId: ctx.userId, lastReadAt: now } });
     }
-    const members = await tx.chatChannelMember.findMany({ where: { channelId }, select: { memberKey: true, userId: true, agentKey: true } });
+    const members = await tx.chatChannelMember.findMany({ where: { channelId, workspaceId: ctx.workspaceId }, select: { memberKey: true, userId: true, agentKey: true } });
     const memberKeys = new Set(members.map((m) => m.memberKey));
     const restricted = channel.kind === "dm" || channel.isPrivate;
     // Agents mentioned anywhere become members of the conversation (they read it to answer).
@@ -548,8 +548,8 @@ export async function postMessage(ctx: MessagesCtx, channelId: string, input: { 
     const row = await tx.teamChatMessage.create({
       data: { workspaceId: ctx.workspaceId, channelId, parentId, userId: ctx.userId, authorName, authorKind: "user", body, mentions: mentioned },
     });
-    await tx.chatChannel.update({ where: { id: channelId }, data: { lastMessageAt: row.createdAt } });
-    await tx.chatChannelMember.updateMany({ where: { channelId, memberKey: userKey(ctx.userId) }, data: { lastReadAt: row.createdAt } });
+    await tx.chatChannel.update({ where: { id: channelId, workspaceId: ctx.workspaceId }, data: { lastMessageAt: row.createdAt } });
+    await tx.chatChannelMember.updateMany({ where: { channelId, workspaceId: ctx.workspaceId, memberKey: userKey(ctx.userId) }, data: { lastReadAt: row.createdAt } });
 
     // Who is told: in a DM every other person; elsewhere the mentioned people
     // who can see it (a private channel: members only).
@@ -602,7 +602,7 @@ export async function editMessage(ctx: MessagesCtx, messageId: string, body: str
     await channelFor(tx, ctx, row.channelId);
     if (row.userId !== ctx.userId || row.authorKind !== "user") throw new HttpError(403, "You can only edit your own messages.");
     if ((row.meta as { removed?: boolean } | null)?.removed) throw new HttpError(409, "This message was removed.");
-    const next = await tx.teamChatMessage.update({ where: { id: row.id }, data: { body: text, mentions: parseMentions(text, targets), editedAt: new Date() } });
+    const next = await tx.teamChatMessage.update({ where: { id: row.id, workspaceId: ctx.workspaceId }, data: { body: text, mentions: parseMentions(text, targets), editedAt: new Date() } });
     return messageView(next);
   });
 }
@@ -615,7 +615,7 @@ export async function removeMessage(ctx: MessagesCtx, messageId: string): Promis
     await channelFor(tx, ctx, row.channelId);
     const own = row.userId === ctx.userId && row.authorKind === "user";
     if (!own && !roleAtLeast(ctx.role, "admin")) throw new HttpError(403, "You can only remove your own messages.");
-    const next = await tx.teamChatMessage.update({ where: { id: row.id }, data: { body: "", mentions: [], meta: { removed: true, by: ctx.userId }, editedAt: new Date() } });
+    const next = await tx.teamChatMessage.update({ where: { id: row.id, workspaceId: ctx.workspaceId }, data: { body: "", mentions: [], meta: { removed: true, by: ctx.userId }, editedAt: new Date() } });
     return messageView(next);
   });
 }
@@ -636,7 +636,7 @@ export async function changesSince(ctx: MessagesCtx, channelId: string, cursor: 
     });
     const roots = rows.filter((r) => !r.parentId).map((r) => r.id);
     const parents = [...new Set(rows.filter((r) => r.parentId).map((r) => r.parentId!))];
-    const stats = await replyStats(tx, [...new Set([...roots, ...parents])]);
+    const stats = await replyStats(tx, ctx.workspaceId, [...new Set([...roots, ...parents])]);
     let next = cursor;
     for (const r of rows) {
       const t = Math.max(r.createdAt.getTime(), r.editedAt?.getTime() ?? 0);
@@ -644,7 +644,7 @@ export async function changesSince(ctx: MessagesCtx, channelId: string, cursor: 
     }
     // A new reply also changes its root's reply count: send the root along.
     const extraRoots = parents.filter((p) => !roots.includes(p));
-    const rootRows = extraRoots.length ? await tx.teamChatMessage.findMany({ where: { id: { in: extraRoots } } }) : [];
+    const rootRows = extraRoots.length ? await tx.teamChatMessage.findMany({ where: { id: { in: extraRoots }, workspaceId: ctx.workspaceId } }) : [];
     return { messages: [...rows.map((r) => messageView(r, stats.get(r.id))), ...rootRows.map((r) => messageView(r, stats.get(r.id)))], cursor: next };
   });
 }

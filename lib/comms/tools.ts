@@ -559,4 +559,14 @@ export const COMMS_TOOL_ACTION: Readonly<Record<string, string>> = {
   // The existing email send action (the Gmail / Outlook send tools' own): Tier 2.
   mail_send: "send_outreach_email",
   social_send_dm: "send_social_dm",
+  // Read / propose-only tools never ask (kind "safe"); their kinds say so to
+  // the tier evaluator too (Tier 0 prefixes), like search_workspace.
+  list_reminders: "list_reminders",
+  find_contact: "search_contacts",
+  suggest_merge: "draft_contact_merge_suggestion",
+  calendar_list_events: "list_calendar_events",
+  calendar_find_time: "check_free_time",
+  mail_list_threads: "list_mail_threads",
+  mail_read_thread: "read_mail_thread",
+  mail_label_thread: "summarize_mail_thread",
 };

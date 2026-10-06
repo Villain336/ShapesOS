@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const row = await withWorkspaceScope(ctx.workspaceId, async (tx) => {
       const d = await tx.mailDraft.findFirst({ where: { id: String(id), workspaceId: ctx.workspaceId, userId: ctx.userId, status: "draft" } });
       if (!d) throw new HttpError(404, "Draft not found.");
-      return tx.mailDraft.update({ where: { id: d.id }, data: parsed.data });
+      return tx.mailDraft.update({ where: { id: d.id, workspaceId: ctx.workspaceId }, data: parsed.data });
     });
     return Response.json({ draft: draftView(row) });
   } catch (err) {

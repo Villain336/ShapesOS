@@ -102,7 +102,7 @@ async function channelsFor(tx: Tx, ctx: MeetCtx, ids: string[]) {
   if (!ids.length) return new Map<string, { id: string; name: string; kind: string; visible: boolean }>();
   const rows = await tx.chatChannel.findMany({ where: { workspaceId: ctx.workspaceId, id: { in: ids } }, select: { id: true, name: true, kind: true, isPrivate: true } });
   const mine = new Set(
-    (await tx.chatChannelMember.findMany({ where: { channelId: { in: ids }, memberKey: userKey(ctx.userId) }, select: { channelId: true } })).map((m) => m.channelId),
+    (await tx.chatChannelMember.findMany({ where: { workspaceId: ctx.workspaceId, channelId: { in: ids }, memberKey: userKey(ctx.userId) }, select: { channelId: true } })).map((m) => m.channelId),
   );
   return new Map(rows.map((c) => [c.id, { id: c.id, name: c.kind === "channel" ? `#${c.name}` : c.kind === "dm" ? "Direct message" : c.name, kind: c.kind, visible: canSee(c, mine.has(c.id)) }]));
 }
@@ -176,7 +176,7 @@ export async function startMeeting(ctx: MeetCtx, input: { title?: string | null;
           meta: { kind: "meeting", meetingId: row.id, title },
         },
       });
-      await tx.chatChannel.update({ where: { id: channel.id }, data: { lastMessageAt: msg.createdAt } });
+      await tx.chatChannel.update({ where: { id: channel.id, workspaceId: ctx.workspaceId }, data: { lastMessageAt: msg.createdAt } });
     }
     return { row, channel };
   });
@@ -236,7 +236,7 @@ export async function endMeeting(ctx: MeetCtx, id: string): Promise<MeetingView>
   await scoped(ctx, async (tx) => {
     const { row } = await meetingFor(tx, ctx, id);
     if (row.startedBy !== ctx.userId && !roleAtLeast(ctx.role, "admin")) throw new HttpError(403, "Only the person who started it, or an admin, can end this meeting.");
-    if (row.status !== "ended") await tx.meetingSession.update({ where: { id: row.id }, data: { status: "ended", endedAt: new Date() } });
+    if (row.status !== "ended") await tx.meetingSession.update({ where: { id: row.id, workspaceId: ctx.workspaceId }, data: { status: "ended", endedAt: new Date() } });
   });
   return getMeeting(ctx, id);
 }
@@ -254,7 +254,7 @@ export async function saveTranscript(ctx: MeetCtx, id: string, input: { text: st
   await scoped(ctx, async (tx) => {
     const { row } = await meetingFor(tx, ctx, id);
     if ((row.summary as StoredSummary | null)?.applied) throw new HttpError(409, "The notes were already saved; start a new meeting record for another transcript.");
-    await tx.meetingSession.update({ where: { id: row.id }, data: { transcript: text, transcriptSource: input.source, summary: Prisma.DbNull } });
+    await tx.meetingSession.update({ where: { id: row.id, workspaceId: ctx.workspaceId }, data: { transcript: text, transcriptSource: input.source, summary: Prisma.DbNull } });
   });
   return getMeeting(ctx, id);
 }
@@ -317,7 +317,7 @@ export async function summarizeMeeting(ctx: MeetCtx, id: string, deps: SummaryDe
   const parsed = parseMeetingSummary(out.text) ?? (out.live ? null : { notes: out.text.trim().slice(0, 600) || "Mock summary.", decisions: [], actionItems: [] });
   if (!parsed) throw new HttpError(502, "The meeting agent's answer couldn't be read. Try again.");
   const stored: StoredSummary = { ...parsed, mock: !out.live, at: new Date().toISOString(), by: ctx.userId, applied: null };
-  await scoped(ctx, (tx) => tx.meetingSession.update({ where: { id: row.id }, data: { summary: stored as unknown as Prisma.InputJsonValue } }));
+  await scoped(ctx, (tx) => tx.meetingSession.update({ where: { id: row.id, workspaceId: ctx.workspaceId }, data: { summary: stored as unknown as Prisma.InputJsonValue } }));
   return getMeeting(ctx, id);
 }
 
@@ -421,7 +421,7 @@ export async function applySummary(ctx: MeetCtx, id: string, input: ApplyInput, 
     const applied = { at: new Date().toISOString(), by: ctx.userId, docId, reminders, tasks };
     // Once: only if nobody applied it meanwhile.
     const n = await tx.meetingSession.updateMany({
-      where: { id: row.id, updatedAt: row.updatedAt },
+      where: { id: row.id, workspaceId: ctx.workspaceId, updatedAt: row.updatedAt },
       data: { summary: { ...summary, applied } as unknown as Prisma.InputJsonValue, notesDocId: docId },
     });
     if (n.count !== 1) throw new HttpError(409, "Someone saved these notes at the same time.");

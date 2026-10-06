@@ -128,9 +128,9 @@ describe("joining", () => {
     assert.equal(r.status, 409);
     assert.equal(r.code, "livekit_not_configured");
     assert.equal(minted, 0, "no token is minted");
-    const real = await meet.liveKitState({ VOICE_LIVEKIT_MODE: "rehearsal" } as NodeJS.ProcessEnv);
+    const real = await meet.liveKitState({ VOICE_LIVEKIT_MODE: "rehearsal" } as unknown as NodeJS.ProcessEnv);
     assert.deepEqual([real.configured, real.mode], [false, "rehearsal"]);
-    const broken = await meet.liveKitState({ VOICE_LIVEKIT_MODE: "cloud" } as NodeJS.ProcessEnv);
+    const broken = await meet.liveKitState({ VOICE_LIVEKIT_MODE: "cloud" } as unknown as NodeJS.ProcessEnv);
     assert.deepEqual([broken.configured, broken.mode], [false, "misconfigured"]);
 
     const rooms: string[] = [];

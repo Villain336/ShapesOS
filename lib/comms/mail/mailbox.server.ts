@@ -130,7 +130,7 @@ async function refreshMailbox(ctx: MailCtx, conn: PersonalConnection, now = new 
       if (Number.isNaN(at.getTime())) continue;
       const party = parseParty(r.from);
       const where = { workspaceId_connectionId_externalId: { workspaceId: ctx.workspaceId, connectionId: conn.id, externalId: r.externalId } };
-      const prior = await tx.mailThreadCache.findUnique({ where, select: { lastMessageAt: true } });
+      const prior = await tx.mailThreadCache.findUnique({ where: { ...where, workspaceId: ctx.workspaceId }, select: { lastMessageAt: true } });
       const newMessage = !prior || at.getTime() > prior.lastMessageAt.getTime();
       await tx.mailThreadCache.upsert({
         where,
@@ -419,8 +419,8 @@ export async function readMailThread(ctx: MailCtx, key: string, opts: { markRead
     ? null
     : await withWorkspaceScope(ctx.workspaceId, async (tx) => {
         const where = { workspaceId_connectionId_externalId: { workspaceId: ctx.workspaceId, connectionId: conn.id, externalId: ref.externalId } };
-        const found = await tx.mailThreadCache.findUnique({ where });
-        if (found && opts.markRead && found.unread) return tx.mailThreadCache.update({ where, data: { unread: false } });
+        const found = await tx.mailThreadCache.findUnique({ where: { ...where, workspaceId: ctx.workspaceId } });
+        if (found && opts.markRead && found.unread) return tx.mailThreadCache.update({ where: { ...where, workspaceId: ctx.workspaceId }, data: { unread: false } });
         return found;
       });
   const last = messages[messages.length - 1];
@@ -471,14 +471,14 @@ export async function organizeThread(
   if (!ref || (ref.source !== "gmail" && ref.source !== "outlook")) throw new HttpError(400, "Only Gmail and Outlook threads can be archived or labelled here.");
   return withWorkspaceScope(ctx.workspaceId, async (tx) => {
     const where = { workspaceId_connectionId_externalId: { workspaceId: ctx.workspaceId, connectionId: ref.connectionId, externalId: ref.externalId } };
-    const row = await tx.mailThreadCache.findUnique({ where });
+    const row = await tx.mailThreadCache.findUnique({ where: { ...where, workspaceId: ctx.workspaceId } });
     if (!row || row.ownerUserId !== ctx.userId) throw new HttpError(404, "Thread not found.");
     const tags = new Set(row.tags);
     for (const t of patch.addTags ?? []) tags.add(t);
     if (patch.acceptSuggested) for (const t of row.suggestedTags) tags.add(t);
     for (const t of patch.removeTags ?? []) tags.delete(t);
     const updated = await tx.mailThreadCache.update({
-      where,
+      where: { ...where, workspaceId: ctx.workspaceId },
       data: {
         ...(patch.archived !== undefined ? { archived: patch.archived } : {}),
         ...(patch.unread !== undefined ? { unread: patch.unread } : {}),

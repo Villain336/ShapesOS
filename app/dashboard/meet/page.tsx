@@ -26,7 +26,7 @@ export default async function MeetPage({ searchParams }: { searchParams: Promise
   const me = await getMembership(user.id, workspace.id);
   if (!me) redirect("/dashboard");
   const sp = await searchParams;
-  const origin = sp.origin === "calendar" || sp.origin === "channel" ? sp.origin : null;
+  const origin: "calendar" | "channel" | null = sp.origin === "calendar" || sp.origin === "channel" ? sp.origin : null;
   const start =
     origin || typeof sp.title === "string"
       ? { title: typeof sp.title === "string" ? sp.title.slice(0, 200) : null, origin: origin ?? ("adhoc" as const), ref: origin && typeof sp.ref === "string" ? sp.ref.slice(0, 400) : null }

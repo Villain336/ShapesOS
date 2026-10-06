@@ -156,14 +156,14 @@ export async function listReminders(
   const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
   const mine = { workspaceId: opts.workspaceId, projectId: null, assigneeId: opts.userId };
   const open = await db.opsTask.findMany({
-    where: { ...mine, stage: { notIn: ["done", "cancelled"] } },
+    where: { ...mine, workspaceId: opts.workspaceId, stage: { notIn: ["done", "cancelled"] } },
     orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
     take: limit,
     select: SELECT,
   });
   const done = opts.includeDone
     ? await db.opsTask.findMany({
-        where: { ...mine, stage: "done" },
+        where: { ...mine, workspaceId: opts.workspaceId, stage: "done" },
         orderBy: { completedAt: "desc" },
         take: 50,
         select: SELECT,
