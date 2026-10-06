@@ -24,6 +24,7 @@ import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditEvent } from "@/lib/auditlog";
 import { getStorageAdapter } from "./storage";
 import { DEFAULT_MAX_FILE_BYTES, DEFAULT_QUOTA_BYTES, FsError } from "./service";
+import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 
 export const DEFAULT_VERSION_RETENTION = 20;
 export const MAX_VERSION_RETENTION = 200;
@@ -56,10 +57,9 @@ export function checkRetention(v: unknown): { ok: true; value: number } | { ok: 
 }
 
 function scheduleIndex(workspaceId: string, fileId: string): void {
-  // Lazy: the indexer never ships in a route bundle (bundle-size rule).
-  void import("@/lib/search/text-index")
-    .then((m) => m.scheduleFileTextIndex(workspaceId, fileId))
-    .catch(() => undefined);
+  // The light write hook (lib/search/text-index-schedule): the indexer loads
+  // only when the job runs — never in a route bundle (bundle-size rule).
+  scheduleFileTextIndex(workspaceId, fileId);
 }
 
 export interface OverwriteOptions {

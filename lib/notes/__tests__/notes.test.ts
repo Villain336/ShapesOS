@@ -100,6 +100,7 @@ describe("note links", () => {
     assert.deepEqual(normalizeLinks([{ kind: "deal", id: "d1", label: "  Acme  renewal " }, { kind: "deal", id: "d1" }]), [{ kind: "deal", id: "d1", label: "Acme renewal" }]);
     assert.throws(() => normalizeLinks([{ kind: "users", id: "x" }]), /Unknown record kind/);
     assert.throws(() => normalizeLinks([{ kind: "lead", id: "a b" }]), /record id/);
+    assert.throws(() => normalizeLinks([{ kind: "mail", id: "t1", label: "Re: salary" }]), /personal/, "a member's own mail threads never link to a (shareable) note");
     assert.throws(() => normalizeLinks(Array.from({ length: 26 }, (_, i) => ({ kind: "lead", id: `l${i}` }))), /at most 25/);
   });
   it("every record kind opens somewhere real", () => {

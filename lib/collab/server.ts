@@ -32,6 +32,7 @@ import { Server, type Hocuspocus } from "@hocuspocus/server";
 import type * as Y from "yjs";
 import { parseDocName, verifyCollabToken, collabSecret, type CollabClaims } from "./token";
 import { docVersions, loadCollabDoc, storeCollabDoc } from "./persistence";
+import { scheduleUniverDocTextIndex } from "@/lib/search/text-index-schedule";
 
 export const COLLAB_STORE_DEBOUNCE_MS = 2_000;
 export const COLLAB_STORE_MAX_DEBOUNCE_MS = 10_000;
@@ -157,10 +158,8 @@ export async function startCollabServer(opts: CollabServerOptions): Promise<Coll
       if (res.status === "stored" || res.status === "unchanged") {
         d.version = res.version;
         if (res.status === "stored") {
-          // Spotlight + agents read the new text (lazy: the indexer loads on first use).
-          void import("@/lib/search/text-index")
-            .then((m) => m.scheduleUniverDocTextIndex(d.workspaceId, d.docId))
-            .catch(() => undefined);
+          // Spotlight + agents read the new text (the light hook: the indexer loads when the job runs).
+          scheduleUniverDocTextIndex(d.workspaceId, d.docId);
         }
       } else if (res.status === "stale") {
         void resetDocument(documentName, `replaced underneath (now version ${res.version})`);

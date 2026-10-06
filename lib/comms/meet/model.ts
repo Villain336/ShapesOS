@@ -122,19 +122,26 @@ export function summaryPrompt(title: string, transcript: string): string {
   ].join("\n");
 }
 
-/** Doc paragraphs for the notes doc (Univer). PURE. */
-export function notesParagraphs(input: { title: string; when: string; summary: MeetingSummary; transcriptSource: string }): { text: string; headingLevel?: 0 | 1 | 2 | 3 }[] {
-  const out: { text: string; headingLevel?: 0 | 1 | 2 | 3 }[] = [{ text: input.when }, { text: "" }, { text: "Notes", headingLevel: 2 }];
-  for (const p of input.summary.notes.split(/\n{2,}/)) if (p.trim()) out.push({ text: p.trim() });
-  out.push({ text: "Decisions", headingLevel: 2 });
-  if (input.summary.decisions.length) for (const d of input.summary.decisions) out.push({ text: `• ${d}` });
-  else out.push({ text: "None recorded." });
-  out.push({ text: "Action items", headingLevel: 2 });
+/**
+ * The meeting's note, as the light Markdown lib/notes createNote() reads
+ * (headings, "- " bullets, "[ ] " tasks — see lib/notes/content.ts
+ * textToNoteDoc). The summary lands in the Notes app (Phase 18.2
+ * integration; it used to be a Univer doc). PURE.
+ */
+export function notesMarkdown(input: { title: string; when: string; summary: MeetingSummary; transcriptSource: string }): string {
+  // One line per item: a model's stray newline must not break a list item.
+  const line = (s: string) => s.replace(/\s+/g, " ").trim();
+  const out: string[] = [`Meeting: ${line(input.title)} · ${input.when}`, "", "## Notes"];
+  for (const p of input.summary.notes.split(/\n{2,}/)) if (p.trim()) out.push(p.trim(), "");
+  out.push("## Decisions");
+  if (input.summary.decisions.length) for (const d of input.summary.decisions) out.push(`- ${line(d)}`);
+  else out.push("None recorded.");
+  out.push("", "## Action items");
   if (input.summary.actionItems.length)
-    for (const a of input.summary.actionItems) out.push({ text: `• ${a.title}${a.owner ? ` — ${a.owner}` : ""}${a.due ? ` (due ${a.due})` : ""}` });
-  else out.push({ text: "None recorded." });
-  out.push({ text: "" }, { text: `Written by the meeting agent from the ${input.transcriptSource} transcript (after the call).` });
-  return out;
+    for (const a of input.summary.actionItems) out.push(`[ ] ${line(a.title)}${a.owner ? ` — ${line(a.owner)}` : ""}${a.due ? ` (due ${line(a.due)})` : ""}`);
+  else out.push("None recorded.");
+  out.push("", "---", `Written by the meeting agent from the ${input.transcriptSource} transcript (after the call).`);
+  return out.join("\n");
 }
 
 /**

@@ -8,7 +8,7 @@ import {
   dueToUtc,
   matchOwner,
   meetingRoomName,
-  notesParagraphs,
+  notesMarkdown,
   parseMeetingSummary,
   RECORDING_IMPORTERS,
   RECORDING_SOURCES,
@@ -16,6 +16,7 @@ import {
   trimTranscript,
   validCalendarRef,
 } from "../meet/model";
+import { noteText, textToNoteDoc } from "@/lib/notes/content";
 
 describe("the meeting agent's summary", () => {
   it("parses notes, decisions and action items from fenced / chatty output", () => {
@@ -82,15 +83,28 @@ describe("transcripts, due dates, owners", () => {
   });
 });
 
-describe("the notes doc, origins, rooms, recording seam", () => {
-  it("writes notes, decisions and action items with headings, and says it was post-call", () => {
-    const paras = notesParagraphs({ title: "Sync", when: "2026-10-06 15:00 UTC", transcriptSource: "pasted", summary: { notes: "One.\n\nTwo.", decisions: [], actionItems: [{ title: "Send deck", owner: "Ben", due: "2026-10-09" }] } });
-    const text = paras.map((p) => p.text);
-    assert.deepEqual(paras.filter((p) => p.headingLevel === 2).map((p) => p.text), ["Notes", "Decisions", "Action items"]);
-    assert.ok(text.includes("One.") && text.includes("Two."));
-    assert.ok(text.includes("None recorded."));
-    assert.ok(text.includes("• Send deck — Ben (due 2026-10-09)"));
-    assert.match(text.at(-1)!, /pasted transcript \(after the call\)/);
+describe("the meeting note, origins, rooms, recording seam", () => {
+  it("writes the note's Markdown: notes, decisions and action items under headings, items as tasks, and says it was post-call", () => {
+    const md = notesMarkdown({
+      title: "Sync",
+      when: "2026-10-06 15:00 UTC",
+      transcriptSource: "pasted",
+      summary: { notes: "One.\n\nTwo.", decisions: [], actionItems: [{ title: "Send\ndeck", owner: "Ben", due: "2026-10-09" }] },
+    });
+    const lines = md.split("\n");
+    assert.equal(lines[0], "Meeting: Sync · 2026-10-06 15:00 UTC");
+    assert.deepEqual(lines.filter((l) => l.startsWith("## ")), ["## Notes", "## Decisions", "## Action items"]);
+    assert.ok(lines.includes("One.") && lines.includes("Two."));
+    assert.ok(lines.includes("None recorded."), "no decisions");
+    assert.ok(lines.includes("[ ] Send deck — Ben (due 2026-10-09)"), "an action item is one task line, even with a stray newline");
+    assert.match(lines.at(-1)!, /pasted transcript \(after the call\)/);
+    // It is exactly what the Notes app's createNote() reads.
+    const doc = textToNoteDoc(md);
+    assert.deepEqual(doc.content.filter((n) => n.type === "heading").map((n) => n.content?.[0]?.text), ["Notes", "Decisions", "Action items"]);
+    const tasks = doc.content.find((n) => n.type === "taskList");
+    assert.equal(tasks?.content?.length, 1);
+    assert.equal(tasks?.content?.[0]?.attrs?.checked, false);
+    assert.match(noteText(doc, 5_000), /Send deck — Ben/);
   });
 
   it("calendar refs, room names and the Zoom / Google Meet seam", () => {

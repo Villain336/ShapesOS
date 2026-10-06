@@ -18,8 +18,11 @@
 // The meeting agent (the workspace's background model, metered) writes the
 // summary; a person then chooses which action items become their reminders
 // (Reminders, sourceRef "meeting:<id>") or tasks in an ops project, and the
-// notes become a Univer doc shared with the workspace. A mock model's
-// summary is labelled and can't be saved (no fake records).
+// notes become a note in the Notes app (lib/notes createNote, sourceRef
+// "meeting:<id>", linked to the ops projects its tasks went to): shared with
+// the workspace, or private to the person who saved it when the call was in
+// a private channel or a DM. A mock model's summary is labelled and can't be
+// saved (no fake records).
 //
 // Who sees a meeting: one started from a channel, the people who can see
 // that channel; any other, every member of the workspace (404 otherwise).
@@ -29,6 +32,7 @@ import { Prisma } from "@prisma/client";
 import { HttpError } from "@/lib/api/errors";
 import { roleAtLeast } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { createNote, type CreateNoteInput } from "@/lib/notes/service";
 import { canSee, workspaceMembers, type MessagesCtx } from "../messages/store.server";
 import { userKey } from "../messages/model";
 import {
@@ -38,7 +42,7 @@ import {
   MAX_RECORDING_BYTES,
   MAX_TRANSCRIPT_CHARS,
   meetingRoomName,
-  notesParagraphs,
+  notesMarkdown,
   parseMeetingSummary,
   summaryPrompt,
   validCalendarRef,
@@ -81,7 +85,7 @@ export interface MeetingView {
   title: string;
   origin: MeetingOrigin;
   originRef: string | null;
-  channel: { id: string; name: string; kind: string } | null;
+  channel: MeetingChannel | null;
   roomName: string;
   startedBy: string;
   startedByName: string;
@@ -92,22 +96,36 @@ export interface MeetingView {
   hasTranscript: boolean;
   transcript?: string | null;
   summary: StoredSummary | null;
+  /** The meeting's note in the Notes app (a UniverDoc of kind "note"; the column predates Notes). */
   notesDocId: string | null;
   canManage: boolean;
+}
+
+export interface MeetingChannel {
+  id: string;
+  name: string;
+  kind: string;
+  /** Only its members see it (a private channel, a DM or a group). */
+  private: boolean;
 }
 
 type Row = Prisma.MeetingSessionGetPayload<object>;
 
 async function channelsFor(tx: Tx, ctx: MeetCtx, ids: string[]) {
-  if (!ids.length) return new Map<string, { id: string; name: string; kind: string; visible: boolean }>();
+  if (!ids.length) return new Map<string, MeetingChannel & { visible: boolean }>();
   const rows = await tx.chatChannel.findMany({ where: { workspaceId: ctx.workspaceId, id: { in: ids } }, select: { id: true, name: true, kind: true, isPrivate: true } });
   const mine = new Set(
     (await tx.chatChannelMember.findMany({ where: { workspaceId: ctx.workspaceId, channelId: { in: ids }, memberKey: userKey(ctx.userId) }, select: { channelId: true } })).map((m) => m.channelId),
   );
-  return new Map(rows.map((c) => [c.id, { id: c.id, name: c.kind === "channel" ? `#${c.name}` : c.kind === "dm" ? "Direct message" : c.name, kind: c.kind, visible: canSee(c, mine.has(c.id)) }]));
+  return new Map(
+    rows.map((c) => [
+      c.id,
+      { id: c.id, name: c.kind === "channel" ? `#${c.name}` : c.kind === "dm" ? "Direct message" : c.name, kind: c.kind, private: !canSee(c, false), visible: canSee(c, mine.has(c.id)) },
+    ]),
+  );
 }
 
-function view(r: Row, ctx: MeetCtx, names: Map<string, string>, channel: { id: string; name: string; kind: string } | null, detail: boolean): MeetingView {
+function view(r: Row, ctx: MeetCtx, names: Map<string, string>, channel: MeetingChannel | null, detail: boolean): MeetingView {
   return {
     id: r.id,
     title: r.title,
@@ -134,13 +152,13 @@ async function memberNames(workspaceId: string): Promise<Map<string, string>> {
 }
 
 /** The meeting if this member may see it (404 otherwise). */
-async function meetingFor(tx: Tx, ctx: MeetCtx, id: string): Promise<{ row: Row; channel: { id: string; name: string; kind: string } | null }> {
+async function meetingFor(tx: Tx, ctx: MeetCtx, id: string): Promise<{ row: Row; channel: MeetingChannel | null }> {
   const row = await tx.meetingSession.findFirst({ where: { id, workspaceId: ctx.workspaceId } });
   if (!row) throw new HttpError(404, "Meeting not found.");
   if (row.origin === "channel" && row.originRef) {
     const ch = (await channelsFor(tx, ctx, [row.originRef])).get(row.originRef);
     if (!ch?.visible) throw new HttpError(404, "Meeting not found.");
-    return { row, channel: { id: ch.id, name: ch.name, kind: ch.kind } };
+    return { row, channel: { id: ch.id, name: ch.name, kind: ch.kind, private: ch.private } };
   }
   return { row, channel: null };
 }
@@ -154,11 +172,11 @@ export async function startMeeting(ctx: MeetCtx, input: { title?: string | null;
   const id = randomUUID().replace(/-/g, "").slice(0, 24);
   const startedByName = (ctx.name ?? "").trim() || (ctx.email ? ctx.email.split("@")[0]! : "Member");
   const created = await scoped(ctx, async (tx) => {
-    let channel: { id: string; name: string; kind: string } | null = null;
+    let channel: MeetingChannel | null = null;
     if (origin === "channel") {
       const ch = (await channelsFor(tx, ctx, [ref!])).get(ref!);
       if (!ch?.visible) throw new HttpError(404, "Channel not found.");
-      channel = { id: ch.id, name: ch.name, kind: ch.kind };
+      channel = { id: ch.id, name: ch.name, kind: ch.kind, private: ch.private };
     }
     const row = await tx.meetingSession.create({
       data: { id, workspaceId: ctx.workspaceId, title, roomName: meetingRoomName(ctx.workspaceId, id), origin, originRef: ref, startedBy: ctx.userId },
@@ -192,7 +210,7 @@ export async function listMeetings(ctx: MeetCtx, limit = 50): Promise<MeetingVie
       .filter((r) => r.origin !== "channel" || (r.originRef && chans.get(r.originRef)?.visible))
       .map((r) => {
         const ch = r.origin === "channel" && r.originRef ? chans.get(r.originRef) : null;
-        return view(r, ctx, names, ch ? { id: ch.id, name: ch.name, kind: ch.kind } : null, false);
+        return view(r, ctx, names, ch ? { id: ch.id, name: ch.name, kind: ch.kind, private: ch.private } : null, false);
       });
   });
 }
@@ -328,24 +346,13 @@ export interface ApplyInput {
 }
 
 export interface ApplyDeps {
-  createDoc: (workspaceId: string, input: { title: string; paragraphs: { text: string; headingLevel?: 0 | 1 | 2 | 3 }[]; sourceRef: string }) => Promise<{ id: string }>;
+  /** Writes the meeting's note (THE Notes server API: lib/notes/service createNote). */
+  createNote: (input: CreateNoteInput) => Promise<{ id: string }>;
   timeZone: (userId: string) => Promise<string>;
 }
 
 export const defaultApplyDeps: ApplyDeps = {
-  createDoc: async (workspaceId, input) => {
-    // Lazy: lib/univer/docs statically imports the search text index (bundle-size rule).
-    const { createUniverDoc } = await import("@/lib/univer/docs");
-    const { buildDocSnapshot } = await import("@/lib/univer/snapshots");
-    const doc = await createUniverDoc(workspaceId, {
-      kind: "doc",
-      title: input.title,
-      snapshot: buildDocSnapshot({ title: input.title, heading: input.title, paragraphs: input.paragraphs }),
-      sourceRef: input.sourceRef,
-      shareState: "workspace",
-    });
-    return { id: doc.id };
-  },
+  createNote: async (input) => ({ id: (await createNote(input)).id }),
   timeZone: async (userId) => {
     try {
       const { getUserPreferences } = await import("@/lib/preferences");
@@ -357,14 +364,16 @@ export const defaultApplyDeps: ApplyDeps = {
 };
 
 /**
- * Save the meeting agent's record: the notes doc (Univer, shared with the
- * workspace) and the chosen action items as the person's reminders or as
- * tasks in an ops project (assigned to the member the item names, when
- * there is exactly one). Once per meeting; never from a mock summary.
+ * Save the meeting agent's record: the note (the Notes app — shared with the
+ * workspace, or private to me when the call was in a private conversation;
+ * provenance "meeting:<id>"; linked to the ops projects its tasks went to)
+ * and the chosen action items as the person's reminders or as tasks in an
+ * ops project (assigned to the member the item names, when there is exactly
+ * one). Once per meeting; never from a mock summary.
  */
 export async function applySummary(ctx: MeetCtx, id: string, input: ApplyInput, deps: ApplyDeps = defaultApplyDeps): Promise<MeetingView> {
   requireEditor(ctx);
-  const { row } = await scoped(ctx, (tx) => meetingFor(tx, ctx, id));
+  const { row, channel } = await scoped(ctx, (tx) => meetingFor(tx, ctx, id));
   const summary = row.summary as StoredSummary | null;
   if (!summary) throw new HttpError(400, "Summarize the meeting first.");
   if (summary.mock) throw new HttpError(409, "This is a mock summary (no model is configured), so nothing is saved from it.");
@@ -373,59 +382,80 @@ export async function applySummary(ctx: MeetCtx, id: string, input: ApplyInput, 
   const members = await workspaceMembers(ctx.workspaceId);
   const picks = input.items.filter((i) => i.target !== "skip" && Number.isInteger(i.index) && i.index >= 0 && i.index < summary.actionItems.length);
   if (new Set(picks.map((p) => p.index)).size !== picks.length) throw new HttpError(400, "Each action item can be saved once.");
+  // Every ops project is checked before anything is written (no orphan note).
+  const projectIds = [...new Set(picks.filter((p) => p.target === "task").map((p) => p.opsProjectId ?? ""))];
+  if (projectIds.length) {
+    const found = await scoped(ctx, (tx) => tx.opsProject.findMany({ where: { workspaceId: ctx.workspaceId, id: { in: projectIds.filter(Boolean) } }, select: { id: true } }));
+    if (found.length !== projectIds.length) throw new HttpError(400, "Pick the ops project for that task.");
+  }
   const docId = input.saveDoc
     ? (
-        await deps.createDoc(ctx.workspaceId, {
+        await deps.createNote({
+          workspaceId: ctx.workspaceId,
+          createdBy: ctx.userId,
           title: `Meeting notes: ${row.title}`.slice(0, 200),
-          paragraphs: notesParagraphs({ title: row.title, when: row.startedAt.toISOString().slice(0, 16).replace("T", " ") + " UTC", summary, transcriptSource: row.transcriptSource }),
+          body: notesMarkdown({ title: row.title, when: row.startedAt.toISOString().slice(0, 16).replace("T", " ") + " UTC", summary, transcriptSource: row.transcriptSource }),
+          // Meetings, calendar events and channels have no Spotlight record
+          // kind, so the meeting is the note's provenance (sourceRef — the
+          // Notes app links back to it) and the meeting keeps the note's id.
+          // The ops projects the action items went to ARE records: linked.
+          links: projectIds.map((pid) => ({ kind: "ops_project", id: pid })),
+          shareState: channel?.private ? "private" : "workspace",
           sourceRef: `meeting:${row.id}`,
+          actor: "user",
         })
       ).id
     : null;
   const reminders: string[] = [];
   const tasks: string[] = [];
-  await scoped(ctx, async (tx) => {
-    const { createReminder } = await import("../reminders");
-    for (const p of picks) {
-      const item = summary.actionItems[p.index]!;
-      const dueAt = dueToUtc(item.due, tz);
-      if (p.target === "reminder") {
-        const r = await createReminder(tx, {
-          workspaceId: ctx.workspaceId,
-          userId: ctx.userId,
-          title: item.title.slice(0, 200),
-          notes: `From the meeting "${row.title}"${item.owner ? ` (owner: ${item.owner})` : ""}.`,
-          dueAt,
-          sourceRef: `meeting:${row.id}`,
-        });
-        reminders.push(r.id);
-      } else {
-        const project = p.opsProjectId ? await tx.opsProject.findFirst({ where: { id: p.opsProjectId, workspaceId: ctx.workspaceId }, select: { id: true } }) : null;
-        if (!project) throw new HttpError(400, "Pick the ops project for that task.");
-        const t = await tx.opsTask.create({
-          data: {
+  try {
+    await scoped(ctx, async (tx) => {
+      const { createReminder } = await import("../reminders");
+      for (const p of picks) {
+        const item = summary.actionItems[p.index]!;
+        const dueAt = dueToUtc(item.due, tz);
+        if (p.target === "reminder") {
+          const r = await createReminder(tx, {
             workspaceId: ctx.workspaceId,
-            projectId: project.id,
+            userId: ctx.userId,
             title: item.title.slice(0, 200),
-            description: `From the meeting "${row.title}"${item.owner ? ` (owner: ${item.owner})` : ""}.`,
-            assigneeId: matchOwner(item.owner, members),
+            notes: `From the meeting "${row.title}"${item.owner ? ` (owner: ${item.owner})` : ""}.`,
             dueAt,
-            createdBy: ctx.userId,
             sourceRef: `meeting:${row.id}`,
-          },
-          select: { id: true },
-        });
-        tasks.push(t.id);
+          });
+          reminders.push(r.id);
+        } else {
+          const project = p.opsProjectId ? await tx.opsProject.findFirst({ where: { id: p.opsProjectId, workspaceId: ctx.workspaceId }, select: { id: true } }) : null;
+          if (!project) throw new HttpError(400, "Pick the ops project for that task.");
+          const t = await tx.opsTask.create({
+            data: {
+              workspaceId: ctx.workspaceId,
+              projectId: project.id,
+              title: item.title.slice(0, 200),
+              description: `From the meeting "${row.title}"${item.owner ? ` (owner: ${item.owner})` : ""}.`,
+              assigneeId: matchOwner(item.owner, members),
+              dueAt,
+              createdBy: ctx.userId,
+              sourceRef: `meeting:${row.id}`,
+            },
+            select: { id: true },
+          });
+          tasks.push(t.id);
+        }
       }
-    }
-    const applied = { at: new Date().toISOString(), by: ctx.userId, docId, reminders, tasks };
-    // Once: only if nobody applied it meanwhile.
-    const n = await tx.meetingSession.updateMany({
-      where: { id: row.id, workspaceId: ctx.workspaceId, updatedAt: row.updatedAt },
-      data: { summary: { ...summary, applied } as unknown as Prisma.InputJsonValue, notesDocId: docId },
+      const applied = { at: new Date().toISOString(), by: ctx.userId, docId, reminders, tasks };
+      // Once: only if nobody applied it meanwhile.
+      const n = await tx.meetingSession.updateMany({
+        where: { id: row.id, workspaceId: ctx.workspaceId, updatedAt: row.updatedAt },
+        data: { summary: { ...summary, applied } as unknown as Prisma.InputJsonValue, notesDocId: docId },
+      });
+      if (n.count !== 1) throw new HttpError(409, "Someone saved these notes at the same time.");
     });
-    if (n.count !== 1) throw new HttpError(409, "Someone saved these notes at the same time.");
-  });
+  } catch (err) {
+    // Nothing half-saved: the items rolled back, so the note goes too.
+    if (docId) await scoped(ctx, (tx) => tx.univerDoc.deleteMany({ where: { id: docId, workspaceId: ctx.workspaceId, kind: "note" } })).catch(() => undefined);
+    throw err;
+  }
   return getMeeting(ctx, id);
 }
 

@@ -5,7 +5,7 @@
 // server-minted token; when LiveKit isn't configured the page says so and
 // joining is off. After the call: the transcript (an uploaded recording or
 // pasted text — nothing records during the call), then the meeting agent's
-// notes, decisions and action items, which a person saves as a notes doc and
+// notes, decisions and action items, which a person saves as a note (the Notes app) and
 // their reminders / ops tasks.
 
 import Link from "next/link";
@@ -689,7 +689,7 @@ function AgentCard({ m, canEdit, opsProjects, onSaved }: { m: MeetingView; canEd
             <div className="flex flex-wrap items-center gap-2" role="status">
               <span className="text-sm text-ink">{t("comms.meet.applied", { reminders: s.applied.reminders.length, tasks: s.applied.tasks.length })}</span>
               {m.notesDocId ? (
-                <Link href={`/dashboard/office?open=${encodeURIComponent(m.notesDocId)}`} className={aosButton({ variant: "secondary", size: "sm" })}>
+                <Link href={`/dashboard/notes?note=${encodeURIComponent(m.notesDocId)}`} className={aosButton({ variant: "secondary", size: "sm" })}>
                   <FileText className="size-4" aria-hidden />
                   {t("comms.meet.openDoc")}
                 </Link>
@@ -705,7 +705,7 @@ function AgentCard({ m, canEdit, opsProjects, onSaved }: { m: MeetingView; canEd
             <div className="flex flex-col gap-3 border-t border-line pt-3">
               <label className="flex items-center gap-2.5 text-sm text-ink">
                 <input type="checkbox" checked={saveDoc} onChange={(e) => setSaveDoc(e.target.checked)} className="size-4 accent-[var(--aos-ink)]" />
-                {t("comms.meet.saveDoc")}
+                {t(m.channel?.private ? "comms.meet.saveDocPrivate" : "comms.meet.saveDoc")}
               </label>
               <div>
                 <button type="button" onClick={() => void apply()} disabled={!!busy} className={aosButton({ variant: "primary", size: "sm" })}>

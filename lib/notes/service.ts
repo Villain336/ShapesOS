@@ -51,18 +51,9 @@ import {
   type NoteDoc,
 } from "./content";
 import { snapshotBeforeSave } from "@/lib/univer/versions";
-
-/**
- * Spotlight re-index, lazily: the indexer (and its embedder) must never be in
- * a route bundle (coordinator's bundle-size rule) — it loads on first use.
- * Integration may repoint this to @/lib/search/text-index-schedule.
- */
-function scheduleDocTextIndex(workspaceId: string, docId: string): void {
-  void import("@/lib/search/text-index")
-    .then((m) => m.scheduleUniverDocTextIndex(workspaceId, docId))
-    .catch(() => undefined);
-}
-
+// The light write hook: the indexer (and its embedder) loads only when the
+// job runs, after the response — never in a route bundle (bundle-size rule).
+import { scheduleUniverDocTextIndex as scheduleDocTextIndex } from "@/lib/search/text-index-schedule";
 
 type Tx = Prisma.TransactionClient;
 
@@ -70,6 +61,13 @@ export const NOTE_SHARE_STATES = ["private", "workspace"] as const;
 export type NoteShareState = (typeof NOTE_SHARE_STATES)[number];
 export const NOTE_LINKS_MAX = 25;
 const RECORD_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * Kinds a note never links to. "mail" (Phase 18.2 comms) is PERSONAL — a
+ * member's own mailbox threads (Spotlight shows them to their owner only) —
+ * and a note can be shared with the workspace, so a link (and its label, the
+ * subject) would leak it.
+ */
+export const UNLINKABLE_KINDS: readonly RecordKind[] = ["mail"];
 
 export interface NoteActor {
   workspaceId: string;
@@ -221,6 +219,7 @@ export function normalizeLinks(links: unknown): Array<{ kind: RecordKind; id: st
     const kind = String((l as NoteLinkInput)?.kind ?? "");
     const id = String((l as NoteLinkInput)?.id ?? "");
     if (!(RECORD_KINDS as readonly string[]).includes(kind)) throw new BadRequestError(`Unknown record kind "${kind.slice(0, 40)}".`);
+    if ((UNLINKABLE_KINDS as readonly string[]).includes(kind)) throw new BadRequestError("Mail threads are personal, so a note can't link to one.");
     if (!RECORD_ID_RE.test(id)) throw new BadRequestError("A record id is 1-64 letters, digits, - or _.");
     const rawLabel = (l as NoteLinkInput)?.label;
     const label = typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.replace(/\s+/g, " ").trim().slice(0, 200) : null;

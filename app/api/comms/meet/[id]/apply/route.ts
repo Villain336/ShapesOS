@@ -1,8 +1,9 @@
 // ShapesOS — Phase 18.2 (WS=comms): save the meeting agent's record.
 //   POST /api/comms/meet/[id]/apply { saveDoc, items: [{ index, target: reminder|task|skip, opsProjectId? }] } → { meeting }
 // Editor+, once per meeting, never from a mock summary: the notes become a
-// Univer doc shared with the workspace; each chosen action item becomes
-// your reminder or a task in an ops project.
+// note in the Notes app (lib/notes createNote — shared with the workspace,
+// or private to you when the call was in a private conversation); each
+// chosen action item becomes your reminder or a task in an ops project.
 
 import type { NextRequest } from "next/server";
 import { errorResponse } from "@/lib/api/errors";

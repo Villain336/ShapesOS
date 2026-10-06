@@ -610,7 +610,18 @@ function NotePane({
       </div>
       <p suppressHydrationWarning className="text-xs text-subtle">
         {t("notes.meta", { updated: format.relative(note.updatedAt), created: format.date(note.createdAt, "date") })}
-        {note.sourceRef === "voice" ? ` · ${t("notes.fromVoice")}` : note.sourceRef?.startsWith("agent") ? ` · ${t("notes.fromAgent")}` : note.sourceRef?.startsWith("meet") ? ` · ${t("notes.fromMeeting")}` : ""}
+        {note.sourceRef === "voice" ? ` · ${t("notes.fromVoice")}` : note.sourceRef?.startsWith("agent") ? ` · ${t("notes.fromAgent")}` : ""}
+        {note.sourceRef?.startsWith("meeting:") ? (
+          // A Meet summary (lib/comms/meet applySummary): back to its meeting.
+          <>
+            {" · "}
+            <Link href={`/dashboard/meet?m=${encodeURIComponent(note.sourceRef.slice("meeting:".length))}`} className="text-ink underline underline-offset-2">
+              {t("notes.fromMeeting")}
+            </Link>
+          </>
+        ) : note.sourceRef?.startsWith("meet") ? (
+          ` · ${t("notes.fromMeeting")}`
+        ) : null}
       </p>
       <VersionHistory
         apiBase={`/api/notes/${encodeURIComponent(note.id)}`}

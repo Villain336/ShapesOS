@@ -17,17 +17,9 @@
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { BadRequestError, NotFoundError } from "@/lib/api/errors";
-
-/**
- * Spotlight re-index, lazily: the indexer (and its embedder) must never be in
- * a route bundle (coordinator's bundle-size rule) — it loads on first use.
- * Integration may repoint this to @/lib/search/text-index-schedule.
- */
-function scheduleDocTextIndex(workspaceId: string, docId: string): void {
-  void import("@/lib/search/text-index")
-    .then((m) => m.scheduleUniverDocTextIndex(workspaceId, docId))
-    .catch(() => undefined);
-}
+// The light write hook: the indexer (and its embedder) loads only when the
+// job runs, after the response — never in a route bundle (bundle-size rule).
+import { scheduleUniverDocTextIndex as scheduleDocTextIndex } from "@/lib/search/text-index-schedule";
 
 
 type Tx = Prisma.TransactionClient;

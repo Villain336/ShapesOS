@@ -39,7 +39,8 @@ export function LinkRecordPicker({ onPick, exclude = [] }: { onPick: (r: PickedR
       fetch(`/api/search/records?q=${encodeURIComponent(query)}&limit=4`, { signal: ctl.signal, cache: "no-store" })
         .then((r) => (r.ok ? r.json() : { results: [] }))
         .then((body: { results: PickedRecord[] }) => {
-          const list = (body.results ?? []).filter((r) => r.kind !== "note" && !exclude.some((e) => e.kind === r.kind && e.id === r.id)).slice(0, 12);
+          // Not notes themselves, and not personal mail threads (lib/notes/service UNLINKABLE_KINDS).
+          const list = (body.results ?? []).filter((r) => r.kind !== "note" && r.kind !== "mail" && !exclude.some((e) => e.kind === r.kind && e.id === r.id)).slice(0, 12);
           setResults(list);
           setActive(0);
         })

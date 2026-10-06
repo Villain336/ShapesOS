@@ -8,8 +8,11 @@
 //     ends it;
 //   - transcripts are post-call: pasted (editor+), or an uploaded recording
 //     through the transcriber (409 when no key — never a fake transcript);
-//   - the meeting agent: a live summary saves once into a Univer notes doc
-//     (shared with the workspace) and the chosen action items as MY
+//   - the meeting agent: a live summary saves once into a note in the Notes
+//     app (lib/notes createNote: private to the saver when the call was in a
+//     private channel, shared with the workspace otherwise; sourceRef
+//     meeting:<id>; linked to the ops project its tasks went to; found by
+//     the Notes list) and the chosen action items as MY
 //     reminders (due 09:00 in my zone, sourceRef meeting:<id>) or tasks in an
 //     ops project (assigned to the member named); a mock summary saves
 //     nothing; a viewer can't.
@@ -215,12 +218,20 @@ describe("transcripts and the meeting agent", () => {
       { saveDoc: true, items: [{ index: 0, target: "reminder" }, { index: 1, target: "task", opsProjectId: ids.ops }, { index: 2, target: "skip" }] },
       tz,
     );
-    assert.ok(applied.notesDocId, "a notes doc");
-    const doc = await inWs(WS, (tx) => tx.univerDoc.findUnique({ where: { id: applied.notesDocId! } }));
-    assert.equal(doc?.kind, "doc");
-    assert.equal(doc?.shareState, "workspace");
+    assert.ok(applied.notesDocId, "a note");
+    const doc = await inWs(WS, (tx) => tx.univerDoc.findUnique({ where: { id: applied.notesDocId! }, include: { noteLinks: true } }));
+    assert.equal(doc?.kind, "note", "the summary lands in the Notes app, not an Office doc");
+    assert.equal(doc?.title, "Meeting notes: Board prep");
+    assert.equal(doc?.createdBy, BEN);
+    assert.equal(doc?.shareState, "private", "a private channel's call: the note is private to the person who saved it");
     assert.equal(doc?.sourceRef, `meeting:${ids.private}`);
+    assert.deepEqual(doc?.noteLinks.map((l) => [l.recordKind, l.recordId]), [["ops_project", ids.ops]], "linked to the ops project its task went to");
     assert.match(JSON.stringify(doc?.snapshot), /Ship on Friday/);
+    assert.match(JSON.stringify(doc?.snapshot), /"taskList"/, "action items are a checklist");
+    const notes = await import("@/lib/notes/service");
+    const mine = await notes.listNotes({ workspaceId: WS, userId: BEN, role: "editor" });
+    assert.ok(mine.some((n) => n.id === applied.notesDocId && n.links.some((l) => l.kind === "ops_project")), "Ben finds it in Notes");
+    assert.equal(await notes.getNote({ workspaceId: WS, userId: VI, role: "viewer" }, applied.notesDocId!), null, "someone outside the private channel never sees it");
 
     const reminders = await inWs(WS, (tx) => tx.opsTask.findMany({ where: { workspaceId: WS, projectId: null, assigneeId: BEN, sourceRef: `meeting:${ids.private}` } }));
     assert.equal(reminders.length, 1);
@@ -235,5 +246,23 @@ describe("transcripts and the meeting agent", () => {
     assert.equal(await status(meet.applySummary(benC(), ids.private!, { saveDoc: true, items: [] }, tz)), 409, "once");
     assert.equal(await status(meet.summarizeMeeting(benC(), ids.private!, live(answer))), 409, "the saved record stays");
     assert.equal(await status(meet.saveTranscript(benC(), ids.private!, { text: "again", source: "pasted" })), 409);
+  });
+
+  it("an ad hoc call's note is shared with the workspace; a bad ops project writes nothing (no orphan note)", async () => {
+    const m = await meet.startMeeting(anaC(), { title: "Weekly sync" });
+    await meet.saveTranscript(anaC(), m.id, { text: transcript, source: "pasted" });
+    await meet.summarizeMeeting(anaC(), m.id, live('{"notes":"Shipping Friday.","decisions":[],"actionItems":[{"title":"Send the deck","owner":"Ben","due":null}]}'));
+    const notesBefore = await inWs(WS, (tx) => tx.univerDoc.count({ where: { workspaceId: WS, kind: "note", sourceRef: `meeting:${m.id}` } }));
+    const foreign = (await inWs(WS_B, (tx) => tx.opsProject.create({ data: { workspaceId: WS_B, name: `Other ${RUN}` } }))).id;
+    assert.equal(await status(meet.applySummary(anaC(), m.id, { saveDoc: true, items: [{ index: 0, target: "task", opsProjectId: foreign }] })), 400, "another workspace's project");
+    assert.equal(await inWs(WS, (tx) => tx.univerDoc.count({ where: { workspaceId: WS, kind: "note", sourceRef: `meeting:${m.id}` } })), notesBefore, "nothing written");
+
+    const applied = await meet.applySummary(anaC(), m.id, { saveDoc: true, items: [{ index: 0, target: "skip" }] });
+    const notes = await import("@/lib/notes/service");
+    const seen = await notes.getNote({ workspaceId: WS, userId: VI, role: "viewer" }, applied.notesDocId!);
+    assert.equal(seen?.shareState, "workspace", "every member can read an ad hoc call's notes");
+    assert.equal(seen?.canEdit, false, "a viewer reads it, never edits it");
+    assert.equal(seen?.sourceRef, `meeting:${m.id}`);
+    assert.deepEqual(seen?.links, [], "no ops project, no links");
   });
 });
