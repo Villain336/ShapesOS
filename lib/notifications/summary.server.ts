@@ -81,7 +81,7 @@ export async function ensureNotificationSummary(
   const prompt = buildSummaryPrompt(input);
   const sources = { notifications: Object.values(input.counts).reduce((a, b) => a + b, 0) };
   try {
-    if (await shouldBatch(workspaceId, deps)) {
+    if (await shouldBatch(workspaceId, { batch: deps.batch })) {
       const key = batchKeyFor(day, userId);
       await (deps.submitBatch ?? defaultSubmitBatch)({ workspaceId, key, prompt, userId, day });
       await withUserScope(workspaceId, userId, (tx) =>

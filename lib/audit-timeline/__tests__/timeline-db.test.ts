@@ -70,7 +70,7 @@ before(async () => {
   const m = await scope(WS, (tx) => tx.mission.create({ data: { workspaceId: WS, template: "outreach_sprint", goal: { text: "g" }, planSnapshot: {}, checkpoints: [], budgetCaps: {}, termination: {}, createdBy: ADMIN }, select: { id: true } }));
   missionId = m.id;
   await appendMissionEvent({ missionId, workspaceId: WS, actor: "lead", step: "plan", tool: "web.search", args: { q: "x" } });
-  await appendMissionEvent({ missionId, workspaceId: WS, actor: "lead", step: "draft", tool: null, observation: { ok: true } });
+  await appendMissionEvent({ missionId, workspaceId: WS, actor: "lead", step: "draft", observation: { ok: true } });
 });
 
 after(async () => {
