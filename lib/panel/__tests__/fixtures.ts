@@ -1,7 +1,7 @@
 // ShapesOS — Phase 19B (WS=panel): shared test fixtures for lib/panel tests.
 // FakeWalkPage is a labelled fake of the browser (a system boundary): a
 // landing page described as data, so the walk loop runs without Chromium.
-// The real browser runs in lib/panel/__tests__/browser-db.test.ts.
+// The real browser runs in lib/panel/__tests__/run-db.test.ts (real Chromium, the same TaskTide page).
 
 import type { PersonaSpec } from "../persona";
 import type { PageOutline, SectionHit, WalkPage } from "../pagemaster";

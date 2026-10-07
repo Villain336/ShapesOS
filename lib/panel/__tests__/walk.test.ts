@@ -3,8 +3,8 @@
 // Ported from the prototype's test/pagemaster.test.ts (9), test/tracker.test.ts
 // (8), test/browser.test.ts (6) and test/walkthrough.test.ts (3). The browser
 // is a system boundary: here it is FakeWalkPage (fixtures.ts, the TaskTide
-// fixture page as data); the same cases against real Chromium are in
-// browser-db.test.ts. The model is a scripted MockLlmProvider.
+// fixture page as data); a real-Chromium walk of the same page is in
+// run-db.test.ts. The model is a scripted MockLlmProvider.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
