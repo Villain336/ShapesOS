@@ -164,9 +164,9 @@ export class RouterPanelModel implements PanelModel {
 
 /** FNV-1a 64-bit — deterministic cache keys. */
 function fnv1a64(input: string): string {
-  let hash = 0xcbf29ce484222325n;
-  const prime = 0x100000001b3n;
-  const mask = 0xffffffffffffffffn;
+  let hash = BigInt("0xcbf29ce484222325");
+  const prime = BigInt("0x100000001b3");
+  const mask = BigInt("0xffffffffffffffff");
   for (const byte of Buffer.from(input, "utf8")) {
     hash ^= BigInt(byte);
     hash = (hash * prime) & mask;
