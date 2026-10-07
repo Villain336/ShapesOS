@@ -22,7 +22,9 @@ import { notifyNotesChanged } from "@/components/notes/events";
 
 const PRIME_KEY = "shapes_offline_primed_at";
 const PRIME_EVERY_MS = 15 * 60_000;
-const PRIME_URLS = ["/api/notes?", "/api/comms/reminders", "/api/comms/mail/threads", "/api/comms/calendar/events", "/api/files", "/api/desk/layout"];
+const PRIME_URLS = ["/api/notes?", "/api/comms/reminders", "/api/comms/mail/threads", "/api/comms/calendar/events", "/api/desk/layout"];
+/** The Files app's own first listing (components/FileManager.tsx: /files of the active workspace). */
+const filesPrimeUrl = (workspaceId: string) => `/api/files?workspaceId=${encodeURIComponent(workspaceId)}&prefix=${encodeURIComponent("/files")}`;
 const TOKEN_NAMES = ["--aos-canvas", "--aos-paper", "--aos-ink", "--aos-muted", "--aos-line", "--aos-control", "--aos-focus", "--aos-hover-paper"];
 
 function liveTokens(): Record<string, string> {
@@ -35,7 +37,7 @@ function liveTokens(): Record<string, string> {
   return out;
 }
 
-async function prime(): Promise<void> {
+async function prime(workspaceId: string | null): Promise<void> {
   try {
     const last = Number(localStorage.getItem(PRIME_KEY) ?? 0);
     if (Date.now() - last < PRIME_EVERY_MS) return;
@@ -43,12 +45,13 @@ async function prime(): Promise<void> {
   } catch {
     return;
   }
-  for (const url of PRIME_URLS) {
+  // Phase 18.3 integration: /api/files needs the workspace (a bare GET is a 400).
+  for (const url of workspaceId ? [...PRIME_URLS, filesPrimeUrl(workspaceId)] : PRIME_URLS) {
     await fetch(url, { cache: "no-store", priority: "low" } as RequestInit).catch(() => undefined);
   }
 }
 
-export function OfflineProvider({ userKey }: { userKey: string }) {
+export function OfflineProvider({ userKey, workspaceId = null }: { userKey: string; workspaceId?: string | null }) {
   const { t, locale, messages } = useI18n();
   const queuedTemplate = messages.flow.offline.page.queued;
   const [offline, setOffline] = useState(false);
@@ -96,13 +99,13 @@ export function OfflineProvider({ userKey }: { userKey: string }) {
           },
         };
         reg.active?.postMessage({ type: "session", key: userKey, strings, tokens: liveTokens() });
-        void prime();
+        void prime(workspaceId);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [userKey, locale, queuedTemplate]);
+  }, [userKey, workspaceId, locale, queuedTemplate]);
 
   useEffect(() => {
     const sync = async () => {

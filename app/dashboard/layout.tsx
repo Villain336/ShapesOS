@@ -184,7 +184,7 @@ export default async function DashboardLayout({
         <NewTaskDialog />
         <QuickCapture />
         <ShareSheetHost role={role} workspaceId={workspace.id} />
-        <OfflineProvider userKey={offlineKey} />
+        <OfflineProvider userKey={offlineKey} workspaceId={workspace.id} />
         <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
