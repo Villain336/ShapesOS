@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): per-persona friction timelines.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/reporting/timeline.ts: the walk's steps and
 // behaviour signals become a scrubbable timeline — where attention died,

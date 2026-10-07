@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): a page walk run on the agent worker.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // The body of the `panel_run` agent job (lib/agents/queue/handlers.ts):
 //   1. claim the run (queued → running). A run found already "running" is a

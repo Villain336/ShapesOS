@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): a persona's browser, over the existing
 // Playwright recorder (lib/agents/runs/recorder.ts AgentRunRecorder).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/simulation/browser.ts + the locator half of
 // pagemaster.ts. One persona = one recorded headless context: every request

@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the PageMaster (the page as the world).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/simulation/pagemaster.ts (Concordia-style
 // game master): the persona emits an intent, the PageMaster resolves it into

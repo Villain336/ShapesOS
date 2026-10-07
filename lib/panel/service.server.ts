@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the Dress Rehearsal service.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // One entry point for the routes, the page and the agent tools, so every path
 // goes through the same gates: the dress_rehearsal entitlement (Pro and

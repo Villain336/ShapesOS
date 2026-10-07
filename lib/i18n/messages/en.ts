@@ -15,6 +15,8 @@ import { contentEn } from "./content.en";
 import { trustEn } from "./trust.en";
 // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
 import { flowEn } from "./flow.en";
+// Phase 19B (WS=panel): Dress Rehearsal.
+import { rehearsalEn } from "./rehearsal.en";
 
 export const en = {
   common: {
@@ -114,6 +116,8 @@ export const en = {
       "/dashboard/attribution": { label: "Attribution", description: "What drove revenue" },
       "/dashboard/analytics": { label: "Analytics", description: "Traffic, social and revenue" },
       "/dashboard/reports": { label: "Reports", description: "Reports and exports" },
+      // Phase 19B (WS=panel)
+      "/dashboard/rehearsal": { label: "Dress rehearsal", description: "Synthetic customers from your interviews walk your page" },
       "/dashboard/studio": { label: "Studio", description: "Creative studio" },
       "/dashboard/clips": { label: "Clips", description: "Long videos into short clips" },
       "/dashboard/voice": { label: "Voice", description: "Voice agents, scripts, voiceovers" },
@@ -998,6 +1002,8 @@ export const en = {
   trust: trustEn,
   // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
   flow: flowEn,
+  // Phase 19B (WS=panel): Dress Rehearsal (/dashboard/rehearsal).
+  ...rehearsalEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the HARD per-run credit cap.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/llm/costs.ts (CostLedger). The prototype
 // priced calls in USD from its own table and threw AFTER a call pushed the run

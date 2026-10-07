@@ -70,6 +70,8 @@ import {
   BookUser,
   CalendarDays,
   Mailbox,
+  // Phase 19B (WS=panel): Dress Rehearsal.
+  Drama,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
@@ -144,6 +146,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },
       { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine, description: "Traffic, social and revenue", keywords: "pageviews umami traffic ga4 search console engagement overview" },
       { href: "/dashboard/reports", label: "Reports", icon: ChartColumn, description: "Reports and exports", keywords: "analytics report pdf" },
+      // Phase 19B (WS=panel): Dress Rehearsal — the Pre Launch Panel (Pro and above; the page shows the upsell below Pro).
+      { href: "/dashboard/rehearsal", label: "Dress rehearsal", icon: Drama, description: "Synthetic customers from your interviews walk your page", keywords: "pre launch panel synthetic customers personas interviews page walk landing page test objections simulation town rehearsal" },
     ],
   },
   {

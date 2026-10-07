@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the panel's system boundaries, injectable.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Everything outside the panel's own code is reached through PanelDeps: the
 // model (the ShapesOS router), the embedder (local MiniLM), the SSRF guard,

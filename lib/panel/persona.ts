@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): Dress Rehearsal persona spec.
-// Commercial layer (entitlement dress_rehearsal, Pro and above). Company-authored;
-// see lib/panel/README.md for the licence boundary.
+// Commercial layer (entitlement dress_rehearsal, Pro and above). Licence
+// boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the Pre Launch Panel prototype (src/persona/types.ts + the
 // founder-edit half of src/persona/derive.ts). The spec is the founder's

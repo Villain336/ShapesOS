@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the track record (predicted vs real).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/trust/validator.ts. After a real launch the
 // founder enters what actually converted; this compares it with the panel's

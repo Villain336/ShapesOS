@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): the up-front credit estimate and the
-// parallel caps. Commercial layer (entitlement dress_rehearsal). See
-// lib/panel/README.md.
+// parallel caps. Commercial layer (entitlement dress_rehearsal). Licence
+// boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // THE CAP MATHS (shown to the person, who confirms a cap before anything runs):
 //   step call    = credits(model, in ≈ STEP_PROMPT_CHARS, out = STEP_MAX_TOKENS)

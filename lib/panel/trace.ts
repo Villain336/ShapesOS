@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): quote tracing.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/reporting/verdicts.ts (traceQuote,
 // filterTraceableQuotes): a quote is traceable when it shares at least

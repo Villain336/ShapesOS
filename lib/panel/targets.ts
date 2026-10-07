@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): what a page walk walks, and what the
 // browser may load while it does.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Three targets:
 //   url           any public http(s) page — every request (navigation,
