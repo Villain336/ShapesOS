@@ -29,7 +29,9 @@ import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { llmTokenCredits } from "@/lib/metering/credits";
 import { allTools, getTool, toolAction, toolGroup } from "@/lib/chat/tools";
 import { executeTool, isDelegationTool, type ChatToolCall } from "@/lib/chat/tool-exec";
-import { AGENT_MAX_GROUPS, type ToolGroup } from "@/lib/agents/grants";
+import { AGENT_MAX_GROUPS, blockableGroups, type ToolGroup } from "@/lib/agents/grants";
+// Phase 19A integration: 18.3's agent app permissions narrow the cursor too.
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { buildLoopTools, type LoopToolSet } from "@/lib/agents/loop-tools";
 import { deferralFor, searchTools, SEARCH_TOOLS_DEF, SEARCH_TOOLS_TOOL } from "@/lib/agents/tool-loading";
 import { appendAgentRunEvent, createAgentRun, finishAgentRun, markAgentRunRunning } from "@/lib/agents/runs/service";
@@ -159,8 +161,13 @@ async function brainProvider(caller: CursorCaller, runId: string, deps: CursorBr
 // ── the conversation run ────────────────────────────────────────────────────
 
 /** The tool groups the cursor's brain may use (the lead's, minus hand-offs: agent mode is separate). */
-export function cursorGrant(): ToolGroup[] {
-  return AGENT_MAX_GROUPS.lead.filter((g) => g !== "delegate");
+export function cursorGrant(blockedGroups: readonly string[] = []): ToolGroup[] {
+  // Phase 19A integration: the workspace's blocked apps (Phase 18.3, Settings →
+  // Privacy and security → Agent app access) come off the cursor's grant like
+  // every computeGrant() caller's, so the model is never offered their tools;
+  // executeTool() still refuses one by name (the 18.3 backstop).
+  const blocked = new Set<ToolGroup>(blockableGroups(blockedGroups));
+  return AGENT_MAX_GROUPS.lead.filter((g) => g !== "delegate" && !blocked.has(g));
 }
 
 async function defaultProjectId(workspaceId: string): Promise<string> {
@@ -169,7 +176,12 @@ async function defaultProjectId(workspaceId: string): Promise<string> {
 }
 
 /** Open (or re-open) the conversation's run; refuses another person's run. */
-export async function openCursorRun(caller: CursorCaller, conversationId: string | null | undefined, summary: string): Promise<{ runId: string; projectId: string }> {
+export async function openCursorRun(
+  caller: CursorCaller,
+  conversationId: string | null | undefined,
+  summary: string,
+  grant: readonly ToolGroup[] = cursorGrant(),
+): Promise<{ runId: string; projectId: string }> {
   if (conversationId) {
     const run = await withWorkspaceScope(caller.workspaceId, (tx) =>
       tx.agentRun.findFirst({ where: { id: conversationId, workspaceId: caller.workspaceId }, select: { id: true, kind: true, startedBy: true, agentState: true } }),
@@ -185,7 +197,7 @@ export async function openCursorRun(caller: CursorCaller, conversationId: string
     kind: "cursor",
     startedBy: caller.userId,
     agentKey: "lead",
-    allowedTools: cursorGrant(),
+    allowedTools: [...grant],
     agentState: { surface: "desktop", mode: "conversation", projectId, prompt: summary.slice(0, 280) },
   });
   await markAgentRunRunning(caller.workspaceId, run.id);
@@ -228,10 +240,10 @@ async function audit(workspaceId: string, actor: string, action: string, runId: 
 
 // ── tools ───────────────────────────────────────────────────────────────────
 
-function cursorToolSet(live: boolean): LoopToolSet {
+function cursorToolSet(live: boolean, grant: readonly ToolGroup[]): LoopToolSet {
   const base = {
     tools: allTools(),
-    grant: cursorGrant() as readonly string[],
+    grant: grant as readonly string[],
     groupOf: toolGroup,
     filter: (c: string) => !isDelegationTool(c),
   };
@@ -309,7 +321,8 @@ export async function runCursorTurn(
   const now = deps.now ?? Date.now;
   const transcript = req.transcript.trim();
   const summary = screenSummary({ screens: req.screenshots, app: req.app, uiMap: req.uiMap });
-  const { runId, projectId } = await openCursorRun(caller, req.conversationId, transcript);
+  const grant = cursorGrant(await getAgentBlockedGroups(caller.workspaceId));
+  const { runId, projectId } = await openCursorRun(caller, req.conversationId, transcript, grant);
   const { provider, byok, mock } = await brainProvider(caller, runId, deps).catch(async (err: unknown) => {
     await finishAgentRun(caller.workspaceId, runId, "failed").catch(() => undefined);
     throw err;
@@ -329,7 +342,7 @@ export async function runCursorTurn(
   if (req.mode === "agent") return agentModeTurn(caller, runId, transcript, emit, summary);
 
   const canAct = roleAtLeast(caller.role, "editor");
-  const tools = canAct ? cursorToolSet(provider.isLive) : null;
+  const tools = canAct ? cursorToolSet(provider.isLive, grant) : null;
   const serverSearch = !!tools && provider.supportsToolSearch?.() === true;
   const activated = new Set<string>();
   const offered = () => {
@@ -421,7 +434,7 @@ export async function runCursorTurn(
           continue;
         }
         const call: ChatToolCall = { tool: canonical, args: u.input, status: "error", toolUseId: u.id, runId };
-        const ctx = { projectId, workspaceId: caller.workspaceId, userId: caller.userId, role: caller.role, confirmed: false, agentKey: "lead" as const, grant: cursorGrant(), runId, signal };
+        const ctx = { projectId, workspaceId: caller.workspaceId, userId: caller.userId, role: caller.role, confirmed: false, agentKey: "lead" as const, grant, runId, signal };
         const result = await executeTool(ctx, canonical, u.input, call);
         if (call.status === "pending_confirmation") {
           const p = await createProposal({ caller, runId, projectId, tool: canonical, input: u.input, elementId: lastElement, now: now() });

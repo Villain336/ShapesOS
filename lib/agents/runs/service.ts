@@ -256,6 +256,9 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
       parentRunId: run.parentRunId,
       createdAt: run.createdAt,
       endedAt: run.endedAt,
+      // Phase 19A integration: cursor agent mode (a spend cap) announces; a
+      // spoken cursor conversation doesn't (lib/notifications/producers.ts).
+      budgetMicroUsd: run.budgetMicroUsd,
     });
   }
   return run;

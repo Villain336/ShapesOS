@@ -127,6 +127,10 @@ describe("producer seams", () => {
     assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "playbook", startedBy: "scheduler" }), false);
     assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "chat", startedBy: "u1", createdAt: t0, endedAt: new Date(t0.getTime() + 30_000) }), false);
     assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "chat", startedBy: "u1", createdAt: t0, endedAt: new Date(t0.getTime() + 5 * 60_000) }), true);
+    // Phase 19A integration: cursor agent mode (a spend cap) notifies; a spoken cursor conversation doesn't.
+    assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "cursor", startedBy: "u1", budgetMicroUsd: 3_000_000 }), true);
+    assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "cursor", startedBy: "u1", budgetMicroUsd: null }), false);
+    assert.equal(runFinishedWorthNotifying({ workspaceId: "w", runId: "r", kind: "cursor", startedBy: "u1", createdAt: t0, endedAt: new Date(t0.getTime() + 5 * 60_000) }), false);
   });
 
   it("meetings: only timed events starting in the next ten minutes", () => {

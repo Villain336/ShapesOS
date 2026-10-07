@@ -11,7 +11,12 @@
 //     budgetMicroUsd, queued for the worker, and the loop stops at the cap
 //     (fake model with a priced usage per call, the budget read from the row);
 //   - talk minutes: free within the plan's included minutes, charged after;
-//   - tokens: wrong workspace / tampered → 401.
+//   - tokens: wrong workspace / tampered → 401;
+//   - Phase 19A integration (the 18.3 hand-offs): a workspace's blocked app
+//     (agent app permissions) is neither offered to the cursor nor proposable;
+//     agent mode announces run_finished / run_failed while a spoken
+//     conversation doesn't; "Undo this agent run" reverts what a cursor run
+//     did; the audit timeline shows the cursor's audit rows and run steps.
 // Run (as the least-privilege app role):
 //   DATABASE_URL=… npx tsx --test lib/cursor/__tests__/cursor-db.test.ts
 // Listed in scripts/test/db-tests.txt.
@@ -40,7 +45,7 @@ import { registerExtraTool, type ToolDef } from "@/lib/chat/tools";
 import { memoryTranscriptStore } from "@/lib/agents/runs/transcript";
 import { runAgentLoop } from "@/lib/agents/loop";
 import { signCursorToken } from "../token";
-import { runCursorTurn, type CursorSseEvent } from "../brain";
+import { cursorGrant, runCursorTurn, type CursorSseEvent } from "../brain";
 import { preflightTalkMinutes, recordTalkMinutes, talkAllowance } from "../metering";
 import { POST as turnPOST } from "@/app/api/cursor/turn/route";
 import { POST as approvePOST } from "@/app/api/cursor/approve/route";
@@ -48,6 +53,12 @@ import { POST as agentPOST } from "@/app/api/cursor/agent/route";
 import { POST as sessionPOST } from "@/app/api/cursor/session/route";
 import { POST as sttPOST } from "@/app/api/cursor/transcribe-token/route";
 import { POST as ttsPOST } from "@/app/api/cursor/tts/route";
+import { toolGroup } from "@/lib/chat/tools";
+import { executeTool, type ChatToolCall } from "@/lib/chat/tool-exec";
+import { setAgentBlockedGroups } from "@/lib/agents/app-permissions";
+import { finishAgentRun } from "@/lib/agents/runs/service";
+import { executeUndo, loadUndoPlan } from "@/lib/timemachine/undo";
+import { loadTimeline } from "@/lib/audit-timeline/timeline.server";
 
 const RUN = randomUUID().slice(0, 8);
 const WS = `p19a-${RUN}`;
@@ -370,5 +381,123 @@ describe("talk minutes and speech (DB)", () => {
     const t = tok(ANA);
     const bad = await sessionPOST(req("/api/cursor/session", `${t.slice(0, -2)}xx`, {}));
     assert.equal(bad.status, 401);
+  });
+});
+
+describe("Phase 19A integration: the 18.3 hand-offs (DB)", () => {
+  const owner = { userId: ANA, workspaceId: WS, role: "owner" as const };
+
+  it("a blocked app's tools are not offered to the cursor and can't be proposed (executeTool refuses them)", async () => {
+    const invoiceGroup = toolGroup("ops_send_invoice");
+    assert.notEqual(invoiceGroup, toolGroup("t_cursor_note"), "the two tools sit in different apps");
+    await setAgentBlockedGroups(WS, [invoiceGroup], ANA);
+    try {
+      let offered: string[] = [];
+      let invoiceResult: { text: string; isError: boolean } | null = null;
+      const script: MockChatStep[] = [
+        (r) => {
+          offered = (r.tools ?? []).map((t) => t.name);
+          return {
+            content: [
+              { type: "text", text: "Sending it and pinning a note." },
+              { type: "tool_use", id: "tu_blk_inv", name: "ops_send_invoice", input: { invoiceId: "inv-blocked" } },
+              { type: "tool_use", id: "tu_blk_note", name: "t_cursor_note", input: { text: "blocked check" } },
+            ],
+          };
+        },
+        (r) => {
+          const last = r.messages[r.messages.length - 1]?.content;
+          for (const b of Array.isArray(last) ? last : []) if (b.type === "tool_result" && b.toolUseId === "tu_blk_inv") invoiceResult = { text: String(b.content), isError: !!b.isError };
+          return { content: [{ type: "text", text: "Done asking." }] };
+        },
+      ];
+      const events: CursorSseEvent[] = [];
+      const out = await runCursorTurn(owner, { transcript: "send the invoice and pin a note", screenshots: [] }, (e) => events.push(e), {
+        provider: new MockLlmProvider({ chatScript: script }),
+      });
+      assert.ok(offered.length > 0, "tools were offered");
+      assert.ok(!offered.includes("ops_send_invoice"), "the blocked app's tool is not offered");
+      assert.ok(offered.includes("t_cursor_note"));
+      const props = events.filter((e): e is Extract<CursorSseEvent, { event: "proposal" }> => e.event === "proposal").map((e) => e.data.tool);
+      assert.deepEqual(props, ["t_cursor_note"], "only the allowed tool became a proposal");
+      const rows = await withWorkspaceScope(WS, (tx) => tx.cursorProposal.count({ where: { runId: out.runId, tool: "ops_send_invoice" } }));
+      assert.equal(rows, 0);
+      assert.ok(invoiceResult?.isError, `the model was told it can't: ${invoiceResult?.text}`);
+      // A proposal made before the block, approved after it: executeTool's
+      // 18.3 backstop refuses it (whatever grant the call carries).
+      const call: ChatToolCall = { tool: "ops_send_invoice", args: { invoiceId: "inv-blocked" }, status: "error", runId: out.runId, confirmed: true };
+      await executeTool({ projectId: "", workspaceId: WS, userId: ANA, role: "owner", confirmed: true, agentKey: "lead", grant: cursorGrant(), runId: out.runId }, "ops_send_invoice", call.args, call);
+      assert.equal(call.status, "denied");
+      assert.match(call.resultSummary ?? "", /Agents may not use/);
+      const refused = await withWorkspaceScope(WS, (tx) =>
+        tx.agentRunEvent.count({ where: { runId: out.runId, type: "gate", payload: { path: ["reason"], equals: "app_blocked" } } }),
+      );
+      assert.equal(refused, 1, "the refusal is on the cursor run's timeline");
+      const run = await withWorkspaceScope(WS, (tx) => tx.agentRun.findFirst({ where: { id: out.runId }, select: { allowedTools: true } }));
+      assert.ok(!run?.allowedTools.includes(invoiceGroup), "the run's recorded grant leaves the blocked app out");
+    } finally {
+      await setAgentBlockedGroups(WS, [], ANA);
+    }
+  });
+
+  it("notifications: cursor agent mode announces run_finished and run_failed; a spoken conversation doesn't", async () => {
+    const count = (where: Record<string, unknown>) => prisma.notification.count({ where: { workspaceId: WS, userId: ANA, ...where } });
+    // A spoken conversation (no spend cap): finished at the end of the turn, silently.
+    const events: CursorSseEvent[] = [];
+    const convo = await runCursorTurn(owner, { transcript: "where is billing", screenshots: [] }, (e) => events.push(e), {
+      provider: new MockLlmProvider({ chatScript: [{ content: [{ type: "text", text: "Top right." }] }] }),
+    });
+    assert.equal(await count({ kind: "run_finished", sourceId: convo.runId }), 0, "the person heard the answer live");
+    // Agent mode: a capped background run.
+    for (const outcome of ["succeeded", "failed"] as const) {
+      const res = await agentPOST(req("/api/cursor/agent", tok(ANA), { goal: `Background ${outcome}`, maxUsd: 1 }));
+      assert.equal(res.status, 200);
+      const { runId } = (await res.json()) as { runId: string };
+      await finishAgentRun(WS, runId, outcome);
+      const kind = outcome === "succeeded" ? "run_finished" : "run_failed";
+      assert.equal(await count({ kind, sourceId: runId }), 1, `${kind} for the agent-mode run`);
+      const n = await prisma.notification.findFirst({ where: { workspaceId: WS, kind, sourceId: runId }, select: { title: true, href: true } });
+      assert.match(n!.title, /^Cursor run (finished|failed)$/);
+      assert.equal(n!.href, `/dashboard/runs/${runId}`);
+    }
+  });
+
+  it("Undo this agent run reverts what a cursor run did (a note approved by voice)", async () => {
+    const title = `Cursor undo ${RUN}`;
+    const events: CursorSseEvent[] = [];
+    const out = await runCursorTurn(owner, { transcript: "write that down as a note", screenshots: [] }, (e) => events.push(e), {
+      provider: new MockLlmProvider({
+        chatScript: [
+          { content: [{ type: "tool_use", id: "tu_undo_note", name: "create_note", input: { title, body: "from the cursor" } }] },
+          { content: [{ type: "text", text: "It's on the card." }] },
+        ],
+      }),
+    });
+    const prop = events.find((e): e is Extract<CursorSseEvent, { event: "proposal" }> => e.event === "proposal")?.data;
+    assert.ok(prop, "create_note waits for an OK");
+    const res = await approvePOST(req("/api/cursor/approve", tok(ANA), { approvalId: prop!.approvalId, decision: "approve", via: prop!.voiceApprovable ? "voice" : "click" }));
+    assert.equal(((await res.json()) as { status: string }).status, "executed");
+    const notes = () => withWorkspaceScope(WS, (tx) => tx.univerDoc.count({ where: { workspaceId: WS, kind: "note", title } }));
+    assert.equal(await notes(), 1);
+
+    const actor = { workspaceId: WS, userId: ANA, role: "owner" as const };
+    const plan = await loadUndoPlan(actor, out.runId);
+    assert.ok(plan.canUndo);
+    const item = plan.items.find((i) => i.kind === "note");
+    assert.ok(item?.revertible, "the note the cursor made is revertible");
+    const { outcomes } = await executeUndo(actor, out.runId, { confirmed: true });
+    assert.ok(outcomes.some((o) => o.kind === "note" && o.result === "reverted"), JSON.stringify(outcomes));
+    assert.equal(await notes(), 0, "the note is gone");
+  });
+
+  it("the audit timeline shows the cursor's audit rows and its run steps", async () => {
+    const page = await loadTimeline(WS, {}, null, 200);
+    const authority = page.entries.filter((e) => e.source === "authority_audit_event" && /^Cursor /.test(e.action));
+    assert.ok(authority.some((e) => e.action === "Cursor proposal"), authority.map((e) => e.action).join(", "));
+    assert.ok(authority.some((e) => e.action === "Cursor approve"));
+    assert.ok(authority.every((e) => e.target?.startsWith("Cursor run ")));
+    const steps = page.entries.filter((e) => e.source === "agent_run_event" && e.target === "Cursor run");
+    assert.ok(steps.length > 0, "the cursor run's steps (summaries only)");
+    assert.ok(steps.every((e) => !(e.summary ?? "").includes(MARKER)), "never the screenshot");
   });
 });

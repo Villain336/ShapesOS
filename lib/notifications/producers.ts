@@ -631,6 +631,12 @@ export interface RunFinishedInput {
   parentRunId?: string | null;
   createdAt?: Date | null;
   endedAt?: Date | null;
+  /**
+   * Phase 19A integration: the run's spend cap (AgentRun.budgetMicroUsd).
+   * A cursor run with one is agent mode ("do it in the background, max $3");
+   * without one it is a spoken conversation the person heard live.
+   */
+  budgetMicroUsd?: number | null;
 }
 
 /** Should this finished run notify? Top-level runs a person started; quick chat turns don't. PURE. */
@@ -643,6 +649,10 @@ export function runFinishedWorthNotifying(input: RunFinishedInput): boolean {
     const ms = input.createdAt && input.endedAt ? input.endedAt.getTime() - input.createdAt.getTime() : 0;
     return ms >= RUN_FINISHED_MIN_CHAT_MS;
   }
+  // Phase 19A integration: a cursor conversation answers out loud while the
+  // person listens (like a quick chat turn); its agent-mode runs (a spend cap,
+  // background work) announce that they finished.
+  if (input.kind === "cursor") return input.budgetMicroUsd != null;
   return true;
 }
 
