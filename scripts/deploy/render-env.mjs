@@ -450,6 +450,10 @@ export const TABLE = [
     (k) => [k, { cls: "exclude", why: "the latency battery (scripts/verify/latency.mts) only; never read by the app" }],
   ),
 
+  // --- Phase 19B (panel): Dress Rehearsal ---------------------------------
+  ["PANEL_MAX_PARALLEL_PERSONAS", { cls: "exclude", why: "default 3 (bounded 1-6 and by the recorder's browser slots) fits the worker; set it only to tune" }],
+  ["PANEL_FAKE_MODEL", { cls: "exclude", why: "dev and test only: the deterministic FAKE panel model; refused when NODE_ENV=production" }],
+
   // --- dev, test and eval only ------------------------------------------
   ...["E2E_BASE_URL", "E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD", "E2E_EDITOR_EMAIL",
     "SMOKE_APP_DATABASE_URL", "SMOKE_PORT_A", "SMOKE_PORT_B", "SMOKE_GRACE_MS", "SMOKE_REAL_S3", "SMOKE_SKIP_WORKER", "E2E_MOCK_OAUTH", "SEED_EMAIL", "MEMORY_TEST_MODE", "GRAPH_WEBHOOK_TEST_SECRETS", "OPS_SCRATCH", "EVAL_HUMAN", "EVAL_RESULTS_PATH", "EVAL_WORKSPACE_ID", "HOME", "FONTCONFIG_FILE",
