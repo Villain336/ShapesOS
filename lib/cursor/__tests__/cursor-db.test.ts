@@ -393,7 +393,9 @@ describe("Phase 19A integration: the 18.3 hand-offs (DB)", () => {
     await setAgentBlockedGroups(WS, [invoiceGroup], ANA);
     try {
       let offered: string[] = [];
-      let invoiceResult: { text: string; isError: boolean } | null = null;
+      // A holder object: TS narrows a `let x = null` assigned only inside a
+      // callback to `null` (then `never` after `?.`).
+      const seen: { invoice: { text: string; isError: boolean } | null } = { invoice: null };
       const script: MockChatStep[] = [
         (r) => {
           offered = (r.tools ?? []).map((t) => t.name);
@@ -407,7 +409,7 @@ describe("Phase 19A integration: the 18.3 hand-offs (DB)", () => {
         },
         (r) => {
           const last = r.messages[r.messages.length - 1]?.content;
-          for (const b of Array.isArray(last) ? last : []) if (b.type === "tool_result" && b.toolUseId === "tu_blk_inv") invoiceResult = { text: String(b.content), isError: !!b.isError };
+          for (const b of Array.isArray(last) ? last : []) if (b.type === "tool_result" && b.toolUseId === "tu_blk_inv") seen.invoice = { text: String(b.content), isError: !!b.isError };
           return { content: [{ type: "text", text: "Done asking." }] };
         },
       ];
@@ -422,7 +424,7 @@ describe("Phase 19A integration: the 18.3 hand-offs (DB)", () => {
       assert.deepEqual(props, ["t_cursor_note"], "only the allowed tool became a proposal");
       const rows = await withWorkspaceScope(WS, (tx) => tx.cursorProposal.count({ where: { runId: out.runId, tool: "ops_send_invoice" } }));
       assert.equal(rows, 0);
-      assert.ok(invoiceResult?.isError, `the model was told it can't: ${invoiceResult?.text}`);
+      assert.ok(seen.invoice?.isError, `the model was told it can't: ${seen.invoice?.text}`);
       // A proposal made before the block, approved after it: executeTool's
       // 18.3 backstop refuses it (whatever grant the call carries).
       const call: ChatToolCall = { tool: "ops_send_invoice", args: { invoiceId: "inv-blocked" }, status: "error", runId: out.runId, confirmed: true };
