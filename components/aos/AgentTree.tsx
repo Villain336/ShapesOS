@@ -20,6 +20,9 @@ import { cn } from "@/lib/utils";
 // pass their translator (server: getI18n, client: useI18n); English otherwise.
 import { createTranslator, type Translator } from "@/lib/i18n";
 import { AgentAvatar } from "./AgentAvatar";
+// Phase 19A (WS=server): each agent row is a cursor target ("where is my
+// researcher?" → the cursor points at its row; lib/cursor/registry.ts).
+import { cursorTarget, type CursorTargetAttrs } from "@/lib/cursor/registry";
 
 const EN: Translator = createTranslator("en");
 import { StatusShape } from "./StatusShape";
@@ -30,16 +33,18 @@ function MaybeLink({
   children,
   label,
   onNavigate,
+  target,
 }: {
   href: string | null;
   className?: string;
   children: React.ReactNode;
   label?: string;
   onNavigate?: () => void;
+  target?: CursorTargetAttrs;
 }) {
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className} aria-label={label} onClick={onNavigate}>
+    <Link href={href} className={className} aria-label={label} onClick={onNavigate} {...target}>
       {children}
     </Link>
   );
@@ -88,6 +93,7 @@ function Branch({
       <MaybeLink
         href={node.href}
         onNavigate={onNavigate}
+        target={cursorTarget(`agent:${node.key}`, node.name, "link")}
         label={t("kit.subAgentRow", { name: node.name, status: meta.label, line: node.line })}
         className={cn(
           "flex items-center gap-3 rounded-sm transition-[background-color] duration-150",
@@ -131,6 +137,7 @@ function SubAgentRows({ nodes, tone, onNavigate, t = EN }: { nodes: AgentNode[];
             <MaybeLink
               href={c.href}
               onNavigate={onNavigate}
+              target={cursorTarget(`agent:${c.key}`, c.name, "link")}
               label={t("kit.subAgentRow", { name: c.name, status: m.label, line: c.line })}
               className={cn(
                 "flex min-h-9 items-center gap-2 rounded-sm px-2 py-1 transition-[background-color] duration-150",

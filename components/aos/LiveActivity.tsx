@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 // Phase 18.1 (integration): status words and captions in the person's language.
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { StatusShape } from "./StatusShape";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget } from "@/lib/cursor/registry";
 
 export function LiveCounts({ counts, className }: { counts: StatusCounts; className?: string }) {
   const { t } = useI18n();
@@ -74,6 +76,7 @@ export function LiveRunStrip({ run, chips = [], className }: { run: LiveRun; chi
           <button
             type="button"
             onClick={run.onStop}
+            {...cursorTarget("kit:live-run:stop", run.stopLabel ?? t("kit.stopRun"))}
             aria-label={run.stopLabel ?? t("kit.stopRun")}
             className="aos-press flex size-9 shrink-0 items-center justify-center rounded-full bg-failed text-paper"
           >

@@ -8,6 +8,7 @@
 //   shell:topbar, shell:needs-you, shell:command-bar, shell:new-task, …
 //   approval:<card id>:approve|deny|review   each approval card's actions
 //   kit:<component>:<action>       each kit primary action (components/aos)
+//   agent:<node key>               each agent row of the agent tree (lead, sub-agents, runs)
 // The page publishes the visible ones through window.__shapesUiMap()
 // (components/cursor/CursorUiMap.tsx); ShapesOS Desktop's preload reads it
 // and the brain points with [POINT:#id:label]. A coverage test
@@ -76,4 +77,21 @@ export const KIT_PRIMARY_ACTIONS: ReadonlyArray<{ file: string; component: strin
   { file: "components/aos/RunTimeline.tsx", component: "RunTimeline", ids: ["kit:run:pause", "kit:run:resume", "kit:run:stop"] },
   { file: "components/aos/Toast.tsx", component: "ToastView", ids: ["kit:toast:"] },
   { file: "components/aos/LeadAgentCard.tsx", component: "LeadAgentCard", ids: ["kit:lead-agent:"] },
+  { file: "components/aos/LiveActivity.tsx", component: "LiveRunStrip", ids: ["kit:live-run:stop"] },
+  { file: "components/aos/AgentTree.tsx", component: "AgentTree", ids: ["agent:${node.key}", "agent:${c.key}"] },
 ];
+
+/**
+ * Kit files that render buttons or links which are NOT primary actions —
+ * form controls and filters the person sets, not actions the cursor points
+ * at to get something done. The coverage test fails on any kit file with a
+ * button or link that is in neither list, so a new kit component must be
+ * wired (or consciously listed here) before it ships.
+ */
+export const KIT_NON_PRIMARY: Readonly<Record<string, string>> = {
+  "components/aos/Controls.tsx": "form controls (permission segmented control, segmented, switch): settings values, not actions",
+  "components/aos/FilterPill.tsx": "list filters: they narrow a view, they do not act",
+  "components/aos/Menu.tsx": "menu rows inside an already-open menu; the menu's trigger is the target",
+  "components/aos/ToolChip.tsx": "a tool chip toggles a tool on a draft; it is not an action",
+  "components/aos/DelegationPlan.tsx": "plain links to sub-tasks inside a plan table (the agent rows are targets)",
+};

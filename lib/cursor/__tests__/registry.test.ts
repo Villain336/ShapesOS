@@ -4,10 +4,10 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allNavItems } from "@/lib/nav/config";
-import { KIT_PRIMARY_ACTIONS, SHELL_TARGETS, cursorSlug, cursorTarget, navCursorId } from "../registry";
+import { KIT_NON_PRIMARY, KIT_PRIMARY_ACTIONS, SHELL_TARGETS, cursorSlug, cursorTarget, navCursorId } from "../registry";
 import { navCursorTargets } from "../registry-nav";
 
 const ROOT = process.cwd();
@@ -56,11 +56,19 @@ describe("kit primary actions", () => {
       total += k.ids.length;
     });
   }
-  it("covers every kit file with a primary button (components/aos)", () => {
-    // Files whose primary action is a button/link the person presses to act.
-    const expected = ["AgentCard", "ApprovalCard", "Banner", "Composer", "RunTimeline", "Toast", "LeadAgentCard"];
-    assert.deepEqual(KIT_PRIMARY_ACTIONS.map((k) => k.file.replace(/^components\/aos\/|\.tsx$/g, "")).sort(), [...expected].sort());
-    console.log(`# kit primary action ids wired: ${total}`);
+  it("covers every kit file that renders a button or link (components/aos), derived from the files", () => {
+    const kitFiles = readdirSync(join(ROOT, "components/aos"))
+      .filter((f) => f.endsWith(".tsx"))
+      .map((f) => `components/aos/${f}`);
+    const pressable = kitFiles.filter((f) => /<button\b|<Link\b|<a\s/.test(src(f)));
+    const wired = new Set(KIT_PRIMARY_ACTIONS.map((k) => k.file));
+    const unaccounted = pressable.filter((f) => !wired.has(f) && !KIT_NON_PRIMARY[f]);
+    assert.deepEqual(unaccounted, [], `kit files with a button/link that are neither cursor targets nor listed as non-primary: ${unaccounted.join(", ")}`);
+    // Neither list names a file that does not exist or has nothing to press.
+    for (const f of [...wired, ...Object.keys(KIT_NON_PRIMARY)]) assert.ok(pressable.includes(f), `${f} renders a button or link`);
+    for (const f of Object.keys(KIT_NON_PRIMARY)) assert.ok(!wired.has(f), `${f} is in one list only`);
+    const primary = pressable.filter((f) => wired.has(f)).length;
+    console.log(`# kit files with something to press: ${pressable.length} — ${primary} wired as cursor targets (${total} ids), ${pressable.length - primary} non-primary by design`);
   });
   it("the Approvals inbox's cards carry approve / deny per item", () => {
     const s = src("components/aos/ApprovalCard.tsx");
