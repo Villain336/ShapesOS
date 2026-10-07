@@ -147,11 +147,11 @@ describe("RouterPanelModel (structured output through the router)", () => {
   });
 
   it("prices on the model the router actually used (failover)", async () => {
-    const { model } = modelWith([answer({ verdict: "buy" }, "claude-opus-5-5", usage(10_000, 2_000))]);
-    // opus 5.5: 10,000 × $4/M + 2,000 × $20/M = $0.08 → 8 × 1.5 = 12 credits (haiku would be 3).
+    const { model } = modelWith([answer({ verdict: "buy" }, "claude-sonnet-5-5", usage(10_000, 2_000))]);
+    // sonnet 5.5: 10,000 × $2/M + 2,000 × $10/M = $0.04 → 4 × 1.5 = 6 credits (haiku would be 3).
     const res = await model.structured("run", REQ);
-    assert.equal(res.model, "claude-opus-5-5");
-    assert.equal(res.credits, 12);
+    assert.equal(res.model, "claude-sonnet-5-5");
+    assert.equal(res.credits, 6);
   });
 
   it("toolInputSchema turns a zod object into a JSON schema object", () => {
