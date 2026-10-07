@@ -97,6 +97,12 @@ export interface RecorderPage {
     opts: ScreencastOptions,
     onFrame: ScreencastFrameHandler,
   ) => Promise<() => Promise<void>>;
+  /**
+   * Phase 19B (WS=panel): the underlying Playwright page, for server-side
+   * code that needs locators (the Dress Rehearsal PageMaster,
+   * lib/panel/browser.server.ts). Absent on stub launchers.
+   */
+  playwright?: () => Page;
 }
 
 export interface RecorderContext {
@@ -115,12 +121,20 @@ export interface RecorderContext {
  */
 export type RequestGuard = (url: string) => Promise<boolean>;
 
+/**
+ * Phase 19B (WS=panel): answers a request from our own storage instead of the
+ * network (a landing page or SiteBuilder site served at a reserved ".invalid"
+ * origin). null = not ours: the request goes on to the guard.
+ */
+export type FulfillRequest = (url: string) => Promise<{ status: number; contentType: string; body: string } | null>;
+
 export interface RecorderBrowser {
   newContext(opts: {
     recordVideoDir: string;
     videoWidth: number;
     videoHeight: number;
     guardRequest?: RequestGuard;
+    fulfillRequest?: FulfillRequest;
   }): Promise<RecorderContext>;
   close(): Promise<void>;
 }
@@ -145,13 +159,22 @@ export const playwrightLauncher: BrowserLauncher = {
           ...(cOpts.guardRequest ? { serviceWorkers: "block" as const } : {}),
         });
         const guard = cOpts.guardRequest;
-        if (guard) {
+        const fulfill = cOpts.fulfillRequest;
+        if (guard || fulfill) {
           // Every request (navigation, redirect hop, subresource) is checked.
           await ctx.route("**/*", async (route) => {
             const u = route.request().url();
-            if (/^(data|blob|about):/i.test(u) || (await guard(u).catch(() => false))) await route.continue();
+            // Phase 19B: pages served from our own storage never touch the network.
+            const served = fulfill ? await fulfill(u).catch(() => null) : null;
+            if (served) {
+              await route.fulfill({ status: served.status, contentType: served.contentType, body: served.body });
+              return;
+            }
+            if (/^(data|blob|about):/i.test(u) || (guard && (await guard(u).catch(() => false)))) await route.continue();
             else await route.abort("blockedbyclient");
           });
+        }
+        if (guard) {
           await ctx.routeWebSocket(/.*/, async (ws) => {
             const httpUrl = ws.url().replace(/^ws(s?):/i, "http$1:");
             if (await guard(httpUrl).catch(() => false)) ws.connectToServer();
@@ -187,6 +210,7 @@ export const playwrightLauncher: BrowserLauncher = {
               },
               title: () => page.title(),
               url: () => page.url(),
+              playwright: () => page,
               // Slice 7: real CDP screencast (Page.startScreencast → JPEG
               // frames). The ack loop throttles capture to consumer speed:
               // the next frame is only sent after we ack the current one.
@@ -293,6 +317,8 @@ export interface RecorderOptions {
   onTimelineEvent?: (event: AgentRunEventInput) => void | Promise<void>;
   /** Phase 8: per-request URL guard (SSRF) handed to the browser context. */
   guardRequest?: RequestGuard;
+  /** Phase 19B (WS=panel): serve some requests from storage (see FulfillRequest). */
+  fulfillRequest?: FulfillRequest;
 }
 
 export interface StoppedRecording {
@@ -317,8 +343,8 @@ export interface StoppedRecording {
  * idempotent-ish: it always releases the slot and closes the browser.
  */
 export class AgentRunRecorder {
-  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest" | "workspaceId">> &
-    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest" | "workspaceId"> & { artifactDir: string };
+  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch" | "guardRequest" | "workspaceId" | "fulfillRequest">> &
+    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch" | "guardRequest" | "workspaceId" | "fulfillRequest"> & { artifactDir: string };
   private browser: RecorderBrowser | null = null;
   private context: RecorderContext | null = null;
   private slotHeld = false;
@@ -353,6 +379,7 @@ export class AgentRunRecorder {
         videoWidth: RECORDING_VIDEO_SIZE.width,
         videoHeight: RECORDING_VIDEO_SIZE.height,
         ...(this.opts.guardRequest ? { guardRequest: this.opts.guardRequest } : {}),
+        ...(this.opts.fulfillRequest ? { fulfillRequest: this.opts.fulfillRequest } : {}),
       });
       await this.context.tracingStart({ screenshots: true, snapshots: true, sources: true });
       const page = await this.context.newPage();

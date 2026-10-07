@@ -40,6 +40,9 @@ export const FEATURES = [
   "digital_twin",
   "payroll",
   "pos",
+  // Phase 19B (WS=panel): Dress Rehearsal — the Pre Launch Panel (page walk)
+  // and, from milestone 2, the simulated town. Pro and above.
+  "dress_rehearsal",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -63,6 +66,7 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   digital_twin: "Digital twin",
   payroll: "Payroll",
   pos: "Point of sale",
+  dress_rehearsal: "Dress rehearsal",
 };
 
 export const LIMIT_LABELS: Record<LimitKey, string> = {
@@ -142,7 +146,16 @@ export const ZERNIO_INCLUDED_ACCOUNTS = {
 /** Plans whose included Zernio accounts are one pool shared by the owner's workspaces on that plan. */
 export const ZERNIO_POOLED_PLANS: ReadonlySet<Plan> = new Set<Plan>(["agency"]);
 
-const PRO_FEATURES: readonly Feature[] = ["api_access", "webhooks", "custom_branding", "digital_twin", "payroll", "pos"];
+const PRO_FEATURES: readonly Feature[] = [
+  "api_access",
+  "webhooks",
+  "custom_branding",
+  "digital_twin",
+  "payroll",
+  "pos",
+  // Phase 19B (WS=panel): Dress Rehearsal is Pro and above (trial and self_hosted keep it too).
+  "dress_rehearsal",
+];
 const BUSINESS_FEATURES: readonly Feature[] = [...PRO_FEATURES, "sso", "scim"];
 
 function limitsOf(plan: Plan): Record<LimitKey, number | null> {

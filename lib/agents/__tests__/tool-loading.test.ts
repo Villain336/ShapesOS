@@ -306,6 +306,10 @@ describe("A2 — shortened descriptions keep every tool's tier (Phase 14 tier tr
   // sends and calendar writes 2 (their connectors' own actions).
   Object.assign(PINNED, {"list_reminders":0,"create_reminder":1,"complete_reminder":1,"find_contact":0,"suggest_merge":0,"confirm_merge":1,"calendar_list_events":0,"calendar_find_time":0,"calendar_create_event_google":2,"calendar_create_event_outlook":2,"mail_list_threads":0,"mail_read_thread":0,"mail_label_thread":0,"mail_draft_reply":0,"mail_send":2,"social_send_dm":2});
 
+  // Phase 19B (WS=panel): Dress Rehearsal, pinned at the brief's tiers —
+  // listing runs is a read (0); starting a page walk spends credits (2).
+  Object.assign(PINNED, {"list_rehearsal_runs":0,"start_page_walk":2});
+
   it("every catalog tool evaluates to the same tier as before", () => {
     assert.equal(Object.keys(PINNED).length, TOOLS.length, "the snapshot covers the whole catalog");
     for (const t of TOOLS) {

@@ -1203,6 +1203,15 @@ model Workspace {
   storePublicationsSent       StorePublication[]          @relation("StorePublicationAgency")
   // Phase 18.3 (WS=flow): Time Machine workspace snapshots (lib/timemachine).
   workspaceSnapshots          WorkspaceSnapshot[]
+  // Phase 19B (WS=panel): Dress Rehearsal — interviews, memory stream, personas,
+  // page walk runs, steps, verdicts and the calibration track record (lib/panel).
+  panelTranscripts            PanelTranscript[]
+  panelMemoryNodes            PanelMemoryNode[]
+  panelPersonas               PanelPersona[]
+  panelRuns                   PanelRun[]
+  panelSteps                  PanelStep[]
+  panelVerdicts               PanelVerdict[]
+  panelCalibrations           PanelCalibration[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -18023,4 +18032,217 @@ model WorkspaceSnapshot {
 
   @@index([workspaceId, createdAt])
   @@map("workspace_snapshots")
+}
+
+// ============================================================================
+// Phase 19B (WS=panel): Dress Rehearsal — the Pre Launch Panel (commercial
+// layer, entitlement dress_rehearsal). Every table carries workspace_id,
+// cascades from workspaces and is FORCE RLS on app.workspace_id (migration
+// 20261024100000_p19b_panel_dress_rehearsal). Screenshots and traces live in
+// blob storage (namespace "rehearsal"); rows keep blob refs only. The town
+// engine (WS=engine) reads personas and the memory stream through lib/panel.
+// ============================================================================
+
+// An interview, stored VERBATIM (never summarized): uploaded (text, VTT, SRT,
+// DOCX), pasted, or reused from a Meet transcript or a Note (source_ref).
+model PanelTranscript {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  interviewee String?
+  // upload | paste | meet | note
+  source      String    @default("upload")
+  // file name, meeting id or note id
+  sourceRef   String?   @map("source_ref")
+  text        String    @db.Text
+  charCount   Int       @default(0) @map("char_count")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  nodes PanelMemoryNode[]
+
+  @@index([workspaceId, createdAt])
+  @@map("panel_transcripts")
+}
+
+// The memory stream: interview chunks and reflections (per transcript), and
+// what a persona saw / thought / concluded during a run (per run + persona).
+// embedding = 384-d MiniLM (lib/substrate/memory/embed.ts), written via raw SQL.
+model PanelMemoryNode {
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // interview | reflection | observation | thought | verdict
+  kind            String
+  transcriptId    String?          @map("transcript_id")
+  transcript      PanelTranscript? @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  runId           String?          @map("run_id")
+  run             PanelRun?        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  personaKey      String?          @map("persona_key")
+  lens            String?
+  // Caller-chosen stable key ("<transcript>:chunk:3"), unique per workspace.
+  nodeKey         String           @map("node_key")
+  content         String           @db.Text
+  importance      Float            @default(0.2)
+  chunkIndex      Int              @default(0) @map("chunk_index")
+  embedding       Unsupported("vector(384)")? @map("embedding")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  lastRetrievedAt DateTime         @default(now()) @map("last_retrieved_at")
+
+  @@unique([workspaceId, nodeKey])
+  @@index([workspaceId, transcriptId, kind])
+  @@index([workspaceId, runId, personaKey])
+  @@map("panel_memory_nodes")
+}
+
+// A persona: the founder-editable spec (lib/panel/persona.ts PersonaSpec).
+// status active | vetoed (a vetoed persona never walks). calibrated = it
+// cites at least one interview (no calibration → no verdicts).
+model PanelPersona {
+  id                  String    @id @default(cuid())
+  workspaceId         String    @map("workspace_id")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                String
+  status              String    @default("active")
+  spec                Json
+  sourceTranscriptIds String[]  @default([]) @map("source_transcript_ids")
+  calibrated          Boolean   @default(false)
+  // interviews | manual
+  origin              String    @default("interviews")
+  // Objections the model proposed that the interview didn't support (dropped).
+  droppedObjections   Json?     @map("dropped_objections")
+  editedBy            String?   @map("edited_by")
+  editedAt            DateTime? @map("edited_at")
+  createdBy           String    @map("created_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("panel_personas")
+}
+
+// One rehearsal run. mode page_walk (town arrives with WS=engine). The
+// estimate is shown and the cap confirmed BEFORE it is queued; spent never
+// passes cap (lib/panel/budget.ts). status: queued | running | completed |
+// partial (stopped at the cap / interrupted: honest partial result) | failed
+// | cancelled.
+model PanelRun {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mode            String    @default("page_walk")
+  status          String    @default("queued")
+  target          Json
+  targetLabel     String    @map("target_label")
+  personaIds      String[]  @default([]) @map("persona_ids")
+  // The personas' specs as they were when the run was confirmed.
+  personaSnapshot Json      @map("persona_snapshot")
+  stepCap         Int       @map("step_cap")
+  model           String
+  // "live" | "fake" (the labelled deterministic test model)
+  modelKind       String    @default("live") @map("model_kind")
+  estimateCredits Int       @map("estimate_credits")
+  capCredits      Int       @map("cap_credits")
+  spentCredits    Int       @default(0) @map("spent_credits")
+  callCount       Int       @default(0) @map("call_count")
+  stopReason      String?   @map("stop_reason")
+  report          Json?
+  jobId           String?   @map("job_id")
+  confirmedBy     String    @map("confirmed_by")
+  confirmedAt     DateTime  @default(now()) @map("confirmed_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  steps        PanelStep[]
+  verdicts     PanelVerdict[]
+  memoryNodes  PanelMemoryNode[]
+  calibration  PanelCalibration?
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
+  @@map("panel_runs")
+}
+
+// One persona step: intent, think-aloud, observation, signals, flags and the
+// screenshot's blob ref.
+model PanelStep {
+  id            String    @id @default(cuid())
+  workspaceId   String    @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId         String    @map("run_id")
+  run           PanelRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  personaKey    String    @map("persona_key")
+  personaName   String    @map("persona_name")
+  stepIndex     Int       @map("step_index")
+  intent        Json?
+  thinkAloud    String    @default("") @map("think_aloud") @db.Text
+  observation   Json
+  signals       Json
+  flags         Json      @default("[]")
+  screenshotRef String?   @map("screenshot_ref")
+  startedAt     DateTime  @map("started_at")
+  endedAt       DateTime  @map("ended_at")
+
+  @@unique([runId, personaKey, stepIndex])
+  @@index([workspaceId, runId])
+  @@map("panel_steps")
+}
+
+// One persona's result in a run: outcome, verdict (or why it was withheld),
+// traced objections and the friction timeline.
+model PanelVerdict {
+  id                  String    @id @default(cuid())
+  workspaceId         String    @map("workspace_id")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId               String    @map("run_id")
+  run                 PanelRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  personaKey          String    @map("persona_key")
+  personaName         String    @map("persona_name")
+  outcome             String
+  // buy | no-buy | maybe; null = withheld
+  verdict             String?
+  // no_calibration | incomplete_walk
+  withheldReason      String?   @map("withheld_reason")
+  confidence          Float?
+  rationale           String    @default("") @db.Text
+  objections          Json      @default("[]")
+  whatWouldChangeMind Json      @default("[]") @map("what_would_change_mind")
+  behaviorSummary     String    @default("") @map("behavior_summary") @db.Text
+  timeline            Json
+  traceRef            String?   @map("trace_ref")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@unique([runId, personaKey])
+  @@index([workspaceId, runId])
+  @@map("panel_verdicts")
+}
+
+// The track record: a run's prediction against the real launch the founder
+// entered (conversions / visitors). The workspace's calibration score is the
+// mean absolute error over these rows (lib/panel/validator.ts).
+model PanelCalibration {
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId             String    @unique @map("run_id")
+  run               PanelRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  predictedRate     Float     @map("predicted_rate")
+  predictedN        Int       @map("predicted_n")
+  actualConversions Int       @map("actual_conversions")
+  actualVisitors    Int       @map("actual_visitors")
+  actualRate        Float     @map("actual_rate")
+  z                 Float
+  pValue            Float     @map("p_value")
+  // within-noise | over-predicting | under-predicting
+  verdict           String
+  absError          Float     @map("abs_error")
+  enteredBy         String    @map("entered_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("panel_calibrations")
 }

@@ -11,6 +11,8 @@ import { contentEs } from "./content.es";
 import { trustEs } from "./trust.es";
 // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
 import { flowEs } from "./flow.es";
+// Phase 19B (WS=panel): Ensayo general.
+import { rehearsalEs } from "./rehearsal.es";
 
 export const es: Catalogue = {
   common: {
@@ -110,6 +112,8 @@ export const es: Catalogue = {
       "/dashboard/attribution": { label: "Atribución", description: "Qué generó ingresos" },
       "/dashboard/analytics": { label: "Analítica", description: "Tráfico, redes e ingresos" },
       "/dashboard/reports": { label: "Informes", description: "Informes y exportaciones" },
+      // Phase 19B (WS=panel)
+      "/dashboard/rehearsal": { label: "Ensayo general", description: "Clientes sintéticos de tus entrevistas recorren tu página" },
       "/dashboard/studio": { label: "Estudio", description: "Estudio creativo" },
       "/dashboard/clips": { label: "Clips", description: "Vídeos largos convertidos en clips cortos" },
       "/dashboard/voice": { label: "Voz", description: "Agentes de voz, guiones, locuciones" },
@@ -986,4 +990,6 @@ export const es: Catalogue = {
   trust: trustEs,
   // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
   flow: flowEs,
+  // Phase 19B (WS=panel): Ensayo general (/dashboard/rehearsal).
+  ...rehearsalEs,
 };
