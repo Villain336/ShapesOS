@@ -114,7 +114,8 @@ export function selfConsistencyHook(args: SelfConsistencyHookArgs): StepHook {
     "(e.g. 'too expensive' then 'seems reasonable' with nothing new shown). Be conservative. One sentence.",
   ].join("\n");
   return async (step) => {
-    const prior = history.slice(-Math.max(0, windowN));
+    // history never holds more than windowN entries (trimmed below).
+    const prior = [...history];
     let verdict: z.infer<typeof JudgeSchema> | null = null;
     if (prior.length > 0 && step.thinkAloud.trim().length > 0) {
       const earlier = prior.map((h) => `Step ${h.stepIndex}: ${h.thinkAloud.slice(0, 500)}`).join("\n");
