@@ -256,3 +256,5 @@ lib/timemachine/__tests__/undo-db.test.ts
 lib/panel/__tests__/store-db.test.ts
 # Phase 19B (WS=panel): the Dress Rehearsal service — the dress_rehearsal gate (starter 403 + upgrade message), interviews in (upload text / VTT verbatim, a Meet transcript, a Note; another person's private note refused), personas derived under a confirmed credit cap with the labelled FAKE model (each cites its interview; cap 0 stops before any call), founder edit / veto, a hand-made persona is uncalibrated, viewers read only.
 lib/panel/__tests__/service-db.test.ts
+# Phase 19B (WS=engine): Dress Rehearsal town persistence — FORCE RLS on all five sim tables (no GUC / another workspace = zero rows, a cross-workspace write is refused, the workspace delete cascades), sim_events APPEND-ONLY for the app role (UPDATE / DELETE refused, the run's delete still cascades), event cursor and snapshot seek reads.
+lib/sim/__tests__/store-db.test.ts

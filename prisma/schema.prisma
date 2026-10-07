@@ -1212,6 +1212,13 @@ model Workspace {
   panelSteps                  PanelStep[]
   panelVerdicts               PanelVerdict[]
   panelCalibrations           PanelCalibration[]
+  // Phase 19B (WS=engine): Dress Rehearsal town mode — worlds, runs, residents,
+  // the append-only event log and hourly snapshots (lib/sim).
+  simWorlds                   SimWorld[]
+  simRuns                     SimRun[]
+  simResidents                SimResident[]
+  simEvents                   SimEvent[]
+  simSnapshots                SimSnapshot[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -18245,4 +18252,162 @@ model PanelCalibration {
 
   @@index([workspaceId, createdAt])
   @@map("panel_calibrations")
+}
+
+// ============================================================================
+// Phase 19B (WS=engine): Dress Rehearsal — town mode (commercial layer,
+// entitlement dress_rehearsal). Every table carries workspace_id, cascades
+// from workspaces and is FORCE RLS on app.workspace_id (migration
+// 20261024200000_p19b_engine_town). sim_events is APPEND-ONLY: the app role
+// has no UPDATE / DELETE on it (revoked in the migration and in
+// scripts/db/create-app-role.sql); rows only go away with their run or
+// workspace (FK cascade). Exports go to blob storage (namespace "rehearsal");
+// rows keep the blob ref.
+// ============================================================================
+
+// A town: its layout JSON (lib/sim/layout.ts) and where it came from.
+model SimWorld {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  // generated | figma
+  source       String
+  seed         Int?
+  // small | medium (generated)
+  size         String?
+  figmaFileKey String?   @map("figma_file_key")
+  figmaNodeId  String?   @map("figma_node_id")
+  layout       Json
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  runs SimRun[]
+
+  @@index([workspaceId, createdAt])
+  @@map("sim_worlds")
+}
+
+// One town rehearsal: scenario A (and B), N seeds, the cap the person
+// confirmed, what it spent, how it ended and the report (ranges over seeds).
+// status: queued | running | completed | partial (stopped at the cap /
+// interrupted — an honest partial) | failed | cancelled.
+// mode: live (model at decision points) | deep (Message Batches) | rules.
+model SimRun {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  worldId         String    @map("world_id")
+  world           SimWorld  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  status          String    @default("queued")
+  mode            String    @default("live")
+  scenarioA       Json      @map("scenario_a")
+  scenarioB       Json?     @map("scenario_b")
+  population      Int
+  segments        Json
+  // The personas' specs as they were when the run was confirmed.
+  personaSnapshot Json      @map("persona_snapshot")
+  days            Int
+  seeds           Int
+  baseSeed        Int       @map("base_seed")
+  model           String
+  // live | fake (the labelled deterministic test model) | rules
+  modelKind       String    @default("live") @map("model_kind")
+  estimate        Json
+  estimateCredits Int       @map("estimate_credits")
+  capCredits      Int       @map("cap_credits")
+  spentCredits    Int       @default(0) @map("spent_credits")
+  callCount       Int       @default(0) @map("call_count")
+  cacheHits       Int       @default(0) @map("cache_hits")
+  stopReason      String?   @map("stop_reason")
+  stoppedAt       Json?     @map("stopped_at")
+  progress        Json?
+  report          Json?
+  // sha256 of each sub-run's event log ({ "A:0": "…" }) — the determinism fingerprint.
+  eventHashes     Json?     @map("event_hashes")
+  exportRef       String?   @map("export_ref")
+  // Replay from seed: the run whose recorded decisions this one reuses.
+  replayOf        String?   @map("replay_of")
+  jobId           String?   @map("job_id")
+  confirmedBy     String    @map("confirmed_by")
+  confirmedAt     DateTime  @default(now()) @map("confirmed_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  residents SimResident[]
+  events    SimEvent[]
+  snapshots SimSnapshot[]
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
+  @@map("sim_runs")
+}
+
+// A resident of a run's town (lib/sim/residents.ts): home, job, routine,
+// traits, ties. Shared by every seed and scenario of the run.
+model SimResident {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId       String    @map("run_id")
+  run         SimRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  residentKey String    @map("resident_key")
+  name        String
+  segment     String
+  personaId   String?   @map("persona_id")
+  calibrated  Boolean   @default(false)
+  homeLotId   String    @map("home_lot_id")
+  workLotId   String    @map("work_lot_id")
+  routine     String
+  data        Json
+
+  @@unique([runId, residentKey])
+  @@index([workspaceId, runId])
+  @@map("sim_residents")
+}
+
+// The append-only event log of one sub-run (variant A/B × seed index):
+// trips with timestamped paths, arrivals, purchases, decisions, reflections…
+model SimEvent {
+  id          BigInt    @id @default(autoincrement())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId       String    @map("run_id")
+  run         SimRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  variant     String
+  seedIndex   Int       @map("seed_index")
+  seq         Int
+  // Absolute sim minute (0 = Monday 00:00 of day 1).
+  t           Int
+  type        String
+  residentKey String?   @map("resident_key")
+  lotId       String?   @map("lot_id")
+  data        Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([runId, variant, seedIndex, seq])
+  @@index([runId, variant, seedIndex, t])
+  @@index([workspaceId, runId])
+  @@map("sim_events")
+}
+
+// One snapshot per sim-hour of a sub-run, for seeking and scrubbing.
+model SimSnapshot {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId       String    @map("run_id")
+  run         SimRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  variant     String
+  seedIndex   Int       @map("seed_index")
+  hour        Int
+  t           Int
+  state       Json
+
+  @@unique([runId, variant, seedIndex, hour])
+  @@index([workspaceId, runId])
+  @@map("sim_snapshots")
 }

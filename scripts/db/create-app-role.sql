@@ -33,6 +33,12 @@ SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA publ
 SELECT format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO %I', :'app_role') \gexec
 SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'app_role') \gexec
 SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', :'app_role') \gexec
+-- Phase 19B (WS=engine): sim_events (the town event log) is APPEND-ONLY for the
+-- app role — the blanket grant above includes UPDATE / DELETE, so take them
+-- back on every run of this script (rows still go with their run or
+-- workspace: the FK cascade runs as the table owner).
+SELECT format('REVOKE UPDATE, DELETE, TRUNCATE ON %I FROM %I', 'sim_events', :'app_role')
+ WHERE EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sim_events') \gexec
 -- Payload CMS keeps its tables in its own `payload` schema (payload.config.ts)
 -- and connects with the same DATABASE_URL, i.e. as this role. Grant what
 -- Payload needs there: read/write on its tables and
