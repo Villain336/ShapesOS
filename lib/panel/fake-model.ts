@@ -33,8 +33,10 @@ const LENS_CUES: Record<string, RegExp> = {
   "competitor-comparer": /(looked at|competitor|switch|alternative|instead|acme|other tool)/i,
 };
 
+/** Speaker turns, one per line. Memory chunks are word-joined, so turns are split inline on "Name:" too. */
 function speakerLines(text: string): string[] {
   return text
+    .replace(/\s(?=(?:Interviewer|[A-Z][\w.'-]*(?: [A-Z][\w.'-]*)?):\s)/g, "\n")
     .split(/\n+/)
     .map((l) => l.trim())
     .filter((l) => l && !/^interviewer\s*:/i.test(l) && !/^\[(chunk|reflection)/i.test(l) && !/^(TRANSCRIPT ID|INTERVIEWEE|EVIDENCE CHUNKS)/i.test(l))
