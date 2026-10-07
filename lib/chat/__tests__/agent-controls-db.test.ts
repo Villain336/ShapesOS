@@ -24,6 +24,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { prisma } from "@/lib/prisma";
@@ -177,6 +178,7 @@ after(async () => {
   }
   server.closeAllConnections?.();
   await new Promise<void>((r) => server.close(() => r()));
+  await settleBackgroundWork(); // usage records and run events land in the background
   for (const id of [WS_A, WS_B]) await prisma.workspace.deleteMany({ where: { id } });
   await prisma.$disconnect();
 });

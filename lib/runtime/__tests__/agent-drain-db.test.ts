@@ -12,6 +12,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { claimAgentJobs, enqueueAgentJob, getAgentJob, releaseAgentJob } from "@/lib/agents/queue/store";
@@ -30,6 +31,7 @@ before(async () => {
   await prisma.workspace.create({ data: { id: WS, name: `drain ${WS}`, ownerUserId: "drain-owner" } });
 });
 after(async () => {
+  await settleBackgroundWork();
   await prisma.workspace.deleteMany({ where: { id: WS } });
   await prisma.$disconnect();
 });
