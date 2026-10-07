@@ -67,7 +67,7 @@ describe("personaAdherenceHook", () => {
 
   it("a cap stop is NOT advisory: it propagates out of the monitor", async () => {
     const m = model([judge({ passed: true, detail: "" })], 0);
-    await assert.rejects(personaAdherenceHook({ model: m.model, personaSpec: PERSONA, runId: "run" })(step(0, "x")), PanelCapReachedError);
+    await assert.rejects(async () => personaAdherenceHook({ model: m.model, personaSpec: PERSONA, runId: "run" })(step(0, "x")), PanelCapReachedError);
   });
 });
 
