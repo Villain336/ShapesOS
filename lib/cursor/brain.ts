@@ -180,7 +180,7 @@ export async function openCursorRun(
   caller: CursorCaller,
   conversationId: string | null | undefined,
   summary: string,
-  grant: readonly ToolGroup[] = cursorGrant(),
+  grant: readonly ToolGroup[],
 ): Promise<{ runId: string; projectId: string }> {
   if (conversationId) {
     const run = await withWorkspaceScope(caller.workspaceId, (tx) =>
