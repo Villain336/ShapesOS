@@ -27,10 +27,27 @@ export default defineConfig({
     {
       name: "e2e",
       testMatch: /.*\.spec\.ts/,
+      testIgnore: /pwa\.spec\.ts/,
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "scripts/e2e/.auth.json",
+        // Phase 18.3: the dashboard registers a service worker (public/sw.js).
+        // Requests it answers keep Playwright's "networkidle" from ever firing,
+        // which every gotoClean() waits on, so these specs run without it.
+        // The worker itself is covered by the "pwa" project below.
+        serviceWorkers: "block",
+      },
+    },
+    // 3) the offline layer's service worker, in a browser that allows it.
+    {
+      name: "pwa",
+      testMatch: /pwa\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "scripts/e2e/.auth.json",
+        serviceWorkers: "allow",
       },
     },
   ],
