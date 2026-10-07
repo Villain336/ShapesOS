@@ -18,7 +18,10 @@
 //   3. OpenAI speech (verified 2026-10-06): POST https://api.openai.com/v1/audio/speech
 //        { model, input, voice, response_format: "mp3" } → chunked audio.
 //        Built-in voices per the guide: alloy, ash, ballad, coral, echo, fable,
-//        nova, onyx, sage, shimmer, verse, marin, cedar.
+//        nova, onyx, sage, shimmer, verse, marin, cedar — but tts-1 / tts-1-hd
+//        "support a smaller set: alloy, ash, coral, echo, fable, onyx, nova,
+//        sage, and shimmer" (re-checked 2026-10-07), so the list offered
+//        depends on the model in use (openAiTtsVoices).
 //        https://developers.openai.com/api/docs/guides/text-to-speech
 //
 // No provider → "none" (503 tts_not_configured). A labelled mock (a short
@@ -39,8 +42,15 @@ export const ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128";
 export const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
 /** OpenAI's lower-latency speech model; OPENAI_TTS_MODEL overrides. */
 export const OPENAI_TTS_DEFAULT_MODEL = "tts-1";
-/** OpenAI's documented built-in voices (the guide above). */
+/** OpenAI's documented built-in voices (the guide above; gpt-4o-mini-tts supports all). */
 export const OPENAI_TTS_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"] as const;
+/** The smaller set tts-1 and tts-1-hd support (the guide above). */
+export const OPENAI_TTS1_VOICES = ["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"] as const;
+
+/** The voices the configured OpenAI speech model supports (never one it would refuse). */
+export function openAiTtsVoices(model: string): readonly string[] {
+  return /^tts-1(-hd)?$/i.test(model.trim()) ? OPENAI_TTS1_VOICES : OPENAI_TTS_VOICES;
+}
 export const OPENAI_TTS_DEFAULT_VOICE = "alloy";
 /** The cursor never waits minutes for a spoken answer. */
 export const VOICESTUDIO_CURSOR_TIMEOUT_MS = 30_000;
@@ -109,7 +119,10 @@ export async function listTtsVoices(provider: TtsProviderName, deps: TtsDeps = {
     const vs = await voiceStudioClient(deps);
     return (await vs.listVoices()).map((v) => ({ id: v.voice_id, label: v.name || v.voice_id }));
   }
-  if (provider === "openai") return OPENAI_TTS_VOICES.map((v) => ({ id: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
+  if (provider === "openai") {
+    const model = env.OPENAI_TTS_MODEL?.trim() || OPENAI_TTS_DEFAULT_MODEL;
+    return openAiTtsVoices(model).map((v) => ({ id: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
+  }
   if (provider === "mock") return [{ id: "mock-silent", label: "Mock voice (silent)" }];
   return [];
 }
@@ -192,8 +205,8 @@ export async function synthesizeSpeech(
         return { provider, voice, body: bytesStream(new Uint8Array(audio)), contentType: "audio/mpeg", mock: false, chars: text.length, model: null };
       }
       // openai
-      const voice = chosen && (OPENAI_TTS_VOICES as readonly string[]).includes(chosen) ? chosen : OPENAI_TTS_DEFAULT_VOICE;
       const model = env.OPENAI_TTS_MODEL?.trim() || OPENAI_TTS_DEFAULT_MODEL;
+      const voice = chosen && openAiTtsVoices(model).includes(chosen) ? chosen : OPENAI_TTS_DEFAULT_VOICE;
       const res = await f(OPENAI_SPEECH_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${env.OPENAI_API_KEY!.trim()}`, "Content-Type": "application/json" },

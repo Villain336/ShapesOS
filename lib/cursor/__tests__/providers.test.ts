@@ -114,7 +114,23 @@ describe("TTS", () => {
   it("voices come from the provider (ElevenLabs list, OpenAI documented built-ins)", async () => {
     const { f } = fakeFetch({ "https://api.elevenlabs.io/v2/voices": () => Response.json({ voices: [{ voice_id: "v1", name: "Rachel" }, { name: "no id" }] }) });
     assert.deepEqual(await listTtsVoices("elevenlabs", { env: { ELEVENLABS_API_KEY: "e" }, fetchImpl: f }), [{ id: "v1", label: "Rachel" }]);
-    const oa = await listTtsVoices("openai");
+    const oa = await listTtsVoices("openai", { env: { OPENAI_API_KEY: "o" } });
     assert.ok(oa.some((v) => v.id === "alloy"));
+  });
+  it("OpenAI: tts-1 is offered only the voices it supports; gpt-4o-mini-tts gets all 13", async () => {
+    const t1 = (await listTtsVoices("openai", { env: { OPENAI_API_KEY: "o" } })).map((v) => v.id);
+    assert.equal(t1.length, 9);
+    for (const v of ["ballad", "verse", "marin", "cedar"]) assert.ok(!t1.includes(v), v);
+    const mini = await listTtsVoices("openai", { env: { OPENAI_API_KEY: "o", OPENAI_TTS_MODEL: "gpt-4o-mini-tts" } });
+    assert.equal(mini.length, 13);
+    // A saved gpt-4o-mini-tts voice is never sent to tts-1 (it would be refused).
+    const sent: string[] = [];
+    const f: typeof fetch = async (_u, init) => {
+      sent.push(JSON.parse(String(init?.body)).voice);
+      return new Response(new Uint8Array([1]), { headers: { "content-type": "audio/mpeg" } });
+    };
+    await synthesizeSpeech({ text: "Hi", voice: "marin", voiceProvider: "openai" }, { env: { OPENAI_API_KEY: "o" }, fetchImpl: f });
+    await synthesizeSpeech({ text: "Hi", voice: "marin", voiceProvider: "openai" }, { env: { OPENAI_API_KEY: "o", OPENAI_TTS_MODEL: "gpt-4o-mini-tts" }, fetchImpl: f });
+    assert.deepEqual(sent, ["alloy", "marin"]);
   });
 });
