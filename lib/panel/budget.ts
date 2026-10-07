@@ -40,20 +40,33 @@ export function estimateInputTokens(promptChars: number): number {
   return Math.ceil((Math.max(0, promptChars) / CHARS_PER_TOKEN) * INPUT_MARGIN);
 }
 
+/**
+ * Phase 19B (WS=engine) additive seam: an optional service tier, so the town
+ * engine's Message Batches path (lib/sim/batch.ts) prices a call at the batch
+ * tier (50 %, lib/llm/pricing.ts). Omitted = the standard tier, as before.
+ */
+export interface CreditPricingOptions {
+  serviceTier?: string | null;
+}
+
 /** List credits of one call's usage on a model (the router's billing rule). */
-export function creditsForUsage(model: string, usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }): number {
-  const { costMicroUsd } = billableCostMicroUsd(model, {
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    cacheReadTokens: usage.cacheReadTokens ?? 0,
-    cacheWriteTokens: usage.cacheWriteTokens ?? 0,
-  });
+export function creditsForUsage(model: string, usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }, opts?: CreditPricingOptions): number {
+  const { costMicroUsd } = billableCostMicroUsd(
+    model,
+    {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens ?? 0,
+      cacheWriteTokens: usage.cacheWriteTokens ?? 0,
+    },
+    opts?.serviceTier ? { serviceTier: opts.serviceTier } : undefined,
+  );
   return llmTokenCredits(costMicroUsd);
 }
 
 /** Worst-case credits of a call before it is sent. */
-export function worstCaseCallCredits(model: string, promptChars: number, maxTokens: number): number {
-  return creditsForUsage(model, { inputTokens: estimateInputTokens(promptChars), outputTokens: Math.max(0, maxTokens) });
+export function worstCaseCallCredits(model: string, promptChars: number, maxTokens: number, opts?: CreditPricingOptions): number {
+  return creditsForUsage(model, { inputTokens: estimateInputTokens(promptChars), outputTokens: Math.max(0, maxTokens) }, opts);
 }
 
 export class PanelCapReachedError extends Error {
@@ -149,12 +162,13 @@ export class PanelLedger {
   }
 
   /** Replace a reservation with the call's actual credits. */
-  settle(reservation: Reservation, model: string, usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }, purpose = "call"): number {
+  settle(reservation: Reservation, model: string, usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }, purpose = "call", opts?: CreditPricingOptions): number {
     const run = this.state(reservation.runId);
     if (reservation.settled) throw new Error("reservation already settled");
     reservation.settled = true;
     run.reservedCredits = Math.max(0, run.reservedCredits - reservation.credits);
-    const credits = creditsForUsage(model, usage);
+    // Phase 19B (WS=engine): `opts.serviceTier` prices a Message Batches result at the batch tier.
+    const credits = creditsForUsage(model, usage, opts);
     run.spentCredits += credits;
     run.callCount += 1;
     run.inputTokens += usage.inputTokens;

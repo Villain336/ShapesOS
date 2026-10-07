@@ -781,6 +781,79 @@ export class AnthropicLlmProvider implements LlmProvider {
     return out;
   }
 
+  // ── Phase 19B (WS=engine): Message Batches with structured (tool) requests ──
+  // The town engine's "deep" runs (lib/sim/batch.ts) send decision prompts as
+  // chat requests (one forced tool, a zod schema) — the params are exactly
+  // chat()'s (buildAnthropicParams, so a model that rejects forced
+  // tool_choice gets "auto"), and each result maps back through
+  // mapAnthropicMessage. Gated and metered like submitBatch / batchResults.
+
+  /** Submit chat requests as one Message Batch (custom ids are the caller's). */
+  async submitChatBatch(
+    requests: ReadonlyArray<{ customId: string; req: ChatRequest }>,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<{ providerBatchId: string; status: string }> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    await assertModelSpendAllowed(usage, this.keySource, this.name);
+    const built = requests.map((r) => ({ custom_id: r.customId, params: buildAnthropicParams(this.model, r.req, { stream: false, defaultEffort: this.defaultEffort, betaAvailable: false }).params }));
+    try {
+      const b = await batches.create({ requests: built });
+      return { providerBatchId: b.id, status: b.processing_status };
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+  }
+
+  /**
+   * An ended chat batch's results as ChatResponses keyed by custom id (any
+   * order). Each succeeded message is metered at the batch tier, idempotent
+   * per response id; errored / canceled / expired lines come back as errors.
+   */
+  async chatBatchResults(
+    providerBatchId: string,
+    requests: ReadonlyMap<string, ChatRequest>,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<Record<string, ChatResponse | { error: string }>> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    const out: Record<string, ChatResponse | { error: string }> = {};
+    let decoder: AsyncIterable<{ custom_id: string; result: { type: string; message?: Anthropic.Messages.Message; error?: unknown } }>;
+    try {
+      decoder = await batches.results(providerBatchId);
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+    for await (const line of decoder) {
+      const r = line.result;
+      const req = requests.get(line.custom_id);
+      if (!req) continue;
+      if (r.type !== "succeeded" || !r.message) {
+        out[line.custom_id] = { error: r.type === "errored" ? `errored: ${JSON.stringify(r.error ?? {}).slice(0, 300)}` : r.type };
+        continue;
+      }
+      // Batch results report usage.service_tier "batch"; default to it.
+      const u = (r.message.usage ?? {}) as unknown as Record<string, unknown>;
+      const msg = { ...r.message, usage: { ...u, service_tier: (u.service_tier as string | null | undefined) ?? "batch" } } as Anthropic.Messages.Message;
+      const res = mapAnthropicMessage(msg, { model: this.model, req, notes: [], serverToolsSent: [] });
+      await recordChatUsage({
+        context: usage,
+        workload: this.workload,
+        provider: this.name,
+        model: this.model,
+        usage: res.usage,
+        costMicroUsd: res.costMicroUsd,
+        responseId: res.id,
+        keySource: this.keySource,
+        timing: null,
+        effort: null,
+        serviceTier: res.serviceTier ?? "batch",
+      });
+      out[line.custom_id] = res;
+    }
+    return out;
+  }
+
   /** Phase 17 (A2): tool search is server-side on the models the docs list. */
   supportsToolSearch(): boolean {
     return anthropicModelCaps(this.model).toolSearch;
