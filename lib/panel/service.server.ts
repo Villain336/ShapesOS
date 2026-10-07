@@ -451,10 +451,10 @@ export async function startPageWalk(actor: PanelActor, input: StartPageWalkInput
   return runView(withJob);
 }
 
-export async function listRuns(actor: PanelActor, limit = 50): Promise<RunView[]> {
+export async function listRuns(actor: PanelActor, limit = 50, opts: { withReports?: boolean } = {}): Promise<RunView[]> {
   await gate(actor, "viewer");
   const rows = await scoped(actor, (tx) => tx.panelRun.findMany({ where: { workspaceId: actor.workspaceId }, orderBy: { createdAt: "desc" }, take: Math.min(Math.max(limit, 1), 200) }));
-  return rows.map((r) => ({ ...runView(r), report: null }));
+  return rows.map((r) => (opts.withReports ? runView(r) : { ...runView(r), report: null }));
 }
 
 export interface StepView {

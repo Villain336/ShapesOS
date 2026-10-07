@@ -53,6 +53,8 @@ import { NOTE_TOOLS } from "@/lib/notes/tools";
 import { FILE_TOOLS } from "@/lib/files/tools";
 import { PROCESS_TOOLS } from "@/lib/aos/tools";
 import { STORE_TOOLS } from "@/lib/store/tools";
+// Phase 19B (WS=panel): Dress Rehearsal (list runs Tier 0; start a page walk Tier 2, capped).
+import { PANEL_TOOLS } from "@/lib/panel/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1097,6 +1099,8 @@ export const TOOLS: ToolDef[] = [
   ...FILE_TOOLS,
   ...PROCESS_TOOLS,
   ...STORE_TOOLS,
+  // Phase 19B (WS=panel): list_rehearsal_runs (Tier 0) / start_page_walk (Tier 2, hard credit cap).
+  ...PANEL_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
@@ -1261,6 +1265,10 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   list_file_versions: "workspace",
   share_file_link: "content",
   list_processes: "workspace",
+  // Phase 19B (WS=panel): Dress Rehearsal — reading runs is workspace data;
+  // a page walk browses a page, so it sits with the web tools.
+  list_rehearsal_runs: "workspace",
+  start_page_walk: "web",
   list_store_items: "workspace",
 };
 
@@ -1381,6 +1389,11 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   list_file_versions: "list_file_versions",
   list_processes: "list_processes",
   list_store_items: "list_store_items",
+  // Phase 19B (WS=panel): reading runs is an observation (Tier 0); a page walk
+  // uses credits under its hard cap — Tier 2 (asks; a per-agent rule may
+  // auto-run it: no money moves, nothing irreversible).
+  list_rehearsal_runs: "list_rehearsal_runs",
+  start_page_walk: "run_page_walk",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

@@ -127,3 +127,15 @@ describe("/api/rehearsal/artifacts", () => {
     assert.equal((await get("../../etc/passwd")).status, 404);
   });
 });
+
+describe("agent tools go through the same gates", () => {
+  it("list_rehearsal_runs reads; start_page_walk refuses unknown personas and below-Pro workspaces", async () => {
+    const { list_rehearsal_runs, start_page_walk } = await import("../tools");
+    const ctx = { workspaceId: WS, userId: ED, role: "editor" } as never;
+    assert.equal((await list_rehearsal_runs.execute(ctx, {})).summary, "No Dress Rehearsal runs yet.");
+    const unknown = await start_page_walk.execute(ctx, { target: "https://example.com", personaIds: ["nope"], capCredits: 50 });
+    assert.match(unknown.summary, /Couldn't start the page walk: One of those personas wasn't found/);
+    const starter = await start_page_walk.execute({ workspaceId: WS_STARTER, userId: ED, role: "editor" } as never, { target: "https://example.com", personaIds: ["x"], capCredits: 50 });
+    assert.match(starter.summary, /Dress rehearsal isn't included in your plan/);
+  });
+});
