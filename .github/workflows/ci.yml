@@ -84,6 +84,11 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=marketr_app
           -v app_password=marketr_app_ci -f scripts/db/create-app-role.sql
 
+      # Phase 19B (WS=panel): the Dress Rehearsal run suite walks a fixture
+      # page in a real headless Chromium (lib/panel/__tests__/run-db.test.ts).
+      - name: Install Chromium for the DB suites
+        run: npx playwright install chromium
+
       - name: DB-backed tests (as non-superuser app role)
         run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npm run test:db
 
