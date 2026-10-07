@@ -1,0 +1,43 @@
+{
+  "name": "shapesos-desktop",
+  "productName": "ShapesOS",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ShapesOS Desktop: the full ShapesOS app in a native window plus a hold-to-talk cursor companion that sees, speaks, points and acts through ShapesOS's governed agents.",
+  "author": "ShapesOS",
+  "license": "UNLICENSED",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:test": "node scripts/build.mjs --test-hooks",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "smoke": "node scripts/build.mjs --test-hooks && playwright test -c test/playwright.config.ts",
+    "pack:dir": "node scripts/build.mjs && DESKTOP_UPDATE_URL=${DESKTOP_UPDATE_URL:-https://updates.example.invalid} DESKTOP_CHANNEL=${DESKTOP_CHANNEL:-stable} electron-builder --dir --config electron-builder.yml --publish never",
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac --config electron-builder.yml --publish never",
+    "dist:win": "node scripts/build.mjs && electron-builder --win --config electron-builder.yml --publish never",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "optionalDependencies": {
+    "get-windows": "9.3.0",
+    "uiohook-napi": "1.5.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "lucide-react": "1.52.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}

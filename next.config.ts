@@ -75,6 +75,11 @@ const nextConfig: NextConfig = {
     "@activepieces/piece-openai",
     "@activepieces/piece-rss",
   ],
+  // Phase 19A: apps/desktop (the Electron app, its own package and
+  // node_modules) is never part of the web build or its standalone trace.
+  outputFileTracingExcludes: {
+    "/*": ["./apps/**"],
+  },
   // Phase 12: the standalone trace copies onnxruntime's .node binding but not
   // its companion libonnxruntime.so, so any route touching @xenova/transformers
   // (embeddings — e.g. /dashboard/intelligence/repurpose) 500s at runtime with

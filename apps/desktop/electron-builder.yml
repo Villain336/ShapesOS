@@ -1,0 +1,74 @@
+# ShapesOS Desktop packaging (electron-builder 26).
+# Signing and notarization are switched on only by the release workflow
+# (.github/workflows/desktop.yml) through environment variables and -c
+# overrides; this file builds UNSIGNED artifacts by default, which is what
+# `npm run pack:dir` (the config smoke) and manual dry runs produce.
+appId: com.shapesos.desktop
+productName: ShapesOS
+copyright: Copyright © ShapesOS
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+  - "!dist/**/*.map"
+  # get-windows lists node-gyp as an optional dependency for source builds;
+  # only its prebuilt binary and @mapbox/node-pre-gyp (the loader) ship.
+  - "!node_modules/node-gyp/**"
+  - "!node_modules/get-windows/Sources/**"
+  - "!node_modules/get-windows/build-tmp-*/**"
+extraResources:
+  - from: assets
+    to: assets
+# Native modules ship N-API prebuilds (uiohook-napi) or are fetched prebuilt
+# (get-windows): nothing to compile per Electron version.
+npmRebuild: false
+asar: true
+asarUnpack:
+  - node_modules/uiohook-napi/**
+  - node_modules/get-windows/**
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip # electron-updater on macOS updates from the zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # The release job passes -c.mac.notarize=true with APPLE_API_KEY /
+  # APPLE_API_KEY_ID / APPLE_API_ISSUER (or APPLE_ID /
+  # APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID) in the environment.
+  notarize: false
+  extendInfo:
+    NSMicrophoneUsageDescription: ShapesOS listens while you hold the talk key, so you can ask and dictate by voice.
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # Azure Trusted Signing: the release job adds
+  # -c.win.azureSignOptions.{publisherName,endpoint,codeSigningAccountName,certificateProfileName}
+  # with AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET in the environment.
+
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+
+linux:
+  # Not a v1 target: only `--linux dir` is used, as the packaging smoke.
+  target: dir
+  category: Utility
+
+# electron-updater "generic" provider: an R2 public bucket per channel
+# (DESKTOP_UPDATE_URL/stable/latest.yml, latest-mac.yml).
+publish:
+  provider: generic
+  url: ${env.DESKTOP_UPDATE_URL}/${env.DESKTOP_CHANNEL}
+  channel: latest

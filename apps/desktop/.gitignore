@@ -1,0 +1,7 @@
+# ShapesOS Desktop: never commit dependencies or build output.
+node_modules/
+dist/
+release/
+test-results/
+playwright-report/
+*.log
