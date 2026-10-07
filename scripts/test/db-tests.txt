@@ -258,3 +258,5 @@ lib/panel/__tests__/store-db.test.ts
 lib/panel/__tests__/service-db.test.ts
 # Phase 19B (WS=engine): Dress Rehearsal town persistence — FORCE RLS on all five sim tables (no GUC / another workspace = zero rows, a cross-workspace write is refused, the workspace delete cascades), sim_events APPEND-ONLY for the app role (UPDATE / DELETE refused, the run's delete still cascades), event cursor and snapshot seek reads.
 lib/sim/__tests__/store-db.test.ts
+# Phase 19B (WS=engine): a Dress Rehearsal town run end to end on the agent worker with the labelled FAKE model — the dress_rehearsal gate (starter 403), generate → estimate → confirmed cap → town_run job → ranges over 3 seeds, events, hourly snapshots, residents; interventions write no real record (every other workspace table byte-identical before/after); a tiny cap ends as an honest partial; replay from seed = 0 model calls and identical event hashes.
+lib/sim/__tests__/run-db.test.ts

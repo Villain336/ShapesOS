@@ -15,6 +15,7 @@
 //               plan whose parent saved its waiting state (safety net).
 //   delegation_join — Phase 16: every task of a plan finished — the delegating
 //               run carries on (a chat turn, or a sub-agent one level up).
+//   town_run — Phase 19B (WS=engine): a Dress Rehearsal town run (lib/sim/run.server.ts).
 //   llm_usage — Phase 17 (latency): one model call's metering, written as an
 //               outbox row by the call and normally processed at once by the
 //               process that wrote it; a worker takes the ones left behind
@@ -99,6 +100,14 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     const payload = job.payload as import("@/lib/slack/events").SlackMentionJobPayload;
     if (payload.workspaceId !== job.workspaceId) throw new Error("slack_mention payload belongs to another workspace");
     return runSlackMention(payload);
+  },
+  // Phase 19B (WS=engine): one Dress Rehearsal town run (scenario A/B × N
+  // seeds under one hard credit cap) — lib/sim/run.server.ts.
+  async town_run(job, ctx) {
+    const { runTownJob } = await import("@/lib/sim/run.server");
+    const payload = job.payload as import("@/lib/sim/run.server").TownRunJobPayload;
+    if (payload.workspaceId !== job.workspaceId) throw new Error("town_run payload belongs to another workspace");
+    return runTownJob(payload, { signal: ctx.signal });
   },
   // Phase 18.2 (WS=comms): an agent mentioned in Messages (or a person's
   // inline Approve of its proposal) — lib/comms/messages/agent.server.ts.

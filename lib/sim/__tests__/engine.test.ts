@@ -91,3 +91,17 @@ describe("economy", () => {
     assert.ok(run.ledger.some((r) => r.wagesIn > 0) && run.ledger.some((r) => r.rentOut > 0));
   });
 });
+
+describe("the event fingerprint", () => {
+  it("is canonical: the same event with keys in another order (a JSONB round trip) hashes the same", () => {
+    const a = { seq: 1, t: 5, type: "decision" as const, r: "r001", d: { point: "reflect", key: "k", value: { summary: "A day.", plan: "nothing" } } };
+    const b = { seq: 1, t: 5, type: "decision" as const, r: "r001", d: { key: "k", point: "reflect", value: { plan: "nothing", summary: "A day." } } };
+    assert.equal(hashEvents([a]), hashEvents([b]));
+  });
+
+  it("ignores who answered (model or cache) but not what was answered", () => {
+    const base = { seq: 1, t: 5, type: "decision" as const, r: "r001", d: { point: "ad", key: "k", value: { attention: "curious", thought: "Hm." } } };
+    assert.equal(hashEvents([{ ...base, d: { ...base.d, source: "model", credits: 1 } }]), hashEvents([{ ...base, d: { ...base.d, source: "cache" } }]));
+    assert.notEqual(hashEvents([base]), hashEvents([{ ...base, d: { ...base.d, value: { attention: "ignore", thought: "Hm." } } }]));
+  });
+});
