@@ -34,12 +34,22 @@ const LOT_FILL: Record<Lot["kind"], string> = {
   billboard: "var(--aos-ink)",
 };
 
+/** A stable spot inside a lot for each resident standing there (2D only: dots don't stack). */
+function spread(id: string, rect: { w: number; h: number }): { dx: number; dy: number } {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  const fx = (h & 0xffff) / 0xffff - 0.5;
+  const fy = (h >>> 16) / 0xffff - 0.5;
+  return { dx: fx * Math.max(0, rect.w - 8), dy: fy * Math.max(0, rect.h - 8) };
+}
+
 export function TownMapSvg({ view, followed, inspected, onResident, onLot, label }: { view: TownViewModel; followed: string | null; inspected: string | null; onResident: (id: string) => void; onLot: (id: string) => void; label: string }) {
   const { layout } = view;
   const pad = 16;
   const yours = new Set(view.yourStores);
   const nodes = useMemo(() => new Map(layout.roads.nodes.map((n) => [n.id, n])), [layout]);
   const wnodes = useMemo(() => new Map(layout.walkways.nodes.map((n) => [n.id, n])), [layout]);
+  const lotRects = useMemo(() => new Map(layout.lots.map((l) => [l.id, l.rect])), [layout]);
   return (
     <svg viewBox={`${-pad} ${-pad} ${layout.size.width + 2 * pad} ${layout.size.height + 2 * pad}`} className="h-auto max-h-[70vh] w-full rounded-md bg-canvas" role="img" aria-label={label}>
       {layout.districts.map((d) => (
@@ -73,7 +83,7 @@ export function TownMapSvg({ view, followed, inspected, onResident, onLot, label
               strokeDasharray={competitor ? "4 3" : undefined}
             />
             {isYours ? (
-              <text x={l.rect.x + l.rect.w / 2} y={l.rect.y + l.rect.h / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} className="fill-ink">
+              <text x={l.rect.x + l.rect.w / 2} y={l.rect.y - 4} textAnchor="middle" fontSize={10} fontWeight={700} className="fill-ink" paintOrder="stroke" stroke="var(--aos-canvas)" strokeWidth={3}>
                 {l.name}
               </text>
             ) : null}
@@ -82,12 +92,16 @@ export function TownMapSvg({ view, followed, inspected, onResident, onLot, label
       })}
       {view.residents.map((r) => {
         const isFollowed = followed === r.id;
+        const rect = !r.moving && r.lot ? lotRects.get(r.lot) : undefined;
+        const off = rect ? spread(r.id, rect) : { dx: 0, dy: 0 };
+        const cx = r.position.x + off.dx;
+        const cy = r.position.y + off.dy;
         return (
           <g key={r.id} onClick={() => onResident(r.id)} className="cursor-pointer">
             <title>{r.name}</title>
-            <circle cx={r.position.x} cy={r.position.y} r={isFollowed ? 6 : 3.4} fill={r.adopted ? "var(--aos-ink)" : "var(--aos-paper)"} stroke="var(--aos-ink)" strokeWidth={isFollowed ? 2.5 : 1.2} />
+            <circle cx={cx} cy={cy} r={isFollowed ? 6 : 3.4} fill={r.adopted ? "var(--aos-ink)" : "var(--aos-paper)"} stroke="var(--aos-ink)" strokeWidth={isFollowed ? 2.5 : 1.2} />
             {isFollowed ? (
-              <text x={r.position.x + 9} y={r.position.y + 4} fontSize={12} fontWeight={700} className="fill-ink" paintOrder="stroke" stroke="var(--aos-paper)" strokeWidth={3}>
+              <text x={cx + 9} y={cy + 4} fontSize={12} fontWeight={700} className="fill-ink" paintOrder="stroke" stroke="var(--aos-paper)" strokeWidth={3}>
                 {r.name}
               </text>
             ) : null}
