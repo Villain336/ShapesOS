@@ -4,12 +4,13 @@
 //   Page walk: interviews in (upload / paste / reuse Meet or a note) →
 //   personas (derive under a confirmed cap, edit, veto) → a page walk run
 //   (estimate first, then a confirmed hard cap) → runs → the report.
-//   Town: the next milestone.
+//   Town: components/rehearsal/town (WS=engine, milestone 2).
 // Run states are neutral pills: a run is a background job, not an agent
 // (DESIGN.md: status colour + shape only for agent states). Personas are
 // people. Every screen carries the "synthetic; directional" note.
 
 import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { Building2, Drama, FileText, Footprints, Plus, RotateCcw, Upload, UserRound, UsersRound } from "lucide-react";
 import { aosButton, NeutralBadge } from "@/components/aos";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -19,6 +20,9 @@ import type { CalibrationSummary, InterviewView, PersonaView, RunView } from "@/
 import type { DeriveEstimate, RunEstimate } from "@/lib/panel/estimate";
 import { RunReportView } from "./RunReport";
 import { cardClass, inputClass, SyntheticNote } from "./ui";
+
+// Phase 19B (WS=engine): the Town tab — heavy (SVG map, playback), so it loads on demand.
+const TownTab = dynamic(() => import("./town/TownTab"), { ssr: false, loading: () => <p className="text-sm text-muted">…</p> });
 
 export interface RehearsalSources {
   meetings: Array<{ id: string; label: string }>;
@@ -99,12 +103,9 @@ export function RehearsalApp({ canEdit, initial, sources }: RehearsalAppProps) {
         })}
       </div>
       {tab === "town" ? (
-        <section id="rehearsal-panel-town" role="tabpanel" aria-labelledby="rehearsal-tab-town" className={cardClass}>
-          <div className="flex items-center gap-2">
-            <Building2 className="size-4 text-muted" aria-hidden />
-            <h2 className="aos-subheading">{t("rehearsal.town.title")}</h2>
-          </div>
-          <p className="text-sm text-muted">{t("rehearsal.town.soon")}</p>
+        // Phase 19B (WS=engine): the Town tab (components/rehearsal/town), loaded lazily.
+        <section id="rehearsal-panel-town" role="tabpanel" aria-labelledby="rehearsal-tab-town">
+          <TownTab canEdit={canEdit} personas={personas} />
         </section>
       ) : (
         <div id="rehearsal-panel-walk" role="tabpanel" aria-labelledby="rehearsal-tab-walk" className="flex flex-col gap-6">

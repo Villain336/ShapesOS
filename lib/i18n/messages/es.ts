@@ -13,6 +13,8 @@ import { trustEs } from "./trust.es";
 import { flowEs } from "./flow.es";
 // Phase 19B (WS=panel): Ensayo general.
 import { rehearsalEs } from "./rehearsal.es";
+// Phase 19B (WS=engine): the Town tab of Dress Rehearsal.
+import { townEs } from "./town.es";
 
 export const es: Catalogue = {
   common: {
@@ -992,4 +994,6 @@ export const es: Catalogue = {
   flow: flowEs,
   // Phase 19B (WS=panel): Ensayo general (/dashboard/rehearsal).
   ...rehearsalEs,
+  // Phase 19B (WS=engine): la pestaña Ciudad (rehearsalTown.*).
+  ...townEs,
 };

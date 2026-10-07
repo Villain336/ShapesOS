@@ -333,6 +333,13 @@ export async function cancelTownRun(actor: PanelActor, id: string): Promise<Town
   return runView(row);
 }
 
+/** The run's residents (who is on the map): key, name, group, home. */
+export async function listRunResidents(actor: PanelActor, runId: string): Promise<Array<{ id: string; name: string; segment: string; homeLotId: string; calibrated: boolean }>> {
+  await gate(actor, "viewer");
+  const rows = await scoped(actor, (tx) => tx.simResident.findMany({ where: { runId, workspaceId: actor.workspaceId }, orderBy: { residentKey: "asc" }, select: { residentKey: true, name: true, segment: true, homeLotId: true, calibrated: true } }));
+  return rows.map((r) => ({ id: r.residentKey, name: r.name, segment: r.segment, homeLotId: r.homeLotId, calibrated: r.calibrated }));
+}
+
 export interface ResidentLog {
   resident: { key: string; name: string; segment: string; calibrated: boolean; personaId: string | null; homeLotId: string; workLotId: string; routine: string };
   /** Decisions, reflections, visits and purchases of seed 0, in order — their thought log. */

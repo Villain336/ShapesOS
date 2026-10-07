@@ -17,6 +17,8 @@ import { trustEn } from "./trust.en";
 import { flowEn } from "./flow.en";
 // Phase 19B (WS=panel): Dress Rehearsal.
 import { rehearsalEn } from "./rehearsal.en";
+// Phase 19B (WS=engine): the Town tab of Dress Rehearsal.
+import { townEn } from "./town.en";
 
 export const en = {
   common: {
@@ -1004,6 +1006,8 @@ export const en = {
   flow: flowEn,
   // Phase 19B (WS=panel): Dress Rehearsal (/dashboard/rehearsal).
   ...rehearsalEn,
+  // Phase 19B (WS=engine): the Town tab (rehearsalTown.*).
+  ...townEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */
