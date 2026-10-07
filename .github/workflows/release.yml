@@ -131,7 +131,7 @@ jobs:
           push: true
 
       - name: Swap for the production build (scripts/ci/add-swap.sh)
-        run: sh scripts/ci/add-swap.sh 12
+        run: sh scripts/ci/add-swap.sh 16
 
       - name: Build and push runner (next build)
         uses: docker/bake-action@v7
