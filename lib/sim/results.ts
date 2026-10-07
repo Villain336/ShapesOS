@@ -15,6 +15,12 @@
 // Synthetic, labelled synthetic, and never representative.
 
 import { powerBadge, type HonestyInput } from "@/lib/flywheel/testlab/honesty";
+import { FAKE_MODEL_LABEL } from "@/lib/panel/fake-model";
+import { traceToInterviews, type InterviewTrace } from "@/lib/panel/trace";
+import type { DayMetrics, TownStop } from "./engine";
+import type { PersonaSeed, Resident, SegmentSpec } from "./residents";
+import type { SubRun, Variant } from "./runner";
+import { describeIntervention, type Scenario } from "./scenario";
 
 export const NOT_REPRESENTATIVE =
   "Synthetic town. Not representative: residents are simulated from your personas and sliders, so these are directional ranges across seeded runs, never a forecast.";
@@ -124,4 +130,189 @@ export function compareVariants(input: CompareInput): VariantComparison {
       ? `Inconclusive: ${power === "underpowered" ? powerDetail : "the seeded runs disagree on which scenario does better."}`
       : `${verdict === "b_ahead" ? "B" : "A"} adopted more in every seeded run (difference ${pct(difference.min)} to ${pct(difference.max)}). Synthetic and directional.`;
   return { metric: "adoption", difference, relativeLift, badges: { power, powerDetail, seeds: n }, verdict: uncalibrated ? null : verdict, withheld: uncalibrated ? "no_calibration" : null, explanation };
+}
+
+// ---------------------------------------------------------------------------
+// The town report (what the results view, the export and the agent read)
+// ---------------------------------------------------------------------------
+
+
+export interface SegmentResult {
+  segment: string;
+  label: string;
+  residents: number;
+  calibrated: boolean;
+  adoption: Range;
+  visits: Range;
+}
+
+export interface ObjectionResult {
+  day: number;
+  text: string;
+  /** How many times it was said, across all seeds. */
+  count: number;
+  segments: string[];
+  /** The interview words behind it, or null (untraced — not from an interview). */
+  trace: InterviewTrace | null;
+}
+
+export type KeyMomentKind = "intervention" | "first_ad" | "first_visit" | "first_adoption" | "first_mention" | "peak_visits" | "cap_stop";
+
+export interface KeyMoment {
+  kind: KeyMomentKind;
+  t: number;
+  day: number;
+  label: string;
+}
+
+export interface VariantReport {
+  variant: Variant;
+  label: string;
+  interventions: string[];
+  seedsCompleted: number;
+  seedsStopped: number;
+  residents: number;
+  /** Cumulative share of residents who bought, per day. */
+  adoption: Range[];
+  footTraffic: Range[];
+  revenueCents: Range[];
+  units: Range[];
+  finalAdoption: Range;
+  totalRevenueCents: Range;
+  bySegment: SegmentResult[];
+  objections: ObjectionResult[];
+  keyMoments: KeyMoment[];
+}
+
+export interface TownReport {
+  synthetic: true;
+  banner: string;
+  modelKind: "live" | "fake" | "rules";
+  modelLabel: string;
+  days: number;
+  variants: { A: VariantReport; B?: VariantReport };
+  comparison: VariantComparison | null;
+  calibration: CalibrationState;
+  /** Sample sd of final adoption across seeds (seed variance, shown). */
+  seedVariance: { A: number; B?: number };
+  stopped: (TownStop & { variant: Variant; seedIndex: number }) | null;
+}
+
+export interface BuildReportInput {
+  scenarios: { A: Scenario; B?: Scenario | null };
+  subRuns: SubRun[];
+  stopped: TownReport["stopped"];
+  residents: Resident[];
+  segments: SegmentSpec[];
+  personas: ReadonlyArray<PersonaSeed>;
+  calibration: CalibrationState;
+  /** Interview chunks of each persona's own transcripts (quote tracing). */
+  interviewChunks: ReadonlyMap<string, ReadonlyArray<{ transcriptId: string; content: string }>>;
+  modelKind: "live" | "fake" | "rules";
+  days: number;
+}
+
+const MODEL_LABELS = { live: "AI model at decision points (through the ShapesOS router)", fake: FAKE_MODEL_LABEL, rules: "Rules only (no AI model was called)" } as const;
+
+function variantReport(v: Variant, scenario: Scenario, input: BuildReportInput): VariantReport {
+  const runs = input.subRuns.filter((s) => s.variant === v && s.result && s.result.days.length > 0);
+  const pop = Math.max(1, input.residents.length);
+  const perSeed = (f: (d: DayMetrics) => number) => runs.map((s) => s.result!.days.map(f));
+  const segLabels = new Map(input.segments.map((s) => [s.key, s.label]));
+  const segKeys = [...new Set(input.residents.map((r) => r.segment))].sort();
+  const bySegment: SegmentResult[] = runs.length
+    ? segKeys.map((seg) => {
+        const members = input.residents.filter((r) => r.segment === seg);
+        return {
+          segment: seg,
+          label: segLabels.get(seg) ?? seg,
+          residents: members.length,
+          calibrated: members.some((r) => r.calibrated),
+          adoption: rangeOf(runs.map((s) => (s.result!.days.at(-1)!.bySegment[seg]?.adopters ?? 0) / Math.max(1, members.length))),
+          visits: rangeOf(runs.map((s) => s.result!.days.reduce((n, d) => n + (d.bySegment[seg]?.visits ?? 0), 0))),
+        };
+      })
+    : [];
+  const residentsById = new Map(input.residents.map((r) => [r.id, r]));
+  const grouped = new Map<string, ObjectionResult>();
+  for (const s of runs) {
+    for (const o of s.result!.objections) {
+      const k = `${o.day}|${o.text}`;
+      const g = grouped.get(k);
+      if (g) {
+        g.count += 1;
+        if (!g.segments.includes(o.segment)) g.segments.push(o.segment);
+        continue;
+      }
+      const persona = o.personaId ?? residentsById.get(o.residentId)?.personaId ?? null;
+      const chunks = persona ? (input.interviewChunks.get(persona) ?? []) : [];
+      grouped.set(k, { day: o.day, text: o.text, count: 1, segments: [o.segment], trace: chunks.length ? traceToInterviews(o.text, chunks) : null });
+    }
+  }
+  const objections = [...grouped.values()].sort((a, b) => a.day - b.day || b.count - a.count || a.text.localeCompare(b.text));
+  const keyMoments: KeyMoment[] = [];
+  const first = runs.find((s) => s.seedIndex === 0) ?? runs[0];
+  if (first?.result) {
+    const ev = first.result.events;
+    const at = (t: number) => Math.floor(t / 1440);
+    for (const e of ev) if (e.type === "intervention") keyMoments.push({ kind: "intervention", t: e.t, day: at(e.t), label: describeIntervention(e.d as never) });
+    const firstOf = (type: string, kind: KeyMomentKind, label: string) => {
+      const e = ev.find((x) => x.type === type);
+      if (e) keyMoments.push({ kind, t: e.t, day: at(e.t), label });
+    };
+    firstOf("ad", "first_ad", "First resident sees an ad");
+    firstOf("visit", "first_visit", "First visit to your store");
+    firstOf("adopt", "first_adoption", "First purchase");
+    firstOf("mention", "first_mention", "First word of mouth");
+    firstOf("cap_stop", "cap_stop", "Stopped at the credit cap");
+    const peak = [...first.result.days].sort((a, b) => b.visits - a.visits || a.day - b.day)[0];
+    if (peak && peak.visits > 0) keyMoments.push({ kind: "peak_visits", t: peak.day * 1440 + 12 * 60, day: peak.day, label: `Busiest day: ${peak.visits} visits` });
+    keyMoments.sort((a, b) => a.t - b.t);
+  }
+  const finals = runs.map((s) => s.result!.days.at(-1)!.adoptersCumulative / pop);
+  return {
+    variant: v,
+    label: scenario.label,
+    interventions: scenario.interventions.map((i) => describeIntervention(i)),
+    seedsCompleted: runs.filter((s) => s.status === "completed").length,
+    seedsStopped: runs.filter((s) => s.status === "stopped").length,
+    residents: input.residents.length,
+    adoption: seriesRanges(perSeed((d) => d.adoptersCumulative / pop)),
+    footTraffic: seriesRanges(perSeed((d) => d.visits)),
+    revenueCents: seriesRanges(perSeed((d) => d.revenueCents)),
+    units: seriesRanges(perSeed((d) => d.units)),
+    finalAdoption: rangeOf(finals.length ? finals : [0]),
+    totalRevenueCents: rangeOf(runs.length ? runs.map((s) => s.result!.days.reduce((n, d) => n + d.revenueCents, 0)) : [0]),
+    bySegment,
+    objections,
+    keyMoments,
+  };
+}
+
+/** The whole report: ranges, segments, objections (traced), key moments, A vs B. */
+export function buildTownReport(input: BuildReportInput): TownReport {
+  const A = variantReport("A", input.scenarios.A, input);
+  const B = input.scenarios.B ? variantReport("B", input.scenarios.B, input) : undefined;
+  let comparison: VariantComparison | null = null;
+  if (B) {
+    // Paired by seed: only seeds where both A and B ran.
+    const pop = Math.max(1, input.residents.length);
+    const final = (v: Variant) => new Map(input.subRuns.filter((s) => s.variant === v && s.result?.days.length).map((s) => [s.seedIndex, s.result!.days.at(-1)!.adoptersCumulative / pop]));
+    const fa = final("A");
+    const fb = final("B");
+    const both = [...fa.keys()].filter((k) => fb.has(k)).sort((x, y) => x - y);
+    comparison = compareVariants({ a: both.map((k) => fa.get(k)!), b: both.map((k) => fb.get(k)!), residents: input.residents.length, calibration: input.calibration, calibratedResidents: input.residents.filter((r) => r.calibrated).length });
+  }
+  return {
+    synthetic: true,
+    banner: NOT_REPRESENTATIVE,
+    modelKind: input.modelKind,
+    modelLabel: MODEL_LABELS[input.modelKind],
+    days: input.days,
+    variants: { A, ...(B ? { B } : {}) },
+    comparison,
+    calibration: input.calibration,
+    seedVariance: { A: A.finalAdoption.sd, ...(B ? { B: B.finalAdoption.sd } : {}) },
+    stopped: input.stopped,
+  };
 }
