@@ -126,14 +126,18 @@ function fnv1a(s: string): number {
 }
 
 /**
- * FAKE embedder for tests (labelled): a 256-bucket hashed bag of content
+ * FAKE embedder for tests (labelled): a 384-bucket (the MiniLM width, so it
+ * fits the vector(384) column) hashed bag of content
  * words, L2-normalised. Two texts sharing words are similar; no shared words
  * → 0; an empty text → the zero vector (similarity 0). Production retrieval
  * never uses it (PgMemoryStore embeds with MiniLM).
  */
+/** = EMBED_DIMS in lib/substrate/memory/embed.ts (not imported: that module loads the model runtime). */
+export const FAKE_EMBED_DIMS = 384;
+
 export const lexicalTestEmbedder: EmbedFn = async (text) => {
-  const v = new Array<number>(256).fill(0);
-  for (const t of tokenize(text)) v[fnv1a(t) % 256] += 1;
+  const v = new Array<number>(FAKE_EMBED_DIMS).fill(0);
+  for (const t of tokenize(text)) v[fnv1a(t) % FAKE_EMBED_DIMS] += 1;
   const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
   return norm === 0 ? v : v.map((x) => x / norm);
 };

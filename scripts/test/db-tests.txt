@@ -252,3 +252,5 @@ lib/push/__tests__/web-push-db.test.ts
 lib/timemachine/__tests__/snapshots-db.test.ts
 # Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
 lib/timemachine/__tests__/undo-db.test.ts
+# Phase 19B (WS=panel): Dress Rehearsal persistence — FORCE RLS on all seven panel tables (no GUC / another workspace = zero rows, a cross-workspace write is refused, the workspace delete cascades) and the pgvector memory stream (verbatim transcripts, cosine relevance, per-transcript and per-persona scope, recency refresh) with the labelled FAKE 384-d embedder.
+lib/panel/__tests__/store-db.test.ts
