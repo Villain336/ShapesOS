@@ -16,7 +16,8 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Tests (~29 min) plus the production build (~16 min with swap) passed 45 on PR #29 (2026-10-07).
+    timeout-minutes: 60
     services:
       postgres:
         # pgvector is required by the memory/substrate migrations.
@@ -127,7 +128,7 @@ jobs:
     # services, no private credentials. scripts/e2e/run.sh is the same entry
     # point developers run locally.
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     services:
       postgres:
         image: pgvector/pgvector:pg16
