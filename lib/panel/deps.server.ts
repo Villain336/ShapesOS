@@ -89,3 +89,15 @@ export function testPanelDeps(over: Partial<PanelDeps> = {}): PanelDeps {
     ...over,
   };
 }
+
+let override: PanelDeps | null = null;
+
+/** The deps routes and tools use (defaultPanelDeps unless a test swapped them). */
+export function panelDeps(): PanelDeps {
+  return override ?? defaultPanelDeps;
+}
+
+/** Test seam (like setBlobBackendForTests): null restores the defaults. */
+export function setPanelDepsForTests(deps: PanelDeps | null): void {
+  override = deps;
+}

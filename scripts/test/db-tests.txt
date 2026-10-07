@@ -258,3 +258,5 @@ lib/panel/__tests__/store-db.test.ts
 lib/panel/__tests__/service-db.test.ts
 # Phase 19B (WS=panel): a page walk run end to end — REAL headless Chromium (needs `npx playwright install chromium`) on the TaskTide fixture landing page served from the database, the labelled FAKE model: estimate → confirm → queued → worker; parallel walks, steps + screenshots in blob storage + traces, verdicts (a hand-made persona withheld: no calibration), the report (distribution, interview-traced objections, heat, fixes); a 4-credit cap stops cleanly (partial, spent ≤ cap); recording a launch creates the calibration and the score follows; diff of two runs; another workspace can't read; the worker handler refuses another workspace and a second claim never re-runs.
 lib/panel/__tests__/run-db.test.ts
+# Phase 19B (WS=panel): the /api/rehearsal routes — 401 signed out, 403 upgrade_required below Pro, viewers read but can't start; a JSON paste and a multipart VTT upload; a run never starts unconfirmed; screenshots served only from this workspace's rehearsal blobs (another workspace's, another namespace and a traversal are 404).
+lib/panel/__tests__/routes-db.test.ts
