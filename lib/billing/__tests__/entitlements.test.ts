@@ -45,6 +45,8 @@ const EXPECTED: Record<Feature, string[]> = {
   digital_twin: ["self_hosted", "trial", "pro", "business", "agency"],
   payroll: ["self_hosted", "trial", "pro", "business", "agency"],
   pos: ["self_hosted", "trial", "pro", "business", "agency"],
+  // Phase 19B (WS=panel): Dress Rehearsal, Pro and above.
+  dress_rehearsal: ["self_hosted", "trial", "pro", "business", "agency"],
 };
 
 describe("entitlement table", () => {
