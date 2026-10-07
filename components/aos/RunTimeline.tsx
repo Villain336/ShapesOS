@@ -8,6 +8,8 @@
 // steps that stop for approval. Step states come from lib/aos/run-steps.
 
 import type { ReactNode } from "react";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget } from "@/lib/cursor/registry";
 import { Pause, Play, Square } from "lucide-react";
 import type { AosStatus } from "@/lib/aos/status";
 import { deriveRunSteps, ofCaption, progressFraction, type TimelineStep, type ToolCall } from "@/lib/aos/run-steps";
@@ -112,17 +114,17 @@ export function RunTimeline({
         <div className="flex shrink-0 items-center gap-2">
           {badge ?? <StatusBadge status={status} />}
           {onPause ? (
-            <button type="button" onClick={onPause} disabled={busy} aria-label={pauseLabel} title={pauseLabel} className={cn(ctl, "bg-paper text-ink shadow-outline")}>
+            <button type="button" onClick={onPause} disabled={busy} {...cursorTarget("kit:run:pause", pauseLabel)} aria-label={pauseLabel} title={pauseLabel} className={cn(ctl, "bg-paper text-ink shadow-outline")}>
               <Pause className="size-4" aria-hidden />
             </button>
           ) : null}
           {onResume ? (
-            <button type="button" onClick={onResume} disabled={busy} aria-label={resumeLabel} title={resumeLabel} className={cn(ctl, "bg-running text-paper")}>
+            <button type="button" onClick={onResume} disabled={busy} {...cursorTarget("kit:run:resume", resumeLabel)} aria-label={resumeLabel} title={resumeLabel} className={cn(ctl, "bg-running text-paper")}>
               <Play className="size-4 fill-current" aria-hidden />
             </button>
           ) : null}
           {onStop ? (
-            <button type="button" onClick={onStop} disabled={busy} aria-label="Stop run" title="Stop run" className={cn(ctl, "bg-failed text-paper")}>
+            <button type="button" onClick={onStop} disabled={busy} {...cursorTarget("kit:run:stop", "Stop run")} aria-label="Stop run" title="Stop run" className={cn(ctl, "bg-failed text-paper")}>
               <Square className="size-3.5 fill-current" aria-hidden />
             </button>
           ) : null}

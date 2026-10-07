@@ -9,6 +9,8 @@ import { X } from "lucide-react";
 import { STATUS_META, type AosColorStatus } from "@/lib/aos/status";
 import { cn } from "@/lib/utils";
 import { aosButton } from "./button";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget, cursorSlug } from "@/lib/cursor/registry";
 import { StatusShape } from "./StatusShape";
 
 export interface BannerAction {
@@ -50,11 +52,11 @@ export function Banner({
       </div>
       {action ? (
         action.href ? (
-          <Link href={action.href} className={btn}>
+          <Link href={action.href} className={btn} {...cursorTarget(`kit:banner:${cursorSlug(action.label)}`, action.label, "link")}>
             {action.label}
           </Link>
         ) : (
-          <button type="button" onClick={action.onClick} className={btn}>
+          <button type="button" onClick={action.onClick} className={btn} {...cursorTarget(`kit:banner:${cursorSlug(action.label)}`, action.label)}>
             {action.label}
           </button>
         )

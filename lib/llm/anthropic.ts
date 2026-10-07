@@ -233,6 +233,10 @@ function toAnthropicContent(
           ...(b.isError ? { is_error: true } : {}),
         });
         break;
+      case "image":
+        // Phase 19A: the cursor's screenshot, for this call only.
+        out.push({ type: "image", source: { type: "base64", media_type: b.mediaType, data: b.data } });
+        break;
       case "opaque":
         // Thinking blocks (with signatures), server tool calls and results are
         // passed back unchanged — required for tool-use turns with thinking.

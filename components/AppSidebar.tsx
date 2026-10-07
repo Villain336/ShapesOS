@@ -12,6 +12,8 @@
 // (lib/aos/agents), then the usage meter and the user row. The collapsed
 // rail keeps icons, the needs-you dot and the running shapes, with tooltips.
 
+// Phase 19A (WS=server): nav rows are cursor targets (nav:<href>).
+import { cursorTarget, navCursorId, SHELL_TARGETS } from "@/lib/cursor/registry";
 import Link from "next/link";
 import { AGENT_ACTIVITY_CHANGED_EVENT } from "@/lib/aos/events";
 import { usePathname, useRouter } from "next/navigation";
@@ -376,6 +378,7 @@ function NavRow({
             aria-label={tip}
             aria-current={active ? "page" : undefined}
             onClick={onNavigate}
+            {...cursorTarget(navCursorId(item.href), item.label, "link")}
             className={cn(
               "relative flex size-11 items-center justify-center rounded-full transition-[background-color,color] duration-150",
               active ? "bg-paper text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
@@ -394,6 +397,7 @@ function NavRow({
         href={item.href}
         aria-current={active ? "page" : undefined}
         onClick={onNavigate}
+        {...cursorTarget(navCursorId(item.href), item.label, "link")}
         className={cn(
           "flex h-10 items-center gap-3 rounded-full px-3 text-base transition-[background-color,color] duration-150",
           onTogglePin && "pr-10",
@@ -783,6 +787,7 @@ export function SidebarPanel({
                 }}
                 aria-label={t("shell.newTask")}
                 aria-haspopup="dialog"
+                {...cursorTarget(SHELL_TARGETS.newTask, t("shell.newTask"))}
                 className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink"
               >
                 <Plus className="size-5" aria-hidden />
@@ -798,6 +803,7 @@ export function SidebarPanel({
                 }}
                 aria-haspopup="dialog"
                 title={t("shell.newTaskHint")}
+                {...cursorTarget(SHELL_TARGETS.newTask, t("shell.newTask"))}
                 className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink"
               >
                 <Plus className="size-4" aria-hidden />
@@ -811,6 +817,7 @@ export function SidebarPanel({
                 }}
                 aria-label={t("shell.search")}
                 title={t("shell.search")}
+                {...cursorTarget(SHELL_TARGETS.commandBar, `${t("shell.search")} (⌘K)`)}
                 className="aos-press flex size-11 shrink-0 items-center justify-center rounded-full bg-night-raised text-paper hover:bg-night-line"
               >
                 <Search className="size-4" aria-hidden />
@@ -818,7 +825,7 @@ export function SidebarPanel({
             </div>
           )}
         </div>
-        <nav data-shell-nav aria-label={t("shell.dashboardNav")} className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
+        <nav data-shell-nav aria-label={t("shell.dashboardNav")} {...cursorTarget(SHELL_TARGETS.sidebar, t("shell.dashboardNav"), "region")} className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
           <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} role={role} dock={dock} onNavigate={onNavigate} />
           {extra && !collapsed ? <div className="mt-4 border-t border-night-line pt-3">{extra}</div> : null}
         </nav>

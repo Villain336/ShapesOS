@@ -255,8 +255,30 @@ function nonNeg(n: number): number {
 export function splitBudget(
   left: Budget,
   tasks: ReadonlyArray<{ id: string; budgetShare?: number }>,
-): { ok: true; split: BudgetSplit } | { ok: false; error: string } {
-  const l = { costMicroUsd: nonNeg(left.costMicroUsd), steps: Math.floor(nonNeg(left.steps)), ms: nonNeg(left.ms) };
+  /**
+   * Phase 19A: what is left of the run's USER-SET spend cap (micro-USD;
+   * null/undefined = none). The children's cost shares are taken from at
+   * most this, so together they never exceed it; when it is used up the
+   * split is refused with a plain reason (the caller records a run event).
+   */
+  opts: { capLeftMicroUsd?: number | null } = {},
+): { ok: true; split: BudgetSplit } | { ok: false; error: string; capExhausted?: true } {
+  const cap = opts.capLeftMicroUsd;
+  const hasCap = cap !== undefined && cap !== null;
+  if (hasCap && nonNeg(cap) < MIN_CHILD_BUDGET.costMicroUsd * Math.max(1, tasks.length) / (1 - MERGE_RESERVE_SHARE)) {
+    return {
+      ok: false,
+      capExhausted: true,
+      error:
+        `The spend cap for this task is used up (≈$${(nonNeg(cap) / 1_000_000).toFixed(3)} left), so no sub-agents were started. ` +
+        "Finish with what you have, or ask the person to raise the cap.",
+    };
+  }
+  const l = {
+    costMicroUsd: hasCap ? Math.min(nonNeg(left.costMicroUsd), nonNeg(cap)) : nonNeg(left.costMicroUsd),
+    steps: Math.floor(nonNeg(left.steps)),
+    ms: nonNeg(left.ms),
+  };
   const reserve: Budget = {
     costMicroUsd: Math.ceil(l.costMicroUsd * MERGE_RESERVE_SHARE),
     steps: Math.max(1, Math.ceil(l.steps * MERGE_RESERVE_SHARE)),

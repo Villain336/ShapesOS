@@ -10,6 +10,8 @@
 // renders every toast through this, and the gallery shows each state.
 
 import Link from "next/link";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget, cursorSlug } from "@/lib/cursor/registry";
 import { X, type LucideIcon } from "lucide-react";
 import { STATUS_META, type AosColorStatus } from "@/lib/aos/status";
 import { progressFraction, ofCaption } from "@/lib/aos/run-steps";
@@ -74,6 +76,7 @@ export function ToastView({
             type="button"
             onClick={action.onClick}
             disabled={action.disabled}
+            {...cursorTarget(`kit:toast:${cursorSlug(action.label)}`, action.label)}
             className="shrink-0 px-1 text-md font-semibold text-paper underline underline-offset-4 disabled:text-night-soft disabled:no-underline"
           >
             {action.label}
@@ -117,7 +120,7 @@ export function ToastView({
         {action ? (
           <div className="mt-3">
             {action.href ? (
-              <Link href={action.href} className="aos-press inline-flex h-8 items-center rounded-full bg-paper px-3.5 text-sm font-semibold text-ink">
+              <Link href={action.href} {...cursorTarget(`kit:toast:${cursorSlug(action.label)}`, action.label, "link")} className="aos-press inline-flex h-8 items-center rounded-full bg-paper px-3.5 text-sm font-semibold text-ink">
                 {action.label}
               </Link>
             ) : (
@@ -125,6 +128,7 @@ export function ToastView({
                 type="button"
                 onClick={action.onClick}
                 disabled={action.disabled}
+                {...cursorTarget(`kit:toast:${cursorSlug(action.label)}`, action.label)}
                 className="aos-press inline-flex h-8 items-center rounded-full bg-paper px-3.5 text-sm font-semibold text-ink disabled:bg-night-raised disabled:text-night-soft"
               >
                 {action.label}

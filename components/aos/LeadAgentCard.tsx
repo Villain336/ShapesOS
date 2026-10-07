@@ -14,6 +14,8 @@ import { createTranslator, toolLabel, type Translator } from "@/lib/i18n";
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentTree } from "./AgentTree";
 import { aosButton } from "./button";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget, cursorSlug } from "@/lib/cursor/registry";
 import { CroppedShape, statusSurface } from "./CroppedShape";
 import { StatusBadge } from "./StatusBadge";
 import { ToolChip } from "./ToolChip";
@@ -54,7 +56,7 @@ export function LeadAgentCard({
             <p className="mt-1 text-md text-muted">{lead.line}</p>
           </div>
           {action ? (
-            <Link href={action.href} className={aosButton({ variant: lead.status === "needs" ? "review" : "primary", size: "sm", className: "hidden sm:inline-flex" })}>
+            <Link href={action.href} {...cursorTarget(`kit:lead-agent:${cursorSlug(action.label)}`, action.label, "link")} className={aosButton({ variant: lead.status === "needs" ? "review" : "primary", size: "sm", className: "hidden sm:inline-flex" })}>
               {action.label}
             </Link>
           ) : null}
@@ -90,7 +92,7 @@ export function LeadAgentCard({
       </div>
       {action ? (
         <div className="border-t border-line px-5 py-3 sm:hidden">
-          <Link href={action.href} className={aosButton({ variant: lead.status === "needs" ? "review" : "primary", size: "sm", className: "w-full" })}>
+          <Link href={action.href} {...cursorTarget(`kit:lead-agent:${cursorSlug(action.label)}`, action.label, "link")} className={aosButton({ variant: lead.status === "needs" ? "review" : "primary", size: "sm", className: "w-full" })}>
             {action.label}
           </Link>
         </div>

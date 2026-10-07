@@ -87,7 +87,23 @@ export interface ChatOpaqueBlock {
   text?: string;
 }
 
-export type ChatContentBlock = ChatTextBlock | ChatToolUseBlock | ChatToolResultBlock | ChatOpaqueBlock;
+/**
+ * Phase 19A (WS=server): an image in a USER turn (request side only) — the
+ * agentic cursor's screenshots. Base64 bytes, sent to the provider for this
+ * one call: callers must never persist a message that carries one (the
+ * cursor keeps its transcript in memory and stores only a text summary).
+ * Anthropic: an `image` block with a base64 source; OpenAI Responses: an
+ * `input_image` data URL. A provider without vision drops it and says so in
+ * meta.notes.
+ */
+export interface ChatImageBlock {
+  type: "image";
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  /** Base64 (no data: prefix). */
+  data: string;
+}
+
+export type ChatContentBlock = ChatTextBlock | ChatToolUseBlock | ChatToolResultBlock | ChatOpaqueBlock | ChatImageBlock;
 
 export interface ChatMessage {
   role: "user" | "assistant";
