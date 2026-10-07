@@ -53,6 +53,8 @@ import { NOTE_TOOLS } from "@/lib/notes/tools";
 import { FILE_TOOLS } from "@/lib/files/tools";
 import { PROCESS_TOOLS } from "@/lib/aos/tools";
 import { STORE_TOOLS } from "@/lib/store/tools";
+// Phase 19B (WS=engine): Dress Rehearsal town tools (lib/sim/tools.ts).
+import { SIM_TOOLS, SIM_TOOL_ACTION, SIM_TOOL_GROUP } from "@/lib/sim/tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -1097,6 +1099,10 @@ export const TOOLS: ToolDef[] = [
   ...FILE_TOOLS,
   ...PROCESS_TOOLS,
   ...STORE_TOOLS,
+  // Phase 19B (WS=engine): list_town_runs (Tier 0) / start_town_rehearsal
+  // (Tier 2, uses credits under a hard cap) / apply_launch_change (Tier 2) /
+  // fund_launch_ad_campaign (Tier 3: real ad budget, never auto).
+  ...SIM_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
@@ -1262,6 +1268,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   share_file_link: "content",
   list_processes: "workspace",
   list_store_items: "workspace",
+  // Phase 19B (WS=engine): Dress Rehearsal town tools (lib/sim/tools.ts).
+  ...SIM_TOOL_GROUP,
 };
 
 /**
@@ -1381,6 +1389,9 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   list_file_versions: "list_file_versions",
   list_processes: "list_processes",
   list_store_items: "list_store_items",
+  // Phase 19B (WS=engine): Dress Rehearsal town tools — list_town_runs (Tier 0),
+  // start_town_rehearsal / apply_launch_change (Tier 2), spend_launch_ad_budget (Tier 3).
+  ...SIM_TOOL_ACTION,
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

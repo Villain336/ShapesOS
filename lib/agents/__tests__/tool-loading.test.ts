@@ -305,6 +305,10 @@ describe("A2 — shortened descriptions keep every tool's tier (Phase 14 tier tr
   // (lib/comms/tools.ts header table): reads / proposals 0, personal writes 1,
   // sends and calendar writes 2 (their connectors' own actions).
   Object.assign(PINNED, {"list_reminders":0,"create_reminder":1,"complete_reminder":1,"find_contact":0,"suggest_merge":0,"confirm_merge":1,"calendar_list_events":0,"calendar_find_time":0,"calendar_create_event_google":2,"calendar_create_event_outlook":2,"mail_list_threads":0,"mail_read_thread":0,"mail_label_thread":0,"mail_draft_reply":0,"mail_send":2,"social_send_dm":2});
+  // Phase 19B (WS=engine): the Dress Rehearsal town tools at their deliberate
+  // tiers (lib/sim/tools.ts): a read 0; starting a run (uses credits) and
+  // "do this for real" without money 2; a real ad campaign 3 (spend, never auto).
+  Object.assign(PINNED, {"list_town_runs":0,"start_town_rehearsal":2,"apply_launch_change":2,"fund_launch_ad_campaign":3});
 
   it("every catalog tool evaluates to the same tier as before", () => {
     assert.equal(Object.keys(PINNED).length, TOOLS.length, "the snapshot covers the whole catalog");

@@ -25,6 +25,7 @@ import { PgMemoryStore } from "@/lib/panel/store.server";
 import { validSpec } from "../../panel/__tests__/fixtures";
 import { testSimDeps } from "../deps.server";
 import { createGeneratedWorld, estimateTown, getTownRun, listTownRuns, replayTownRun, startTownRun, type TownRunInput } from "../service.server";
+import { proposeForReal } from "../real.server";
 import type { PanelActor } from "@/lib/panel/service.server";
 
 const RUN = randomUUID().slice(0, 8);
@@ -169,5 +170,29 @@ describe("a town rehearsal on the worker (FAKE model)", () => {
     assert.equal(done.callCount, 0, "no model call on a replay");
     const orig = await getTownRun(ed, original.id);
     assert.deepEqual(done.eventHashes, orig.eventHashes);
+  });
+
+  it('"do this for real": a normal proposal through executeTool — the ad campaign is Tier 3 and asks even with an auto-approve rule; a non-money change can run on a rule', async () => {
+    const run = (await listTownRuns(ed)).find((r) => r.status === "completed" && r.scenarioB)!;
+    await withWorkspaceScope(WS, (tx) =>
+      tx.automationSetting.createMany({
+        data: [
+          { workspaceId: WS, agentKey: "*", action: "spend_launch_ad_budget", behavior: "auto", updatedBy: ED },
+          { workspaceId: WS, agentKey: "*", action: "apply_launch_change", behavior: "auto", updatedBy: ED },
+        ],
+      }),
+    );
+    const notes = () => withWorkspaceScope(WS, (tx) => tx.univerDoc.count({ where: { workspaceId: WS, kind: "note" } }));
+    const before = await notes();
+    const ad = await proposeForReal(ed, run.id, { variant: "A", index: 0 });
+    assert.equal(ad.tool, "fund_launch_ad_campaign");
+    assert.equal(ad.status, "pending_confirmation", "Tier 3 always asks a person");
+    assert.equal(await notes(), before, "a proposal writes nothing");
+    const price = await proposeForReal(ed, run.id, { variant: "B", index: 1 });
+    assert.equal(price.tool, "apply_launch_change");
+    assert.equal(price.status, "executed", "Tier 2 can run on the workspace's auto-approve rule");
+    const okd = await proposeForReal(ed, run.id, { variant: "A", index: 0, confirmed: true });
+    assert.equal(okd.status, "executed", "the person's explicit OK runs it");
+    assert.equal(await notes(), before + 2);
   });
 });
