@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): per-persona verdicts.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/reporting/verdicts.ts. A verdict is READ
 // OFF the persona's behaviour, think-aloud and memory — never asked as "would

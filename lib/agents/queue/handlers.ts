@@ -16,6 +16,7 @@
 //   delegation_join — Phase 16: every task of a plan finished — the delegating
 //               run carries on (a chat turn, or a sub-agent one level up).
 //   town_run — Phase 19B (WS=engine): a Dress Rehearsal town run (lib/sim/run.server.ts).
+//   panel_run — Phase 19B (WS=panel): one Dress Rehearsal page walk run.
 //   llm_usage — Phase 17 (latency): one model call's metering, written as an
 //               outbox row by the call and normally processed at once by the
 //               process that wrote it; a worker takes the ones left behind
@@ -94,6 +95,21 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     if (payload.record?.context?.workspaceId !== job.workspaceId) throw new Error("llm_usage payload belongs to another workspace");
     await processUsageRecord(payload.record, payload.idempotencyKey);
     return { idempotencyKey: payload.idempotencyKey };
+  },
+  // Phase 19B (WS=panel): one Dress Rehearsal page walk run (lib/panel/runner.server.ts):
+  // personas walk the page under the run's confirmed credit cap. "deferred" =
+  // another run of the workspace is working (the live-run cap): re-queued.
+  async panel_run(job) {
+    const payload = job.payload as { workspaceId: string; panelRunId: string };
+    if (payload.workspaceId !== job.workspaceId) throw new Error("panel_run payload belongs to another workspace");
+    const { runPanelRun } = await import("@/lib/panel/runner.server");
+    const { defaultPanelDeps } = await import("@/lib/panel/deps.server");
+    const out = await runPanelRun(payload.workspaceId, payload.panelRunId, defaultPanelDeps);
+    if (out.status === "deferred") {
+      const { enqueueAgentJob } = await import("./store");
+      await enqueueAgentJob({ workspaceId: job.workspaceId, kind: "panel_run", payload, maxAttempts: 2, runAfter: new Date(Date.now() + 30_000) });
+    }
+    return out;
   },
   async slack_mention(job) {
     const { runSlackMention } = await import("@/lib/slack/mention");

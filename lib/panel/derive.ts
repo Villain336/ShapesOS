@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): persona derivation from interviews.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/persona/derive.ts: pull a transcript's
 // evidence, ask the model for a PersonaSpec grounded in it, validate it,

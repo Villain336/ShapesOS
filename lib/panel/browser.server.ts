@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): a persona's browser, over the existing
 // Playwright recorder (lib/agents/runs/recorder.ts AgentRunRecorder).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/simulation/browser.ts + the locator half of
 // pagemaster.ts. One persona = one recorded headless context: every request
@@ -38,6 +38,30 @@ export type OpenWalkPage = (opts: OpenWalkPageOptions) => Promise<OpenedWalk>;
 
 const ACTION_TIMEOUT_MS = 8_000;
 
+/** The page's real outline: title, visible headings, buttons / links, form labels. */
+const OUTLINE_SCRIPT = `(() => {
+  var visible = function (el) {
+    var r = el.getBoundingClientRect();
+    var st = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && st.visibility !== "hidden" && st.display !== "none";
+  };
+  var text = function (el) { return (el.textContent || "").replace(/\\s+/g, " ").trim(); };
+  var uniq = function (xs) { var out = []; xs.forEach(function (x) { if (x && out.indexOf(x) < 0) out.push(x); }); return out; };
+  var all = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)).filter(visible); };
+  return {
+    title: document.title,
+    headings: uniq(all("h1, h2, h3").map(text)).slice(0, 30),
+    actions: uniq(all("a[href], button, [role=button], input[type=submit]").map(function (el) {
+      return el.tagName === "INPUT" && el.value ? el.value : (el.getAttribute("aria-label") || text(el));
+    })).slice(0, 30),
+    fields: uniq(all("label").map(function (l) {
+      var c = l.cloneNode(true);
+      Array.prototype.slice.call(c.querySelectorAll("input, textarea, select")).forEach(function (i) { i.remove(); });
+      return text(c);
+    })).slice(0, 15),
+  };
+})()`;
+
 function clean(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
@@ -51,21 +75,9 @@ export class PlaywrightWalkPage implements WalkPage {
   }
 
   async outline(): Promise<PageOutline> {
-    return this.page.evaluate(() => {
-      const visible = (el: Element) => {
-        const r = (el as HTMLElement).getBoundingClientRect();
-        const st = getComputedStyle(el as HTMLElement);
-        return r.width > 0 && r.height > 0 && st.visibility !== "hidden" && st.display !== "none";
-      };
-      const text = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
-      const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))];
-      return {
-        title: document.title,
-        headings: uniq([...document.querySelectorAll("h1, h2, h3")].filter(visible).map(text)).slice(0, 30),
-        actions: uniq([...document.querySelectorAll("a[href], button, [role=button], input[type=submit]")].filter(visible).map((el) => (el as HTMLInputElement).value && el.tagName === "INPUT" ? (el as HTMLInputElement).value : el.getAttribute("aria-label") ?? text(el))).slice(0, 30),
-        fields: uniq([...document.querySelectorAll("label")].filter(visible).map((l) => text(l.cloneNode(true) as Element).replace(/\s+$/, ""))).slice(0, 15),
-      };
-    });
+    // A plain string, not a function: a transpiled function can carry
+    // bundler helpers (e.g. esbuild's __name) that don't exist in the page.
+    return (await this.page.evaluate(OUTLINE_SCRIPT)) as PageOutline;
   }
 
   private async section(target: string): Promise<{ heading: string; sectionId?: string; loc: Locator } | null> {

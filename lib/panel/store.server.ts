@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the memory stream over Postgres + pgvector.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // PgMemoryStore implements lib/panel/memory.ts MemoryStore for one workspace:
 // panel_transcripts (verbatim) + panel_memory_nodes (content, importance,

@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): in-page behaviour tracker + human timing.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/simulation/browser.ts. TRACKER_SCRIPT is an
 // init script injected before any navigation: scroll depth, per-section time
@@ -113,13 +113,6 @@ export function coerceTrackerState(raw: unknown): TrackerState {
     clicks: Array.isArray(r.clicks) ? (r.clicks as TrackerClick[]) : [],
     hovers: Array.isArray(r.hovers) ? (r.hovers as TrackerHover[]) : [],
   };
-}
-
-/** Total time a section key has been on screen (ms), including an open view. */
-export function timeOnSectionMs(state: TrackerState, key: string, now = Date.now()): number {
-  const rec = state.sections[key];
-  if (!rec) return 0;
-  return rec.totalMs + (rec.lastEnter > 0 ? now - rec.lastEnter : 0);
 }
 
 export interface RageBurst {

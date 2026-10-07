@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): in-character proposition monitors.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/trust/propositions.ts (TinyTroupe-style
 // checks). Each walk step, a model-as-judge answers one proposition:

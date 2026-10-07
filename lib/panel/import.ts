@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): interviews in.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // An uploaded interview becomes ONE verbatim transcript text: speaker turns
 // kept, caption timings, cue numbers and NOTE blocks dropped, nothing

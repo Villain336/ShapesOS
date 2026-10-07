@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the panel's system boundaries, injectable.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Everything outside the panel's own code is reached through PanelDeps: the
 // model (the ShapesOS router), the embedder (local MiniLM), the SSRF guard,
@@ -88,4 +88,16 @@ export function testPanelDeps(over: Partial<PanelDeps> = {}): PanelDeps {
     humanTiming: false,
     ...over,
   };
+}
+
+let override: PanelDeps | null = null;
+
+/** The deps routes and tools use (defaultPanelDeps unless a test swapped them). */
+export function panelDeps(): PanelDeps {
+  return override ?? defaultPanelDeps;
+}
+
+/** Test seam (like setBlobBackendForTests): null restores the defaults. */
+export function setPanelDepsForTests(deps: PanelDeps | null): void {
+  override = deps;
 }

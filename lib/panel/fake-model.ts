@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the FAKE model (labelled; tests and smoke only).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // A deterministic stand-in for the router so the whole pipeline (derive →
 // walk → verdict → report) can run without a model: unit tests, the DB

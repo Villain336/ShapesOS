@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): expert reflections (the 4 lenses).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/calibration/reflections.ts (genagents
 // "expert reflections"): four domain-expert lenses — price skeptic,

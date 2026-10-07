@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the panel report and the run diff.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/reporting/aggregate.ts. The report is:
 //   * the DISTRIBUTION — who landed in each bucket, by name, plus the personas
@@ -19,6 +19,7 @@ import { z } from "zod";
 import { isCapReached } from "./budget";
 import type { PanelModel } from "./model";
 import type { ObjectionSeverity } from "./persona";
+import { tokenize } from "./memory";
 import type { FrictionTimeline } from "./timeline";
 import type { InterviewTrace } from "./trace";
 import type { PersonaVerdict, VerdictChoice, VerdictOutcome, WithheldReason } from "./verdicts";
@@ -87,17 +88,8 @@ export interface PanelReport {
   fixesSkippedAtCap: number;
 }
 
-const CLUSTER_STOPWORDS = new Set(
-  "a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,should,could,can,it,its,this,that,these,those,i,you,he,she,we,they,them,his,her,our,their,my,your,me,him,us,not,no,yes,so,very,just,about,into,over,after,before,between,through,during,up,down,out,off,again,once,here,there,when,where,why,how,all,any,both,each,few,more,most,other,some,such,only,own,same,than,too".split(","),
-);
-
 function clusterTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length > 2 && !CLUSTER_STOPWORDS.has(t)),
-  );
+  return new Set(tokenize(text));
 }
 
 export const CLUSTER_JACCARD_THRESHOLD = 0.5;

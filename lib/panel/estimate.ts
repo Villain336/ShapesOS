@@ -1,6 +1,6 @@
 // ShapesOS — Phase 19B (WS=panel): the up-front credit estimate and the
-// parallel caps. Commercial layer (entitlement dress_rehearsal). See
-// lib/panel/README.md.
+// parallel caps. Commercial layer (entitlement dress_rehearsal). Licence
+// boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // THE CAP MATHS (shown to the person, who confirms a cap before anything runs):
 //   step call    = credits(model, in ≈ STEP_PROMPT_CHARS, out = STEP_MAX_TOKENS)
@@ -119,11 +119,6 @@ export function panelLimits(env: Record<string, string | undefined> = process.en
   const [lo, hi] = PANEL_LIMIT_BOUNDS.maxParallelPerRun;
   const par = Number.isFinite(raw) ? Math.min(hi, Math.max(lo, raw)) : DEFAULT_PANEL_LIMITS.maxParallelPerRun;
   return { maxParallelPerRun: Math.max(1, Math.min(par, browserSlots)), maxLiveRunsPerWorkspace: DEFAULT_PANEL_LIMITS.maxLiveRunsPerWorkspace };
-}
-
-/** How many more personas may start now. */
-export function personaSlots(limits: PanelLimits, liveInRun: number, pending: number): number {
-  return Math.max(0, Math.min(pending, limits.maxParallelPerRun - liveInRun));
 }
 
 /** Run `tasks` with at most `limit` at a time; results in input order. */

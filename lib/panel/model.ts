@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): every Dress Rehearsal model call.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Replaces the prototype's src/llm/backend.ts (its own OpenAI / Anthropic
 // HTTP clients) and src/llm/cache.ts. Every call now:

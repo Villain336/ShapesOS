@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the Dress Rehearsal service.
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // One entry point for the routes, the page and the agent tools, so every path
 // goes through the same gates: the dress_rehearsal entitlement (Pro and
@@ -9,7 +9,7 @@
 // confirmed.
 
 import { randomUUID } from "node:crypto";
-import type { WorkspaceRole } from "@prisma/client";
+import type { Prisma, WorkspaceRole } from "@prisma/client";
 import { HttpError } from "@/lib/api/errors";
 import { roleAtLeast } from "@/lib/authz";
 import { requireEntitlement } from "@/lib/billing/entitlements-server";
@@ -17,7 +17,15 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { isCapReached, PanelLedger } from "./budget";
 import type { PanelDeps } from "./deps.server";
 import { derivePersonaSpec } from "./derive";
-import { estimateDerivation, type DeriveEstimate } from "./estimate";
+import { clampStepCap, DEFAULT_STEP_CAP, estimateDerivation, estimateRun, MAX_PERSONAS_PER_RUN, type DeriveEstimate, type RunEstimate } from "./estimate";
+import { diffReports, distributionVerdicts, type PanelReport, type ReportDiff } from "./aggregate";
+import type { Intent } from "./intents";
+import type { Observation } from "./pagemaster";
+import { PanelTargetSchema, targetLabel, type PanelTarget } from "./targets";
+import type { FrictionTimeline } from "./timeline";
+import { calibrationScore, compareRunWithLaunch } from "./validator";
+import type { VerdictObjection } from "./verdicts";
+import type { StepFlag, StepSignals } from "./walk";
 import { importTranscriptFile, TranscriptImportError, TRANSCRIPT_MAX_CHARS } from "./import";
 import { applyFounderEdits, isCalibratedSpec, parsePersonaSpec, PersonaValidationError, type PersonaEdits, type PersonaSpec } from "./persona";
 import { runReflections } from "./reflections";
@@ -267,4 +275,325 @@ export async function setPersonaStatus(actor: PanelActor, id: string, status: "a
   const row = await personaRow(actor, id);
   const updated = await scoped(actor, (tx) => tx.panelPersona.update({ where: { id: row.id }, data: { status, editedBy: actor.userId, editedAt: new Date() } }));
   return personaView(updated);
+}
+
+// ---------------------------------------------------------------------------
+// Runs (page walk)
+// ---------------------------------------------------------------------------
+
+export interface RunReport extends PanelReport {
+  /** "live" or "fake" — a fake-model run says so on every screen. */
+  modelKind: "live" | "fake";
+  model: string;
+  spend: { estimateCredits: number; capCredits: number; spentCredits: number; calls: number; byPurpose: Record<string, { calls: number; credits: number }>; cacheHits: number };
+}
+
+export interface PersonaSnapshot {
+  key: string;
+  name: string;
+  spec: PersonaSpec;
+  calibrated: boolean;
+}
+
+export interface RunView {
+  id: string;
+  mode: string;
+  status: string;
+  target: PanelTarget;
+  targetLabel: string;
+  personas: Array<{ key: string; name: string; calibrated: boolean }>;
+  stepCap: number;
+  model: string;
+  modelKind: "live" | "fake";
+  estimateCredits: number;
+  capCredits: number;
+  spentCredits: number;
+  callCount: number;
+  stopReason: string | null;
+  report: RunReport | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+type RunRow = {
+  id: string;
+  mode: string;
+  status: string;
+  target: unknown;
+  targetLabel: string;
+  personaSnapshot: unknown;
+  stepCap: number;
+  model: string;
+  modelKind: string;
+  estimateCredits: number;
+  capCredits: number;
+  spentCredits: number;
+  callCount: number;
+  stopReason: string | null;
+  report: unknown;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+};
+
+export function runView(r: RunRow): RunView {
+  const snap = (Array.isArray(r.personaSnapshot) ? r.personaSnapshot : []) as PersonaSnapshot[];
+  return {
+    id: r.id,
+    mode: r.mode,
+    status: r.status,
+    target: r.target as PanelTarget,
+    targetLabel: r.targetLabel,
+    personas: snap.map((p) => ({ key: p.key, name: p.name, calibrated: p.calibrated })),
+    stepCap: r.stepCap,
+    model: r.model,
+    modelKind: r.modelKind === "fake" ? "fake" : "live",
+    estimateCredits: r.estimateCredits,
+    capCredits: r.capCredits,
+    spentCredits: r.spentCredits,
+    callCount: r.callCount,
+    stopReason: r.stopReason,
+    report: (r.report as RunReport | null) ?? null,
+    createdAt: r.createdAt.toISOString(),
+    startedAt: r.startedAt?.toISOString() ?? null,
+    finishedAt: r.finishedAt?.toISOString() ?? null,
+  };
+}
+
+/** The active personas a run would use, in the order asked. */
+async function runPersonas(actor: PanelActor, personaIds: string[]): Promise<PersonaSnapshot[]> {
+  const ids = [...new Set(personaIds)];
+  if (ids.length === 0) throw new HttpError(400, "Pick at least one persona.");
+  if (ids.length > MAX_PERSONAS_PER_RUN) throw new HttpError(400, `A run takes at most ${MAX_PERSONAS_PER_RUN} personas.`);
+  const rows = await scoped(actor, (tx) => tx.panelPersona.findMany({ where: { workspaceId: actor.workspaceId, id: { in: ids } } }));
+  if (rows.length !== ids.length) throw new HttpError(404, "One of those personas wasn't found.");
+  const vetoed = rows.filter((r) => r.status === "vetoed");
+  if (vetoed.length) throw new HttpError(400, `${vetoed.map((v) => v.name).join(", ")} ${vetoed.length === 1 ? "is" : "are"} vetoed. Bring ${vetoed.length === 1 ? "it" : "them"} back or leave ${vetoed.length === 1 ? "it" : "them"} out.`);
+  return ids.map((id) => {
+    const r = rows.find((x) => x.id === id)!;
+    return { key: r.id, name: r.name, spec: r.spec as PersonaSpec, calibrated: r.calibrated };
+  });
+}
+
+export async function estimatePageWalk(actor: PanelActor, input: { personaIds: string[]; stepCap?: number }, deps: Pick<PanelDeps, "pricingModel">): Promise<RunEstimate & { modelKind: "live" | "fake" }> {
+  await gate(actor, "viewer");
+  const personas = await runPersonas(actor, input.personaIds);
+  const pm = await deps.pricingModel(actor.workspaceId);
+  return { ...estimateRun(pm.model, personas.length, clampStepCap(input.stepCap ?? DEFAULT_STEP_CAP)), modelKind: pm.kind };
+}
+
+/** Check a target exists in this workspace (and a URL passes the SSRF guard); returns its label. */
+async function checkTarget(actor: PanelActor, raw: unknown, deps: Pick<PanelDeps, "checkUrl">): Promise<{ target: PanelTarget; label: string }> {
+  const parsed = PanelTargetSchema.safeParse(raw);
+  if (!parsed.success) throw new HttpError(400, "Pick what to walk: a URL, a landing page or a site.");
+  const target = parsed.data;
+  if (target.kind === "url") {
+    try {
+      const url = String(await deps.checkUrl(target.url) ?? target.url);
+      return { target: { kind: "url", url: /^https?:/.test(url) ? url : target.url }, label: target.url };
+    } catch (err) {
+      throw new HttpError(400, `That URL can't be walked: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (target.kind === "landing_page") {
+    const d = await scoped(actor, (tx) => tx.pageDraft.findFirst({ where: { id: target.pageDraftId, workspaceId: actor.workspaceId }, select: { name: true } }));
+    if (!d) throw new HttpError(404, "Landing page not found.");
+    return { target, label: targetLabel(target, { pageDraft: d.name }) };
+  }
+  const { prisma } = await import("@/lib/prisma");
+  const site = await prisma.site.findFirst({ where: { id: target.siteId, project: { workspaceId: actor.workspaceId } }, select: { name: true } });
+  if (!site) throw new HttpError(404, "Site not found.");
+  return { target, label: targetLabel(target, { site: site.name }) };
+}
+
+export interface StartPageWalkInput {
+  target: unknown;
+  personaIds: string[];
+  stepCap?: number;
+  /** The HARD cap the person confirmed (credits). */
+  capCredits: number;
+  /** The person saw the estimate and confirmed the cap. */
+  confirmed: boolean;
+}
+
+/** Create the run (with its estimate and confirmed cap) and queue it on the worker. */
+export async function startPageWalk(actor: PanelActor, input: StartPageWalkInput, deps: Pick<PanelDeps, "pricingModel" | "checkUrl" | "enqueueRun">): Promise<RunView> {
+  await gate(actor, "editor");
+  if (input.confirmed !== true) throw new HttpError(400, "Confirm the credit cap before the run starts.");
+  const cap = Math.floor(Number(input.capCredits));
+  if (!Number.isFinite(cap) || cap < 1) throw new HttpError(400, "The cap must be at least 1 credit.");
+  const { target, label } = await checkTarget(actor, input.target, deps);
+  const personas = await runPersonas(actor, input.personaIds);
+  const pm = await deps.pricingModel(actor.workspaceId);
+  const estimate = estimateRun(pm.model, personas.length, clampStepCap(input.stepCap ?? DEFAULT_STEP_CAP));
+  const row = await scoped(actor, (tx) =>
+    tx.panelRun.create({
+      data: {
+        workspaceId: actor.workspaceId,
+        mode: "page_walk",
+        status: "queued",
+        target,
+        targetLabel: label.slice(0, 300),
+        personaIds: personas.map((p) => p.key),
+        personaSnapshot: personas as unknown as Prisma.InputJsonValue,
+        stepCap: estimate.stepCap,
+        model: pm.model,
+        modelKind: pm.kind,
+        estimateCredits: estimate.total,
+        capCredits: cap,
+        confirmedBy: actor.userId,
+      },
+    }),
+  );
+  const jobId = await deps.enqueueRun(actor.workspaceId, row.id);
+  const withJob = await scoped(actor, (tx) => tx.panelRun.update({ where: { id: row.id }, data: { jobId } }));
+  return runView(withJob);
+}
+
+export async function listRuns(actor: PanelActor, limit = 50, opts: { withReports?: boolean } = {}): Promise<RunView[]> {
+  await gate(actor, "viewer");
+  const rows = await scoped(actor, (tx) => tx.panelRun.findMany({ where: { workspaceId: actor.workspaceId }, orderBy: { createdAt: "desc" }, take: Math.min(Math.max(limit, 1), 200) }));
+  return rows.map((r) => (opts.withReports ? runView(r) : { ...runView(r), report: null }));
+}
+
+export interface StepView {
+  personaKey: string;
+  personaName: string;
+  stepIndex: number;
+  intent: Intent | null;
+  thinkAloud: string;
+  observation: Observation;
+  signals: StepSignals;
+  flags: StepFlag[];
+  screenshotRef: string | null;
+}
+
+export interface VerdictView {
+  personaKey: string;
+  personaName: string;
+  outcome: string;
+  verdict: "buy" | "no-buy" | "maybe" | null;
+  withheldReason: string | null;
+  confidence: number | null;
+  rationale: string;
+  objections: VerdictObjection[];
+  whatWouldChangeMind: string[];
+  behaviorSummary: string;
+  timeline: FrictionTimeline;
+  traceRef: string | null;
+}
+
+export interface CalibrationView {
+  predictedRate: number;
+  predictedN: number;
+  actualConversions: number;
+  actualVisitors: number;
+  actualRate: number;
+  z: number;
+  pValue: number;
+  verdict: string;
+  absError: number;
+}
+
+async function runRow(actor: PanelActor, id: string) {
+  const row = await scoped(actor, (tx) => tx.panelRun.findFirst({ where: { id, workspaceId: actor.workspaceId } }));
+  if (!row) throw new HttpError(404, "Run not found.");
+  return row;
+}
+
+export async function getRun(actor: PanelActor, id: string): Promise<{ run: RunView; steps: StepView[]; verdicts: VerdictView[]; calibration: CalibrationView | null }> {
+  await gate(actor, "viewer");
+  const row = await runRow(actor, id);
+  const [steps, verdicts, cal] = await scoped(actor, (tx) =>
+    Promise.all([
+      tx.panelStep.findMany({ where: { runId: id, workspaceId: actor.workspaceId }, orderBy: [{ personaName: "asc" }, { stepIndex: "asc" }] }),
+      tx.panelVerdict.findMany({ where: { runId: id, workspaceId: actor.workspaceId }, orderBy: { personaName: "asc" } }),
+      tx.panelCalibration.findFirst({ where: { runId: id, workspaceId: actor.workspaceId } }),
+    ]),
+  );
+  return {
+    run: runView(row),
+    steps: steps.map((s) => ({
+      personaKey: s.personaKey,
+      personaName: s.personaName,
+      stepIndex: s.stepIndex,
+      intent: (s.intent as Intent | null) ?? null,
+      thinkAloud: s.thinkAloud,
+      observation: s.observation as unknown as Observation,
+      signals: s.signals as unknown as StepSignals,
+      flags: (s.flags as unknown as StepFlag[]) ?? [],
+      screenshotRef: s.screenshotRef,
+    })),
+    verdicts: verdicts.map((v) => ({
+      personaKey: v.personaKey,
+      personaName: v.personaName,
+      outcome: v.outcome,
+      verdict: (v.verdict as VerdictView["verdict"]) ?? null,
+      withheldReason: v.withheldReason,
+      confidence: v.confidence,
+      rationale: v.rationale,
+      objections: v.objections as unknown as VerdictObjection[],
+      whatWouldChangeMind: v.whatWouldChangeMind as unknown as string[],
+      behaviorSummary: v.behaviorSummary,
+      timeline: v.timeline as unknown as FrictionTimeline,
+      traceRef: v.traceRef,
+    })),
+    calibration: cal ? calibrationView(cal) : null,
+  };
+}
+
+function calibrationView(c: CalibrationView): CalibrationView {
+  return { predictedRate: c.predictedRate, predictedN: c.predictedN, actualConversions: c.actualConversions, actualVisitors: c.actualVisitors, actualRate: c.actualRate, z: c.z, pValue: c.pValue, verdict: c.verdict, absError: c.absError };
+}
+
+export async function diffRuns(actor: PanelActor, beforeId: string, afterId: string): Promise<ReportDiff> {
+  await gate(actor, "viewer");
+  const [a, b] = [runView(await runRow(actor, beforeId)), runView(await runRow(actor, afterId))];
+  if (!a.report || !b.report) throw new HttpError(409, "Both runs need a report before they can be compared.");
+  return diffReports(a.report, b.report);
+}
+
+export interface CalibrationSummary {
+  launches: number;
+  /** Mean absolute error of predicted vs real conversion (null before the first launch). */
+  score: number | null;
+  entries: Array<CalibrationView & { runId: string; targetLabel: string }>;
+}
+
+export async function calibrationSummary(actor: PanelActor): Promise<CalibrationSummary> {
+  await gate(actor, "viewer");
+  const rows = await scoped(actor, (tx) => tx.panelCalibration.findMany({ where: { workspaceId: actor.workspaceId }, orderBy: { createdAt: "desc" }, include: { run: { select: { targetLabel: true } } } }));
+  return {
+    launches: rows.length,
+    score: rows.length ? calibrationScore(rows) : null,
+    entries: rows.map((r) => ({ ...calibrationView(r), runId: r.runId, targetLabel: r.run.targetLabel })),
+  };
+}
+
+/** Enter what really converted after launch; the run's calibration and the workspace score update. */
+export async function recordLaunch(actor: PanelActor, runId: string, input: { conversions: number; visitors: number }): Promise<{ calibration: CalibrationView; summary: CalibrationSummary }> {
+  await gate(actor, "editor");
+  const run = runView(await runRow(actor, runId));
+  if (!run.report) throw new HttpError(409, "This run has no report yet.");
+  let cmp;
+  try {
+    cmp = compareRunWithLaunch({ predicted: distributionVerdicts(run.report.distribution), conversions: Number(input.conversions), visitors: Number(input.visitors) });
+  } catch (err) {
+    throw new HttpError(400, err instanceof Error ? err.message : String(err));
+  }
+  const data = {
+    predictedRate: cmp.predictedRate,
+    predictedN: cmp.n,
+    actualConversions: Number(input.conversions),
+    actualVisitors: Number(input.visitors),
+    actualRate: cmp.actualRate,
+    z: cmp.z,
+    pValue: cmp.pValue,
+    verdict: cmp.verdict,
+    absError: Math.abs(cmp.delta),
+    enteredBy: actor.userId,
+  };
+  const saved = await scoped(actor, (tx) => tx.panelCalibration.upsert({ where: { runId }, create: { workspaceId: actor.workspaceId, runId, ...data }, update: data }));
+  return { calibration: calibrationView(saved), summary: await calibrationSummary(actor) };
 }

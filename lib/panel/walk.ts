@@ -1,5 +1,5 @@
 // ShapesOS — Phase 19B (WS=panel): the page walk loop (the game master).
-// Commercial layer (entitlement dress_rehearsal). See lib/panel/README.md.
+// Commercial layer (entitlement dress_rehearsal). Licence boundary: CONTRIBUTING.md (open vs commercial; company-authored).
 //
 // Ported from the prototype's src/simulation/gamemaster.ts. One persona walks
 // the page-as-world:
