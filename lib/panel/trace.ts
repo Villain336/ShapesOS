@@ -13,19 +13,11 @@
 // words next to the synthetic ones (or say plainly that nothing in the
 // interviews supports it).
 
+import { tokenize } from "./memory";
 import type { ObjectionSeverity } from "./persona";
 
-const QUOTE_STOPWORDS = new Set(
-  "a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,should,could,can,it,its,this,that,these,those,i,you,he,she,we,they,them,his,her,our,their,my,your,me,him,us,not,no,yes,so,very,just,about,into,over,after,before,between,through,during,up,down,out,off,again,once,here,there,when,where,why,how,all,any,both,each,few,more,most,other,some,such,only,own,same,than,too".split(","),
-);
-
 export function quoteTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length >= 4 && !QUOTE_STOPWORDS.has(t)),
-  );
+  return new Set(tokenize(text).filter((t) => t.length >= 4));
 }
 
 /** Minimum overlapping content-word count for a quote to count as traceable. */

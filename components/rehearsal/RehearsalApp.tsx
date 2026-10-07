@@ -18,7 +18,7 @@ import type { MessageKey } from "@/lib/i18n";
 import type { CalibrationSummary, InterviewView, PersonaView, RunView } from "@/lib/panel/service.server";
 import type { DeriveEstimate, RunEstimate } from "@/lib/panel/estimate";
 import { RunReportView } from "./RunReport";
-import { inputClass, SyntheticNote } from "./ui";
+import { cardClass, inputClass, SyntheticNote } from "./ui";
 
 export interface RehearsalSources {
   meetings: Array<{ id: string; label: string }>;
@@ -34,7 +34,6 @@ export interface RehearsalAppProps {
 }
 
 const labelClass = "flex flex-col gap-1.5 text-sm font-semibold text-ink";
-const cardClass = "flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline";
 
 async function api<T>(url: string, init?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   const res = await fetch(url, { cache: "no-store", ...init }).catch(() => null);

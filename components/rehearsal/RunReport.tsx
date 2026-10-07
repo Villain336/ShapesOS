@@ -16,7 +16,7 @@ import { toast, toastError } from "@/lib/ui/feedback";
 import type { MessageKey } from "@/lib/i18n";
 import type { ReportDiff } from "@/lib/panel/aggregate";
 import type { CalibrationSummary, CalibrationView, RunView, StepView, VerdictView } from "@/lib/panel/service.server";
-import { inputClass, SyntheticNote } from "./ui";
+import { cardClass, inputClass, SyntheticNote } from "./ui";
 
 interface RunDetail {
   run: RunView;
@@ -26,7 +26,6 @@ interface RunDetail {
 }
 
 const POLL_MS = 4_000;
-const cardClass = "flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline";
 const shotUrl = (ref: string) => `/api/rehearsal/artifacts?ref=${encodeURIComponent(ref)}`;
 
 export function RunReportView({ runId, runs, canEdit, onClose, onChange }: { runId: string; runs: RunView[]; canEdit: boolean; onClose: () => void; onChange: () => Promise<void> }) {

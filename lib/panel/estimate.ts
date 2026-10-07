@@ -121,11 +121,6 @@ export function panelLimits(env: Record<string, string | undefined> = process.en
   return { maxParallelPerRun: Math.max(1, Math.min(par, browserSlots)), maxLiveRunsPerWorkspace: DEFAULT_PANEL_LIMITS.maxLiveRunsPerWorkspace };
 }
 
-/** How many more personas may start now. */
-export function personaSlots(limits: PanelLimits, liveInRun: number, pending: number): number {
-  return Math.max(0, Math.min(pending, limits.maxParallelPerRun - liveInRun));
-}
-
 /** Run `tasks` with at most `limit` at a time; results in input order. */
 export async function runPool<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);

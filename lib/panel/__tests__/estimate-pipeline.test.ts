@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { aggregateReport } from "../aggregate";
 import { PanelLedger } from "../budget";
 import { derivePersonaSpec } from "../derive";
-import { clampStepCap, estimateDerivation, estimateRun, panelLimits, personaSlots, runPool } from "../estimate";
+import { clampStepCap, estimateDerivation, estimateRun, panelLimits, runPool } from "../estimate";
 import { createFakePanelProvider, fakeModelAllowed, FAKE_MODEL_PRICED_AS } from "../fake-model";
 import { InMemoryMemoryStore } from "../memory";
 import { RouterPanelModel } from "../model";
@@ -51,10 +51,6 @@ describe("parallel caps (Phase 16 style)", () => {
     assert.equal(panelLimits({}).maxParallelPerRun, 3);
     assert.equal(panelLimits({ PANEL_MAX_PARALLEL_PERSONAS: "50" }).maxParallelPerRun, 6);
     assert.equal(panelLimits({ PANEL_MAX_PARALLEL_PERSONAS: "4" }, 1).maxParallelPerRun, 1);
-  });
-
-  it("slots = what's left under the per-run cap", () => {
-    assert.deepEqual([personaSlots({ maxParallelPerRun: 3, maxLiveRunsPerWorkspace: 1 }, 1, 10), personaSlots({ maxParallelPerRun: 3, maxLiveRunsPerWorkspace: 1 }, 3, 10), personaSlots({ maxParallelPerRun: 3, maxLiveRunsPerWorkspace: 1 }, 0, 1)], [2, 0, 1]);
   });
 
   it("runPool never runs more than its limit at once and keeps input order", async () => {

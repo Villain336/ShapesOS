@@ -115,13 +115,6 @@ export function coerceTrackerState(raw: unknown): TrackerState {
   };
 }
 
-/** Total time a section key has been on screen (ms), including an open view. */
-export function timeOnSectionMs(state: TrackerState, key: string, now = Date.now()): number {
-  const rec = state.sections[key];
-  if (!rec) return 0;
-  return rec.totalMs + (rec.lastEnter > 0 ? now - rec.lastEnter : 0);
-}
-
 export interface RageBurst {
   target: string;
   count: number;
