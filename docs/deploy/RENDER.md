@@ -266,6 +266,14 @@ FLEET_CONTACT_URL=
 STRIPE_WEBHOOK_SECRET=
 
 # When you turn the feature on (leave out otherwise)
+# cursor speech in (streaming STT tokens)
+ASSEMBLYAI_API_KEY=
+# cursor speech in, the alternative to AssemblyAI
+DEEPGRAM_API_KEY=
+# cursor spoken answers
+ELEVENLABS_API_KEY=
+# the R2 public bucket ShapesOS Desktop updates from; /download lists it
+DESKTOP_UPDATE_URL=
 # Sign in with Google (redirect https://app.shapesos.com/api/auth/callback/google)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -300,7 +308,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (258 keys)</summary>
+<details><summary>Not set on Render, on purpose (262 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -322,6 +330,10 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | OpenAI-compatible override; OPENAI_API_KEY is used on hosted | `LLM_API_KEY` |
 | default https://api.openai.com/v1 | `LLM_BASE_URL` |
 | default OpenAI endpoint | `OPENAI_BASE_URL` |
+| default: AssemblyAI when its key is set, else Deepgram | `CURSOR_STT_PROVIDER` |
+| default low-latency model | `ELEVENLABS_MODEL_ID` |
+| default: each person's choice, else the account's first voice | `ELEVENLABS_VOICE_ID` |
+| default speech model | `OPENAI_TTS_MODEL` |
 | only for a self-hosted push service | `WEB_PUSH_EXTRA_HOSTS` |
 | default 256 is right | `SNAPSHOT_MAX_MB` |
 | default gpt-image-2 is right | `LLM_IMAGE_MODEL` |

@@ -64,6 +64,8 @@ import { QuickCapture } from "@/components/notes/QuickCapture";
 import { createHash } from "node:crypto";
 import { OfflineProvider } from "@/components/offline/OfflineProvider";
 import { ShareSheetHost } from "@/components/share/ShareSheetHost";
+// Phase 19A (WS=server): window.__shapesUiMap() for ShapesOS Desktop's cursor.
+import { CursorUiMap } from "@/components/cursor/CursorUiMap";
 
 export default async function DashboardLayout({
   children,
@@ -186,6 +188,8 @@ export default async function DashboardLayout({
         <ShareSheetHost role={role} workspaceId={workspace.id} />
         <OfflineProvider userKey={offlineKey} workspaceId={workspace.id} />
         <FeedbackHost />
+        {/* Phase 19A (WS=server): the cursor's element map (renders nothing). */}
+        <CursorUiMap />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}

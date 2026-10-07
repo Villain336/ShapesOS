@@ -90,7 +90,7 @@ import {
   searchTools,
   sliceResult,
 } from "./tool-loading";
-import { appendAgentRunEvent } from "./runs/service";
+import { appendAgentRunEvent, getAgentRunBudget } from "./runs/service";
 import { isLeaseLost, isRunStopped } from "./runs/abort";
 import { isDraining } from "@/lib/runtime/shutdown";
 import { prismaTranscriptStore, type TranscriptStore } from "./runs/transcript";
@@ -337,6 +337,11 @@ export interface AgentLoopDeps {
   connectorTools?: readonly ConnectorChatTool[];
   /** Persist streamed text / tool events on the run (default true with a runId). */
   persistEvents?: boolean;
+  /**
+   * Phase 19A: the run's user-set spend cap (AgentRun.budgetMicroUsd), micro-
+   * USD, or null. Default: read from the run row (tests inject one).
+   */
+  runBudget?: (workspaceId: string, runId: string) => Promise<number | null>;
 }
 
 export interface AgentLoopInput {
@@ -589,6 +594,13 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
   const now = deps.now ?? Date.now;
   const limits: AgentLoopLimits = { ...loopLimitsFromEnv(), ...(input.limits ?? {}) };
   const persistEvents = deps.persistEvents ?? true;
+  // Phase 19A: a user-set spend cap on the run (cursor agent mode: "max $3")
+  // is a hard ceiling on the cost limit, checked BEFORE every model call with
+  // the budget guard (the next call is assumed to cost what the last one
+  // did), and it rides into delegation (costLeftMicroUsd → splitBudget).
+  const runBudget = ctx.runId ? await (deps.runBudget ?? getAgentRunBudget)(ctx.workspaceId, ctx.runId).catch(() => null) : null;
+  if (runBudget !== null) limits.maxCostMicroUsd = Math.min(limits.maxCostMicroUsd, Math.max(0, runBudget));
+  const budgetGuard = input.budgetGuard === true || runBudget !== null;
   const agentKey: AgentKey = ctx.agentKey ?? "lead";
 
   // Fresh or resumed state.
@@ -670,7 +682,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
         ? "steps"
         : elapsed >= limits.maxMs || (ctx.deadlineAt !== undefined && now() >= ctx.deadlineAt)
           ? "time"
-          : s.costMicroUsd + (input.budgetGuard && s.steps > 0 ? (s.lastCallCostMicroUsd ?? 0) : 0) >=
+          : s.costMicroUsd + (budgetGuard && s.steps > 0 ? (s.lastCallCostMicroUsd ?? 0) : 0) >=
               Math.min(limits.maxCostMicroUsd, ctx.costLeftMicroUsd ?? Infinity)
             ? "cost"
             : null;
@@ -680,8 +692,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
           ? `its step limit (${limits.maxSteps} model calls)`
           : cap === "time"
             ? `its time limit (${Math.round(limits.maxMs / 60_000)} minutes)`
-            : `its cost limit (≈$${(limits.maxCostMicroUsd / 1_000_000).toFixed(2)})`;
-      await note(`Stopped at ${why}`, { kind: "cap", cap });
+            : runBudget !== null && limits.maxCostMicroUsd === Math.max(0, runBudget)
+              ? `your spend cap (≈$${(limits.maxCostMicroUsd / 1_000_000).toFixed(2)})`
+              : `its cost limit (≈$${(limits.maxCostMicroUsd / 1_000_000).toFixed(2)})`;
+      await note(`Stopped at ${why}`, { kind: "cap", cap, ...(runBudget !== null ? { budgetMicroUsd: runBudget, spentMicroUsd: s.costMicroUsd } : {}) });
       const text = [lastText, `I stopped here: this task reached ${why}. Ask me to continue if you want more.`]
         .filter(Boolean)
         .join("\n\n");

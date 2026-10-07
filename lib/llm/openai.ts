@@ -216,15 +216,37 @@ export function buildResponsesBody(
     // Text runs become one message; tool calls / results become their own
     // items, in transcript order (a function_call_output must follow its call).
     let texts: string[] = [];
+    // Phase 19A: images in a user turn make that message a content array
+    // (input_text + input_image parts, in order); text-only stays a string.
+    let images: Array<{ at: number; url: string }> = [];
     const flush = () => {
-      if (texts.length === 0) return;
-      input.push({ role: m.role, content: texts.join("\n\n") });
+      if (texts.length === 0 && images.length === 0) return;
+      if (images.length === 0) {
+        input.push({ role: m.role, content: texts.join("\n\n") });
+      } else {
+        const parts: Array<Record<string, unknown>> = [];
+        let ti = 0;
+        for (const img of images) {
+          while (ti < img.at) parts.push({ type: "input_text", text: texts[ti++] });
+          parts.push({ type: "input_image", image_url: img.url });
+        }
+        while (ti < texts.length) parts.push({ type: "input_text", text: texts[ti++] });
+        input.push({ role: m.role, content: parts });
+      }
       texts = [];
+      images = [];
     };
     for (const b of m.content) {
       switch (b.type) {
         case "text":
           texts.push(b.text);
+          break;
+        case "image":
+          if (m.role !== "user") {
+            dropped++;
+            break;
+          }
+          images.push({ at: texts.length, url: `data:${b.mediaType};base64,${b.data}` });
           break;
         case "tool_use":
           flush();

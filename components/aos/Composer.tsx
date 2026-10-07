@@ -9,6 +9,8 @@
 // presentational; components/command-bar/NewTaskDialog.tsx wires it.
 
 import { useId, useRef, type KeyboardEvent } from "react";
+// Phase 19A (WS=server): kit primary actions are cursor targets (lib/cursor/registry.ts).
+import { cursorTarget } from "@/lib/cursor/registry";
 import { ArrowUp, Check, ChevronDown, FileText, Loader2, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -230,6 +232,7 @@ export function TaskComposer({
           disabled={sending}
           aria-label={sending ? "Sending" : `Send to ${current?.name ?? "the agent"}`}
           title="Send (⌘↵)"
+          {...cursorTarget("kit:composer:send", `Send to ${current?.name ?? "the agent"}`)}
           className="aos-press flex size-10 shrink-0 items-center justify-center rounded-full bg-ink text-paper hover:bg-ink-hover disabled:bg-disabled disabled:text-disabled-fg"
         >
           {sending ? <Loader2 className="size-5 aos-spin" aria-hidden /> : <ArrowUp className="size-5" aria-hidden />}

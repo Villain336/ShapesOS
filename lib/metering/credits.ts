@@ -20,9 +20,10 @@ export const CREDIT_TABLE_VERSION = 3;
 export const CREDITS_PER_DOLLAR = 100;
 
 /** Phase 15.2: the Usage page groups credits by what they bought. */
-export type CreditCategory = "ai" | "data" | "messaging" | "compute" | "other";
+// Phase 19A (WS=server): + "cursor" (the agentic cursor's talk minutes and spoken answers).
+export type CreditCategory = "ai" | "data" | "messaging" | "compute" | "other" | "cursor";
 
-export const CREDIT_CATEGORIES: readonly CreditCategory[] = ["ai", "data", "messaging", "compute", "other"];
+export const CREDIT_CATEGORIES: readonly CreditCategory[] = ["ai", "data", "messaging", "compute", "other", "cursor"];
 
 export interface CreditCostDef {
   /** Integer credits charged per unit of the action. */
@@ -225,6 +226,22 @@ export const CREDIT_COSTS = {
     description: "Zernio managed ads beyond the free allowance: Zernio's charge at cost plus margin",
     category: "messaging",
   },
+  // ── Phase 19A (WS=server): the agentic cursor (ShapesOS Desktop) ──
+  // Priced from provider cost at the Phase 15.2 cost-plus rule (~4× vendor
+  // cost, rounded up; 1 credit = $0.01). Constants below; see
+  // lib/cursor/metering.ts for the per-provider amounts actually charged.
+  /** One started minute of hold-to-talk speech input, AFTER the plan's
+   *  included talk minutes (lib/billing/entitlements.ts
+   *  CURSOR_TALK_MINUTES_INCLUDED). Table price = the dearer provider:
+   *  Deepgram Nova-3 streaming $0.0077/min (regular PAYG, checked
+   *  2026-10-06) × 4 = $0.0308 → 4 credits. AssemblyAI Universal-Streaming
+   *  is $0.15/h = $0.0025/min × 4 = $0.01 → 1 credit (CURSOR_TALK_MINUTE_CREDITS). */
+  cursor_talk_minute: { credits: 4, basis: "cost-plus", description: "Cursor talk: 1 started minute of speech input, past the plan's included minutes", category: "cursor" },
+  /** 1,000 characters of spoken answer (rounded up). Table price = ElevenLabs
+   *  Flash/Turbo $0.04 per 1k chars (API pricing, checked 2026-10-06) × 4 =
+   *  $0.16 → 16 credits. Multilingual models ($0.08) → 32, OpenAI tts-1
+   *  ($0.015) → 6, self-hosted VoiceStudio → 0 (CURSOR_TTS_CREDITS_PER_1K). */
+  cursor_tts_1k_chars: { credits: 16, basis: "cost-plus", description: "Cursor voice: 1,000 characters of spoken answer", category: "cursor" },
 } as const satisfies Record<string, CreditCostDef>;
 
 // ── Phase 15.2: cost-based conversions (named constants; owner knobs) ───────

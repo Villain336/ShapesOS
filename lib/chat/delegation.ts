@@ -44,7 +44,7 @@ import { AGENT_MAX_GROUPS, agentDisplayName, computeGrant, isAgentKey, type Agen
 import { isLoopState, loopLimitsFromEnv, runAgentLoop, toolResultFor, type AgentLoopDeps, type AgentLoopResult, type LoopState } from "@/lib/agents/loop";
 import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
 import { abortRunWith, isLeaseLost, LeaseLostError, registerRunAbort, releaseRunAbort } from "@/lib/agents/runs/abort";
-import { finishAgentRun, getAgentRun, markAgentRunRunning } from "@/lib/agents/runs/service";
+import { finishAgentRun, getAgentRun, getAgentRunBudget, markAgentRunRunning } from "@/lib/agents/runs/service";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   childBriefMessage,
@@ -129,6 +129,9 @@ async function startPlan(ctx: ToolContext, raw: unknown, via: typeof DELEGATE_TA
   // The budget the children share: what is left of this run's.
   const env = loopLimitsFromEnv();
   const now = Date.now();
+  // Phase 19A: a run with a user-set spend cap (cursor agent mode) splits at
+  // most what is left of it (costLeftMicroUsd already counts the cap).
+  const runBudget = await getAgentRunBudget(ctx.workspaceId, ctx.runId).catch(() => null);
   const split = splitBudget(
     {
       costMicroUsd: lctx.costLeftMicroUsd ?? env.maxCostMicroUsd,
@@ -136,8 +139,14 @@ async function startPlan(ctx: ToolContext, raw: unknown, via: typeof DELEGATE_TA
       ms: Math.max(0, (lctx.deadlineAt ?? now + env.maxMs) - now),
     },
     v.plan.tasks,
+    { capLeftMicroUsd: runBudget !== null ? Math.max(0, Math.min(runBudget, lctx.costLeftMicroUsd ?? runBudget)) : null },
   );
-  if (!split.ok) throw new Error(split.error);
+  if (!split.ok) {
+    if (split.capExhausted) {
+      await runEvent(ctx, "Spend cap reached: no sub-agents started", { kind: "cap", cap: "cost", budgetMicroUsd: runBudget }, "note");
+    }
+    throw new Error(split.error);
+  }
 
   const parentGrant: readonly string[] = ctx.grant ?? AGENT_MAX_GROUPS.lead;
   const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");

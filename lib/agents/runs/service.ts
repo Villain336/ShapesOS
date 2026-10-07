@@ -29,6 +29,8 @@ export interface CreateAgentRunInput extends AgentRunLinkage {
   kind: AgentRunKind;
   startedBy: string;
   agentState?: Record<string, unknown>;
+  /** Phase 19A: a user-set spend cap for the whole run (micro-USD). */
+  budgetMicroUsd?: number | null;
 }
 
 export interface AttachRecordingInput {
@@ -72,9 +74,22 @@ export async function createAgentRun(input: CreateAgentRunInput) {
         parentRunId: input.parentRunId ?? null,
         allowedTools: input.allowedTools ? [...input.allowedTools] : [],
         agentState: (input.agentState ?? undefined) as Prisma.InputJsonValue | undefined,
+        // Phase 19A: a user-set spend cap for the whole run.
+        ...(input.budgetMicroUsd !== undefined && input.budgetMicroUsd !== null ? { budgetMicroUsd: input.budgetMicroUsd } : {}),
       },
     }),
   );
+}
+
+/**
+ * Phase 19A: the run's user-set spend cap (micro-USD), or null when it has
+ * none (platform limits only). Read under the workspace scope (RLS).
+ */
+export async function getAgentRunBudget(workspaceId: string, runId: string): Promise<number | null> {
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { budgetMicroUsd: true } }),
+  );
+  return row?.budgetMicroUsd ?? null;
 }
 
 /** Mark a run `running` (called when the recorder actually starts). */
@@ -241,6 +256,9 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
       parentRunId: run.parentRunId,
       createdAt: run.createdAt,
       endedAt: run.endedAt,
+      // Phase 19A integration: cursor agent mode (a spend cap) announces; a
+      // spoken cursor conversation doesn't (lib/notifications/producers.ts).
+      budgetMicroUsd: run.budgetMicroUsd,
     });
   }
   return run;

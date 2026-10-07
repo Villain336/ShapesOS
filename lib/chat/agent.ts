@@ -1400,6 +1400,14 @@ export interface TrackedTurnOptions {
   inlineBudgetMs?: number | null;
   /** Phase 8: told the run id as soon as the run exists (the SSE route tails it). */
   onRunCreated?: (runId: string) => void;
+  /**
+   * Phase 19A: the cursor's agent mode records the run as kind "cursor" with
+   * a user-set spend cap (AgentRun.budgetMicroUsd, enforced in the loop and
+   * in the delegation split) and extra agentState (its conversation).
+   */
+  runKind?: "chat" | "cursor";
+  budgetMicroUsd?: number | null;
+  agentState?: Record<string, unknown>;
 }
 
 /** Finish a tracked turn's run from its outcome (shared by the request and the worker). */
@@ -1441,12 +1449,13 @@ export async function runTrackedAgentTurn(
   const mode = input.mode ?? turnMode(profile.agentKey, profile.grant);
   const run = await createAgentRun({
     workspaceId: input.workspaceId,
-    kind: "chat",
+    kind: opts.runKind ?? "chat",
     startedBy: input.userId,
     threadId: input.threadId,
     agentKey: profile.agentKey,
     allowedTools: profile.grant,
-    agentState: { projectId: input.projectId, prompt: input.userContent.slice(0, 280), mode },
+    agentState: { ...(opts.agentState ?? {}), projectId: input.projectId, prompt: input.userContent.slice(0, 280), mode },
+    budgetMicroUsd: opts.budgetMicroUsd ?? null,
   });
   await markAgentRunRunning(input.workspaceId, run.id);
   opts.onRunCreated?.(run.id);

@@ -75,9 +75,9 @@ describe("settings grouping", () => {
     assert.ok(settingsHalf("workspace").some((g) => g.id === "privacy"), "Privacy and security is a workspace group");
   });
 
-  it("the You half has the plan's pages, in order", () => {
+  it("the You half has the plan's pages, in order (Cursor is personal, from Phase 19A)", () => {
     const you = settingsHalf("you")[0]!.pages.map((p) => en.settings.pages[p.href as keyof typeof en.settings.pages]?.label);
-    assert.deepEqual(you, ["General", "Appearance", "Notifications", "Keyboard", "Accessibility", "Language and region", "Privacy", "Your security", "Your account"]);
+    assert.deepEqual(you, ["General", "Appearance", "Notifications", "Keyboard", "Accessibility", "Language and region", "Privacy", "Cursor", "Your security", "Your account"]);
   });
 
   it("Security and the Audit log moved to Privacy and security, keeping their URLs", () => {

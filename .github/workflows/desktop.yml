@@ -1,0 +1,177 @@
+# ShapesOS Desktop release (Phase 19A): build apps/desktop on macOS and
+# Windows, sign + notarize, and upload to the R2 update bucket that
+# electron-updater ("generic" provider) and the website's /download page read.
+# Owner checklist: docs/desktop/RELEASE.md.
+#
+# Triggers
+#   * push of a tag `desktop-v*` — a real release, ONLY when the repository
+#     variable DESKTOP_RELEASE_ENABLED is "true" (off by default, so no runner
+#     minutes are spent before the signing accounts exist).
+#   * manual dispatch — an UNSIGNED dry run: builds both platforms and keeps
+#     the artifacts on the run (Actions → desktop → Run workflow). Tick
+#     "publish" to sign and upload instead (also needs DESKTOP_RELEASE_ENABLED).
+#
+# Settings (Settings → Secrets and variables → Actions; nothing is hardcoded):
+#   vars.DESKTOP_RELEASE_ENABLED       "true" turns signing + upload on
+#   vars.DESKTOP_UPDATE_URL            public R2 URL, e.g. https://updates.shapesos.com
+#                                      (baked into the app; the feed is <url>/<channel>/)
+#   vars.R2_ACCOUNT_ID                 Cloudflare account id (S3 endpoint)
+#   vars.DESKTOP_R2_BUCKET             bucket name behind DESKTOP_UPDATE_URL
+#   secrets.R2_ACCESS_KEY_ID / secrets.R2_SECRET_ACCESS_KEY   R2 API token (write)
+#   macOS (Developer ID + notarization):
+#   secrets.MAC_CSC_LINK               base64 of the "Developer ID Application" .p12
+#   secrets.MAC_CSC_KEY_PASSWORD       its password
+#   secrets.APPLE_API_KEY_P8           App Store Connect API key (.p8 contents)
+#   secrets.APPLE_API_KEY_ID / secrets.APPLE_API_ISSUER
+#   Windows (Azure Trusted Signing):
+#   secrets.AZURE_TENANT_ID / secrets.AZURE_CLIENT_ID / secrets.AZURE_CLIENT_SECRET
+#   vars.AZURE_SIGN_ENDPOINT           e.g. https://eus.codesigning.azure.net
+#   vars.AZURE_SIGN_ACCOUNT            Trusted Signing account name
+#   vars.AZURE_SIGN_PROFILE            certificate profile name
+#   vars.AZURE_SIGN_PUBLISHER          publisher name exactly as on the certificate
+
+name: desktop
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Update channel
+        type: choice
+        options: [stable, beta]
+        default: stable
+      publish:
+        description: Sign and upload to R2 (needs DESKTOP_RELEASE_ENABLED=true); unticked = unsigned dry run
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Tag pushes do nothing until the owner turns releases on.
+    if: github.event_name == 'workflow_dispatch' || vars.DESKTOP_RELEASE_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    env:
+      # Signed + uploaded only for an enabled tag push, or a dispatch with publish ticked.
+      RELEASE: ${{ vars.DESKTOP_RELEASE_ENABLED == 'true' && (github.event_name == 'push' || inputs.publish) }}
+      DESKTOP_CHANNEL: ${{ inputs.channel || (contains(github.ref_name, '-beta') && 'beta') || 'stable' }}
+      # A dry run still needs a well-formed feed URL in the build config; the
+      # .invalid host can never resolve, so a dry-run build can't auto-update.
+      DESKTOP_UPDATE_URL: ${{ vars.DESKTOP_UPDATE_URL || 'https://updates.example.invalid' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install (apps/desktop only)
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Version from the tag
+        if: github.event_name == 'push'
+        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#desktop-v}"
+
+      - name: Build (unsigned dry run)
+        if: env.RELEASE != 'true'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          node scripts/build.mjs
+          npx electron-builder --${{ matrix.platform }} --config electron-builder.yml --publish never
+
+      - name: Build, sign and notarize (macOS)
+        if: env.RELEASE == 'true' && matrix.platform == 'mac'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_P8" > "$key"
+          export APPLE_API_KEY="$key"
+          node scripts/build.mjs
+          npx electron-builder --mac --config electron-builder.yml --publish never -c.mac.notarize=true
+          rm -f "$key"
+
+      - name: Build and sign (Windows, Azure Trusted Signing)
+        if: env.RELEASE == 'true' && matrix.platform == 'win'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGN_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
+          AZURE_SIGN_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
+          AZURE_SIGN_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
+          AZURE_SIGN_PUBLISHER: ${{ vars.AZURE_SIGN_PUBLISHER }}
+        run: |
+          node scripts/build.mjs
+          npx electron-builder --win --config electron-builder.yml --publish never \
+            -c.win.azureSignOptions.endpoint="$AZURE_SIGN_ENDPOINT" \
+            -c.win.azureSignOptions.codeSigningAccountName="$AZURE_SIGN_ACCOUNT" \
+            -c.win.azureSignOptions.certificateProfileName="$AZURE_SIGN_PROFILE" \
+            -c.win.azureSignOptions.publisherName="$AZURE_SIGN_PUBLISHER"
+
+      - name: Keep the artifacts on the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: shapesos-desktop-${{ matrix.platform }}-${{ env.RELEASE == 'true' && 'signed' || 'unsigned' }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to R2 (<channel>/; the latest*.yml feed goes last)
+        if: env.RELEASE == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          BUCKET: ${{ vars.DESKTOP_R2_BUCKET }}
+        run: |
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          shopt -s nullglob
+          # Binaries first, so a client never sees a feed whose files are missing.
+          for f in release/*.dmg release/*.zip release/*.exe release/*.blockmap; do
+            aws s3 cp "$f" "s3://${BUCKET}/${DESKTOP_CHANNEL}/$(basename "$f")" --endpoint-url "$endpoint" --only-show-errors
+          done
+          for f in release/latest*.yml; do
+            aws s3 cp "$f" "s3://${BUCKET}/${DESKTOP_CHANNEL}/$(basename "$f")" --endpoint-url "$endpoint" \
+              --cache-control "no-cache" --content-type "text/yaml" --only-show-errors
+          done
