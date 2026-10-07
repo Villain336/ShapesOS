@@ -173,6 +173,8 @@ export const TABLE = [
   ["UNSPLASH_ACCESS_KEY", { cls: "paste", group: S }],
   ["COMPOSIO_API_KEY", { cls: "paste", group: S }],
   ["ZERNIO_API_KEY", { cls: "paste", group: S, need: "launch" }],
+  // Phase 19B (WS=engine): Dress Rehearsal Figma town import (read-only).
+  ["FIGMA_TOKEN", { cls: "paste", group: S }],
   ["TWILIO_ACCOUNT_SID", { cls: "paste", group: S }],
   ["TWILIO_AUTH_TOKEN", { cls: "paste", group: S }],
   ["TWILIO_API_KEY", { cls: "paste", group: S }],

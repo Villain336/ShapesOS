@@ -75,6 +75,7 @@ registry, then run `npx tsx scripts/docs/generate-keys-md.mts`.
 | Expo | Platform | `EXPO_ACCESS_TOKEN` | — | Mobile app builds. |
 | LiveKit | Platform | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` | — | Realtime voice and video. |
 | ShapesOS Stripe billing | Platform | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | — | Plans, seats, top-ups and overage. |
+| Figma (Dress Rehearsal town layouts) | Platform | `FIGMA_TOKEN` | — | Read-only: imports a town layout frame for Dress Rehearsal (no general Figma connector). No credits. |
 | Google (Analytics, Search Console, Business Profile, Ads, Drive, Gmail, Calendar) | Connect | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN` | — | One Google app; the Ads developer token is the platform's. |
 | Microsoft (Outlook mail and calendar) | Connect | `MICROSOFT_OAUTH_CLIENT_ID`, `MICROSOFT_OAUTH_CLIENT_SECRET` | — | Mail and calendar. |
 | Slack | Connect | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | — | Notifications and approvals. |

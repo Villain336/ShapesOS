@@ -125,6 +125,10 @@ export const KEY_SOURCES: readonly KeySourceEntry[] = [
   P("expo", "Expo", "compute", ["EXPO_ACCESS_TOKEN"], "Mobile app builds."),
   P("livekit", "LiveKit", "compute", ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "LIVEKIT_URL"], "Realtime voice and video."),
   P("stripe-billing", "ShapesOS Stripe billing", "compute", ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], "Plans, seats, top-ups and overage."),
+  // Phase 19B (WS=engine): Dress Rehearsal town layouts drawn in Figma (lib/sim/figma.ts).
+  // Read-only, scoped to the rehearsal import — not a general Figma connector.
+  P("figma-rehearsal", "Figma (Dress Rehearsal town layouts)", "data", ["FIGMA_TOKEN"],
+    "Read-only: imports a town layout frame for Dress Rehearsal (no general Figma connector). No credits."),
 
   // ── Connect: platform OAuth app, each workspace authorises its own account ──
   // `m21` names the built-in connectors (lib/connectors/m21/registry.ts); the
