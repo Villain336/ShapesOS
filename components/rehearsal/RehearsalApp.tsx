@@ -520,7 +520,11 @@ function NewRun({ personas, sources, onStarted }: { personas: PersonaView[]; sou
   const [pageDraftId, setPageDraftId] = useState(sources.landingPages[0]?.id ?? "");
   const [siteId, setSiteId] = useState(sources.sites[0]?.id ?? "");
   const [sitePath, setSitePath] = useState("");
-  const [picked, setPicked] = useState<string[]>(active.map((p) => p.id));
+  const [chosen, setChosen] = useState<string[] | null>(null);
+  // Until the person changes the selection, every active persona walks —
+  // including personas derived after the page loaded.
+  const picked = chosen ?? active.map((p) => p.id);
+  const setPicked = (fn: (xs: string[]) => string[]) => setChosen(fn(picked));
   const [stepCap, setStepCap] = useState("8");
   const [estimate, setEstimate] = useState<RunEstimate | null>(null);
   const [cap, setCap] = useState("");
