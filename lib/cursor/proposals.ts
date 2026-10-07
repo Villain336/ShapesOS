@@ -61,7 +61,7 @@ export async function decideCursorProposal(input: DecideInput, now: Date = new D
   if (!row || row.userId !== input.userId) throw new CursorDecisionError(404, "not_found", "That proposal was not found.");
   if (row.status !== "pending") throw new CursorDecisionError(409, "already_decided", `That proposal was already ${row.status}.`);
   if (row.expiresAt.getTime() <= now.getTime()) {
-    await withWorkspaceScope(input.workspaceId, (tx) => tx.cursorProposal.updateMany({ where: { id: row.id, status: "pending" }, data: { status: "expired" } }));
+    await withWorkspaceScope(input.workspaceId, (tx) => tx.cursorProposal.updateMany({ where: { id: row.id, workspaceId: input.workspaceId, status: "pending" }, data: { status: "expired" } }));
     throw new CursorDecisionError(410, "expired", "That proposal expired. Ask again.");
   }
 
@@ -116,7 +116,7 @@ export async function decideCursorProposal(input: DecideInput, now: Date = new D
   const status: DecideResult["status"] = call.status === "executed" ? "executed" : call.status === "pending_confirmation" ? "pending_confirmation" : "failed";
   const summary = (result?.summary ?? call.resultSummary ?? status).slice(0, 1000);
   await withWorkspaceScope(input.workspaceId, (tx) =>
-    tx.cursorProposal.update({ where: { id: row.id }, data: { status: status === "executed" ? "executed" : "failed", resultSummary: summary } }),
+    tx.cursorProposal.updateMany({ where: { id: row.id, workspaceId: input.workspaceId }, data: { status: status === "executed" ? "executed" : "failed", resultSummary: summary } }),
   );
   await appendAgentRunEvent(input.workspaceId, row.runId, {
     type: "gate",

@@ -116,6 +116,14 @@ export const KEY_SOURCES: readonly KeySourceEntry[] = [
   // its own Zernio profile and connects its accounts there (Settings → Connectors).
   P("zernio", "Zernio (ads on 7 networks, social on 16 platforms)", "marketing", ["ZERNIO_API_KEY", "ZERNIO_BASE_URL"],
     "One profile per workspace; 2 accounts included (plans include 3 / 10 / 25 / 50), then 600 credits per account a month. Creating ads and raising budgets always ask."),
+  // Phase 19A (WS=server): the agentic cursor (ShapesOS Desktop). ShapesOS is
+  // the key proxy: the desktop app never holds one of these.
+  P("cursor-stt", "Agentic cursor (ShapesOS Desktop): speech in", "ai", ["ASSEMBLYAI_API_KEY", "DEEPGRAM_API_KEY", "CURSOR_STT_PROVIDER"],
+    "Hold-to-talk transcription through short-lived tokens; the key never leaves the server. AssemblyAI is used when both are set unless CURSOR_STT_PROVIDER says otherwise. Talk minutes included per plan (60 / 300 / 1,000 / 300 pooled), then 1 (AssemblyAI) or 4 (Deepgram) credits a minute."),
+  P("cursor-tts", "Agentic cursor: speech out", "ai", ["ELEVENLABS_API_KEY", "VOICESTUDIO_URL", "OPENAI_API_KEY", "OPENAI_TTS_MODEL"],
+    "Spoken answers from ElevenLabs, then self-hosted VoiceStudio, then OpenAI speech (optional ElevenLabs model and default-voice overrides are in .env.example). 16 credits per 1,000 characters on ElevenLabs Flash (32 on its multilingual models), 6 on OpenAI, 0 on VoiceStudio. The brain runs on the router, so workspace model keys are honoured."),
+  P("desktop-releases", "ShapesOS Desktop downloads", "compute", ["DESKTOP_UPDATE_URL"],
+    "The public R2 bucket the desktop app updates from; /download lists its Mac and Windows builds. Unset: \"not published yet\"."),
   P("twilio", "Twilio SMS and voice", "messaging", ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
     "SMS (4 credits a segment), voice minutes, tracking numbers and transcription."),
   P("system-mail", "Resend / SMTP system mail", "messaging", ["SMTP_HOST", "SMTP_FROM", "SMTP_USER", "SMTP_PASS", "INVITE_MAIL_FROM"],
