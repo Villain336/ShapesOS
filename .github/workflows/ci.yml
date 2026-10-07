@@ -110,7 +110,7 @@ jobs:
       - name: Swap for the production build
         # The build's native compiler outgrows the runner's 8 GB; extra swap
         # keeps the runner alive (scripts/ci/add-swap.sh explains).
-        run: sh scripts/ci/add-swap.sh 12
+        run: sh scripts/ci/add-swap.sh 16
 
       - name: Production build
         # Types were already gated by the Typecheck step above; skip Next's
@@ -167,7 +167,7 @@ jobs:
           -v app_password=marketr_app_ci -f scripts/db/create-app-role.sql
 
       - name: Swap for the production build
-        run: sh scripts/ci/add-swap.sh 12
+        run: sh scripts/ci/add-swap.sh 16
 
       - name: Production build
         # Types are gated by the verify job; skip Next's duplicate pass.

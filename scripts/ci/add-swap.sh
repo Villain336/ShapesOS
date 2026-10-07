@@ -15,12 +15,23 @@
 # docs/deploy/RENDER.md "Build capacity").
 #
 # Usage: sh scripts/ci/add-swap.sh [target total swap in GB, default 12]
+# (FREE_RUNNER_DISK=0 skips the runner clean-up.)
 set -eu
 
 target_gb=${1:-12}
-dir=/mnt
-if [ ! -d "$dir" ]; then dir=/; fi
-file="$dir/shapes-build.swap"
+
+# On a GitHub-hosted runner, free disk first: the image ships ~20+ GB of
+# toolchains this repo never uses (the release workflow already removes the
+# same ones). Without this, /mnt had only ~8 GB free on #29's run, so swap
+# could grow to just 7 GB and the build thrashed until the runner died.
+if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ "${FREE_RUNNER_DISK:-1}" = "1" ]; then
+  sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+fi
+
+# Put the swap file on whichever of / and /mnt has the most free space.
+dir=/
+if [ -d /mnt ] && [ "$(df -m --output=avail /mnt | tail -1 | tr -d ' ')" -gt "$(df -m --output=avail / | tail -1 | tr -d ' ')" ]; then dir=/mnt; fi
+file="${dir%/}/shapes-build.swap"
 
 current_mb=$(free -m | awk '/^Swap:/ {print $2}')
 want_mb=$((target_gb * 1024 - current_mb))
