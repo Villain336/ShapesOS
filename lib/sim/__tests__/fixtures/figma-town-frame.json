@@ -1,0 +1,39 @@
+{
+  "_note": "Fixture in the documented shape of GET https://api.figma.com/v1/files/:key/nodes?ids=:id (Figma REST API: { name, nodes: { <id>: { document } } }, absoluteBoundingBox on every node). Hand-authored from the documented shape, NOT captured from a live Figma account (no FIGMA_TOKEN in this environment) — the live read is UNVERIFIED-LIVE.",
+  "name": "Rehearsal town",
+  "lastModified": "2026-10-01T12:00:00Z",
+  "nodes": {
+    "12:34": {
+      "document": {
+        "id": "12:34",
+        "name": "Town: Harbor Point",
+        "type": "FRAME",
+        "absoluteBoundingBox": { "x": 1000, "y": 500, "width": 400, "height": 300 },
+        "children": [
+          { "id": "12:40", "name": "district:residential:Northside", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1000, "y": 500, "width": 400, "height": 140 } },
+          { "id": "12:41", "name": "district:commercial:Harbor front", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1000, "y": 660, "width": 400, "height": 140 } },
+          { "id": "12:50", "name": "road:4:50:Harbor Ave", "type": "LINE", "absoluteBoundingBox": { "x": 1000, "y": 650, "width": 400, "height": 0 } },
+          { "id": "12:51", "name": "road:2:30:Mill St", "type": "LINE", "absoluteBoundingBox": { "x": 1200, "y": 500, "width": 0, "height": 300 } },
+          { "id": "12:52", "name": "road:1:30:oneway:Pier Rd", "type": "LINE", "absoluteBoundingBox": { "x": 1300, "y": 650, "width": 0, "height": 150 } },
+          {
+            "id": "12:60",
+            "name": "Lots",
+            "type": "GROUP",
+            "absoluteBoundingBox": { "x": 1020, "y": 520, "width": 360, "height": 260 },
+            "children": [
+              { "id": "12:61", "name": "home:1 Gull Lane", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1020, "y": 520, "width": 60, "height": 60 } },
+              { "id": "12:62", "name": "home:3 Gull Lane", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1100, "y": 520, "width": 60, "height": 60 } },
+              { "id": "12:63", "name": "work:Fish market", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1220, "y": 520, "width": 80, "height": 60 } },
+              { "id": "12:64", "name": "shop:you:Our store", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1020, "y": 680, "width": 70, "height": 50 } },
+              { "id": "12:65", "name": "shop:competitor:Dock Goods", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1110, "y": 680, "width": 70, "height": 50 } },
+              { "id": "12:66", "name": "cafe:Tide Café", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1220, "y": 680, "width": 60, "height": 50 } },
+              { "id": "12:67", "name": "park:Pier Park", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1320, "y": 680, "width": 60, "height": 100 } },
+              { "id": "12:68", "name": "billboard:Harbor board", "type": "RECTANGLE", "absoluteBoundingBox": { "x": 1150, "y": 640, "width": 30, "height": 6 } }
+            ]
+          },
+          { "id": "12:70", "name": "Notes (ignored)", "type": "TEXT", "absoluteBoundingBox": { "x": 1010, "y": 510, "width": 50, "height": 10 } }
+        ]
+      }
+    }
+  }
+}
