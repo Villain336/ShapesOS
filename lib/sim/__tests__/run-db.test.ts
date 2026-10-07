@@ -26,6 +26,7 @@ import { validSpec } from "../../panel/__tests__/fixtures";
 import { testSimDeps } from "../deps.server";
 import { createGeneratedWorld, estimateTown, getTownRun, listTownRuns, replayTownRun, startTownRun, type TownRunInput } from "../service.server";
 import { proposeForReal } from "../real.server";
+import { streamTownRun } from "../stream.server";
 import type { PanelActor } from "@/lib/panel/service.server";
 
 const RUN = randomUUID().slice(0, 8);
@@ -194,5 +195,35 @@ describe("a town rehearsal on the worker (FAKE model)", () => {
     const okd = await proposeForReal(ed, run.id, { variant: "A", index: 0, confirmed: true });
     assert.equal(okd.status, "executed", "the person's explicit OK runs it");
     assert.equal(await notes(), before + 2);
+  });
+
+  it("streams a run over SSE: meta, pages of events with a Last-Event-ID cursor, a seek via the hourly snapshot, resume after an id, end", async () => {
+    const run = (await listTownRuns(ed)).find((r) => r.status === "completed" && r.scenarioB)!;
+    const collect = async (opts: Parameters<typeof streamTownRun>[2]) => {
+      const sent: Array<{ event: string | null; data: unknown; id?: string | null }> = [];
+      const ac = new AbortController();
+      await streamTownRun(ed, run.id, opts, { send: (event, data, o) => (sent.push({ event, data, id: o?.id }), true), closed: false, signal: ac.signal });
+      return sent;
+    };
+    const all = await collect({ variant: "A" });
+    assert.equal(all[0]!.event, "meta");
+    assert.equal(all.at(-1)!.event, "end");
+    const events = all.filter((m) => m.event === "events").flatMap((m) => m.data as Array<{ seq: number; t: number; type: string }>);
+    const stored = await withWorkspaceScope(WS, (tx) => tx.simEvent.count({ where: { runId: run.id, variant: "A", seedIndex: 0 } }));
+    assert.equal(events.length, stored, "every event of the played seed, once");
+    assert.ok(events.some((e) => e.type === "trip" && Array.isArray((e as { d?: { path?: unknown } }).d?.path)), "trips carry timestamped paths");
+    const pages = all.filter((m) => m.event === "events");
+    assert.equal(pages.at(-1)!.id, `A:${events.at(-1)!.seq}`);
+
+    const seekAt = 1 * 1440 + 8 * 60 + 30; // Tuesday 08:30
+    const seek = await collect({ variant: "A", fromMinute: seekAt });
+    assert.equal(seek[1]!.event, "snapshot");
+    const snapT = (seek[1]!.data as { t: number }).t;
+    assert.equal(snapT, 1 * 1440 + 8 * 60, "the hourly snapshot at or before the seek");
+    const firstAfterSeek = (seek.find((m) => m.event === "events")!.data as Array<{ t: number }>)[0]!;
+    assert.ok(firstAfterSeek.t >= snapT);
+
+    const resume = await collect({ variant: "A", lastEventId: "A:100" });
+    assert.equal((resume.find((m) => m.event === "events")!.data as Array<{ seq: number }>)[0]!.seq, 101);
   });
 });
