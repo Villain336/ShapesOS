@@ -86,14 +86,14 @@ export async function runPanelRun(workspaceId: string, runId: string, deps: Pane
   const run = await scoped((tx) => tx.panelRun.findFirst({ where: { id: runId, workspaceId } }));
   if (!run) return { status: "skipped" };
   if (run.status === "running") {
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status: "partial", stopReason: "interrupted: the worker stopped during this run; it was not re-run, so no credits were spent twice.", finishedAt: new Date() } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status: "partial", stopReason: "interrupted: the worker stopped during this run; it was not re-run, so no credits were spent twice.", finishedAt: new Date() } }));
     return { status: "partial" };
   }
   if (run.status !== "queued") return { status: "skipped" };
   const limits = panelLimits(process.env, maxConcurrentRecordings());
   const live = await scoped((tx) => tx.panelRun.count({ where: { workspaceId, status: "running", id: { not: runId } } }));
   if (live >= limits.maxLiveRunsPerWorkspace) return { status: "deferred" };
-  await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status: "running", startedAt: new Date() } }));
+  await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status: "running", startedAt: new Date() } }));
 
   const ledger = new PanelLedger();
   ledger.beginRun(runId, run.capCredits);
@@ -104,7 +104,7 @@ export async function runPanelRun(workspaceId: string, runId: string, deps: Pane
     cached = new CachedPanelModel(await deps.modelFor(workspaceId, ledger, run.confirmedBy));
     model = cached;
   } catch (err) {
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), finishedAt: new Date() } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), finishedAt: new Date() } }));
     return { status: "failed" };
   }
   const store = new PgMemoryStore(workspaceId, { embed: deps.embed, createdBy: run.confirmedBy });
@@ -113,14 +113,14 @@ export async function runPanelRun(workspaceId: string, runId: string, deps: Pane
   try {
     target = await resolveTarget(workspaceId, run.target as unknown as PanelTarget);
   } catch (err) {
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), finishedAt: new Date() } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), finishedAt: new Date() } }));
     return { status: "failed" };
   }
   const guard = makePanelRequestGuard({ checkUrl: deps.checkUrl, servedOrigin: target.served?.origin ?? null });
 
   const syncSpend = async () => {
     const s = ledger.spend(runId);
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { spentCredits: s.spentCredits, callCount: s.callCount } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { spentCredits: s.spentCredits, callCount: s.callCount } }));
   };
 
   const walkOne = async (p: PersonaSnapshot): Promise<{ outcome: VerdictOutcome; timeline: FrictionTimeline; capStopped: boolean }> => {
@@ -230,11 +230,11 @@ export async function runPanelRun(workspaceId: string, runId: string, deps: Pane
       : failed.length
         ? `${failed.length} of ${personas.length} walks failed: ${failed[0]!.outcome.kind === "withheld" ? failed[0]!.outcome.detail : ""}`.trim()
         : null;
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status, report: full as unknown as object, spentCredits: spend.spentCredits, callCount: spend.callCount, stopReason, finishedAt: new Date() } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status, report: full as unknown as object, spentCredits: spend.spentCredits, callCount: spend.callCount, stopReason, finishedAt: new Date() } }));
     return { status };
   } catch (err) {
     const spend = ledger.spend(runId);
-    await scoped((tx) => tx.panelRun.update({ where: { id: runId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), spentCredits: spend.spentCredits, callCount: spend.callCount, finishedAt: new Date() } }));
+    await scoped((tx) => tx.panelRun.update({ where: { id: runId, workspaceId }, data: { status: "failed", stopReason: err instanceof Error ? err.message : String(err), spentCredits: spend.spentCredits, callCount: spend.callCount, finishedAt: new Date() } }));
     return { status: "failed" };
   }
 }

@@ -310,6 +310,10 @@ describe("A2 — shortened descriptions keep every tool's tier (Phase 14 tier tr
   // "do this for real" without money 2; a real ad campaign 3 (spend, never auto).
   Object.assign(PINNED, {"list_town_runs":0,"start_town_rehearsal":2,"apply_launch_change":2,"fund_launch_ad_campaign":3});
 
+  // Phase 19B (WS=panel): Dress Rehearsal, pinned at the brief's tiers —
+  // listing runs is a read (0); starting a page walk spends credits (2).
+  Object.assign(PINNED, {"list_rehearsal_runs":0,"start_page_walk":2});
+
   it("every catalog tool evaluates to the same tier as before", () => {
     assert.equal(Object.keys(PINNED).length, TOOLS.length, "the snapshot covers the whole catalog");
     for (const t of TOOLS) {

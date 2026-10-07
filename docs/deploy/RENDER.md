@@ -301,7 +301,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (258 keys)</summary>
+<details><summary>Not set on Render, on purpose (260 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -403,6 +403,8 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | Prisma's default pool fits 2-4 web replicas + a worker on the 200-connection plan (docs/deploy/RENDER.md §6); set it only when pg_stat_activity gets tight | `DATABASE_POOL_SIZE` |
 | default on (warm the recall embedder at boot) | `MEMORY_WARM_AT_BOOT` |
 | the latency battery (scripts/verify/latency.mts) only; never read by the app | `LATENCY_RUNS`, `LATENCY_SLACK`, `LATENCY_STRICT`, `LATENCY_ASSERT`, `LATENCY_BASE_URL`, `LATENCY_PORT`, `LATENCY_DEV`, `LATENCY_LOG_DIR`, `LATENCY_APP_DATABASE_URL` |
+| default 3 (bounded 1-6 and by the recorder's browser slots) fits the worker; set it only to tune | `PANEL_MAX_PARALLEL_PERSONAS` |
+| dev and test only: the deterministic FAKE panel model; refused when NODE_ENV=production | `PANEL_FAKE_MODEL` |
 | dev, test or demo only; never in production | `E2E_BASE_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_EDITOR_EMAIL`, `SMOKE_APP_DATABASE_URL`, `SMOKE_PORT_A`, `SMOKE_PORT_B`, `SMOKE_GRACE_MS`, `SMOKE_REAL_S3`, `SMOKE_SKIP_WORKER`, `E2E_MOCK_OAUTH`, `SEED_EMAIL`, `MEMORY_TEST_MODE`, `GRAPH_WEBHOOK_TEST_SECRETS`, `OPS_SCRATCH`, `EVAL_HUMAN`, `EVAL_RESULTS_PATH`, `EVAL_WORKSPACE_ID`, `HOME`, `FONTCONFIG_FILE`, `FAKE_MESSAGING_SECRET`, `FAKE_MAIL_SECRET`, `FAKE_CALLRAIL_SECRET`, `FAKE_TELEPHONY_SECRET` |
 | opt-in live smoke tests (scripts/live, GitHub secrets); never read by the app | `LIVE_ONLY`, `LIVE_DEPLOY_WRITE`, `LIVE_GITHUB_TOKEN`, `LIVE_GITHUB_REPO`, `LIVE_GITHUB_BRANCH`, `LIVE_WORDPRESS_URL`, `LIVE_WORDPRESS_USER`, `LIVE_WORDPRESS_APP_PASSWORD`, `LIVE_WEBFLOW_TOKEN`, `LIVE_WEBFLOW_SITE_ID`, `LIVE_VERCEL_TOKEN`, `LIVE_VERCEL_TEAM_ID`, `LIVE_VERCEL_PROJECT`, `LIVE_CLOUDFLARE_TOKEN`, `LIVE_CLOUDFLARE_ACCOUNT_ID`, `LIVE_CLOUDFLARE_PROJECT`, `LIVE_NETLIFY_TOKEN`, `LIVE_NETLIFY_SITE_ID`, `LIVE_ANTHROPIC_API_KEY`, `LIVE_ANTHROPIC_MODEL` |
 
@@ -502,7 +504,7 @@ Notes are co-edited live through a Hocuspocus (yjs WebSocket) server, `scripts/c
 - **Database**: `plan: 2c-8g` → `4c-16g` (400 connections). Read replicas and high availability (`highAvailability: enabled`, Pro workspace) when uptime needs it.
 - **Long requests**: Render allows HTTP responses up to 100 minutes ([Render vs Vercel](https://render.com/docs/render-vs-vercel-comparison)); Cloudflare closes a proxied connection idle for ~100 s, which the SSE heartbeats (every 15 s) prevent.
 - **Shutdown**: `maxShutdownDelaySeconds` is 120 s on web and 300 s (the maximum) on worker: Render sends SIGTERM, waits, then SIGKILL ([deploys](https://render.com/docs/deploys#graceful-shutdown)).
-- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check), plus extra swap (`scripts/ci/add-swap.sh`) because the compile peaks at ~10 GB: past 8 GB it pages out instead of killing the runner, at some cost in build time. If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
+- **Build capacity**: images build on a standard GitHub runner (2 CPUs, 8 GB, 14 GB SSD for a private repo: [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)) with the CI memory settings (`LOW_MEMORY_BUILD=1` in `docker-bake.hcl`: no Turbopack source maps or disk cache, no second type check), plus extra swap (`scripts/ci/add-swap.sh`) because the compile peaks at ~10–14 GB: past 8 GB it pages out instead of killing the runner, at some cost in build time. If the build outgrows it: a larger runner (GitHub Team or Enterprise), or a Render Docker build of the `runner` target with a Performance build pipeline, or CodeBuild on AWS. Production stack traces need source maps: set `LOW_MEMORY_BUILD=""` once the runner has ~13 GB.
 
 ## 15. HIPAA, and when to move to AWS
 

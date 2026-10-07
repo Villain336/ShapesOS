@@ -264,7 +264,7 @@ export async function editPersona(actor: PanelActor, id: string, edits: PersonaE
   }
   if (edits.sourceTranscriptIds && spec.sourceTranscriptIds.length > 0) await interviewChars(actor, spec.sourceTranscriptIds);
   const updated = await scoped(actor, (tx) =>
-    tx.panelPersona.update({ where: { id: row.id }, data: { spec, name: spec.identity.name.slice(0, 120), sourceTranscriptIds: spec.sourceTranscriptIds, calibrated: isCalibratedSpec(spec), editedBy: actor.userId, editedAt: new Date() } }),
+    tx.panelPersona.update({ where: { id: row.id, workspaceId: actor.workspaceId }, data: { spec, name: spec.identity.name.slice(0, 120), sourceTranscriptIds: spec.sourceTranscriptIds, calibrated: isCalibratedSpec(spec), editedBy: actor.userId, editedAt: new Date() } }),
   );
   return personaView(updated);
 }
@@ -273,7 +273,7 @@ export async function editPersona(actor: PanelActor, id: string, edits: PersonaE
 export async function setPersonaStatus(actor: PanelActor, id: string, status: "active" | "vetoed"): Promise<PersonaView> {
   await gate(actor, "editor");
   const row = await personaRow(actor, id);
-  const updated = await scoped(actor, (tx) => tx.panelPersona.update({ where: { id: row.id }, data: { status, editedBy: actor.userId, editedAt: new Date() } }));
+  const updated = await scoped(actor, (tx) => tx.panelPersona.update({ where: { id: row.id, workspaceId: actor.workspaceId }, data: { status, editedBy: actor.userId, editedAt: new Date() } }));
   return personaView(updated);
 }
 
@@ -447,7 +447,7 @@ export async function startPageWalk(actor: PanelActor, input: StartPageWalkInput
     }),
   );
   const jobId = await deps.enqueueRun(actor.workspaceId, row.id);
-  const withJob = await scoped(actor, (tx) => tx.panelRun.update({ where: { id: row.id }, data: { jobId } }));
+  const withJob = await scoped(actor, (tx) => tx.panelRun.update({ where: { id: row.id, workspaceId: actor.workspaceId }, data: { jobId } }));
   return runView(withJob);
 }
 
@@ -594,6 +594,6 @@ export async function recordLaunch(actor: PanelActor, runId: string, input: { co
     absError: Math.abs(cmp.delta),
     enteredBy: actor.userId,
   };
-  const saved = await scoped(actor, (tx) => tx.panelCalibration.upsert({ where: { runId }, create: { workspaceId: actor.workspaceId, runId, ...data }, update: data }));
+  const saved = await scoped(actor, (tx) => tx.panelCalibration.upsert({ where: { runId, workspaceId: actor.workspaceId }, create: { workspaceId: actor.workspaceId, runId, ...data }, update: data }));
   return { calibration: calibrationView(saved), summary: await calibrationSummary(actor) };
 }
