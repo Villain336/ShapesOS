@@ -40,6 +40,10 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "share_file_externally", label: "Share a file by link", description: "Create a share link to a workspace file (view-only or download, expiring)." },
   // Phase 19B (WS=panel): Dress Rehearsal — a page walk uses credits under its hard cap (Tier 2).
   { action: "run_page_walk", label: "Run a Dress Rehearsal page walk", description: "Synthetic personas walk a page and report; uses credits up to the hard cap set for the run." },
+  // Phase 19B (WS=engine): Dress Rehearsal town — a town run uses credits under
+  // its hard cap; "do this for real" for a launch change that moves no money (Tier 2).
+  { action: "start_town_rehearsal", label: "Run a Dress Rehearsal town", description: "Simulated residents meet a launch scenario over days; uses credits up to the hard cap set for the run." },
+  { action: "apply_launch_change", label: "Do a rehearsed launch change for real", description: "Record a launch change rehearsed in the town (price, hours, promotion, product drop, new location) as an approved plan." },
   // Tier 2: significant — external audience or above the threshold. Asks
   // unless a rule says Auto-run (Phase 14).
   { action: "publish_external", label: "Publish externally", description: "Publish to audiences you don't own." },
@@ -51,6 +55,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "sign_contract", label: "Sign contract", description: "Sign or execute any contract or agreement." },
   { action: "delete_campaign_data", label: "Delete campaign data", description: "Delete or purge campaign data." },
   { action: "issue_refund", label: "Issue refund", description: "Move money back to a customer." },
+  // Phase 19B (WS=engine): a town-rehearsed ad campaign done for real spends real ad budget.
+  { action: "spend_launch_ad_budget", label: "Fund a rehearsed ad campaign", description: "Spend real ad budget on a campaign rehearsed in the town. Money: never automated." },
   // Phase 5: the agent tool actions per-agent rules can switch to auto.
   // Drafts, audits, reports and research are Tier 0; they still cost
   // compute, so they ask until a rule says otherwise.
