@@ -164,6 +164,17 @@ export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] =
 ];
 
 /**
+ * Phase 18.3: per-person rows in FORCE-RLS tables keyed on the person GUC
+ * alone (no workspace): deleted once the subject is the GUC.
+ */
+export const PERSONAL_USER_RLS_TABLES: readonly { table: string; column: string }[] = [
+  // WS=trust — the session registry (lib/auth/sessions.ts): every sign-in of the person.
+  { table: "user_sessions", column: "user_id" },
+  // WS=flow — Web Push subscriptions (lib/push/web.ts).
+  { table: "push_subscriptions", column: "user_id" },
+];
+
+/**
  * Tables whose person references are kept as they are:
  *   workspaces / workspace_members  handled explicitly (ownership, membership)
  *   workspace_lifecycle_events      the platform's own record of who created
@@ -175,7 +186,12 @@ export const KEEP_REFERENCES: readonly string[] = ["workspaces", "workspace_memb
 
 /** Columns pseudonymized on account deletion (catalog-driven; pure). */
 export function pseudonymizeTargets(catalog: Catalog): { table: string; columns: string[]; rls: boolean }[] {
-  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
+  const skip = new Set([
+    ...PERSONAL_TABLES.map((p) => p.table),
+    ...PERSONAL_RLS_TABLES.map((p) => p.table),
+    ...PERSONAL_USER_RLS_TABLES.map((p) => p.table),
+    ...KEEP_REFERENCES,
+  ]);
   const out: { table: string; columns: string[]; rls: boolean }[] = [];
   for (const name of [...catalog.keys()].sort()) {
     if (skip.has(name)) continue;
@@ -303,6 +319,12 @@ export async function deleteAccount(opts: {
       }
       // Phase 18.1: owner-only tables answer only to their member (app.user_id).
       await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
+      // Phase 18.3: person-only FORCE-RLS tables (no workspace): the session
+      // registry and Web Push subscriptions, deleted once with the person GUC set.
+      for (const p of PERSONAL_USER_RLS_TABLES) {
+        if (!catalog.has(p.table)) continue;
+        personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
+      }
       for (const p of PERSONAL_RLS_TABLES) {
         if (!catalog.has(p.table)) continue;
         for (const ws of scopeWorkspaces) {

@@ -72,6 +72,15 @@ export const CRON_JOBS: readonly CronJob[] = [
   },
 
   // --- Every 5–15 minutes -------------------------------------------------
+  {
+    // Phase 18.3 (WS=trust): meetings starting, the email digest, the agent-written summary.
+    key: "notifications",
+    path: "/api/cron/notifications",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "New in Phase 18.3. Meeting reminders look 10 minutes ahead, so a 5-minute sweep reaches every meeting at least once before it starts (each occurrence notifies once by dedup key); the digest and summary are once-a-day per person and skip until the person's morning.",
+    timeoutMs: SHORT,
+  },
   { key: "newsletter", path: "/api/cron/newsletter", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "social", path: "/api/cron/social", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "ads", path: "/api/cron/ads", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
@@ -285,6 +294,15 @@ export const CRON_JOBS: readonly CronJob[] = [
   { key: "zernio-accounts", path: "/api/cron/zernio-accounts", cron: "30 2 1 * *", source: "deploy", timeoutMs: LONG },
   // Phase 15.4 (zernio): daily ad-report pull (last 7 days) into ad_reports.
   { key: "zernio-ads-reports", path: "/api/cron/zernio-ads-reports", cron: "40 5 * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 18.3 (WS=flow): Time Machine — scheduled workspace snapshots.
+  {
+    key: "snapshots",
+    path: "/api/cron/snapshots",
+    cron: "17 * * * *",
+    source: "picked",
+    note: "Hourly: a workspace's daily / weekly snapshot is taken within the hour it falls due (lib/timemachine/snapshots.ts snapshotDue). Off the :00 rush.",
+    timeoutMs: LONG,
+  },
 ];
 
 const parsed = new Map<string, CronSchedule>();

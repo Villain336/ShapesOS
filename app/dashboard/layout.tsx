@@ -59,6 +59,11 @@ import { getI18n } from "@/lib/i18n/server";
 import { getShellState } from "@/lib/preferences/server";
 // Phase 18.2 (WS=content): Notes quick capture (⌥⇧N from anywhere).
 import { QuickCapture } from "@/components/notes/QuickCapture";
+// Phase 18.3 (WS=flow): offline mode (service worker, read cache, queued
+// safe writes) and the share sheet's dialog for ⌘K "Share…".
+import { createHash } from "node:crypto";
+import { OfflineProvider } from "@/components/offline/OfflineProvider";
+import { ShareSheetHost } from "@/components/share/ShareSheetHost";
 
 export default async function DashboardLayout({
   children,
@@ -140,6 +145,8 @@ export default async function DashboardLayout({
   );
 
   const [{ t }, shellState] = await Promise.all([getI18n(), getShellState()]);
+  // Phase 18.3 (WS=flow): the service worker's per-person cache key (a hash, never the id).
+  const offlineKey = createHash("sha256").update(`shapes-offline:${user.id}`).digest("hex").slice(0, 32);
 
   if (pane) {
     // Phase 18.1 (WS=desk): a split-view pane — no sidebar / top bar; the
@@ -151,6 +158,7 @@ export default async function DashboardLayout({
           <CommandBar workspaceId={workspace.id} />
           <NewTaskDialog />
           <QuickCapture />
+          <ShareSheetHost role={role} workspaceId={workspace.id} />
           <FeedbackHost />
           <RecentsTracker />
           <PaneBridge initialOverrides={prefs.shortcuts} />
@@ -175,6 +183,8 @@ export default async function DashboardLayout({
         <CommandBar workspaceId={workspace.id} />
         <NewTaskDialog />
         <QuickCapture />
+        <ShareSheetHost role={role} workspaceId={workspace.id} />
+        <OfflineProvider userKey={offlineKey} workspaceId={workspace.id} />
         <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />

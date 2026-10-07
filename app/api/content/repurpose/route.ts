@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     // Phase 13B: episode capture — fail-soft, never breaks the response.
     void captureEpisode({
       workspaceId: workspace.id,
+      userId: user.id, // Phase 18.3: what agents remember from this person's work
       agentId: "content-brief",
       promptSummary: `Repurpose "${body.topic ?? ""}" as ${format.id}`,
       outputSummary: `Repurposed asset generated (${result.asset?.length ?? 0} chars, ${result.sources?.length ?? 0} sources).`,

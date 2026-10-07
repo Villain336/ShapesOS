@@ -17,7 +17,7 @@ export async function generateMetadata() {
   return { title: `${t("comms.mail.title")} — ShapesOS`, description: t("comms.mail.metaDescription") };
 }
 
-export default async function MailPage({ searchParams }: { searchParams: Promise<{ thread?: string; compose?: string; to?: string }> }) {
+export default async function MailPage({ searchParams }: { searchParams: Promise<{ thread?: string; compose?: string; to?: string; subject?: string; body?: string }> }) {
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -28,7 +28,16 @@ export default async function MailPage({ searchParams }: { searchParams: Promise
     <MailApp
       canEdit={roleAtLeast(me.role, "editor")}
       initialThread={typeof sp.thread === "string" ? sp.thread.slice(0, 900) : null}
-      initialCompose={sp.compose === "1" ? { to: typeof sp.to === "string" ? sp.to.slice(0, 300) : null } : null}
+      initialCompose={
+        sp.compose === "1"
+          ? {
+              to: typeof sp.to === "string" ? sp.to.slice(0, 300) : null,
+              // Phase 18.3 (WS=flow): the share sheet's "Send to → Mail" prefills a new message.
+              subject: typeof sp.subject === "string" ? sp.subject.slice(0, 200) : null,
+              body: typeof sp.body === "string" ? sp.body.slice(0, 4000) : null,
+            }
+          : null
+      }
     />
   );
 }

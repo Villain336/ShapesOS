@@ -97,7 +97,9 @@ describe("notifications (DB)", () => {
 
     const ok = await createAgentRun({ workspaceId: WS, kind: "browser", startedBy: VIEWER });
     await finishAgentRun(WS, ok.id, "succeeded");
-    assert.equal(await prisma.notification.count({ where: { sourceId: ok.id } }), 0);
+    assert.equal(await prisma.notification.count({ where: { sourceId: ok.id, kind: "run_failed" } }), 0);
+    // Phase 18.3 (WS=trust): a member's finished run now says so (run_finished, once).
+    assert.deepEqual((await prisma.notification.findMany({ where: { sourceId: ok.id } })).map((r) => [r.userId, r.kind]), [[VIEWER, "run_finished"]]);
   });
 
   it("a claimed invite notifies the owners and admins", async () => {

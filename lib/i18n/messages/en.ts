@@ -11,6 +11,10 @@
 import { commsEn } from "./comms.en";
 // Phase 18.2 (WS=content): the core apps' strings live in their own file.
 import { contentEn } from "./content.en";
+// Phase 18.3 (WS=trust): system services strings live in their own file.
+import { trustEn } from "./trust.en";
+// Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
+import { flowEn } from "./flow.en";
 
 export const en = {
   common: {
@@ -122,6 +126,9 @@ export const en = {
       "/dashboard/activity": { label: "Activity monitor", description: "Every run, job and sandbox: cost, time, Stop" },
       "/dashboard/terminal": { label: "Terminal", description: "A shell on a workspace sandbox" },
       "/dashboard/store": { label: "Store", description: "Install apps, skills, templates and connectors" },
+      // Phase 18.3 (WS=flow)
+      "/dashboard/automations": { label: "Automations", description: "Every schedule, workflow and rule in one list" },
+      "/dashboard/time-machine": { label: "Time machine", description: "Snapshots, versions and undoing an agent run" },
       // Phase 18.1 (integration): the desk's ⌘K system actions (lib/nav/config NAV_SYSTEM_ACTIONS).
       "/dashboard/switch": { label: "Switch app", description: "Jump to a recent app or record (⌃Tab)" },
       "/dashboard/split": { label: "Split view", description: "Two pages side by side, or a page next to the Assistant" },
@@ -188,6 +195,11 @@ export const en = {
       mention: "Mentions",
       direct_message: "Direct messages",
       reminder_due: "Reminders",
+      // Phase 18.3 (WS=trust)
+      run_finished: "Finished runs",
+      invoice_paid: "Invoices paid",
+      ticket_assigned: "Tickets",
+      meeting_starting: "Meetings",
     },
   },
 
@@ -239,6 +251,9 @@ export const en = {
       media: "Media buy",
       mail: "Direct mail",
       social: "Social post",
+      // Phase 18.3 (WS=trust)
+      autopilot: "Autopilot",
+      workflow: "Workflow",
     },
   },
 
@@ -390,6 +405,17 @@ export const en = {
       integrations: "Integrations",
       brand: "Brand",
       developer: "Developer",
+      // Phase 18.3 (WS=trust)
+      privacy: "Privacy and security",
+    },
+    // Phase 18.3 (WS=trust): the two halves and settings search.
+    halves: { you: "You", workspace: "Workspace" },
+    search: {
+      label: "Search settings",
+      placeholder: "Search settings",
+      results: "{count, plural, =0 {No settings match} one {# setting} other {# settings}}",
+      empty: "No settings match \u201c{query}\u201d. Try another word.",
+      clear: "Clear search",
     },
     pages: {
       "/dashboard/settings/you": { label: "General", description: "Your name, time zone and how ShapesOS starts." },
@@ -426,6 +452,13 @@ export const en = {
       "/dashboard/settings/webhooks": { label: "Webhooks", description: "Signed events to your own endpoints, with a delivery log." },
       "/dashboard/settings/experiments": { label: "Experiments", description: "Feature flags and growth experiments." },
       "/dashboard/settings/design": { label: "Design kit", description: "Every Agentic OS component in every state, next to the kit renders." },
+      // Phase 18.3 (WS=trust)
+      "/dashboard/settings/you/keyboard": { label: "Keyboard", description: "Every shortcut, and the keys you changed." },
+      "/dashboard/settings/you/privacy": { label: "Privacy", description: "Where you're signed in, what agents read for you, and what they remember." },
+      "/dashboard/settings/security-center": { label: "Security center", description: "One timeline of everything people and agents did, across every audit trail." },
+      "/dashboard/settings/security-center/apps": { label: "Agent app access", description: "Which apps agents may use in this workspace." },
+      "/dashboard/settings/security-center/data-access": { label: "Data access log", description: "Which agent read which app's data, and when." },
+      "/dashboard/settings/security-center/memory": { label: "Memory controls", description: "See and forget what agents remember about this workspace." },
     },
   },
 
@@ -502,6 +535,11 @@ export const en = {
         mention: "Mentions of you",
         direct_message: "Direct messages",
         reminder_due: "Reminders due",
+        // Phase 18.3 (WS=trust)
+        run_finished: "Runs finished",
+        invoice_paid: "Invoices paid",
+        ticket_assigned: "Tickets assigned to you",
+        meeting_starting: "Meetings starting",
       },
       workspaceDefaults: "Workspace-wide defaults are in Workspace → Notifications.",
     },
@@ -955,6 +993,11 @@ export const en = {
 
   // Phase 18.2 (WS=content): Notes, Files, collaboration, Activity Monitor, Terminal, Store.
   ...contentEn,
+
+  // Phase 18.3 (WS=trust): Settings → You (Keyboard, Privacy), the Privacy & Security center, Notifications 2.0.
+  trust: trustEn,
+  // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
+  flow: flowEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

@@ -182,6 +182,13 @@ export const TABLE = [
   ["GITHUB_APP_PRIVATE_KEY", { cls: "paste", group: S, why: "PEM with \\n escapes" }],
   ["EXPO_ACCESS_TOKEN", { cls: "paste", group: S }],
   ["PUSH_PROVIDER", { cls: "paste", group: S, why: "expo, once the mobile app ships" }],
+  // Phase 18.3 (WS=flow): Web Push (lib/push/vapid.ts). One key pair for the
+  // whole deployment; unset = Web Push off and Settings says why.
+  ["VAPID_PUBLIC_KEY", { cls: "paste", group: S, why: "generateVapidKeys() in lib/push/vapid.ts (see .env.example)" }],
+  ["VAPID_PRIVATE_KEY", { cls: "paste", group: S, why: "the pair's private half" }],
+  ["VAPID_SUBJECT", { cls: "paste", group: S, why: "mailto: or https: contact for the push services" }],
+  ["WEB_PUSH_EXTRA_HOSTS", { cls: "exclude", why: "only for a self-hosted push service" }],
+  ["SNAPSHOT_MAX_MB", { cls: "exclude", why: "default 256 is right" }],
   ["LIVEKIT_URL", { cls: "paste", group: S }],
   ["LIVEKIT_API_KEY", { cls: "paste", group: S }],
   ["LIVEKIT_API_SECRET", { cls: "paste", group: S }],
@@ -401,7 +408,7 @@ export const TABLE = [
   ["RENDER_POSTGRES_ID", { cls: "service", why: "shapesos-backup cron job (sync: false)" }],
 
   // --- local disk paths: hosted files go to R2 (MARKETR_STORAGE=s3) ------
-  ...["FIX_SNAPSHOT_DIR", "REPORT_STORAGE_DIR", "SITE_STORAGE_DIR", "AUDIO_BRIEF_STORAGE_DIR", "EDDM_BRIEF_STORAGE_DIR", "IO_BRIEF_STORAGE_DIR", "LAUNCH_PACKET_STORAGE_DIR", "SITEMAP_STORAGE_DIR", "SANDBOX_SNAPSHOT_DIR", "CORPUS_DIR", "CC_GRAPH_DIR"].map(
+  ...["FIX_SNAPSHOT_DIR", "SNAPSHOT_STORAGE_DIR", "REPORT_STORAGE_DIR", "SITE_STORAGE_DIR", "AUDIO_BRIEF_STORAGE_DIR", "EDDM_BRIEF_STORAGE_DIR", "IO_BRIEF_STORAGE_DIR", "LAUNCH_PACKET_STORAGE_DIR", "SITEMAP_STORAGE_DIR", "SANDBOX_SNAPSHOT_DIR", "CORPUS_DIR", "CC_GRAPH_DIR"].map(
     (k) => [k, { cls: "exclude", why: "local disk path; on hosted, files live in shared object storage (MARKETR_STORAGE=s3)" }],
   ),
 

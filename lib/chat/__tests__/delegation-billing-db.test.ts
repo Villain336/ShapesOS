@@ -8,6 +8,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { AgentWorker } from "@/lib/agents/queue/worker";
@@ -33,6 +34,7 @@ before(async () => {
 });
 
 after(async () => {
+  await settleBackgroundWork(); // usage records and run events land in the background
   await model.close();
   await prisma.workspace.deleteMany({ where: { id: WS } });
   await prisma.$disconnect();

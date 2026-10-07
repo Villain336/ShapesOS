@@ -13,6 +13,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { prisma } from "@/lib/prisma";
 import { countWithoutScope, withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { recordSlackInstall, routeSlackTeam, SlackInstallConflictError } from "../install";
@@ -37,6 +38,7 @@ before(async () => {
 });
 
 after(async () => {
+  await settleBackgroundWork();
   for (const id of [WS_A, WS_B]) await prisma.workspace.deleteMany({ where: { id } });
   await prisma.$disconnect();
 });

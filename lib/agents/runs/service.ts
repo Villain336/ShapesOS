@@ -19,7 +19,7 @@ import type {
   AgentRunEventInput,
 } from "./types";
 import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
-import { notifyAgentRunFailed } from "@/lib/notifications/producers";
+import { notifyAgentRunFailed, notifyRunFinished } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
 import { publishRunEvent } from "./live-events";
 import { HttpError } from "@/lib/api/errors";
@@ -229,6 +229,18 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
       runId: run.id,
       kind: run.kind,
       startedBy: run.startedBy,
+    });
+  } else if (status === "succeeded") {
+    // Phase 18.3 (WS=trust): "run finished" → the member who started it
+    // (top-level runs; a quick chat turn the person watched doesn't count).
+    await notifyRunFinished({
+      workspaceId,
+      runId: run.id,
+      kind: run.kind,
+      startedBy: run.startedBy,
+      parentRunId: run.parentRunId,
+      createdAt: run.createdAt,
+      endedAt: run.endedAt,
     });
   }
   return run;

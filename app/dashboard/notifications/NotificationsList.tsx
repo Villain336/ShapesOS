@@ -30,6 +30,7 @@ import { toast, toastError } from "@/lib/ui/feedback";
 // bodies are generated per notification and stay as written).
 import { useI18n } from "@/components/i18n/I18nProvider";
 import type { Translator } from "@/lib/i18n";
+import { sendSafeWrite } from "@/lib/offline/client";
 
 const PAGE = 30;
 
@@ -106,14 +107,12 @@ export default function NotificationsList() {
   }
 
   async function markRead(payload: { ids: string[] } | { all: true }) {
-    const res = await fetch("/api/notifications/read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? t("notifications.updateError"));
-    setUnread(body.unread);
+    // Phase 18.3 (WS=flow): offline, "mark read" is queued (idempotent) and
+    // sent when the connection returns (lib/offline/queue.ts).
+    const out = await sendSafeWrite("notifications_read", payload);
+    if (out.status === "error") throw new Error(out.error || t("notifications.updateError"));
+    if (out.status === "sent") setUnread(Number(out.data.unread) || 0);
+    else setUnread((u) => ("all" in payload ? 0 : Math.max(0, u - payload.ids.length)));
     const now = new Date().toISOString();
     setItems((prev) =>
       unreadOnly && "all" in payload

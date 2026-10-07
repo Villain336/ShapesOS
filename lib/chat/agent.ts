@@ -1281,11 +1281,14 @@ registerCodeTools();
 export async function threadTaskProfile(threadId: string): Promise<{ agentKey: AgentKey; grant: ToolGroup[] }> {
   const t = await prisma.aiChatThread.findUnique({
     where: { id: threadId },
-    select: { agentKey: true, allowedTools: true },
+    select: { agentKey: true, allowedTools: true, project: { select: { workspaceId: true } } },
   });
   const agentKey: AgentKey = t && isAgentKey(t.agentKey) ? t.agentKey : "lead";
+  // Phase 18.3 (WS=trust): the workspace's agent app permissions narrow it.
+  const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");
+  const blockedGroups = t?.project?.workspaceId ? await getAgentBlockedGroups(t.project.workspaceId) : [];
   // Re-computed every turn: a stored grant can never outgrow the agent.
-  const grant = computeGrant({ agentKey, requested: t?.allowedTools ?? [] }).groups;
+  const grant = computeGrant({ agentKey, requested: t?.allowedTools ?? [], blockedGroups }).groups;
   // Phase 8: no sandbox provider → the code tools are off for this turn (the
   // model never sees tools that can only refuse, and the turn isn't build
   // mode). Delegated children inherit the narrowed grant.

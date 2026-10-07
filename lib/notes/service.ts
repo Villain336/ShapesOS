@@ -319,6 +319,18 @@ export async function getNote(actor: NoteActor, id: string): Promise<NoteDetail 
   return row ? toDetail(row, actor) : null;
 }
 
+/**
+ * Phase 18.3 (WS=flow): the note this person already made from one offline
+ * write carrying a client id (sourceRef "client:<clientId>"), so a replayed create returns it
+ * instead of writing a second note (lib/offline/queue.ts).
+ */
+export async function findOwnNoteBySourceRef(actor: NoteActor, sourceRef: string): Promise<NoteDetail | null> {
+  const row = await withWorkspaceScope(actor.workspaceId, (tx) =>
+    tx.univerDoc.findFirst({ where: { workspaceId: actor.workspaceId, kind: NOTE_KIND, createdBy: actor.userId, sourceRef }, select: NOTE_SELECT }),
+  );
+  return row ? toDetail(row as NoteRow, actor) : null;
+}
+
 export interface ListNotesOptions {
   q?: string | null;
   pinned?: boolean;

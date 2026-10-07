@@ -14,6 +14,7 @@
 import "dotenv/config";
 import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
@@ -53,6 +54,7 @@ before(async () => {
 
 after(async () => {
   await flushUsageRecording();
+  await settleBackgroundWork();
   await model.close();
   await prisma.workspace.deleteMany({ where: { id: WS } });
   await prisma.$disconnect();

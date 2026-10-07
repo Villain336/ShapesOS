@@ -28,9 +28,13 @@ import {
   type PreferenceKey,
   type PreferencesPatch,
   type UserPreferences,
+  type UserPreferencesInput,
 } from "./schema";
 
 export * from "./schema";
+// Phase 18.3 (WS=trust): the channel matrix every delivery checks.
+import { channelAllows } from "@/lib/notifications/channels";
+import type { NotificationChannel } from "./schema";
 
 export class PreferenceError extends Error {
   readonly status = 400;
@@ -39,7 +43,7 @@ export class PreferenceError extends Error {
 /** The narrow interface WS=desk (and later 19A) import. */
 export interface UserPrefs {
   getUserPreferences(userId: string): Promise<UserPreferences>;
-  setUserPreference<K extends PreferenceKey>(userId: string, key: K, value: UserPreferences[K]): Promise<UserPreferences>;
+  setUserPreference<K extends PreferenceKey>(userId: string, key: K, value: UserPreferencesInput[K]): Promise<UserPreferences>;
 }
 
 type PrefDb = Pick<Prisma.TransactionClient, "userPreference">;
@@ -124,7 +128,7 @@ export async function setUserPreferences(userId: string, patch: unknown, db: Pre
 export async function setUserPreference<K extends PreferenceKey>(
   userId: string,
   key: K,
-  value: UserPreferences[K],
+  value: UserPreferencesInput[K],
   db: PrefDb = prisma,
 ): Promise<UserPreferences> {
   if (!isPreferenceKey(key)) throw new PreferenceError(`Unknown preference "${String(key)}"`);
@@ -141,11 +145,13 @@ export const userPrefs: UserPrefs = {
 
 /**
  * Keep the notification inputs whose recipient allows this channel and kind
- * (lib/notifications/producers.ts calls it for the bell, then for push).
+ * (lib/notifications/producers.ts calls it for the bell, then for each
+ * delivery channel). Phase 18.3: every channel of the matrix
+ * (lib/notifications/channels.ts).
  */
 export async function filterByNotificationPrefs<T extends { userId: string; kind: string }>(
   inputs: readonly T[],
-  channel: "inApp" | "push",
+  channel: NotificationChannel,
   db: PrefDb = prisma,
 ): Promise<T[]> {
   if (inputs.length === 0) return [];
@@ -163,7 +169,7 @@ export async function filterByNotificationPrefs<T extends { userId: string; kind
  */
 export async function recipientsAllowing(
   userIds: readonly string[],
-  channel: "inApp" | "push",
+  channel: NotificationChannel,
   kind: string,
   db: PrefDb = prisma,
 ): Promise<Set<string>> {
@@ -171,12 +177,17 @@ export async function recipientsAllowing(
   if (all.size === 0) return all;
   try {
     const rows = await db.userPreference.findMany({ where: { userId: { in: [...all] } } });
-    for (const row of rows) {
-      const p = rowToPreferences(row);
-      if (!p.notifications[channel] || (p.notifications.mutedKinds as string[]).includes(kind)) all.delete(row.userId);
+    const byUser = new Map(rows.map((r) => [r.userId, rowToPreferences(r)]));
+    // Phase 18.3: people with no saved preferences get the defaults (the
+    // opt-in channels — Web Push, email digest, Slack — are off for them).
+    for (const userId of [...all]) {
+      const p = byUser.get(userId) ?? DEFAULT_PREFERENCES;
+      if (!channelAllows(p.notifications, kind, channel)) all.delete(userId);
     }
   } catch {
-    // fail open: deliver
+    // Fail open for the bell and phone push (a preference lookup must never
+    // swallow an approval request); fail closed for the opt-in channels.
+    if (channel !== "inApp" && channel !== "push") return new Set();
   }
   return all;
 }

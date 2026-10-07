@@ -30,7 +30,9 @@ import {
   type ToolDef,
   type ToolResult,
 } from "./tools";
-import { TOOL_GROUP_LABELS, agentDisplayName, isAgentKey } from "@/lib/agents/grants";
+import { TOOL_GROUP_LABELS, agentDisplayName, isAgentKey, isGroupBlocked, type ToolGroup } from "@/lib/agents/grants";
+// Phase 18.3 (WS=trust): agent app permissions (the workspace's blocked apps).
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { autoApprovalFor } from "@/lib/automation/policy";
 import { appendAgentRunEvent, isAgentRunCancelRequested } from "@/lib/agents/runs/service";
 import { abortRun, isRunStopped } from "@/lib/agents/runs/abort";
@@ -210,6 +212,17 @@ export async function executeTool(
       .join(", ")}`;
     return null;
   }
+  // Phase 18.3 (WS=trust): an app the workspace blocked for agents is refused
+  // whatever the task's grant says (the grant already leaves it out; this is
+  // the backstop, and it also covers calls with no task grant at all).
+  if (await blockedForAgents(ctx, toolGroup(tool.name))) {
+    const group = toolGroup(tool.name);
+    call.status = "denied";
+    call.resultSummary = blockedSummary(group, tool.name);
+    await auditToolExecution(ctx, tool, `DENIED (agents may not use ${TOOL_GROUP_LABELS[group]} in this workspace)`);
+    await runEvent(ctx, `Refused ${tool.name}: ${TOOL_GROUP_LABELS[group]} is blocked for agents`, { kind: "tool_result", tool: tool.name, group, status: "denied", reason: "app_blocked", ...ids }, "gate");
+    return null;
+  }
   // Phase 5: the task's tool grant, checked before anything runs. The model
   // only ever sees granted tools, so this is the backstop for a model that
   // names a tool anyway.
@@ -274,6 +287,8 @@ export async function executeTool(
       ...ids,
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
+      // Phase 18.3 (WS=flow): what it wrote, for "Undo this agent run".
+      ...(result.touched?.length ? { touched: result.touched.slice(0, 20) } : {}),
       ...(hit ? { cached: true } : {}),
       // Phase 8: the tool recorded its own timeline event (ship / browser
       // tools); this one only feeds the live stream (isStreamEvent hides it).
@@ -292,6 +307,17 @@ export async function executeTool(
     await runEvent(ctx, `${tool.name} failed: ${call.resultSummary}`, { kind: "tool_result", tool: tool.name, status: "error", ...ids });
     return null;
   }
+}
+
+/** Phase 18.3: is this group blocked for agents in the call's workspace? */
+export async function blockedForAgents(ctx: Pick<ToolContext, "workspaceId">, group: ToolGroup): Promise<boolean> {
+  if (!ctx.workspaceId) return false;
+  return isGroupBlocked(await getAgentBlockedGroups(ctx.workspaceId), group);
+}
+
+/** Phase 18.3: what the model (and the person) is told when an app is blocked. */
+export function blockedSummary(group: ToolGroup, toolName: string): string {
+  return `Agents may not use ${TOOL_GROUP_LABELS[group]} in this workspace (${toolName}). An admin can allow it in Settings → Privacy and security → Agent app access.`;
 }
 
 /** The chat text that asks the user to OK a proposed call. */

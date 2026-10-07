@@ -273,11 +273,14 @@ export function OpsSlideOver({
   title,
   meta,
   onClose,
+  actions,
   children,
 }: {
   title: React.ReactNode;
   meta?: React.ReactNode;
   onClose: () => void;
+  /** Phase 18.3 (WS=flow): header actions (the share sheet) before Close. */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -290,9 +293,12 @@ export function OpsSlideOver({
               <div className="flex items-center gap-2 text-lg font-bold tracking-tight text-ink">{title}</div>
               {meta && <p className="mt-0.5 text-[0.8125rem] text-muted">{meta}</p>}
             </div>
-            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
-              <X size={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {actions}
+              <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         </div>

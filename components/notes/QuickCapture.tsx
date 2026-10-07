@@ -13,6 +13,7 @@ import { Link2, NotebookPen } from "lucide-react";
 import { aosButton } from "@/components/aos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { toast, toastError } from "@/lib/ui/feedback";
+import { sendSafeWrite } from "@/lib/offline/client";
 import { NOTE_CAPTURE_EVENT, notifyNotesChanged, type NoteCaptureDetail } from "./events";
 
 export function QuickCapture() {
@@ -43,15 +44,19 @@ export function QuickCapture() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body, links }),
-    }).catch(() => null);
+    // Phase 18.3 (WS=flow): offline, the note is queued with a client id and
+    // sent once when the connection returns (lib/offline/queue.ts).
+    const out = await sendSafeWrite("note_create", { body, links });
     setSaving(false);
-    const json = (await res?.json().catch(() => ({}))) as { note?: { id: string; title: string }; error?: string } | undefined;
-    if (!res?.ok || !json?.note) {
-      toastError(t("notes.capture.failed"), json?.error);
+    if (out.status === "queued") {
+      setText("");
+      setOpen(false);
+      toast({ title: t("flow.offline.queuedNote") });
+      return;
+    }
+    const json = (out.status === "sent" ? out.data : { error: out.error }) as { note?: { id: string; title: string }; error?: string };
+    if (out.status !== "sent" || !json.note) {
+      toastError(t("notes.capture.failed"), json.error);
       return;
     }
     const note = json.note;

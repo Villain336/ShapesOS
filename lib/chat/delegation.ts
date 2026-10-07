@@ -140,9 +140,12 @@ async function startPlan(ctx: ToolContext, raw: unknown, via: typeof DELEGATE_TA
   if (!split.ok) throw new Error(split.error);
 
   const parentGrant: readonly string[] = ctx.grant ?? AGENT_MAX_GROUPS.lead;
+  const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");
+  const blockedGroups = await getAgentBlockedGroups(ctx.workspaceId);
   const planId = planIdFor(ctx.runId, lctx.toolUseId);
   const tasks: DelegationTaskState[] = v.plan.tasks.map((t) => {
-    const g = computeGrant({ agentKey: t.agent as AgentKey, requested: t.tools ?? null, parentGrant });
+    // Phase 18.3 (WS=trust): never wider than the parent, and minus blocked apps.
+    const g = computeGrant({ agentKey: t.agent as AgentKey, requested: t.tools ?? null, parentGrant, blockedGroups });
     return {
       id: t.id,
       agent: t.agent as DelegationTaskState["agent"],

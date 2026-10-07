@@ -58,11 +58,12 @@ export function executorGroups(executor: ExecutorName): ToolGroup[] {
 }
 
 /** The grant a mission step runs under: its executor's allow-list ∩ the agent's maximum. */
-export function executorGrant(executor: ExecutorName): Grant {
+export function executorGrant(executor: ExecutorName, blockedGroups?: readonly string[] | null): Grant {
   const groups = executorGroups(executor);
   // parentGrant = the allow-list itself (plus the always-granted workspace
   // reads every task gets), so nothing else survives — not even the lead's
   // hand-off ability.
   const ceiling = [...new Set<ToolGroup>([...ALWAYS_GRANTED, ...groups])];
-  return computeGrant({ agentKey: executor, requested: groups, parentGrant: ceiling });
+  // Phase 18.3 (WS=trust): the workspace's agent app permissions, when known.
+  return computeGrant({ agentKey: executor, requested: groups, parentGrant: ceiling, blockedGroups });
 }

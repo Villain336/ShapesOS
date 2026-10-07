@@ -84,6 +84,7 @@ const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/programmatic\/generate$/, // AI page generation
   /^\/api\/autopilot\//, // scheduled fix-agent
   /^\/api\/workflows\/[^/]+\/run$/, // automation / skill execution
+  /^\/api\/automations\/draft$/, // Phase 18.3: "Describe it" (the lead model drafts an automation)
   /^\/api\/(sites|websites)\/[^/]+\/assist$/, // IDE assist (LLM)
   /^\/api\/websites\/generate$/, // site generation (LLM)
   /^\/api\/ads\/creatives\/[^/]+\/regenerate$/, // AI creative regen

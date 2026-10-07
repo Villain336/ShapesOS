@@ -17,6 +17,7 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { prisma } from "@/lib/prisma";
 import { runTrackedAgentTurn } from "../agent";
 import { settleThreadFacts, updateThreadFacts } from "../facts";
@@ -41,6 +42,7 @@ before(async () => {
 
 after(async () => {
   await settleThreadFacts(); // the background facts summaries of the turns above
+  await settleBackgroundWork(); // …and the usage records they wrote (deleting the workspace under them deadlocked on CI)
   await fake.close();
   await prisma.workspace.deleteMany({ where: { id: { in: [WS_A, WS_B] } } });
   await prisma.$disconnect();

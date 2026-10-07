@@ -101,6 +101,12 @@ export interface StoreItem {
   source: "builtin" | "workspace" | "agency";
   /** The installed row's id where the kind has one (skill id, MCP connector id). */
   installedId: string | null;
+  /**
+   * Phase 18.3 (WS=trust): the app (tool group) a connector belongs to and
+   * whether this workspace blocks agents from it (Settings → Privacy and
+   * security → Agent app access). Set by loadStoreCatalogue for connectors.
+   */
+  agentAccess?: { group: string; blocked: boolean } | null;
 }
 
 const TIER_SETTINGS = { smallActionThresholdCents: DEFAULT_SMALL_ACTION_THRESHOLD_CENTS, automationAllows: true, defaultCurrency: "USD" } as const;

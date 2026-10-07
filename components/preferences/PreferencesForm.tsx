@@ -28,9 +28,16 @@ import {
   MOTIONS,
   NOTIFICATION_KINDS,
   THEMES,
+  // Phase 18.3 (WS=trust): Notifications 2.0 channels.
+  EMAIL_DIGESTS,
+  NOTIFICATION_CHANNELS,
+  type EmailDigest,
+  type NotificationChannel,
+  type NotificationKindPref,
   type PreferencesPatch,
   type UserPreferences,
 } from "@/lib/preferences/schema";
+import { cellAvailable, channelOn, kindChannelChoice } from "@/lib/notifications/channels";
 import { SHELL_CLASS_PREFIXES, shellClassNames, shellFrom } from "@/lib/preferences/shell";
 import { formatDate } from "@/lib/i18n/format";
 
@@ -359,55 +366,105 @@ export function NotificationPrefsForm({ initial }: { initial: UserPreferences })
   const { prefs, save, saving } = usePreferences(initial);
   const n = prefs.notifications;
   const kindsId = useId();
+  const put = (patch: Partial<typeof n>) => void save({ notifications: { ...n, ...patch } }, { refresh: false });
+  // Phase 18.3 (WS=trust): kind × channel. A cell is a checkbox; its channel's
+  // switch above (or a muted kind) turns the whole column / row off.
+  const setCell = (kind: NotificationKindPref, channel: NotificationChannel, on: boolean) =>
+    put({ channels: { ...n.channels, [kind]: { ...(n.channels[kind] ?? {}), [channel]: on } } });
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <Row title={t("prefs.notifications.inApp")} help={t("prefs.notifications.inAppHelp")}>
-          {({ labelId, helpId }) => (
-            <Switch checked={n.inApp} labelledBy={labelId} describedBy={helpId} onChange={(inApp) => void save({ notifications: { ...n, inApp } }, { refresh: false })} />
-          )}
+          {({ labelId, helpId }) => <Switch checked={n.inApp} labelledBy={labelId} describedBy={helpId} onChange={(inApp) => put({ inApp })} />}
         </Row>
         <Row title={t("prefs.notifications.push")} help={t("prefs.notifications.pushHelp")}>
           {({ labelId, helpId }) => (
-            <Switch
-              checked={n.inApp && n.push}
-              disabled={!n.inApp}
+            <Switch checked={n.inApp && n.push} disabled={!n.inApp} labelledBy={labelId} describedBy={helpId} onChange={(push) => put({ push })} />
+          )}
+        </Row>
+        <Row title={t("trust.notifications.webPush")} help={t("trust.notifications.webPushHelp")}>
+          {({ labelId, helpId }) => <Switch checked={n.webPush} labelledBy={labelId} describedBy={helpId} onChange={(webPush) => put({ webPush })} />}
+        </Row>
+        <Row title={t("trust.notifications.emailDigest")} help={t("trust.notifications.emailDigestHelp")}>
+          {({ labelId }) => (
+            <Segmented<EmailDigest>
+              value={n.emailDigest}
               labelledBy={labelId}
-              describedBy={helpId}
-              onChange={(push) => void save({ notifications: { ...n, push } }, { refresh: false })}
+              onChange={(emailDigest) => put({ emailDigest })}
+              options={EMAIL_DIGESTS.map((d) => ({ value: d, label: t(`trust.notifications.digest.${d}`) }))}
             />
           )}
+        </Row>
+        <Row title={t("trust.notifications.slack")} help={t("trust.notifications.slackHelp")}>
+          {({ labelId, helpId }) => <Switch checked={n.slack} labelledBy={labelId} describedBy={helpId} onChange={(slack) => put({ slack })} />}
+        </Row>
+        <Row title={t("trust.notifications.summary")} help={t("trust.notifications.summaryHelp")}>
+          {({ labelId, helpId }) => <Switch checked={n.summary} labelledBy={labelId} describedBy={helpId} onChange={(summary) => put({ summary })} />}
         </Row>
       </Card>
       <section aria-labelledby={kindsId} className="rounded-lg bg-paper shadow-hairline">
         <div className="px-4 pt-4 sm:px-5">
           <h2 id={kindsId} className="aos-subheading">
-            {t("prefs.notifications.kinds")}
+            {t("trust.notifications.channelsTitle")}
           </h2>
-          <p className="mt-0.5 text-sm text-muted">{t("prefs.notifications.kindsHelp")}</p>
+          <p className="mt-0.5 text-sm text-muted">{t("trust.notifications.channelsHelp")}</p>
         </div>
-        <div className="mt-2 divide-y divide-line">
-          {NOTIFICATION_KINDS.map((kind) => {
-            const muted = n.mutedKinds.includes(kind);
-            return (
-              <Row key={kind} title={t(`prefs.notifications.kindNames.${kind}`)}>
-                {({ labelId }) => (
-                  <Switch
-                    checked={!muted}
-                    labelledBy={labelId}
-                    onChange={(on) =>
-                      void save(
-                        { notifications: { ...n, mutedKinds: on ? n.mutedKinds.filter((k) => k !== kind) : [...n.mutedKinds, kind] } },
-                        { refresh: false },
-                      )
-                    }
-                  />
-                )}
-              </Row>
-            );
-          })}
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm" data-testid="notification-grid">
+            <caption className="sr-only">{t("trust.notifications.channelsTitle")}</caption>
+            <thead>
+              <tr className="border-b border-line">
+                <th scope="col" className="px-4 py-2.5 text-left text-xs font-semibold text-muted sm:px-5">
+                  {t("trust.notifications.kind")}
+                </th>
+                {NOTIFICATION_CHANNELS.map((c) => (
+                  <th key={c} scope="col" className="px-2 py-2.5 text-center text-xs font-semibold text-muted">
+                    {t(`trust.notifications.channels.${c}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {NOTIFICATION_KINDS.map((kind) => {
+                const muted = n.mutedKinds.includes(kind);
+                const kindName = t(`prefs.notifications.kindNames.${kind}`);
+                return (
+                  <tr key={kind} className="border-b border-line last:border-0" data-kind={kind}>
+                    <th scope="row" className="px-4 py-2 text-left font-normal sm:px-5">
+                      <span className="flex items-center gap-3">
+                        <Switch
+                          checked={!muted}
+                          label={kindName}
+                          onChange={(on) => put({ mutedKinds: on ? n.mutedKinds.filter((k) => k !== kind) : [...n.mutedKinds, kind] })}
+                        />
+                        <span className={`text-base font-semibold ${muted ? "text-muted" : "text-ink"}`}>{kindName}</span>
+                      </span>
+                    </th>
+                    {NOTIFICATION_CHANNELS.map((c) => {
+                      const available = cellAvailable(kind, c);
+                      const columnOn = channelOn(n, c);
+                      const checked = available && kindChannelChoice(n, kind, c);
+                      return (
+                        <td key={c} className="px-2 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={muted || !available || !columnOn || c === "inApp"}
+                            onChange={(e) => setCell(kind, c, e.target.checked)}
+                            aria-label={t("trust.notifications.channelFor", { kind: kindName, channel: t(`trust.notifications.channels.${c}`) })}
+                            className="size-5 cursor-pointer accent-[var(--aos-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
+      <p className="text-sm text-muted">{t("trust.notifications.focusNote")}</p>
       <p className="text-sm text-muted">{t("prefs.notifications.workspaceDefaults")}</p>
       <SavingNote saving={saving} />
     </div>

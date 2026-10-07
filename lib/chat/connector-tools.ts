@@ -33,7 +33,9 @@ import type {
   InvokeResult,
 } from "@/lib/connectors/m21/types";
 import type { ToolContext } from "./tools";
-import { connectorAction, connectorGroup, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
+import { connectorAction, connectorGroup, isGroupBlocked, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
+// Phase 18.3 (WS=trust): agent app permissions (the workspace's blocked apps).
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { autoApprovalFor } from "@/lib/automation/policy";
 import type { ConnectorChatTool } from "@/lib/agents/loop-tools";
 
@@ -260,6 +262,18 @@ export async function resolveConnectorTool(
   //    soon as the binding is known (step 2b).
   const builtin = isBuiltinKey(key);
   const group = connectorGroup(key);
+  // Phase 18.3: an app blocked for agents in this workspace, whatever the grant.
+  const blockedGroups = await getAgentBlockedGroups(ctx.workspaceId);
+  if (builtin && isGroupBlocked(blockedGroups, group)) {
+    return {
+      ...(await deny(
+        ctx,
+        toolName,
+        `Agents may not use ${TOOL_GROUP_LABELS[group]} in this workspace (${toolName}). An admin can allow it in Settings → Privacy and security → Agent app access.`,
+      )),
+      status: "denied",
+    };
+  }
   if (builtin && !isGroupGranted(ctx.grant, group)) {
     return {
       ...(await deny(
@@ -312,6 +326,16 @@ export async function resolveConnectorTool(
   const connectorConfig = connection.connector?.config ?? null;
   if (!builtin) {
     const toolGroup = mcpToolGroup(connectorConfig, tool);
+    if (isGroupBlocked(blockedGroups, toolGroup)) {
+      return {
+        ...(await deny(
+          ctx,
+          toolName,
+          `Agents may not use ${TOOL_GROUP_LABELS[toolGroup]} in this workspace (${toolName}). An admin can allow it in Settings → Privacy and security → Agent app access.`,
+        )),
+        status: "denied",
+      };
+    }
     if (!isGroupGranted(ctx.grant, toolGroup)) {
       return {
         ...(await deny(

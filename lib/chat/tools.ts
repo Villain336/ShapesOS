@@ -85,6 +85,25 @@ export interface ToolContext {
 export interface ToolResult {
   summary: string;
   details?: unknown;
+  /**
+   * Phase 18.3 (WS=flow): the records this call wrote, recorded on the run's
+   * timeline (AgentRunEvent payload) so "Undo this agent run" knows exactly
+   * what to revert (lib/timemachine/undo.ts). `before` = the changed fields'
+   * prior values for an update.
+   */
+  touched?: TouchedRecord[];
+}
+
+/** Phase 18.3 (WS=flow): one record a tool call wrote. */
+export interface TouchedRecord {
+  kind: string;
+  id: string;
+  op: "create" | "update" | "share";
+  /** Ops entity slug ("deals") for kind "ops". */
+  entity?: string;
+  /** The file a share link belongs to. */
+  fileId?: string;
+  before?: Record<string, unknown>;
 }
 
 /**

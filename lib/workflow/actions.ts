@@ -143,6 +143,56 @@ async function publishApproved(config: Record<string, unknown>, ctx: ActionExecC
   return { itemId, publishedUrl: res.publishedUrl };
 }
 
+/** Workflow actors that are not a person (cron sweep, inbound webhook, system). */
+const NON_PERSON_ACTORS = new Set(["cron", "system", "webhook"]);
+
+/**
+ * Phase 18.3 (WS=flow): run one agent tool through executeTool — the gate
+ * chat uses — as the person who started the run (or, for a scheduled /
+ * webhook run, the workflow's creator), with their role. confirmed is
+ * always false: nobody can say "yes" inside a workflow, so a call that
+ * would wait for a person's OK is NOT run and the step fails, saying so.
+ */
+export async function runAgentToolAction(config: Record<string, unknown>, ctx: ActionExecContext): Promise<Output> {
+  const toolName = str(config.tool);
+  if (!toolName) throw new Error("run_agent_tool: config.tool is required");
+  let args: Record<string, unknown> = {};
+  const rawArgs = config.args;
+  if (typeof rawArgs === "string" && rawArgs.trim()) {
+    try {
+      const parsed = JSON.parse(rawArgs) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+      args = parsed as Record<string, unknown>;
+    } catch {
+      throw new Error("run_agent_tool: config.args must be a JSON object");
+    }
+  } else if (rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)) {
+    args = rawArgs as Record<string, unknown>;
+  }
+  const run = await prisma.workflowRun.findUnique({
+    where: { id: ctx.runId },
+    select: { createdBy: true, workflow: { select: { createdBy: true } } },
+  });
+  const person = [ctx.actor, run?.createdBy, run?.workflow.createdBy].find((a): a is string => !!a && !NON_PERSON_ACTORS.has(a));
+  if (!person) throw new Error("run_agent_tool: this workflow has no person to act as (its creator is unknown)");
+  const membership = await prisma.workspaceMember.findFirst({ where: { workspaceId: ctx.workspaceId, userId: person }, select: { role: true } });
+  if (!membership) throw new Error("run_agent_tool: the workflow's owner is no longer a member of this workspace");
+  // Lazy: keeps the agent tool registry out of the canvas route's bundle.
+  const { executeTool } = await import("@/lib/chat/tool-exec");
+  const call: Parameters<typeof executeTool>[3] = { tool: toolName, args, status: "executed" };
+  const result = await executeTool(
+    { projectId: ctx.projectId, workspaceId: ctx.workspaceId, userId: person, role: membership.role, confirmed: false, agentKey: "lead" },
+    toolName,
+    args,
+    call,
+  );
+  if (call.status === "pending_confirmation") {
+    throw new Error(`run_agent_tool: ${toolName} needs a person's OK, so it was not run (add an auto-approve rule for it in Settings → Automation, or use a schedule whose runs wait in Needs you). Money and deleting always ask.`);
+  }
+  if (call.status !== "executed") throw new Error(`run_agent_tool: ${call.resultSummary ?? call.status}`);
+  return { tool: toolName, summary: (result?.summary ?? call.resultSummary ?? "").slice(0, 2000), ...(call.autoApproved ? { autoApproved: call.autoApproved } : {}) };
+}
+
 /** Dispatch a single action node. Throws on any failure (fail-closed). */
 export async function runActionNode(
   type: string,
@@ -162,6 +212,8 @@ export async function runActionNode(
       return generateReportAction(config, ctx);
     case "publish_approved":
       return publishApproved(config, ctx);
+    case "run_agent_tool":
+      return runAgentToolAction(config, ctx);
     default:
       throw new Error(`Unknown action type "${type}"`);
   }

@@ -155,6 +155,12 @@ export interface CaptureEpisodeInput {
   endedAt?: Date;
   /** Extra refs merged into the episode refs (e.g. contentItemId, draftFull). */
   refs?: Record<string, unknown>;
+  /**
+   * Phase 18.3 (WS=trust): the member the agent worked for, stored as
+   * refs.userId so Settings → You → Privacy can show (and forget) what
+   * agents remember from that person's own work.
+   */
+  userId?: string | null;
 }
 
 const SUMMARY_FLOOR = 12; // mirrors assertWriteWorthy in the memory write path
@@ -185,6 +191,7 @@ export async function captureEpisode(
         promptSummary: prompt.slice(0, 2000),
         outputSummary: (input.outputSummary ?? "").slice(0, 4000),
         outcome: input.outcome ?? "completed",
+        ...(input.userId ? { userId: input.userId } : {}),
         ...(input.refs ?? {}),
       },
       startedAt: input.startedAt,

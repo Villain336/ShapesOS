@@ -16,6 +16,7 @@ import Link from "next/link";
 import { AGENT_ACTIVITY_CHANGED_EVENT } from "@/lib/aos/events";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { forgetOfflineData } from "@/lib/offline/client";
 import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { Dialog } from "@base-ui/react/dialog";
@@ -324,7 +325,8 @@ function UserRow({
         <DropdownMenuSeparator className="mx-2 my-1 bg-line" />
         <DropdownMenuItem
           className="min-h-11 gap-3 rounded-sm px-3 text-base text-failed-text data-highlighted:bg-failed-tint"
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          // Phase 18.3 (WS=flow): forget this person's offline copies, queue and Web Push first.
+          onClick={() => void forgetOfflineData().finally(() => signOut({ callbackUrl: "/login" }))}
         >
           <LogOut className="size-4" aria-hidden />
           {t("shell.signOut")}

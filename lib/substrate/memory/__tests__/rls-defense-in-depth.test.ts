@@ -34,6 +34,8 @@ const ALLOW = new Map<string, string>([
   ["app/api/team/chat/route.ts:project.findFirst", "projectAccess: resolves the project through accessibleWorkspaceWhere(userId) (the caller's memberships) before any workspace is known; every chat query after it is workspace-scoped"],
   // Phase 18.2 (content): public file share links — token hash → link, the one cross-workspace read, through the SELECT-only app.file_share_route policy (live links only); everything after it runs under the link's workspace scope.
   ["lib/files/shares.ts:workspaceFileShare.findFirst", "resolveShareToken: maps a public /r/file/<token> to its link via the SELECT-only app.file_share_route policy (unrevoked rows only)"],
+  // Phase 18.3 (WS=flow): the hourly Time Machine sweep lists which workspaces asked for scheduled snapshots (workspace_settings is not a tenant RLS table; ids + schedule only); every snapshot read / write after it runs under that workspace's scope.
+  ["lib/timemachine/snapshots.ts:workspaceSettings.findMany", "runDueSnapshots: cron-only fan-out over workspaces with a snapshot schedule (ids only); each snapshot is taken under its own workspace scope"],
   ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 

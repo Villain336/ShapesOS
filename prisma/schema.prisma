@@ -383,6 +383,22 @@ enum FileChangeAction {
   // Phase 18.2 (WS=content): a run / job / sandbox / terminal stopped from the
   // Activity Monitor.
   process_stopped
+  // Phase 18.3 (WS=trust): the Privacy & Security center — agent app access
+  // changed, a sign-in session revoked, a memory forgotten, a phone removed,
+  // the audit timeline exported.
+  agent_app_access_changed
+  session_revoked
+  memory_forgotten
+  push_device_removed
+  audit_timeline_exported
+  // Phase 18.3 (WS=flow): Time Machine (snapshots, restore into a new
+  // workspace, undo an agent run) and the Automations app's drafts.
+  snapshot_created
+  snapshot_deleted
+  snapshot_downloaded
+  snapshot_restored
+  snapshot_settings_changed
+  agent_run_undone
 }
 
 // ---------------------------------------------------------------------------
@@ -1185,6 +1201,8 @@ model Workspace {
   storeItems                  WorkspaceStoreItem[]
   storePublications           StorePublication[]          @relation("StorePublicationTarget")
   storePublicationsSent       StorePublication[]          @relation("StorePublicationAgency")
+  // Phase 18.3 (WS=flow): Time Machine workspace snapshots (lib/timemachine).
+  workspaceSnapshots          WorkspaceSnapshot[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -3793,6 +3811,14 @@ model WorkspaceSettings {
   // slug → "low" | "medium" | "high". Overrides win over verb-derived
   // classification (spec §3).
   toolTierOverrides    Json?     @map("tool_tier_overrides")
+  // Phase 18.3 (WS=trust): agent app permissions — tool groups (lib/agents/
+  // grants.ts TOOL_GROUPS) agents may NOT use in this workspace. Empty = every
+  // app allowed (the behaviour before 18.3). Enforced inside computeGrant().
+  agentBlockedGroups   String[]  @default([]) @map("agent_blocked_groups")
+  // Phase 18.3 (WS=flow): Time Machine — scheduled workspace snapshots
+  // ("off" | "daily" | "weekly"; default off) and how many to keep.
+  snapshotSchedule     String    @default("off") @map("snapshot_schedule")
+  snapshotRetention    Int       @default(7) @map("snapshot_retention")
   updatedBy            String?   @map("updated_by")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -15225,6 +15251,11 @@ enum NotificationKind {
   mention
   direct_message
   reminder_due
+  // Phase 18.3 (WS=trust): Notifications 2.0.
+  run_finished
+  invoice_paid
+  ticket_assigned
+  meeting_starting
 }
 
 model Notification {
@@ -15248,6 +15279,9 @@ model Notification {
   // no push) and is released (heldAt cleared, push sent) when focus ends.
   // Queued, never dropped (lib/desktop/focus.ts).
   heldAt      DateTime?        @map("held_at")
+  // Phase 18.3 (WS=trust): when the row went out in the person's email
+  // digest (lib/notifications/digest.ts) — each row is mailed at most once.
+  digestedAt  DateTime?        @map("digested_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, dedupKey])
@@ -17895,4 +17929,98 @@ model StorePublication {
   @@index([workspaceId, status])
   @@index([agencyWorkspaceId, createdAt])
   @@map("store_publications")
+}
+
+// ============================================================================
+// Phase 18.3 (WS=trust): the per-person session registry. Auth stays JWT
+// (auth.ts, strategy "jwt"): each completed sign-in writes one row and puts its
+// id in the token (token.sid); the jwt callback refuses a token whose row is
+// revoked. Device label + IP prefix only (never the full IP, never the token).
+// Owner-only: FORCE RLS on app.user_id (no workspace — a session belongs to
+// the person). Covered by GDPR export (user_id) and account delete.
+// ============================================================================
+
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  // How the session signed in ("google", "credentials", "email-password" …).
+  provider    String?   @db.VarChar(64)
+  userAgent   String?   @map("user_agent") @db.VarChar(400)
+  // "Chrome on macOS" — derived from the user agent (lib/auth/sessions.ts).
+  deviceLabel String?   @map("device_label") @db.VarChar(120)
+  // "203.0.113.0/24" / "2001:db8:1::/48" — never the full address.
+  ipPrefix    String?   @map("ip_prefix") @db.VarChar(64)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  // Touched at most every few minutes (SESSION_TOUCH_MS).
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  // When the absolute JWT lifetime ends (auth.ts maxAge).
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // Who revoked it: the person themselves ("self") or "admin:<userId>".
+  revokedBy   String?   @map("revoked_by") @db.VarChar(200)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 18.3 (WS=flow): Web Push subscriptions and Time Machine snapshots.
+// ---------------------------------------------------------------------------
+
+// One browser's Web Push subscription (RFC 8030 endpoint + RFC 8291 keys) for
+// one person. Owner-only FORCE RLS on app.user_id (lib/push/web.ts sets it);
+// no workspace — a person's pushes follow them across workspaces. Removed when
+// the push service answers 404/410, when they unsubscribe, and on account
+// deletion. auth_secret is the subscription's 16-byte auth key (never exported).
+model PushSubscription {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  endpoint     String
+  p256dh       String
+  authSecret   String    @map("auth_secret")
+  userAgent    String?   @map("user_agent") @db.VarChar(300)
+  // Phase 18.3 integration: the sign-in session (user_sessions.id, token.sid)
+  // that subscribed this browser. Revoking that session (Settings → You →
+  // Privacy) removes the subscription, so a signed-out device stops getting
+  // pushes. Null = subscribed from a token minted before the registry.
+  sessionId    String?   @map("session_id") @db.VarChar(64)
+  failureCount Int       @default(0) @map("failure_count")
+  lastError    String?   @map("last_error") @db.VarChar(300)
+  lastSentAt   DateTime? @map("last_sent_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, endpoint])
+  @@index([userId, sessionId])
+  @@map("push_subscriptions")
+}
+
+// A Time Machine snapshot: the lib/gdpr workspace export stream, gzipped, in
+// object storage (blob namespace "snapshots", <workspaceId>/<id>.json.gz). This
+// row is the manifest (size, per-table row counts, who, when). Restore always
+// goes into a NEW workspace (lib/timemachine/restore.ts); last_restore keeps the
+// latest restore's report (new workspace, what could not be restored).
+model WorkspaceSnapshot {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // pending | ready | failed
+  status      String    @default("pending") @db.VarChar(16)
+  // manual | scheduled
+  trigger     String    @default("manual") @db.VarChar(16)
+  blobPath    String?   @map("blob_path")
+  sizeBytes   Int       @default(0) @map("size_bytes")
+  // { "<table>": rows } from the export manifest.
+  tables      Json      @default("{}")
+  tableCount  Int       @default(0) @map("table_count")
+  rowCount    Int       @default(0) @map("row_count")
+  error       String?   @db.VarChar(500)
+  lastRestore Json?     @map("last_restore")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("workspace_snapshots")
 }

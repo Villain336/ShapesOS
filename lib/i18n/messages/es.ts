@@ -7,6 +7,10 @@ import type { Catalogue } from "./en";
 import { commsEs } from "./comms.es";
 // Phase 18.2 (WS=content): las apps de este flujo, en su propio archivo.
 import { contentEs } from "./content.es";
+// Phase 18.3 (WS=trust)
+import { trustEs } from "./trust.es";
+// Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
+import { flowEs } from "./flow.es";
 
 export const es: Catalogue = {
   common: {
@@ -118,6 +122,9 @@ export const es: Catalogue = {
       "/dashboard/activity": { label: "Monitor de actividad", description: "Cada ejecución, tarea y entorno aislado: coste, tiempo, Detener" },
       "/dashboard/terminal": { label: "Consola", description: "Una consola en un entorno aislado del espacio de trabajo" },
       "/dashboard/store": { label: "Tienda", description: "Instala apps, habilidades, plantillas y conectores" },
+      // Phase 18.3 (WS=flow)
+      "/dashboard/automations": { label: "Automatizaciones", description: "Todas las programaciones, flujos y reglas en una lista" },
+      "/dashboard/time-machine": { label: "Máquina del tiempo", description: "Instantáneas, versiones y deshacer una ejecución" },
       "/dashboard/switch": { label: "Cambiar de app", description: "Vuelve a una app o un registro reciente (⌃Tab)" },
       "/dashboard/split": { label: "Vista dividida", description: "Dos páginas lado a lado, o una página junto al Asistente" },
       "/dashboard/esign": { label: "Firma electrónica", description: "Sobres de firma" },
@@ -183,6 +190,11 @@ export const es: Catalogue = {
       mention: "Menciones",
       direct_message: "Mensajes directos",
       reminder_due: "Recordatorios",
+      // Phase 18.3 (WS=trust)
+      run_finished: "Ejecuciones terminadas",
+      invoice_paid: "Facturas pagadas",
+      ticket_assigned: "Tickets",
+      meeting_starting: "Reuniones",
     },
   },
 
@@ -234,6 +246,9 @@ export const es: Catalogue = {
       media: "Compra de medios",
       mail: "Correo postal",
       social: "Publicación social",
+      // Phase 18.3 (WS=trust)
+      autopilot: "Piloto automático",
+      workflow: "Flujo de trabajo",
     },
   },
 
@@ -385,6 +400,17 @@ export const es: Catalogue = {
       integrations: "Integraciones",
       brand: "Marca",
       developer: "Desarrolladores",
+      // Phase 18.3 (WS=trust)
+      privacy: "Privacidad y seguridad",
+    },
+    // Phase 18.3 (WS=trust): las dos mitades y la búsqueda de ajustes.
+    halves: { you: "Tú", workspace: "Espacio de trabajo" },
+    search: {
+      label: "Buscar en ajustes",
+      placeholder: "Buscar en ajustes",
+      results: "{count, plural, =0 {Ningún ajuste coincide} one {# ajuste} other {# ajustes}}",
+      empty: "Ningún ajuste coincide con \u201c{query}\u201d. Prueba con otra palabra.",
+      clear: "Borrar la búsqueda",
     },
     pages: {
       "/dashboard/settings/you": { label: "General", description: "Tu nombre, tu zona horaria y cómo arranca ShapesOS." },
@@ -421,6 +447,13 @@ export const es: Catalogue = {
       "/dashboard/settings/webhooks": { label: "Webhooks", description: "Eventos firmados hacia tus propios endpoints, con registro de entregas." },
       "/dashboard/settings/experiments": { label: "Experimentos", description: "Flags de funciones y experimentos de crecimiento." },
       "/dashboard/settings/design": { label: "Kit de diseño", description: "Cada componente de Agentic OS en cada estado, junto a las referencias del kit." },
+      // Phase 18.3 (WS=trust)
+      "/dashboard/settings/you/keyboard": { label: "Teclado", description: "Todos los atajos y las teclas que cambiaste." },
+      "/dashboard/settings/you/privacy": { label: "Privacidad", description: "Dónde tienes la sesión iniciada, qué leen los agentes por ti y qué recuerdan." },
+      "/dashboard/settings/security-center": { label: "Centro de seguridad", description: "Una sola cronología de todo lo que hicieron personas y agentes, en todos los registros de auditoría." },
+      "/dashboard/settings/security-center/apps": { label: "Acceso de agentes a apps", description: "Qué apps pueden usar los agentes en este espacio de trabajo." },
+      "/dashboard/settings/security-center/data-access": { label: "Registro de acceso a datos", description: "Qué agente leyó los datos de qué app, y cuándo." },
+      "/dashboard/settings/security-center/memory": { label: "Control de la memoria", description: "Mira y borra lo que los agentes recuerdan de este espacio de trabajo." },
     },
   },
 
@@ -497,6 +530,11 @@ export const es: Catalogue = {
         mention: "Menciones a ti",
         direct_message: "Mensajes directos",
         reminder_due: "Recordatorios pendientes",
+        // Phase 18.3 (WS=trust)
+        run_finished: "Ejecuciones terminadas",
+        invoice_paid: "Facturas pagadas",
+        ticket_assigned: "Tickets asignados a ti",
+        meeting_starting: "Reuniones que empiezan",
       },
       workspaceDefaults: "Los valores por defecto de todo el espacio de trabajo están en Espacio de trabajo → Notificaciones.",
     },
@@ -943,4 +981,9 @@ export const es: Catalogue = {
 
   // Phase 18.2 (WS=content): Notas, Archivos, colaboración, Monitor de actividad, Terminal, Tienda.
   ...contentEs,
+
+  // Phase 18.3 (WS=trust): Ajustes → Tú (Teclado, Privacidad), el centro de privacidad y seguridad, Notificaciones 2.0.
+  trust: trustEs,
+  // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
+  flow: flowEs,
 };

@@ -20,13 +20,15 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import { CopilotKitProvider } from "@copilotkit/react-native";
-import { ListChecks, MessageCircle, Rocket, Settings } from "lucide-react-native";
+import { Bell, LayoutGrid, ListChecks, MessageCircle, Settings } from "lucide-react-native";
 import { SessionProvider, useSession } from "./session-context";
 import { GenerativeHostNative } from "./components/GenerativeHost.native";
 import { LoginScreen } from "./screens/LoginScreen";
 import { ChatScreen } from "./screens/ChatScreen";
 import { ApprovalQueueScreen } from "./screens/ApprovalQueueScreen";
-import { MissionsScreen } from "./screens/MissionsScreen";
+// Phase 18.3 (WS=trust): notifications, and Missions/Files/Calendar/Mail under Apps.
+import { NotificationsScreen } from "./screens/NotificationsScreen";
+import { AppsScreen } from "./screens/AppsScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { configureForegroundHandling } from "./push/register";
 import { tabForPushData, type AppTab } from "./push/push-client";
@@ -37,23 +39,16 @@ type Tab = AppTab;
 const TABS: Array<{ id: Tab; label: string; Icon: typeof MessageCircle }> = [
   { id: "chat", label: "Chat", Icon: MessageCircle },
   { id: "approvals", label: "Approvals", Icon: ListChecks },
-  { id: "missions", label: "Missions", Icon: Rocket },
+  { id: "notifications", label: "Alerts", Icon: Bell },
+  { id: "apps", label: "Apps", Icon: LayoutGrid },
   { id: "settings", label: "Settings", Icon: Settings },
 ];
 
 configureForegroundHandling();
 
-function resolveDefaultProjectId(baseUrl: string, authHeaders: () => Record<string, string>): Promise<string | null> {
-  return fetch(`${baseUrl}/api/projects`, { headers: authHeaders() })
-    .then((r) => (r.ok ? r.json() : null))
-    .then((j) => (j?.projects?.[0]?.id as string | undefined) ?? null)
-    .catch(() => null);
-}
-
 function AuthedApp() {
   const { session, baseUrl, gate } = useSession();
   const [tab, setTab] = useState<Tab>("chat");
-  const [projectId, setProjectId] = useState<string | null>(null);
 
   // A tapped push opens the tab it is about (also on a cold start).
   useEffect(() => {
@@ -74,15 +69,8 @@ function AuthedApp() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void resolveDefaultProjectId(baseUrl, gate.authHeaders).then((pid) => {
-      if (!cancelled) setProjectId(pid);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [baseUrl, gate]);
+  // Phase 18.3 (WS=trust): the approvals tab is the unified inbox — no
+  // project to resolve any more (it was one project's autopilot queue).
 
   return (
     <CopilotKitProvider
@@ -102,8 +90,9 @@ function AuthedApp() {
         </View>
         <View style={styles.body}>
           {tab === "chat" ? <ChatScreen /> : null}
-          {tab === "approvals" ? <ApprovalQueueScreen projectId={projectId} /> : null}
-          {tab === "missions" ? <MissionsScreen /> : null}
+          {tab === "approvals" ? <ApprovalQueueScreen /> : null}
+          {tab === "notifications" ? <NotificationsScreen /> : null}
+          {tab === "apps" ? <AppsScreen /> : null}
           {tab === "settings" ? <SettingsScreen /> : null}
         </View>
         <View style={styles.tabBar}>
