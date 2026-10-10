@@ -169,6 +169,9 @@ const addAttrs = (attrs: string, extra: string): string => {
   return `${attrs.slice(0, at)}${extra}${attrs.slice(at)}`;
 };
 
+// A tool that submits nowhere ("#", javascript:) would be a lie to the agent.
+const submitsSomewhere = (action: string): boolean => !/^\s*(#|javascript:)/i.test(action);
+
 export interface AnnotateResult {
   html: string;
   annotated: number;
@@ -187,7 +190,7 @@ export function annotateForms(html: string, opts: { siteName: string }): Annotat
   let annotated = 0;
   const out = html.replace(FORM_RE, (whole, attrs: string, body: string) => {
     const info = findForms(whole)[0];
-    if (!info || info.annotated || !info.kind) return whole;
+    if (!info || info.annotated || !info.kind || !submitsSomewhere(info.action)) return whole;
     const base = TOOL_NAME[info.kind];
     let name = base;
     for (let n = 2; used.has(name); n++) name = `${base}_${n}`;
@@ -262,4 +265,37 @@ export function addPotentialActions(block: JsonLd, actions: JsonLd[]): JsonLd {
   const kept = existing.filter((a) => !fresh.has(key(a)));
   const merged = [...kept, ...actions];
   return merged.length ? { ...block, potentialAction: merged } : block;
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers the draft planner shares
+// ---------------------------------------------------------------------------
+
+/** First tel: and mailto: link across the pages (what the site already publishes). */
+export function contactDetails(pages: { path: string; html: string }[]): { email?: string; telephone?: string } {
+  const out: { email?: string; telephone?: string } = {};
+  for (const p of pages) {
+    for (const m of p.html.matchAll(/href\s*=\s*["'](mailto|tel):([^"'?#]+)/gi)) {
+      const kind = m[1].toLowerCase();
+      const value = decodeURIComponent(m[2]).trim();
+      if (kind === "mailto" && !out.email && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value)) out.email = value;
+      if (kind === "tel" && !out.telephone && /^\+?[0-9][0-9 ()-]{4,}$/.test(value)) out.telephone = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Fields only the agent-ready flow writes (potentialAction, contactPoint) survive
+ * the plain structured-data flow regenerating the same block: carried over from the
+ * previously injected block of the same @type unless the fresh one sets them.
+ */
+export function carryOverAgentFields(fresh: JsonLd[], previous: JsonLd[]): JsonLd[] {
+  return fresh.map((block) => {
+    const before = previous.find((p) => JSON.stringify(p["@type"]) === JSON.stringify(block["@type"]));
+    if (!before) return block;
+    const extra: JsonLd = {};
+    for (const key of ["potentialAction", "contactPoint"] as const) if (before[key] !== undefined && block[key] === undefined) extra[key] = before[key];
+    return Object.keys(extra).length ? { ...block, ...extra } : block;
+  });
 }

@@ -4,7 +4,7 @@
 // it, nothing enforces it, and we say so in the audit.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { applyAiPolicy, readAiPolicy, AI_CRAWLERS } from "../robots-ai";
+import { applyAiPolicy, readAiPolicy, policyOf, AI_CRAWLERS } from "../robots-ai";
 
 const GOLDEN_ALLOW_SEARCH = `User-agent: *
 Content-Signal: search=yes, ai-input=yes, ai-train=no
@@ -90,5 +90,19 @@ describe("readAiPolicy (for the audit)", () => {
   });
   it("nothing at all", () => {
     assert.deepEqual(readAiPolicy(null), { present: false, managed: false, explicit: false, blocksEveryone: false, hasSitemap: false, decided: [] });
+  });
+});
+
+describe("policyOf", () => {
+  it("reads back the policy we wrote", () => {
+    for (const policy of [{ search: true, input: true, train: false }, { search: false, input: false, train: false }, { search: true, input: false, train: true }]) {
+      assert.deepEqual(policyOf(applyAiPolicy(null, policy, {})), policy);
+    }
+  });
+  it("reads the owner's own Content-Signal and nothing else", () => {
+    assert.deepEqual(policyOf("User-agent: *\nContent-Signal: search=yes, ai-input=no, ai-train=no\nAllow: /\n"), { search: true, input: false, train: false });
+    assert.equal(policyOf("User-agent: *\nAllow: /\n"), null);
+    assert.equal(policyOf("Content-Signal: search=yes\n"), null);
+    assert.equal(policyOf(null), null);
   });
 });

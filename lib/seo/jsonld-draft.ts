@@ -17,6 +17,8 @@ import type { WorkingCopyProvider } from "@/lib/connectors/local";
 import { assertSnapshotSize, readSiteWorkingCopy, siteFingerprint, type SiteFile } from "@/lib/sites/files";
 import { createSiteRevision, type SiteRevisionSummary } from "@/lib/sites/revisions";
 import { capPatch } from "@/lib/ship/git";
+// Phase 21A (WS=agentweb): keep the actions/contactPoint the agent-ready flow added to a block.
+import { carryOverAgentFields } from "@/lib/agentweb/site/actions";
 import { resolveLiveAuditUrl } from "@/lib/audit/project-audit";
 import {
   injectJsonLd,
@@ -124,7 +126,7 @@ export async function planJsonLd(input: JsonLdDraftInput): Promise<JsonLdPlan> {
   const pages: PagePlan[] = [];
   const next = files.map((f) => {
     if (!HTML.test(f.path) || (wanted && !wanted.has(f.path) && !extras[f.path])) return f;
-    const fresh = [...suggestJsonLdForPage(f.path, f.content, identity), ...(extras[f.path] ?? [])];
+    const fresh = carryOverAgentFields([...suggestJsonLdForPage(f.path, f.content, identity), ...(extras[f.path] ?? [])], injectedJsonLd(f.content));
     // Blocks we injected earlier whose @type isn't regenerated now (e.g. a
     // Product the agent supplied last time) are kept: re-runs only add/update.
     const freshTypes = new Set(fresh.map((b) => JSON.stringify(b["@type"])));

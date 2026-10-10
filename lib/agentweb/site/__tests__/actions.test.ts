@@ -8,7 +8,7 @@
 // anyway (contact / booking / quote), never login, payment or account forms.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { addPotentialActions, annotateForms, findForms, potentialActions } from "../actions";
+import { addPotentialActions, annotateForms, carryOverAgentFields, contactDetails, findForms, potentialActions } from "../actions";
 import { detectChannels } from "../../channels";
 
 const CONTACT = `<h1>Contact</h1>
@@ -94,6 +94,13 @@ describe("annotateForms", () => {
     }
   });
 
+  it("does not turn a form that submits nowhere into a tool", () => {
+    for (const action of ["#", "javascript:void(0)"]) {
+      const src = CONTACT.replace('action="/contact"', `action="${action}"`);
+      assert.equal(annotateForms(src, { siteName: "X" }).annotated, 0);
+    }
+  });
+
   it("keeps a form the owner already annotated exactly as it is", () => {
     const own = `<form action="/contact" toolname="my_tool" tooldescription="Mine"><input name="email"><textarea name="message"></textarea></form>`;
     assert.equal(annotateForms(own, { siteName: "X" }).html, own);
@@ -160,5 +167,30 @@ describe("potentialActions", () => {
       ["ReserveAction", "https://riverside.test/book", "POST"],
       ["QuoteAction", "https://riverside.test/quote", "POST"],
     ]);
+  });
+});
+
+describe("contactDetails", () => {
+  it("takes the first tel: and mailto: links, without query strings", () => {
+    const html = `<a href="mailto:hello@riverside.test?subject=Hi">Mail</a><a href="tel:+441234567890">Call</a><a href="mailto:other@x.test">x</a>`;
+    assert.deepEqual(contactDetails([{ path: "/index.html", html }]), { email: "hello@riverside.test", telephone: "+441234567890" });
+  });
+  it("says nothing it did not find", () => {
+    assert.deepEqual(contactDetails([{ path: "/a.html", html: "<p>no links</p>" }]), {});
+    assert.deepEqual(contactDetails([{ path: "/a.html", html: '<a href="mailto:not an email">x</a>' }]), {});
+  });
+});
+
+describe("carryOverAgentFields", () => {
+  it("keeps potentialAction and contactPoint that an earlier run put on the same type", () => {
+    const fresh = [{ "@type": "Organization", name: "A" }, { "@type": "WebSite", name: "A" }];
+    const previous = [{ "@type": "Organization", name: "A", potentialAction: [{ "@type": "CommunicateAction" }], contactPoint: { "@type": "ContactPoint" } }];
+    const out = carryOverAgentFields(fresh, previous);
+    assert.deepEqual(out[0], { "@type": "Organization", name: "A", potentialAction: [{ "@type": "CommunicateAction" }], contactPoint: { "@type": "ContactPoint" } });
+    assert.deepEqual(out[1], fresh[1]);
+  });
+  it("does not overwrite what the fresh block already says", () => {
+    const out = carryOverAgentFields([{ "@type": "Organization", potentialAction: [{ "@type": "SearchAction" }] }], [{ "@type": "Organization", potentialAction: [{ "@type": "OldAction" }] }]);
+    assert.deepEqual(out[0].potentialAction, [{ "@type": "SearchAction" }]);
   });
 });

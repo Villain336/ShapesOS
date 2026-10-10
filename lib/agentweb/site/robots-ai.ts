@@ -96,3 +96,16 @@ export function readAiPolicy(text: string | null): AiPolicyReading {
   }
   return { present: true, managed: text.includes(BEGIN), explicit: decided.length > 0, blocksEveryone, hasSitemap: /^sitemap:\s*\S+/im.test(text), decided };
 }
+
+/** The policy a robots.txt states through its Content-Signal line (ours or the owner's), else null. */
+export function policyOf(text: string | null): AiPolicy | null {
+  const line = text ? /^content-signal:\s*(.+)$/im.exec(text)?.[1] : undefined;
+  if (!line) return null;
+  const pick = (key: string): boolean | null => {
+    const v = new RegExp(`\\b${key}\\s*=\\s*(yes|no)\\b`, "i").exec(line)?.[1]?.toLowerCase();
+    return v === undefined ? null : v === "yes";
+  };
+  const [search, input, train] = [pick("search"), pick("ai-input"), pick("ai-train")];
+  // A signal that leaves a use unstated expresses no preference for it; we only read complete ones.
+  return search === null || input === null || train === null ? null : { search, input, train };
+}

@@ -16,6 +16,8 @@ import { llmStatus } from "@/lib/llm";
 import { getLlmProviderForWorkspace } from "@/lib/llm/workspace";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { recordUsage } from "@/lib/usage";
+// Phase 21A (WS=agentweb): agent-ready output — WebMCP form annotations (never auto-submit).
+import { annotateForms } from "@/lib/agentweb/site/actions";
 
 interface GenerateBody {
   projectId?: string;
@@ -38,6 +40,8 @@ function buildBuilderPrompt(userPrompt: string, brief: string | null): string {
     "- Write REAL, specific marketing copy — never lorem ipsum, never placeholder text.",
     "- Responsive, modern, polished. Inline <style> only for what Tailwind can't do.",
     "- No external images (use CSS/SVG/emoji for visuals). Minimal emojis.",
+    "- Any form (contact, booking, quote) gets a visible <label for> on EVERY field, a name on every",
+    "  input and a real action URL; people and AI agents both rely on those labels.",
     brief ? `Content brief to ground the copy:\n${brief}` : "",
     `The landing page is for: "${userPrompt}"`,
   ]
@@ -166,6 +170,10 @@ export async function POST(req: NextRequest) {
       /* ignore */
     }
   }
+
+  // Phase 21A (WS=agentweb): contact/booking/quote forms become WebMCP tools (toolname,
+  // tooldescription, toolparamdescription); idempotent, never toolautosubmit.
+  html = annotateForms(html, { siteName: project.domain }).html;
 
   return Response.json({ html, llm: llmStatus(), briefUsed });
 }
