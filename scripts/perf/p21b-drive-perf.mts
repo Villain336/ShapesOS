@@ -31,7 +31,7 @@ const WS = `p21perf-${RUN}`;
 const OWNER = `p21perf-own-${RUN}`;
 const actor = { workspaceId: WS, userId: OWNER, role: "owner" as const };
 const out: Record<string, number | string> = {};
-const time = async <T>(label: string, fn: () => Promise<T>, repeat = 1): Promise<T> => {
+const time = async <T,>(label: string, fn: () => Promise<T>, repeat = 1): Promise<T> => {
   let last!: T;
   const t0 = performance.now();
   for (let i = 0; i < repeat; i++) last = await fn();
