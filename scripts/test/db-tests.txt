@@ -258,3 +258,6 @@ lib/drive/__tests__/drive-db.test.ts
 
 # Phase 21B (drive): large files — resumable multipart upload through presigned part URLs to the (fake) S3, resume after a drop, quota-governed cap under a hard maximum, >25 MB safe types only + end-to-end streamed scan (flagged object deleted), new version by multipart, hosted refuses without a scanner, other people's uploads invisible, local mode keeps the buffered path.
 lib/drive/__tests__/uploads-db.test.ts
+
+# Phase 21B (drive): the native FileProvider (Postgres registry + local disk) passes the provider contract suite and is scoped to its actor.
+lib/drive/providers/__tests__/native-db.test.ts

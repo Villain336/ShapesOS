@@ -3920,6 +3920,8 @@ model WorkspaceFile {
   pathKey                    String?                     @map("path_key")
   tags                       String[]                    @default([])
   trashBatch                 String?                     @map("trash_batch")
+  // When this row last changed (null on rows that pre-date Drive: use createdAt).
+  updatedAt                  DateTime?                   @updatedAt @map("updated_at")
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])

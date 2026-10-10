@@ -11,7 +11,8 @@
 ALTER TABLE "workspace_files" ADD COLUMN     "owner_user_id" TEXT,
 ADD COLUMN     "path_key" TEXT,
 ADD COLUMN     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "trash_batch" TEXT;
+ADD COLUMN     "trash_batch" TEXT,
+ADD COLUMN     "updated_at" TIMESTAMP(3);
 
 -- CreateTable
 CREATE TABLE "workspace_folders" (

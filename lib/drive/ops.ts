@@ -11,6 +11,13 @@ import { FsError } from "../filesystem/core";
 import { fileCan, type FileAction, type FileRole } from "../files/acl";
 import { driveRoleFor, type DriveActor } from "./access";
 import { personMayWriteTo } from "./roots";
+import { prisma } from "@/lib/prisma";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { collisionKey, dirnameOf, basenameOf, normalizeLogicalPath, sanitizeUploadName } from "../filesystem/paths";
+import { deleteFile, moveFile, restoreFile, trashFile, writeFile, renameFile, type PublicFile } from "../filesystem/service";
+import { moveFolder, restoreFolder, trashFolder, createFolder, type PublicFolder } from "../filesystem/folders";
+import { overwriteFile } from "../filesystem/versions";
+import { requireFileAction } from "../files/access";
 
 /** Validate a folder path and make sure this person may add to it. Returns its parsed path. */
 export async function requireDirWrite(actor: DriveActor, dirPath: string): Promise<PathInfo> {
@@ -35,3 +42,126 @@ export async function requireFolderAction(actor: DriveActor, folder: { path: str
   if (!fileCan(role, action)) throw new ForbiddenError("Your access to this folder doesn't allow that.");
   return role;
 }
+
+// ---------------------------------------------------------------------------
+// Actor-aware file and folder operations
+// ---------------------------------------------------------------------------
+
+
+/** The live file at this canonical path (case/NFC-insensitive), or null. */
+export async function findLiveFileByPath(workspaceId: string, path: string) {
+  const key = collisionKey(path);
+  return prisma.workspaceFile.findFirst({
+    where: { workspaceId, trashedAt: null, OR: [{ pathKey: key }, { pathKey: null, logicalPath: { equals: path, mode: "insensitive" } }] },
+  });
+}
+
+export async function findLiveFolderByPath(workspaceId: string, path: string) {
+  return withWorkspaceScope(workspaceId, (tx) => tx.workspaceFolder.findFirst({ where: { workspaceId, pathKey: collisionKey(path), trashedAt: null } }));
+}
+
+/**
+ * Save bytes as a file in a folder: a new file, or (overwrite: true) a new
+ * version of the file already there. The person needs write access to the
+ * folder (new file) or the "version" right on the file (overwrite).
+ */
+export async function writeFileAs(
+  actor: DriveActor,
+  args: { dir: string; filename: string; bytes: Buffer; mimeType?: string; overwrite?: boolean; maxBytes?: number },
+): Promise<{ file: PublicFile; created: boolean; version: number }> {
+  const dir = await requireDirWrite(actor, args.dir);
+  const name = sanitizeUploadName(args.filename);
+  const target = normalizeLogicalPath(`${dir.path}/${name}`);
+  if (!target.ok) throw new FsError("invalid_path", target.reason);
+  const existing = await findLiveFileByPath(actor.workspaceId, target.path);
+  if (existing) {
+    if (!args.overwrite) throw new FsError("conflict", `A file already exists at ${existing.logicalPath}.`);
+    await requireFileAction(actor, existing.id, "version");
+    const res = await overwriteFile({ workspaceId: actor.workspaceId, fileId: existing.id, bytes: args.bytes, mimeType: args.mimeType, userId: actor.userId, maxBytes: args.maxBytes });
+    const row = await prisma.workspaceFile.findFirstOrThrow({ where: { id: existing.id } });
+    const { getFile } = await import("../filesystem/service");
+    return { file: (await getFile({ workspaceId: actor.workspaceId, fileId: row.id }))!, created: false, version: res.version };
+  }
+  const file = await writeFile({ workspaceId: actor.workspaceId, logicalPath: target.path, kind: target.kind, bytes: args.bytes, mimeType: args.mimeType, createdBy: actor.userId, maxBytes: args.maxBytes });
+  return { file, created: true, version: 1 };
+}
+
+export async function createFolderAs(actor: DriveActor, path: string): Promise<PublicFolder> {
+  const info = await requireDirWrite(actor, dirnameOf(path) === "/" ? path : dirnameOf(path));
+  const full = normalizeFolderPath(path);
+  if (!full.ok) throw new FsError("invalid_path", full.reason);
+  void info;
+  return createFolder({ workspaceId: actor.workspaceId, path: full.path, createdBy: actor.userId });
+}
+
+async function folderRow(actor: DriveActor, folderId: string, includeTrashed = false) {
+  const f = await withWorkspaceScope(actor.workspaceId, (tx) => tx.workspaceFolder.findFirst({ where: { id: folderId, workspaceId: actor.workspaceId, ...(includeTrashed ? {} : { trashedAt: null }) } }));
+  if (!f) throw new NotFoundError("Folder not found.");
+  return f;
+}
+
+/** Move or rename a file or folder to a new full path. */
+export async function moveItemAs(actor: DriveActor, args: { kind: "file" | "folder"; id: string; to: string }): Promise<PublicFile | PublicFolder> {
+  const dest = normalizeFolderPath(dirnameOf(args.to));
+  if (!dest.ok) throw new FsError("invalid_path", dest.reason);
+  await requireDirWrite(actor, dest.path);
+  if (args.kind === "file") {
+    await requireFileAction(actor, args.id, "edit");
+    return moveFile({ workspaceId: actor.workspaceId, fileId: args.id, newPath: args.to, actorUserId: actor.userId });
+  }
+  const f = await folderRow(actor, args.id);
+  await requireFolderAction(actor, f, "edit");
+  return moveFolder({ workspaceId: actor.workspaceId, folderId: args.id, newPath: args.to, actorUserId: actor.userId });
+}
+
+export async function renameItemAs(actor: DriveActor, args: { kind: "file" | "folder"; id: string; name: string }): Promise<PublicFile | PublicFolder> {
+  if (args.kind === "file") {
+    await requireFileAction(actor, args.id, "edit");
+    return renameFile({ workspaceId: actor.workspaceId, fileId: args.id, filename: args.name, actorUserId: actor.userId });
+  }
+  const f = await folderRow(actor, args.id);
+  await requireFolderAction(actor, f, "edit");
+  return moveFolder({ workspaceId: actor.workspaceId, folderId: args.id, newPath: `${dirnameOf(f.path)}/${args.name}`, actorUserId: actor.userId });
+}
+
+/** Send to the Trash (reversible for 30 days). */
+export async function trashItemAs(actor: DriveActor, args: { kind: "file" | "folder"; id: string }): Promise<{ trashed: number }> {
+  if (args.kind === "file") {
+    await requireFileAction(actor, args.id, "trash");
+    await trashFile({ workspaceId: actor.workspaceId, fileId: args.id, actorUserId: actor.userId });
+    return { trashed: 1 };
+  }
+  const f = await folderRow(actor, args.id);
+  await requireFolderAction(actor, f, "trash");
+  const r = await trashFolder({ workspaceId: actor.workspaceId, folderId: args.id, actorUserId: actor.userId });
+  return { trashed: 1 + r.files + r.folders };
+}
+
+async function trashedFileRole(actor: DriveActor, fileId: string) {
+  const row = await prisma.workspaceFile.findFirst({ where: { id: fileId, workspaceId: actor.workspaceId, trashedAt: { not: null } } });
+  if (!row) throw new NotFoundError("File not found in the trash.");
+  const role = await driveRoleFor(actor, { path: row.logicalPath, ownerUserId: row.ownerUserId, createdBy: row.createdBy, fileId: row.id });
+  if (!role) throw new NotFoundError("File not found in the trash.");
+  return { row, role };
+}
+
+/** Put something back from the Trash where it was. */
+export async function restoreItemAs(actor: DriveActor, args: { kind: "file" | "folder"; id: string }): Promise<PublicFile | { folder: PublicFolder; files: number; folders: number }> {
+  if (args.kind === "file") {
+    const { role } = await trashedFileRole(actor, args.id);
+    if (!fileCan(role, "trash")) throw new ForbiddenError("Your access to this file doesn't allow restoring it.");
+    return restoreFile({ workspaceId: actor.workspaceId, fileId: args.id, actorUserId: actor.userId });
+  }
+  const f = await folderRow(actor, args.id, true);
+  await requireFolderAction(actor, f, "trash");
+  return restoreFolder({ workspaceId: actor.workspaceId, folderId: args.id, actorUserId: actor.userId });
+}
+
+/** Delete one trashed file for good. Its owner or an admin only; it must already be in the Trash. */
+export async function removeFromTrashAs(actor: DriveActor, fileId: string): Promise<void> {
+  const { role } = await trashedFileRole(actor, fileId);
+  if (!fileCan(role, "manageAccess")) throw new ForbiddenError("Only the file's owner or an admin can remove it for good.");
+  await deleteFile({ workspaceId: actor.workspaceId, fileId, actorUserId: actor.userId });
+}
+
+export { basenameOf };
