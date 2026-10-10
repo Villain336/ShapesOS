@@ -52,6 +52,11 @@ describe("findForms", () => {
       ["message", "Message", false],
     ]);
   });
+
+  it("knows a placeholder is not an accessible name", () => {
+    const [f] = findForms(`<form action="/c"><input name="email" type="email" placeholder="Email"><label>Phone <input name="phone"></label><input name="x" aria-label="Extra"></form>`);
+    assert.deepEqual(f.fields.map((x) => [x.name, x.labelled]), [["email", false], ["phone", true], ["x", true]]);
+  });
 });
 
 describe("annotateForms", () => {

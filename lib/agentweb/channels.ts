@@ -300,21 +300,52 @@ function structured(root: HtmlNode): ChannelReport["structured"] {
   return { actions, entities, microdata: findAll(root, (n) => "itemscope" in (n.attrs ?? {})).length };
 }
 
-export function detectChannels(p: SiteProbe, opts: { browserAvailable?: boolean } = {}): ChannelReport {
-  const root = parseHtml(p.html);
-  const st = structured(root);
-  const declaredTools = [...declarativeTools(root, p.origin), ...imperativeTools(root), ...siteMcp(p, root), ...nlweb(p, root, st.actions.map((a) => a.target))];
-  const apiList = apis(p, root);
+function channelFindings(declaredTools: DeclaredTool[], apiList: ApiDescription[], st: ChannelReport["structured"], browser: boolean): ChannelFinding[] {
   const opCount = apiList.reduce((n, a) => n + a.operations.length, 0);
-  const browser = opts.browserAvailable !== false;
-  const channels: ChannelFinding[] = [
+  return [
     { channel: "declared-tools", declared: declaredTools.length > 0, count: declaredTools.length, note: declaredTools.length ? `${declaredTools.length} tool(s) declared for agents` : "the site declares no tools for agents" },
     { channel: "documented-api", declared: apiList.length > 0, count: opCount, note: apiList.length ? `${opCount} documented operation(s)` : "no OpenAPI description or feed found" },
     { channel: "structured-data", declared: st.entities.length + st.actions.length + st.microdata > 0, count: st.entities.length + st.actions.length, note: st.actions.length ? `${st.actions.length} schema.org action(s)` : st.entities.length ? "schema.org facts only" : "no schema.org data" },
     { channel: "a11y-tree", declared: browser, count: browser ? 1 : 0, note: browser ? "the page's controls can be read and used through a browser provider" : "no browser provider is configured" },
     { channel: "vision", declared: false, count: 0, note: "Vision (screenshots read by a model) is not available in this release." },
   ];
+}
+
+export function detectChannels(p: SiteProbe, opts: { browserAvailable?: boolean } = {}): ChannelReport {
+  const root = parseHtml(p.html);
+  const st = structured(root);
+  const declaredTools = [...declarativeTools(root, p.origin), ...imperativeTools(root), ...siteMcp(p, root), ...nlweb(p, root, st.actions.map((a) => a.target))];
+  const apiList = apis(p, root);
+  const browser = opts.browserAvailable !== false;
+  const channels = channelFindings(declaredTools, apiList, st, browser);
   return { origin: p.origin, declaredTools, apis: apiList, structured: st, channels, llmsTxt: p.files["/llms.txt"]?.status === 200 };
+}
+
+/** One report for a whole site from the reports of several of its pages (the first is the home page). */
+export function mergeReports(reports: ChannelReport[]): ChannelReport {
+  const first = reports[0];
+  const tools = new Map<string, DeclaredTool>();
+  const apiList = new Map<string, ApiDescription>();
+  const actions = new Map<string, StructuredAction>();
+  const entities: StructuredEntity[] = [];
+  let microdata = 0;
+  for (const r of reports) {
+    for (const t of r.declaredTools) tools.set(`${t.source}|${t.name}|${t.endpoint ?? t.form?.action ?? ""}`, t);
+    for (const a of r.apis) apiList.set(`${a.kind}|${a.source}`, a);
+    for (const a of r.structured.actions) actions.set(`${a.type}|${a.target}`, a);
+    entities.push(...r.structured.entities);
+    microdata += r.structured.microdata;
+  }
+  const st = { actions: [...actions.values()], entities, microdata };
+  const browser = first.channels.find((c) => c.channel === "a11y-tree")?.declared ?? true;
+  return {
+    origin: first.origin,
+    declaredTools: [...tools.values()],
+    apis: [...apiList.values()],
+    structured: st,
+    channels: channelFindings([...tools.values()], [...apiList.values()], st, browser),
+    llmsTxt: reports.some((r) => r.llmsTxt),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +384,7 @@ export function selectChannel(report: ChannelReport, task: { intent: string; fai
   const tool = report.declaredTools
     .map((t) => ({ t, score: t.source === "nlweb" || t.source === "site-mcp" ? overlap(want, ASK_WORDS) : overlap(want, tokens(`${t.name} ${t.description}`)) }))
     .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.t;
+    .sort((a, b) => b.score - a.score || Number(!!b.t.verified) - Number(!!a.t.verified))[0]?.t; // on a tie prefer the endpoint that answered a probe
   if (tool) {
     if (failed.has("declared-tools")) notes.push("declared tools failed before on this site");
     else return done({ channel: "declared-tools", tool, reason: `the site declares a tool for this (${tool.name}, ${tool.source})` });

@@ -22,6 +22,8 @@ export interface FormField {
   name: string;
   type: string;
   label: string;
+  /** A real accessible name (label, aria-label, title); a placeholder or the field name alone does not count. */
+  labelled: boolean;
   required: boolean;
 }
 export interface FormInfo {
@@ -90,8 +92,9 @@ function fieldsOf(body: string): (FormField & { attrs: string; tag: string; inde
     const id = attrOf(attrs, "id");
     const at = m.index ?? 0;
     const wrap = wrapping.find((w) => at >= w.start && at < w.end);
-    const label = (id ? labelsFor.get(id) : undefined) || wrap?.text || attrOf(attrs, "aria-label") || attrOf(attrs, "placeholder") || humanize(name);
-    out.push({ name, type, label, required: hasFlag(attrs, "required"), attrs, tag, index: at, length: m[0].length });
+    const real = (id ? labelsFor.get(id) : undefined) || wrap?.text || attrOf(attrs, "aria-label") || attrOf(attrs, "aria-labelledby") || attrOf(attrs, "title");
+    const label = real || attrOf(attrs, "placeholder") || humanize(name);
+    out.push({ name, type, label, labelled: !!real, required: hasFlag(attrs, "required"), attrs, tag, index: at, length: m[0].length });
   }
   return out;
 }
@@ -132,7 +135,7 @@ export function findForms(html: string): FormInfo[] {
     const submits = [...body.matchAll(FIELD_RE)].filter((f) => /^(submit|button|image)$/i.test(attrOf(f[2], "type") ?? "")).map((f) => attrOf(f[2], "value") ?? "");
     const button = [...buttons, ...submits].filter(Boolean).join(" ");
     const action = attrOf(attrs, "action") ?? "";
-    const base = { action, fields: fields.map(({ name, type, label, required }) => ({ name, type, label, required })), button };
+    const base = { action, fields: fields.map(({ name, type, label, labelled, required }) => ({ name, type, label, labelled, required })), button };
     const kind = hinted ? null : classify(base);
     out.push({
       kind,
