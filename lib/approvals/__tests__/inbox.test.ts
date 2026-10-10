@@ -56,6 +56,12 @@ function fixtures() {
     connectorBoardyRequest: both((ws) => [
       { id: `${ws}_boardy`, workspaceId: ws, status: "draft", targetName: "Cy", draftedSubject: "Intro to Cy", createdAt: at(14), mode: "funding" },
     ]),
+    // Phase 21A round 2 (WS=agentweb): one pending cart, one expired, one already signed.
+    agentwebMandate: both((ws) => [
+      { id: `${ws}_cart`, workspaceId: ws, status: "pending", expiresAt: LATER, merchantName: "Acme shop", merchantOrigin: "https://acme.test", amountMinor: 2500, currency: "GBP", cart: { items: [{ name: "Blue mug", qty: 2, unitMinor: 1250 }] }, requestedBy: "agent:lead", createdAt: at(3) },
+      { id: `${ws}_cart_expired`, workspaceId: ws, status: "pending", expiresAt: EARLIER, merchantName: "Old", merchantOrigin: "https://old.test", amountMinor: 100, currency: "GBP", cart: { items: [] }, requestedBy: "agent:lead", createdAt: at(90) },
+      { id: `${ws}_cart_signed`, workspaceId: ws, status: "signed", expiresAt: LATER, merchantName: "Done", merchantOrigin: "https://done.test", amountMinor: 100, currency: "GBP", cart: { items: [] }, requestedBy: "agent:lead", createdAt: at(80) },
+    ]),
     esignEnvelope: both((ws) => [
       { id: `${ws}_env`, workspaceId: ws, status: "draft", title: "MSA", documentName: "msa.pdf", createdBy: "agent:pipeline", createdAt: at(15), events: [{ event: "agent_draft_prepared" }] },
       { id: `${ws}_env_human`, workspaceId: ws, status: "draft", title: "Mine", documentName: null, createdBy: "u_editor", createdAt: at(15), events: [] },
@@ -128,8 +134,8 @@ describe("approvals inbox: workspace scoping", () => {
     const h = harness();
     await loadInbox(viewer("owner"), h.opts);
     // mission_approvals, report_send_approvals, composio_action_approvals,
-    // social_publications
-    assert.equal(h.scoped.length, 4);
+    // social_publications, agentweb_mandates (Phase 21A round 2)
+    assert.equal(h.scoped.length, 5);
     assert.ok(h.scoped.every((w) => w === A));
   });
 
@@ -146,7 +152,7 @@ describe("approvals inbox: workspace scoping", () => {
     assert.ok(!ids.has(`${A}_nudge2`), "approved nudge is gone");
     assert.ok(ids.has(`${A}_social`), "submitted social post");
     assert.ok(!ids.has(`${A}_social_draft`), "a draft post is not an approval");
-    assert.equal(res.total, 18, "16 + the autopilot draft and the workflow gate (Phase 18.3)");
+    assert.equal(res.total, 19, "16 + the autopilot draft and the workflow gate (Phase 18.3) + the pending cart (Phase 21A round 2)");
     assert.ok(!ids.has(`${A}_ap_done`), "a decided autopilot item is gone");
   });
 
@@ -293,8 +299,8 @@ describe("approvals inbox: resilience and display", () => {
 describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17)", () => {
   it("are the 16th and 17th sources", () => {
     const keys = INBOX_SOURCE_DEFS.map((d) => d.key);
-    assert.equal(keys.length, 17);
-    assert.deepEqual(keys.slice(15), ["autopilot", "workflow"]);
+    assert.equal(keys.length, 18);
+    assert.deepEqual(keys.slice(15), ["autopilot", "workflow", "agentweb"]);
   });
 
   it("autopilot lists pending drafts (not gates, not decided) and decides through the existing autopilot routes", async () => {
@@ -326,5 +332,34 @@ describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17
       assert.equal(i.approve, null);
     }
     assert.ok(res.items.some((i) => i.source === "workflow"));
+  });
+});
+
+
+describe("approvals inbox: cart approvals (Phase 21A round 2, source 18)", () => {
+  it("lists only pending, unexpired carts, as a high-risk card whose approve action is a ui_click signature", async () => {
+    const res = await loadInbox(viewer("editor", { userId: "u_other" }), harness().opts);
+    const carts = res.items.filter((i) => i.source === "agentweb");
+    assert.deepEqual(carts.map((i) => i.id), [`${A}_cart`]);
+    const c = carts[0]!;
+    assert.equal(c.risk, "high");
+    assert.equal(c.canDecide, true);
+    assert.equal(c.title, "Approve 25.00 GBP at Acme shop?");
+    assert.deepEqual(c.approve, { method: "POST", url: `/api/agentweb/mandates/${A}_cart/sign`, body: { channel: "ui_click" } });
+    assert.deepEqual(c.deny, { method: "POST", url: `/api/agentweb/mandates/${A}_cart/reject`, body: {} });
+    assert.deepEqual(c.lines, [{ label: "Blue mug × 2", detail: "25.00 GBP" }]);
+  });
+
+  it("a viewer sees the card but cannot decide it", async () => {
+    const res = await loadInbox(viewer("viewer"), harness().opts);
+    const c = res.items.find((i) => i.id === `${A}_cart`)!;
+    assert.equal(c.canDecide, false);
+    assert.equal(c.approve, null);
+    assert.equal(c.deny, null);
+  });
+
+  it("never shows another workspace's cart", async () => {
+    const res = await loadInbox(viewer("owner"), harness().opts);
+    assert.ok(!res.items.some((i) => i.id === `${B}_cart`));
   });
 });

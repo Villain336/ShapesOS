@@ -135,6 +135,8 @@ import "@/lib/agents/runs/browser-tools";
 import "@/lib/agentweb/tools";
 // Phase 21A (WS=agentweb): ask_web and web_monitor_page.
 import "@/lib/answer/tools";
+// Phase 21A round 2 (WS=agentweb): cart_request_signature and cart_status (no tool can approve a cart).
+import "@/lib/agentweb/commerce/tools";
 // Phase 9 (apps): the mini-app tools register themselves on import.
 import "@/lib/apps/tools";
 // Phase 11 (seotools): structured data + sitemap tools (group "site").

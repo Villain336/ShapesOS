@@ -253,6 +253,8 @@ export const es: Catalogue = {
       // Phase 18.3 (WS=trust)
       autopilot: "Piloto automático",
       workflow: "Flujo de trabajo",
+      // Phase 21A round 2 (WS=agentweb)
+      agentweb: "Web de agentes",
     },
   },
 

@@ -1243,6 +1243,9 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 21A (WS=agentweb): the answer-and-action engine (lib/answer/tools.ts).
   ask_web: "web",
   web_monitor_page: "web",
+  // Phase 21A round 2 (WS=agentweb): commerce — the agent can ask for a cart to be approved, never approve it.
+  cart_request_signature: "web",
+  cart_status: "web",
   // Phase 8: code tools, registered by lib/sandbox/tools.ts (run in the
   // agent run's sandbox, never on the host).
   read_file: "code",
@@ -1377,6 +1380,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // watching a page is a standing task on someone else's site (Tier 2, always asks unless a rule allows).
   ask_web: "search_web_answer",
   web_monitor_page: "write_web_monitor",
+  // Phase 21A round 2: putting a cart in front of the person is a request, not a purchase; approving is their click.
+  cart_request_signature: "write_cart_request",
   // Phase 8: sandbox edits are Tier 0 (local to an isolated, checkpointed
   // sandbox — a per-agent auto rule may apply); commands are Tier 2 (ask).
   write_file: "edit_sandbox_files",

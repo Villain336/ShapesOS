@@ -258,6 +258,8 @@ export const en = {
       // Phase 18.3 (WS=trust)
       autopilot: "Autopilot",
       workflow: "Workflow",
+      // Phase 21A round 2 (WS=agentweb)
+      agentweb: "Agent web",
     },
   },
 

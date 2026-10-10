@@ -266,3 +266,7 @@ lib/agentweb/__tests__/storefront-routes-db.test.ts
 lib/agentweb/__tests__/identity-keys-db.test.ts
 # Phase 21A round 2 (WS=agentweb): delegation records as the app role — stored with the receipt and mirrored in the audit chain entry (who delegated, run, scope, expiry, tier decision), FORCE RLS (no GUC sees nothing, another workspace sees nothing, a cross-workspace write is refused).
 lib/agentweb/__tests__/delegation-db.test.ts
+# Phase 21A round 2 (WS=agentweb): cart mandates as the app role — pending until a ui_click by an editor+ signs (voice, chat confirmation, API key, agent refused and the row stays pending), consumed exactly once and only for the cart it was signed for (different cart, expired, unsigned, rejected: refused; racing checkouts: one wins), FORCE RLS isolation, audit chain entries via ui_click without card data, a cap on pending carts.
+lib/agentweb/__tests__/mandate-db.test.ts
+# Phase 21A round 2 (WS=agentweb): the cart flow through the real tool gate and routes as the app role — an agent can ask but a chat/spoken yes never approves, no tool signs or completes, the signing route refuses every channel but a same-origin ui_click by an editor+, a click completes once through a MOCK ACP merchant or stops at payment without using the mandate up, a moved price is cancelled, card numbers are refused and absent from the audit chain.
+lib/agentweb/__tests__/commerce-flow-db.test.ts

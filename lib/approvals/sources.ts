@@ -970,6 +970,47 @@ const workflow: InboxSource = {
   },
 };
 
+/**
+ * Phase 21A round 2 (WS=agentweb): cart approvals. A cart an agent put in front of the person:
+ * the Tier 3 card. Approving is POST /api/agentweb/mandates/:id/sign with channel ui_click, a
+ * session route that refuses every other channel; the person's click is the only thing that
+ * can sign it. Agent sessions that need a person (a paused step, a failed teach-once step)
+ * join this source in the sessions slice.
+ */
+const agentweb: InboxSource = {
+  key: "agentweb",
+  viewRole: "viewer",
+  async load(ctx) {
+    const { viewer, now } = ctx;
+    const rows = await ctx.scoped((tx) =>
+      tx.agentwebMandate.findMany({ where: { workspaceId: viewer.workspaceId, status: "pending", expiresAt: { gt: now } }, orderBy: { createdAt: "desc" }, take: ctx.limit }),
+    );
+    return rows.map((r) => {
+      const items = ((r.cart as { items?: Array<{ name: string; qty: number; unitMinor: number }> } | null)?.items ?? []).slice(0, 8);
+      const amount = `${(r.amountMinor / 100).toFixed(2)} ${r.currency}`;
+      return makeItem({
+        id: r.id,
+        source: "agentweb",
+        typeLabel: "Cart approval",
+        title: `Approve ${amount} at ${r.merchantName}?`,
+        detail: `${r.merchantOrigin} · nothing is paid until you approve; approving is only ever your click`,
+        requestedBy: r.requestedBy,
+        createdAt: r.createdAt,
+        expiresAt: r.expiresAt,
+        risk: "high",
+        href: "/dashboard/approvals",
+        canDecide: isEditor(viewer),
+        blockedReason: EDITOR_REASON,
+        approve: post(`/api/agentweb/mandates/${enc(r.id)}/sign`, { channel: "ui_click" }),
+        deny: post(`/api/agentweb/mandates/${enc(r.id)}/reject`),
+        agent: r.requestedBy.startsWith("agent:") ? "Agent" : null,
+        lines: items.map((i) => ({ label: `${i.name} × ${i.qty}`, detail: `${((i.qty * i.unitMinor) / 100).toFixed(2)} ${r.currency}` })),
+        lineTotal: ((r.cart as { items?: unknown[] } | null)?.items ?? []).length,
+      });
+    });
+  },
+};
+
 export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   mission,
   spend,
@@ -989,4 +1030,6 @@ export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   // Phase 18.3 (WS=trust)
   autopilot,
   workflow,
+  // Phase 21A round 2 (WS=agentweb)
+  agentweb,
 ];
