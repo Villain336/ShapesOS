@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Film, GitPullRequest, Workflow } from "lucide-react";
+import { ChevronRight, Film, GitPullRequest, Globe, Workflow } from "lucide-react";
 import type { AgentRunStatus as PrismaRunStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
@@ -135,11 +135,18 @@ export default async function RunsIndexPage({
             Every agent run in {workspace.name}. Open one to follow its steps, tool calls and recording.
           </p>
         </div>
-        {/* Phase 9 (repos): the repositories agents work on, and their pull requests. */}
-        <Link href="/dashboard/runs/repositories" className={aosButton({ variant: "secondary", size: "sm" })}>
-          <GitPullRequest className="size-4" aria-hidden />
-          Repositories
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {/* Phase 21A round 2 (WS=agentweb): mission control for the web. */}
+          <Link href="/dashboard/runs/sessions" className={aosButton({ variant: "secondary", size: "sm" })}>
+            <Globe className="size-4" aria-hidden />
+            Agent sessions
+          </Link>
+          {/* Phase 9 (repos): the repositories agents work on, and their pull requests. */}
+          <Link href="/dashboard/runs/repositories" className={aosButton({ variant: "secondary", size: "sm" })}>
+            <GitPullRequest className="size-4" aria-hidden />
+            Repositories
+          </Link>
+        </div>
       </div>
 
       <nav aria-label="Filter runs by status" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
