@@ -270,3 +270,6 @@ lib/drive/__tests__/sandbox-bridge-db.test.ts
 
 # Phase 21B (drive): per-app storage (appContainer: own subtree + own quota, nothing leaks between installs) and the file-picker handle model (pickFileForApp / openHandle: one file behind an opaque signed handle, dies with the person's access).
 lib/drive/__tests__/app-container-db.test.ts
+
+# Phase 21B (drive): restore a folder as of a time from version history + the change journal — dry run first, new versions, files brought back from the Trash, nothing created later is deleted, purged history reported, a viewer can plan but not apply.
+lib/drive/__tests__/restore-db.test.ts
