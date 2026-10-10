@@ -435,7 +435,7 @@ async function relocateFile(args: MoveArgs & { newPath: string; sameRootOnly: bo
         }
       }
       const updated = await tx.workspaceFile.update({
-        where: { id: row.id },
+        where: { id: row.id, workspaceId: args.workspaceId },
         data: {
           logicalPath: finalPath,
           pathKey: collisionKey(finalPath),
@@ -478,7 +478,7 @@ export async function trashFile(args: MoveArgs): Promise<PublicFile> {
     const row = await tx.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId } });
     if (!row) throw new FsError("not_found", "File not found.");
     if (row.trashedAt) return toPublic(row);
-    const updated = await tx.workspaceFile.update({ where: { id: row.id }, data: { trashedAt: new Date() } });
+    const updated = await tx.workspaceFile.update({ where: { id: row.id, workspaceId: args.workspaceId }, data: { trashedAt: new Date() } });
     await recordChange(tx, args.workspaceId, { type: "trash", entity: "file", entityId: row.id, path: row.logicalPath, version: row.version, actorUserId: args.actorUserId ?? null });
     return toPublic(updated);
   });
@@ -504,7 +504,7 @@ export async function restoreFile(args: MoveArgs & { newPath?: string }): Promis
         throw new FsError("conflict", `A file already exists at ${finalPath}; restore to a different path.`);
       }
       const updated = await tx.workspaceFile.update({
-        where: { id: row.id },
+        where: { id: row.id, workspaceId: args.workspaceId },
         data: {
           logicalPath: finalPath,
           pathKey: collisionKey(finalPath),
@@ -549,7 +549,7 @@ export async function deleteFile(args: MoveArgs): Promise<void> {
   const info = normalizeLogicalPath(row.logicalPath);
   await withWorkspaceScope(args.workspaceId, async (tx) => {
     await lockDriveTree(tx, args.workspaceId);
-    await tx.workspaceFile.delete({ where: { id: row.id } });
+    await tx.workspaceFile.delete({ where: { id: row.id, workspaceId: args.workspaceId } });
     await tx.$executeRaw`UPDATE "workspace_quotas" SET "used_bytes" = GREATEST(0, "used_bytes" - ${BigInt(row.sizeBytes + versionBytes)}) WHERE "workspace_id" = ${args.workspaceId}`;
     if (info.ok) {
       for (const sc of quotaScopesFor(info)) {

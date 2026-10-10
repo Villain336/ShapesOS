@@ -82,7 +82,7 @@ export async function writeFileAs(
     if (!args.overwrite && args.baseVersion === undefined) throw new FsError("conflict", `A file already exists at ${existing.logicalPath}.`);
     await requireFileAction(actor, existing.id, "version");
     const res = await overwriteFile({ workspaceId: actor.workspaceId, fileId: existing.id, bytes: args.bytes, mimeType: args.mimeType, userId: actor.userId, maxBytes: args.maxBytes, expectVersion: args.baseVersion });
-    const row = await prisma.workspaceFile.findFirstOrThrow({ where: { id: existing.id } });
+    const row = await prisma.workspaceFile.findFirstOrThrow({ where: { id: existing.id, workspaceId: actor.workspaceId } });
     const { getFileAuthorised } = await import("../filesystem/service");
     return { file: (await getFileAuthorised({ workspaceId: actor.workspaceId, fileId: row.id }))!, created: false, version: res.version };
   }

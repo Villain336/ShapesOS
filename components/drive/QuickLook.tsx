@@ -30,8 +30,8 @@ export function QuickLook({ workspaceId, row, onClose, onDetails }: { workspaceI
   }, [onClose]);
   const handlers = openWithFor(row).filter((h) => h.id !== "drive:quick-look");
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={t("drive.quickLook.title", { name: row.name })} className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={t("drive.quickLook.title", { name: row.name })} className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-paper shadow-overlay">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-md font-semibold text-ink">{row.name}</h2>

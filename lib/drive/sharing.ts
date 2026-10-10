@@ -75,7 +75,7 @@ export async function setFolderAccess(actor: DriveActor, folderId: string, targe
     if (role === null) await tx.workspaceFolderAcl.deleteMany({ where: { workspaceId: actor.workspaceId, folderId, userId: targetUserId } });
     else {
       const existing = await tx.workspaceFolderAcl.findFirst({ where: { workspaceId: actor.workspaceId, folderId, userId: targetUserId }, select: { id: true } });
-      if (existing) await tx.workspaceFolderAcl.update({ where: { id: existing.id }, data: { role, grantedBy: actor.userId } });
+      if (existing) await tx.workspaceFolderAcl.update({ where: { id: existing.id, workspaceId: actor.workspaceId }, data: { role, grantedBy: actor.userId } });
       else await tx.workspaceFolderAcl.create({ data: { workspaceId: actor.workspaceId, folderId, userId: targetUserId, role, grantedBy: actor.userId } });
     }
     await recordChanges(tx, actor.workspaceId, [{ type: "update", entity: "folder", entityId: folderId, path: folder.path, actorUserId: actor.userId }]);

@@ -300,7 +300,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (258 keys)</summary>
+<details><summary>Not set on Render, on purpose (260 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -348,7 +348,10 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | bring-your-own on hosted | `INSTANTLY_API_KEY`, `SMARTLEAD_RELAY_CAMPAIGN_IDS`, `INSTANTLY_RELAY_CAMPAIGN_IDS` |
 | default memory; no Redis on Render | `MCP_RATE_LIMITER` |
 | default is right | `MEDIA_CARD_MODE`, `ACTION_APPROVAL_TTL_MS`, `GRAPH_CONNECTORS_LIVE`, `MARKETR_MAX_BROWSER_RECORDINGS`, `MEDIA_TWO_PERSON_THRESHOLD_CENTS`, `MEDIA_EXECUTION_WINDOW_HOURS`, `LLM_TIMEOUT_MS` |
-| no ClamAV sidecar on Render | `CLAMAV_HOST`, `CLAMAV_PORT` |
+| no ClamAV sidecar on Render; REQUIRED for uploads when hosted (21B) - point it at an external clamd | `CLAMAV_HOST` |
+| no ClamAV sidecar on Render; default 3310 | `CLAMAV_PORT` |
+| default (2 GiB - 1, quota-governed) is right | `DRIVE_MAX_FILE_BYTES` |
+| default 24 hours is right | `DRIVE_UPLOAD_TTL_HOURS` |
 | default Telegram API | `TELEGRAM_API_BASE` |
 | the test lab stays dry-run unless you decide otherwise | `TESTLAB_REAL_SEND` |
 | default Composio endpoint | `COMPOSIO_BASE_URL` |

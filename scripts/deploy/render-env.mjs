@@ -332,8 +332,11 @@ export const TABLE = [
   ["INSTANTLY_RELAY_CAMPAIGN_IDS", { cls: "exclude", why: "bring-your-own on hosted" }],
   ["MCP_RATE_LIMITER", { cls: "exclude", why: "default memory; no Redis on Render" }],
   ["MEDIA_CARD_MODE", { cls: "exclude", why: "default is right" }],
-  ["CLAMAV_HOST", { cls: "exclude", why: "no ClamAV sidecar on Render" }],
-  ["CLAMAV_PORT", { cls: "exclude", why: "no ClamAV sidecar on Render" }],
+  // Phase 21B: with DEPLOYMENT_MODE=hosted a missing scanner REFUSES uploads (lib/security/malware-scan.ts). Render has no ClamAV sidecar, so uploads stay off on Render until the owner points CLAMAV_HOST at an external clamd (add it by hand in the dashboard).
+  ["CLAMAV_HOST", { cls: "exclude", why: "no ClamAV sidecar on Render; REQUIRED for uploads when hosted (21B) - point it at an external clamd" }],
+  ["CLAMAV_PORT", { cls: "exclude", why: "no ClamAV sidecar on Render; default 3310" }],
+  ["DRIVE_MAX_FILE_BYTES", { cls: "exclude", why: "default (2 GiB - 1, quota-governed) is right" }],
+  ["DRIVE_UPLOAD_TTL_HOURS", { cls: "exclude", why: "default 24 hours is right" }],
   ["TELEGRAM_API_BASE", { cls: "exclude", why: "default Telegram API" }],
   ["TESTLAB_REAL_SEND", { cls: "exclude", why: "the test lab stays dry-run unless you decide otherwise" }],
   ["ACTION_APPROVAL_TTL_MS", { cls: "exclude", why: "default is right" }],

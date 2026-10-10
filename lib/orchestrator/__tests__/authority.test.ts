@@ -197,8 +197,10 @@ describe("TIER1_KINDS is conservative", () => {
     // Phase 18.2 (WS=comms): the person's own reminders and contact-card
     // merges (internal links between records; reversible by unlinking).
     const personalItems = new Set(["create_reminder", "complete_reminder", "confirm_contact_merge"]);
+    // Phase 21B (WS=drive): saving a NEW file in the workspace Drive (never over an existing one - that is Tier 2) is an internal, reversible write.
+    const driveItems = new Set(["save_agent_file"]);
     for (const k of TIER1_KINDS) {
-      if (internalSiteOps.has(k) || personalItems.has(k)) continue;
+      if (internalSiteOps.has(k) || personalItems.has(k) || driveItems.has(k)) continue;
       assert.match(k, /owned|internal|listing/, `unexpected Tier 1 kind: ${k}`);
     }
   });

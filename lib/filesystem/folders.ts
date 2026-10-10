@@ -174,7 +174,7 @@ export async function updateFolderMeta(args: { workspaceId: string; folderId: st
     const f = await tx.workspaceFolder.findFirst({ where: { id: args.folderId, workspaceId: args.workspaceId, trashedAt: null } });
     if (!f) throw new FsError("not_found", "Folder not found.");
     const updated = await tx.workspaceFolder.update({
-      where: { id: f.id },
+      where: { id: f.id, workspaceId: args.workspaceId },
       data: { ...(args.color !== undefined ? { color: args.color } : {}), ...(tags ? { tags: Array.from(new Set(tags)) } : {}) },
     });
     await recordChanges(tx, args.workspaceId, [{ type: "update", entity: "folder", entityId: f.id, path: f.path, actorUserId: args.actorUserId }]);
@@ -284,7 +284,7 @@ export async function moveFolder(args: { workspaceId: string; folderId: string; 
         const newOwner = ownerOf(canonicalDst);
         const moved = await rewriteSubtree(tx, args.workspaceId, f.path, canonicalDst, newOwner);
         const updated = await tx.workspaceFolder.update({
-          where: { id: f.id },
+          where: { id: f.id, workspaceId: args.workspaceId },
           data: { path: canonicalDst, pathKey: collisionKey(canonicalDst), name: basenameOf(canonicalDst), parentId: parentChain.leaf?.id ?? null, ownerUserId: newOwner },
         });
         await shiftScopes(tx, args.workspaceId, src, dst, moved.bytes);
@@ -330,7 +330,7 @@ export async function trashFolder(args: { workspaceId: string; folderId: string;
       const subs = await tx.workspaceFolder.findMany({ where: { workspaceId: args.workspaceId, trashedAt: null, path: { startsWith: `${f.path}/` } }, select: { id: true, path: true } });
       if (files.length) await tx.workspaceFile.updateMany({ where: { workspaceId: args.workspaceId, id: { in: files.map((x) => x.id) } }, data: { trashedAt: now, trashBatch: batch } });
       if (subs.length) await tx.workspaceFolder.updateMany({ where: { workspaceId: args.workspaceId, id: { in: subs.map((x) => x.id) } }, data: { trashedAt: now, trashBatch: batch } });
-      const trashed = await tx.workspaceFolder.update({ where: { id: f.id }, data: { trashedAt: now, trashBatch: batch } });
+      const trashed = await tx.workspaceFolder.update({ where: { id: f.id, workspaceId: args.workspaceId }, data: { trashedAt: now, trashBatch: batch } });
       await recordChanges(tx, args.workspaceId, [
         { type: "trash", entity: "folder", entityId: f.id, path: f.path, actorUserId: args.actorUserId },
         ...subs.map((s): NewChange => ({ type: "trash", entity: "folder", entityId: s.id, path: s.path, actorUserId: args.actorUserId })),
@@ -365,7 +365,7 @@ export async function restoreFolder(args: { workspaceId: string; folderId: strin
         const subs = f.trashBatch ? await tx.workspaceFolder.findMany({ where: { workspaceId: args.workspaceId, trashedAt: { not: null }, ...batchWhere, id: { not: f.id } }, select: { id: true, path: true } }) : [];
         if (files.length) await tx.workspaceFile.updateMany({ where: { workspaceId: args.workspaceId, id: { in: files.map((x) => x.id) } }, data: { trashedAt: null, trashBatch: null } });
         if (subs.length) await tx.workspaceFolder.updateMany({ where: { workspaceId: args.workspaceId, id: { in: subs.map((x) => x.id) } }, data: { trashedAt: null, trashBatch: null } });
-        const restored = await tx.workspaceFolder.update({ where: { id: f.id }, data: { trashedAt: null, trashBatch: null, parentId: parent.leaf?.id ?? null } });
+        const restored = await tx.workspaceFolder.update({ where: { id: f.id, workspaceId: args.workspaceId }, data: { trashedAt: null, trashBatch: null, parentId: parent.leaf?.id ?? null } });
         await recordChanges(tx, args.workspaceId, [
           ...parent.events,
           { type: "restore", entity: "folder", entityId: f.id, path: f.path, actorUserId: args.actorUserId },

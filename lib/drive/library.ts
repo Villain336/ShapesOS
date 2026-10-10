@@ -78,7 +78,7 @@ export async function setFavorite(actor: DriveActor, kind: "file" | "folder", id
     if (on) {
       const n = await tx.workspaceDriveFavorite.count({ where: { workspaceId: actor.workspaceId, userId: actor.userId } });
       if (n >= 200) throw new FsError("invalid_state", "You can have up to 200 favourites.");
-      await tx.workspaceDriveFavorite.upsert({ where: { userId_entity_entityId: { userId: actor.userId, entity: kind, entityId: id } }, create: { workspaceId: actor.workspaceId, userId: actor.userId, entity: kind, entityId: id }, update: {} });
+      await tx.workspaceDriveFavorite.upsert({ where: { userId_entity_entityId: { userId: actor.userId, entity: kind, entityId: id }, workspaceId: actor.workspaceId }, create: { workspaceId: actor.workspaceId, userId: actor.userId, entity: kind, entityId: id }, update: {} });
     } else {
       await tx.workspaceDriveFavorite.deleteMany({ where: { workspaceId: actor.workspaceId, userId: actor.userId, entity: kind, entityId: id } });
     }

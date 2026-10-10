@@ -200,7 +200,7 @@ function stateOf(row: UploadRow): UploadState {
 
 async function save(workspaceId: string, id: string, state: UploadState, extra: { completedFileId?: string } = {}) {
   await withWorkspaceScope(workspaceId, (tx) =>
-    tx.workspaceUpload.update({ where: { id }, data: { status: state.status, parts: state.parts as never, ...extra } }),
+    tx.workspaceUpload.update({ where: { id, workspaceId }, data: { status: state.status, parts: state.parts as never, ...extra } }),
   );
 }
 
@@ -401,7 +401,7 @@ export async function expireUploadsFor(workspaceId: string, now = new Date()): P
   const adapter = getStorageAdapter();
   for (const u of stale) {
     if (supportsMultipart(adapter) && u.providerUploadId) await adapter.abortMultipartUpload(u.storageKey, u.providerUploadId).catch(() => {});
-    await withWorkspaceScope(workspaceId, (tx) => tx.workspaceUpload.update({ where: { id: u.id }, data: { status: "expired" } }));
+    await withWorkspaceScope(workspaceId, (tx) => tx.workspaceUpload.update({ where: { id: u.id, workspaceId }, data: { status: "expired" } }));
   }
   return { expired: stale.length };
 }
