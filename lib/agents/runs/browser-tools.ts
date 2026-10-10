@@ -16,6 +16,17 @@
 // makes (navigations a click causes, redirect hops, subresources,
 // websockets); refused requests are aborted. Service workers are blocked.
 //
+// Phase 21A (WS=agentweb): browser_act is now judged step by step against the
+// page (lib/agentweb/classify.ts). Before each click or fill the element is
+// described (role, name, input type, autocomplete, the form's destination) and
+// the safety kernel decides: ordinary steps run; steps that pay, remove, sign
+// in, or type into a password / card field STOP the sequence (the person's own
+// act, whatever they said yes to); sending and unclear steps run only because
+// the person confirmed this call. A click that carries the page to another
+// origin also stops the sequence and nothing from that page is read back. Page
+// text returned by browser_open / browser_extract / browser_act is third-party
+// data: it is labelled so, and registered with the task's taint ledger.
+//
 // Each call starts from a fresh page: act / extract default to the last page
 // browser_open opened in this task. Deploy PR: that page is read back from
 // the run timeline (lastBrowserPageForTask) so it survives a hand-off to the
@@ -30,6 +41,11 @@ import { appendAgentRunEvent, lastBrowserPageForTask } from "./service";
 import { executeBrowserRun, RecorderBusyError, type BrowserRunRequest, type BrowserRunDeps, type BrowserRunResult } from "./lifecycle";
 import type { BrowserLauncher, RecorderPage, RequestGuard } from "./recorder";
 import type { AgentRunEventInput } from "./types";
+// Phase 21A (WS=agentweb): page-aware gate for browser_act, and page text kept as untrusted data.
+import { capabilitiesFor, checkNavigation } from "@/lib/agentweb/capabilities";
+import { SafetyKernel } from "@/lib/agentweb/kernel";
+import { wrapUntrusted } from "@/lib/agentweb/reader";
+import { taskKeyOf, webTasks } from "@/lib/agentweb/tasks";
 
 type Ctx = ToolContext & { threadId?: string };
 
@@ -125,6 +141,19 @@ export function parseSteps(raw: unknown): BrowserStep[] {
         throw new Error(`Step ${i + 1}: action must be click, fill, wait or screenshot.`);
     }
   });
+}
+
+/** Page text returned to the model: labelled as third-party data and remembered as untrusted (taint ledger). */
+async function untrustedText(ctx: Ctx, text: string, url: string): Promise<string> {
+  let origin = "unknown";
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    /* keep unknown */
+  }
+  const task = await webTasks.ensure(taskKeyOf(ctx), ctx.workspaceId).catch(() => null);
+  task?.kernel.ledger.register(text, origin, "untrusted");
+  return wrapUntrusted(text, origin);
 }
 
 function need<T>(fn: T | undefined, what: string): T {
@@ -238,7 +267,7 @@ export function createBrowserTools(deps: BrowserToolDeps = defaultBrowserToolDep
         title: r.title,
         browserRunId: res.runId,
       });
-      return done(`${r.title ? `${r.title} — ` : ""}${r.url}\n${r.text || "(no visible text)"}`, {
+      return done(`${r.title ? `${r.title} — ` : ""}${r.url}\n${await untrustedText(ctx, r.text || "(no visible text)", r.url)}`, {
         url: r.url,
         title: r.title,
         browserRunId: res.runId,
@@ -284,7 +313,7 @@ export function createBrowserTools(deps: BrowserToolDeps = defaultBrowserToolDep
       });
       const text = r.items.map((t, i) => `${i + 1}. ${t.trim()}`).join("\n");
       return done(
-        r.items.length ? (text.length > TEXT_CAP ? `${text.slice(0, TEXT_CAP)}…` : text) : `Nothing on ${r.url} matches ${selector}.`,
+        r.items.length ? await untrustedText(ctx, text.length > TEXT_CAP ? `${text.slice(0, TEXT_CAP)}…` : text, r.url) : `Nothing on ${r.url} matches ${selector}.`,
         { url: r.url, count: r.items.length, browserRunId: res.runId },
       );
     },
@@ -310,11 +339,40 @@ export function createBrowserTools(deps: BrowserToolDeps = defaultBrowserToolDep
       const url = await resolveStartUrl(deps, ctx, args.url);
       const res = await run(ctx, "browser_act", url, async (page, recordAction, artifactDir) => {
         let n = 0;
+        let stopped: { step: number; reason: string; leftSite: boolean } | null = null;
+        const task = await webTasks.ensure(taskKeyOf(ctx), ctx.workspaceId);
+        const kernel = new SafetyKernel({ caps: capabilitiesFor(url), ledger: task.kernel.ledger });
         for (const step of steps) {
           n += 1;
+          // Phase 21A: judge the step against the page before it runs.
+          if ((step.action === "click" || step.action === "fill") && page.describe) {
+            const el = await page.describe(step.selector).catch(() => null);
+            if (el) {
+              const cur = page.url ? page.url() : url;
+              const at = { url: cur, origin: new URL(cur).origin };
+              const d = kernel.authorize(
+                step.action === "click"
+                  ? { kind: "click", element: { ref: "s", ...el }, page: at }
+                  : { kind: "type", element: { ref: "s", ...el }, page: at, value: step.value },
+              );
+              if (d.decision !== "allow" && (d.decision !== "confirm" || !ctx.confirmed)) {
+                stopped = { step: n, reason: d.reasons.join("; "), leftSite: false };
+                await recordAction(`Stopped before step ${n}: ${stopped.reason}`, { action: step.action, selector: step.selector, klass: d.klass, tier: d.tier, decision: d.decision });
+                break;
+              }
+            }
+          }
           if (step.action === "click") {
             await need(page.click, "click").call(page, step.selector);
             await recordAction(`Clicked ${step.selector}`, { action: "click", selector: step.selector });
+            // A click that carried the page to another origin pauses the sequence; that page is not read back.
+            const landed = page.url ? page.url() : url;
+            const nav = checkNavigation(kernel.caps, landed);
+            if (!nav.ok) {
+              stopped = { step: n, reason: `the page moved to ${nav.reason === "new-origin" ? nav.origin : "another address"}, which this task did not start with`, leftSite: true };
+              await recordAction(`Paused after step ${n}: ${stopped.reason}`, { action: "click", selector: step.selector, decision: "paused" });
+              break;
+            }
           } else if (step.action === "fill") {
             await need(page.fill, "fill fields").call(page, step.selector, step.value);
             // Never the value itself: it may be a password or personal data.
@@ -328,18 +386,30 @@ export function createBrowserTools(deps: BrowserToolDeps = defaultBrowserToolDep
             await recordAction("Took a screenshot", { action: "screenshot", file });
           }
         }
-        const title = page.title ? await page.title().catch(() => "") : "";
-        return { url: page.url ? page.url() : url, title, text: await pageText(page) };
+        const left = stopped?.leftSite === true;
+        const title = left ? "" : page.title ? await page.title().catch(() => "") : "";
+        return { url: page.url ? page.url() : url, title, text: left ? "" : await pageText(page), ...(stopped ? { stopped } : {}) };
       });
-      const r = res.result as { url: string; title: string; text: string };
-      remember(ctx, r.url || url);
-      await linkEvent(ctx, `Ran ${steps.length} browser step${steps.length === 1 ? "" : "s"} on ${r.title || r.url}`, {
+      const r = res.result as { url: string; title: string; text: string; stopped?: { step: number; reason: string; leftSite: boolean } };
+      remember(ctx, r.stopped?.leftSite ? url : r.url || url);
+      await linkEvent(ctx, `Ran ${r.stopped ? r.stopped.step - (r.stopped.leftSite ? 0 : 1) : steps.length} of ${steps.length} browser step${steps.length === 1 ? "" : "s"} on ${r.title || r.url}`, {
         tool: "browser_act",
         url: r.url,
         steps: steps.map((s) => (s.action === "fill" ? { action: "fill", selector: s.selector } : s)),
+        ...(r.stopped ? { stoppedAt: r.stopped.step, stoppedBecause: r.stopped.reason } : {}),
         browserRunId: res.runId,
       });
-      return done(`Ran ${steps.length} step${steps.length === 1 ? "" : "s"}; now on ${r.title ? `${r.title} — ` : ""}${r.url}\n${r.text}`, {
+      if (r.stopped) {
+        const ran = r.stopped.leftSite ? r.stopped.step : r.stopped.step - 1;
+        const text = r.text ? `\n${await untrustedText(ctx, r.text, r.url)}` : "";
+        return done(
+          r.stopped.leftSite
+            ? `Ran ${ran} of ${steps.length} steps, then paused: ${r.stopped.reason}. Nothing from that page was read. Ask the person before going there.`
+            : `Ran ${ran} of ${steps.length} steps, then stopped before step ${r.stopped.step}: ${r.stopped.reason}. ShapesOS does not take money, delete things or fill passwords for an agent: tell the person what is needed so they can do it themselves.${text}`,
+          { url: r.url, title: r.title, browserRunId: res.runId, stoppedAt: r.stopped.step },
+        );
+      }
+      return done(`Ran ${steps.length} step${steps.length === 1 ? "" : "s"}; now on ${r.title ? `${r.title} — ` : ""}${r.url}\n${await untrustedText(ctx, r.text, r.url)}`, {
         url: r.url,
         title: r.title,
         browserRunId: res.runId,

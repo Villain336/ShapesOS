@@ -26,6 +26,8 @@ import { chromium } from "playwright";
 import type { Browser, BrowserContext, CDPSession, Page } from "playwright";
 import type { AgentRunEventInput } from "./types";
 import { attachWatch } from "./watch";
+// Phase 21A (WS=agentweb): the page-aware gate reads what a selector points at.
+import { DESCRIBE_ELEMENT, type DescribedElement } from "@/lib/agentweb/dom-describe";
 
 /**
  * Legacy artifact root (gitignored): recordings made before the deploy PR
@@ -87,6 +89,13 @@ export interface RecorderPage {
   extract?(selector: string, opts?: { limit?: number; timeoutMs?: number }): Promise<string[]>;
   title?(): Promise<string>;
   url?(): string;
+  /**
+   * Phase 21A (WS=agentweb): describe the element a selector points at (role,
+   * name, input type, autocomplete, the form and its destination) so the
+   * page-aware gate can judge a step before it runs. Null when nothing matches.
+   * Absent on stub launchers (their steps are not gated).
+   */
+  describe?(selector: string): Promise<DescribedElement | null>;
   /**
    * Slice 7: start CDP screencast on this page. Resolves with a stop
    * function; every captured frame is delivered as JPEG bytes to onFrame.
@@ -187,6 +196,11 @@ export const playwrightLauncher: BrowserLauncher = {
               },
               title: () => page.title(),
               url: () => page.url(),
+              describe: async (selector) => {
+                const loc = page.locator(selector).first();
+                if ((await loc.count().catch(() => 0)) === 0) return null;
+                return loc.evaluate(DESCRIBE_ELEMENT).catch(() => null);
+              },
               // Slice 7: real CDP screencast (Page.startScreencast → JPEG
               // frames). The ack loop throttles capture to consumer speed:
               // the next frame is only sent after we ack the current one.

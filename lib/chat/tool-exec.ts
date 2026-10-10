@@ -41,6 +41,8 @@ import { resolveConnectorTool } from "./connector-tools";
 // answer cache it also drops on a write (lib/chat/answer-cache.ts).
 import { isCacheableTool, toolCacheKey, toolResultCache } from "./tool-cache";
 import { answerCache } from "./answer-cache";
+// Phase 21A (WS=agentweb): page-aware call gates and taint tracking.
+import { preflightFor } from "@/lib/agentweb/gate";
 
 export const DELEGATE_TOOL = "delegate_to_subagent";
 /** Phase 16: hand a whole plan to sub-agents that run in parallel (lib/chat/delegation.ts). */
@@ -239,13 +241,26 @@ export async function executeTool(
     call.resultSummary = `Tool "${toolName}" needs the ${tool.minRole} role (you have ${ctx.role}).`;
     return null;
   }
+  // Phase 21A (WS=agentweb): the call's own gate (a click on a payment button,
+  // a navigation to a new origin) and taint tracking (page text flowing into a
+  // send / post / write). A refusal stands whatever the person says; a
+  // "confirm" asks even for a safe tool and beats an auto-approve rule.
+  const pre = await preflightFor(ctx, tool, args);
+  if (pre.verdict === "refuse") {
+    call.status = "denied";
+    call.resultSummary = pre.reason ?? `${tool.name} was stopped.`;
+    await auditToolExecution(ctx, tool, `DENIED (${pre.reason ?? "page-aware gate"})`);
+    await runEvent(ctx, `Stopped ${tool.name}: ${pre.reason ?? "page-aware gate"}`, { kind: "tool_result", tool: tool.name, status: "denied", reason: "preflight", ...ids }, "gate");
+    return null;
+  }
+  const mustAsk = pre.verdict === "confirm";
   // Confirmation gate: non-safe tools only run after an explicit "yes" —
   // or, Phase 5, when a per-agent auto-approve rule covers the action
   // (Phase 14: Tier 0–2). Tier 3 and destructive tools always ask.
   let autoReason: string | undefined;
-  if (tool.kind !== "safe" && !ctx.confirmed) {
+  if ((tool.kind !== "safe" || mustAsk) && !ctx.confirmed) {
     const decision =
-      tool.kind === "destructive"
+      tool.kind === "destructive" || mustAsk
         ? null
         : await autoApprovalFor(ctx.workspaceId, {
             agentKey: ctx.agentKey ?? "lead",
@@ -254,7 +269,7 @@ export async function executeTool(
           }).catch(() => null);
     if (!decision?.auto) {
       call.status = "pending_confirmation";
-      call.resultSummary = `Proposed ${tool.name} (${tool.kind}) — awaiting confirmation`;
+      call.resultSummary = mustAsk && pre.reason ? `Proposed ${tool.name} — ${pre.reason}` : `Proposed ${tool.name} (${tool.kind}) — awaiting confirmation`;
       if (ctx.grant) call.grant = [...ctx.grant];
       // Phase 14: offered on every Tier 0–2 call (never Tier 3 / destructive).
       if (decision?.offerAuto) call.autoAction = toolAction(tool.name);

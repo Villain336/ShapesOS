@@ -120,6 +120,20 @@ export interface ToolArgSchema {
   items?: Record<string, unknown>;
 }
 
+/**
+ * Phase 21A (WS=agentweb): what a tool's page-aware gate says about THIS call.
+ * Decided from the call and the live page (a click on a payment button, a
+ * navigation to a new origin), not from the tool's name, so the platform sets
+ * the tier from the effect. "confirm" makes executeTool ask a person even for a
+ * safe tool or an auto-approve rule; "refuse" stops the call whatever the
+ * person says (money, deletion, credentials are the person's own act).
+ */
+export interface ToolPreflight {
+  verdict: "allow" | "confirm" | "refuse";
+  /** Plain words for the person (and the model, on a refusal). */
+  reason?: string;
+}
+
 export interface ToolDef {
   name: string;
   description: string;
@@ -131,6 +145,8 @@ export interface ToolDef {
     required?: string[];
   };
   execute: (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>;
+  /** Phase 21A: the call's own gate, run before the confirmation gate (see ToolPreflight). */
+  preflight?: (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolPreflight>;
 }
 
 function str(v: unknown): string | undefined {
@@ -1216,6 +1232,14 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   browser_open: "web",
   browser_extract: "web",
   browser_act: "web",
+  // Phase 21A (WS=agentweb): the governed browser (lib/agentweb/tools.ts).
+  browser_snapshot: "web",
+  browser_navigate: "web",
+  browser_click: "web",
+  browser_type: "web",
+  browser_tabs: "web",
+  browser_screenshot: "web",
+  web_channels: "web",
   // Phase 8: code tools, registered by lib/sandbox/tools.ts (run in the
   // agent run's sandbox, never on the host).
   read_file: "code",
@@ -1341,6 +1365,11 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",
   browser_act: "browser_act",
+  // Phase 21A (WS=agentweb): Tier 2 like browser_act, but the page decides per step: a click or
+  // keystroke that pays, removes or signs in is refused (Tier 3, the person's own act), sending and
+  // unclear steps always ask even under an Auto-run rule (lib/agentweb/kernel.ts).
+  browser_click: "browser_click",
+  browser_type: "browser_type",
   // Phase 8: sandbox edits are Tier 0 (local to an isolated, checkpointed
   // sandbox — a per-agent auto rule may apply); commands are Tier 2 (ask).
   write_file: "edit_sandbox_files",

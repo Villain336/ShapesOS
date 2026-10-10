@@ -33,6 +33,28 @@ describe("authorize: navigation", () => {
   });
 });
 
+describe("authorizeStart (the first address of a task)", () => {
+  it("allows an address the person gave and scopes the task to its origin", () => {
+    const k = new SafetyKernel({ caps: capabilitiesFor("") });
+    assert.equal(k.authorizeStart("https://a.test/start").decision, "allow");
+    k.startAt("https://a.test/start");
+    assert.equal(k.authorize({ kind: "navigate", url: "https://a.test/x" }).decision, "allow");
+    assert.equal(k.authorize({ kind: "navigate", url: "https://b.test/x" }).decision, "confirm");
+  });
+  it("asks first when the address came out of a web page or a search result", () => {
+    const k = new SafetyKernel({ caps: capabilitiesFor("") });
+    k.ledger.register("Best deals at https://promo.example/offer today", "https://search.example", "untrusted");
+    const d = k.authorizeStart("https://promo.example/offer");
+    assert.equal(d.decision, "confirm");
+    assert.match(d.reasons.join(" "), /web page/);
+  });
+  it("refuses non-web addresses and addresses that carry a secret", () => {
+    const k = kernel();
+    assert.equal(k.authorizeStart("javascript:alert(1)").decision, "refuse");
+    assert.equal(k.authorizeStart("https://a.test/?t=sk-live-CANARY-7731a9").decision, "refuse");
+  });
+});
+
 describe("authorize: clicks", () => {
   it("money and destructive steps are handed to the person (Tier 3), never run", () => {
     const pay = kernel().authorize({ kind: "click", element: el(`<form action="/checkout/pay" method="post"><button>Place order</button></form>`, /Place/), page: PAGE });

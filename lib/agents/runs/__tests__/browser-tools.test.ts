@@ -110,7 +110,8 @@ describe("browser tools", () => {
   it("browser_open records into a child browser run and links it on the calling run", async () => {
     const h = harness();
     const res = await h.tools.get("browser_open")!.execute(ctx, { url: "https://www.example.com/" });
-    assert.match(res.summary, /Example — https:\/\/www\.example\.com\/after\nHello page/);
+    // Phase 21A: page text is labelled as third-party data.
+    assert.match(res.summary, /Example — https:\/\/www\.example\.com\/after\n<untrusted_page_data origin="https:\/\/www\.example\.com"[^>]*>\nHello page\n<\/untrusted_page_data>/);
     const req = h.runs[0]!;
     assert.equal(req.parentRunId, "run-1");
     assert.equal(req.threadId, ctx.threadId);
@@ -144,7 +145,86 @@ describe("browser tools", () => {
   it("browser_extract returns the matching elements' text", async () => {
     const h = harness();
     const res = await h.tools.get("browser_extract")!.execute(ctx, { url: "https://shop.example.com/", selector: "h2" });
-    assert.equal(res.summary, "1. One\n2. Two");
+    assert.match(res.summary, /^<untrusted_page_data origin="https:\/\/www\.example\.com"[^>]*>\n1\. One\n2\. Two\n<\/untrusted_page_data>$/);
+  });
+
+  describe("Phase 21A: browser_act is judged against the page, step by step", () => {
+    type Described = NonNullable<Awaited<ReturnType<NonNullable<RecorderPage["describe"]>>>>;
+    const els: Record<string, Described> = {
+      "#menu": { role: "button", name: "Menu", tag: "button" },
+      "#order": { role: "button", name: "Place order", tag: "button", form: { action: "https://www.example.com/checkout/pay", method: "post", fields: [{ type: "text", autocomplete: "cc-number" }] } },
+      "#pw": { role: "textbox", name: "Password", tag: "input", type: "password" },
+      "#send": { role: "button", name: "Send message", tag: "button", form: { action: "https://www.example.com/contact", method: "post", fields: [{ type: "email" }, { type: "textarea" }] } },
+      "#away": { role: "link", name: "Offers", tag: "a", href: "https://www.example.com/offers" },
+    };
+    function gated(landAt = "https://www.example.com/after") {
+      let current = "https://www.example.com/after";
+      const calls: string[] = [];
+      const page: RecorderPage = {
+        goto: async () => undefined,
+        click: async (s) => {
+          calls.push(`click ${s}`);
+          if (s === "#away") current = landAt;
+        },
+        fill: async (s, v) => void calls.push(`fill ${s}=${v}`),
+        extract: async () => ["Visible page text"],
+        title: async () => "Example",
+        url: () => current,
+        describe: async (sel) => els[sel] ?? null,
+      };
+      const actions: Array<{ summary: string; payload?: Record<string, unknown> }> = [];
+      const deps: BrowserToolDeps = {
+        checkUrl,
+        recordEvent: async () => undefined,
+        runBrowser: async (_req, d) => {
+          const out = await d.execute({ page, recordAction: async (summary, payload) => void actions.push({ summary, payload }), artifactDir: "/tmp/x", runId: "b2" });
+          return { runId: "b2", status: "succeeded", videoPath: null, tracePath: "t", stepCount: 0, sizeBytes: 0, result: out.result };
+        },
+      };
+      const act = createBrowserTools(deps).find((t) => t.name === "browser_act")!;
+      return { act, calls, actions };
+    }
+    const run = (act: ToolDef, steps: unknown[], over: Partial<ToolContext> = {}) => act.execute({ ...ctx, threadId: `g-${Math.random()}`, ...over }, { url: "https://www.example.com/start", steps });
+
+    it("ordinary steps run", async () => {
+      const g = gated();
+      const res = await run(g.act, [{ action: "click", selector: "#menu" }]);
+      assert.deepEqual(g.calls, ["click #menu"]);
+      assert.match(res.summary, /Ran 1 step/);
+    });
+
+    it("a payment click is stopped even though the person confirmed the call", async () => {
+      const g = gated();
+      const res = await run(g.act, [{ action: "click", selector: "#menu" }, { action: "click", selector: "#order" }, { action: "click", selector: "#menu" }]);
+      assert.deepEqual(g.calls, ["click #menu"]);
+      assert.match(res.summary, /Ran 1 of 3 steps, then stopped before step 2/);
+      assert.match(res.summary, /do it themselves/);
+    });
+
+    it("a password field is never filled and the value is not recorded", async () => {
+      const g = gated();
+      const res = await run(g.act, [{ action: "fill", selector: "#pw", value: "hunter2-secret" }]);
+      assert.deepEqual(g.calls, []);
+      assert.match(res.summary, /stopped before step 1/);
+      assert.ok(!JSON.stringify(g.actions).includes("hunter2-secret"));
+    });
+
+    it("sending runs only because the call was confirmed", async () => {
+      const yes = gated();
+      await run(yes.act, [{ action: "click", selector: "#send" }], { confirmed: true });
+      assert.deepEqual(yes.calls, ["click #send"]);
+      const no = gated();
+      const res = await run(no.act, [{ action: "click", selector: "#send" }], { confirmed: false });
+      assert.deepEqual(no.calls, []);
+      assert.match(res.summary, /stopped before step 1/);
+    });
+
+    it("a click that lands on another origin pauses and reads nothing from it", async () => {
+      const g = gated("https://evil.example.org/landing");
+      const res = await run(g.act, [{ action: "click", selector: "#away" }]);
+      assert.match(res.summary, /then paused: the page moved to https:\/\/evil\.example\.org/);
+      assert.doesNotMatch(res.summary, /Visible page text/);
+    });
   });
 
   it("validates steps", () => {

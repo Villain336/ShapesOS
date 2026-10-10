@@ -131,6 +131,8 @@ import "@/lib/ship/tools";
 // Phase 9 (sites): site_checkout / site_publish_draft (registers on import).
 import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
+// Phase 21A (WS=agentweb): the governed browser (snapshot / navigate / click / type / tabs / screenshot / web_channels).
+import "@/lib/agentweb/tools";
 // Phase 9 (apps): the mini-app tools register themselves on import.
 import "@/lib/apps/tools";
 // Phase 11 (seotools): structured data + sitemap tools (group "site").

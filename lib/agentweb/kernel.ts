@@ -24,6 +24,8 @@ import type { ElementInfo, ProposedStep, StepClass, StepDecision, TaintHit } fro
 
 export interface KernelOptions {
   caps: TaskCapabilities;
+  /** Share a taint ledger (the task's) instead of starting a fresh one. */
+  ledger?: TaintLedger;
   /** Credentials and tokens that must never reach an outward sink. */
   secrets?: readonly string[];
 }
@@ -38,10 +40,11 @@ const hit = <K extends StepDecision["decision"]>(
 
 export class SafetyKernel {
   readonly caps: TaskCapabilities;
-  readonly ledger = new TaintLedger();
+  readonly ledger: TaintLedger;
 
   constructor(opts: KernelOptions) {
     this.caps = opts.caps;
+    this.ledger = opts.ledger ?? new TaintLedger();
     for (const s of opts.secrets ?? []) this.ledger.registerSecret(s);
   }
 
@@ -82,6 +85,22 @@ export class SafetyKernel {
 
   sanitizeOutput(text: string): string {
     return sanitizeModelOutput(text, { allowedOrigins: this.caps.allowedOrigins, ledger: this.ledger });
+  }
+
+  /** May the task start at this address? (Before any origin is fixed.) */
+  authorizeStart(url: string): StepDecision {
+    const o = originOf(url);
+    if (!o) return hit("refuse", 2, "unknown", ["only http and https addresses can be opened"]);
+    const flow = checkFlow(this.ledger, { name: "browser_navigate", kind: "navigate", sameOrigin: false }, { url });
+    if (flow.verdict === "refuse") return hit("refuse", 2, "unknown", ["the address carries a secret"], flow.hits);
+    if (flow.verdict === "confirm") return hit("confirm", 2, "unknown", ["the address was taken from a web page or search result, not given by you"], flow.hits);
+    return hit("allow", 0, "benign", ["an address you gave"]);
+  }
+
+  /** Fix the task's first origin. Call after authorizeStart allowed (or the person confirmed). */
+  startAt(url: string): void {
+    const o = originOf(url);
+    if (o) this.caps.allowedOrigins.add(o);
   }
 
   authorize(step: ProposedStep): StepDecision {
