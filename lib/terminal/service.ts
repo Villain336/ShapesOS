@@ -302,6 +302,24 @@ async function finishSession(workspaceId: string, id: string, reason: string, by
 }
 
 /** End a session: destroy its sandbox, record it, meter paid minutes. Idempotent. */
+/**
+ * Phase 21B (WS=drive): the person's OWN live terminal sandbox, for the Drive upload/download
+ * bridge (lib/drive/sandbox-bridge.ts). Same rules as typing into it: editor+, the owner only.
+ */
+export async function terminalSandbox(actor: TerminalActor, sessionId: string): Promise<Sandbox> {
+  requireEditor(actor);
+  const row = await withWorkspaceScope(actor.workspaceId, (tx) => tx.terminalSession.findFirst({ where: { id: sessionId, workspaceId: actor.workspaceId } }));
+  if (!row) throw new NotFoundError("Terminal session not found.");
+  if (row.userId !== actor.userId) throw new ForbiddenError("This terminal belongs to someone else.");
+  if (row.status !== "active") throw new ConflictError("This terminal session has ended. Open a new one.");
+  const sb = await attach(row);
+  if (!sb) {
+    await finishSession(actor.workspaceId, row.id, "the sandbox idled out", null);
+    throw new ConflictError("The sandbox behind this terminal has stopped (idle timeout). Open a new one.");
+  }
+  return sb;
+}
+
 export async function endTerminalSession(workspaceId: string, id: string, byUserId: string, reason = "closed"): Promise<boolean> {
   const row = await withWorkspaceScope(workspaceId, (tx) => tx.terminalSession.findFirst({ where: { id, workspaceId } }));
   if (!row) throw new NotFoundError("Terminal session not found.");

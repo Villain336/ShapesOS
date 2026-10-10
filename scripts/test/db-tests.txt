@@ -273,3 +273,6 @@ lib/drive/__tests__/app-container-db.test.ts
 
 # Phase 21B (drive): restore a folder as of a time from version history + the change journal — dry run first, new versions, files brought back from the Trash, nothing created later is deleted, purged history reported, a viewer can plan but not apply.
 lib/drive/__tests__/restore-db.test.ts
+
+# Phase 21B (drive): folder sharing (inheritance, private-home shares, no admin break-glass), tree reads (roots, /shared with system folders, sorting/paging, Trash, shared with me, recents, usage), favourites, tags, smart folders.
+lib/drive/__tests__/library-db.test.ts

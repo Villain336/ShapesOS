@@ -118,6 +118,15 @@ describe("private homes", () => {
     await assert.rejects(() => requireFileAction(adm, file, "view"), (e: unknown) => (e as { status?: number }).status === 404);
   });
 
+  it("the service itself refuses to read a private file for anyone who does not name its owner", async () => {
+    const { readFile, getFile, readFileAuthorised } = await import("@/lib/filesystem/service");
+    assert.equal(await readFile({ workspaceId: WS, fileId: file }), null, "no viewer: nobody");
+    assert.equal(await readFile({ workspaceId: WS, fileId: file, viewerUserId: ADM }), null, "an admin is not the owner");
+    assert.equal(await getFile({ workspaceId: WS, fileId: file, viewerUserId: BEN }), null);
+    assert.equal((await readFile({ workspaceId: WS, fileId: file, viewerUserId: ANA }))!.bytes.toString(), "my taxes");
+    assert.equal((await readFileAuthorised({ workspaceId: WS, fileId: file }))!.bytes.toString(), "my taxes", "for callers that already checked the person's access");
+  });
+
   it("lists access only for the people who can see it", async () => {
     const { entries } = await listFileAccess(ana, file);
     assert.deepEqual(entries.map((e) => e.userId).sort(), [ANA, BEN].sort());

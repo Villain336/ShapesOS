@@ -14,10 +14,11 @@ import { personMayWriteTo } from "./roots";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { collisionKey, dirnameOf, basenameOf, normalizeLogicalPath, sanitizeUploadName } from "../filesystem/paths";
-import { deleteFile, moveFile, restoreFile, trashFile, writeFile, renameFile, type PublicFile } from "../filesystem/service";
+import { deleteFile, moveFile, restoreFile, trashFile, writeFile, renameFile, screenUserUpload, type PublicFile } from "../filesystem/service";
 import { moveFolder, restoreFolder, trashFolder, createFolder, type PublicFolder } from "../filesystem/folders";
 import { overwriteFile } from "../filesystem/versions";
 import { requireFileAction } from "../files/access";
+import { extractZip, type SkippedEntry } from "./extract";
 
 /** Validate a folder path and make sure this person may add to it. Returns its parsed path. */
 export async function requireDirWrite(actor: DriveActor, dirPath: string): Promise<PathInfo> {
@@ -79,8 +80,8 @@ export async function writeFileAs(
     await requireFileAction(actor, existing.id, "version");
     const res = await overwriteFile({ workspaceId: actor.workspaceId, fileId: existing.id, bytes: args.bytes, mimeType: args.mimeType, userId: actor.userId, maxBytes: args.maxBytes });
     const row = await prisma.workspaceFile.findFirstOrThrow({ where: { id: existing.id } });
-    const { getFile } = await import("../filesystem/service");
-    return { file: (await getFile({ workspaceId: actor.workspaceId, fileId: row.id }))!, created: false, version: res.version };
+    const { getFileAuthorised } = await import("../filesystem/service");
+    return { file: (await getFileAuthorised({ workspaceId: actor.workspaceId, fileId: row.id }))!, created: false, version: res.version };
   }
   const file = await writeFile({ workspaceId: actor.workspaceId, logicalPath: target.path, kind: target.kind, bytes: args.bytes, mimeType: args.mimeType, createdBy: actor.userId, maxBytes: args.maxBytes });
   return { file, created: true, version: 1 };
@@ -165,3 +166,46 @@ export async function removeFromTrashAs(actor: DriveActor, fileId: string): Prom
 }
 
 export { basenameOf };
+
+// ---------------------------------------------------------------------------
+// Upload a .zip and unpack it here
+// ---------------------------------------------------------------------------
+
+
+export interface ExtractIntoReport {
+  created: Array<{ path: string; fileId: string }>;
+  /** Refused by the archive rules (names, symlinks, bomb limits …). */
+  skippedByArchive: SkippedEntry[];
+  /** Refused by the normal upload gate, the quota, or because the name is taken. */
+  rejected: Array<{ path: string; reason: string }>;
+}
+
+/**
+ * Unpack an uploaded zip into a folder. The archive is checked as a whole by the malware
+ * scanner (refused on hosted without one), its entries by lib/drive/extract.ts, and every
+ * file then goes through the same gate as any upload (sniff, quota, versions). An existing
+ * file is never overwritten.
+ */
+export async function extractZipInto(actor: DriveActor, args: { dir: string; zip: Buffer }): Promise<ExtractIntoReport> {
+  const dir = await requireDirWrite(actor, args.dir);
+  await screenUserUpload(actor.workspaceId, actor.userId, "archive.zip", args.zip);
+  let result;
+  try {
+    result = extractZip(args.zip);
+  } catch (err) {
+    throw new FsError("unsafe_content", err instanceof Error ? err.message : "That is not a zip archive.");
+  }
+  const report: ExtractIntoReport = { created: [], skippedByArchive: result.skipped, rejected: [] };
+  for (const f of result.files) {
+    const target = `${dir.path}/${f.path}`;
+    try {
+      const { file, created } = await writeFileAs(actor, { dir: dirnameOf(target), filename: basenameOf(target), bytes: f.bytes, overwrite: false });
+      if (created) report.created.push({ path: file.logicalPath, fileId: file.id });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "could not be saved";
+      report.rejected.push({ path: f.path, reason });
+      if (err instanceof FsError && (err.code === "quota_exceeded" || err.code === "scanner_unavailable")) break;
+    }
+  }
+  return report;
+}

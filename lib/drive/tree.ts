@@ -144,6 +144,8 @@ export async function listChildren(args: {
   const ws = actor.workspaceId;
   const me = actor.userId;
   const isSharedTop = info.path === "/shared";
+  // Inside a private home that was shared with this person (resolveFolder proved they may look), its items are theirs to see.
+  const sharedHome = info.ownerUserId ?? me;
 
   // ---- folders first (Finder shows folders before files), then files ----
   const folders = await withWorkspaceScope(ws, (tx) =>
@@ -153,7 +155,7 @@ export async function listChildren(args: {
        WHERE workspace_id = ${ws} AND trashed_at IS NULL
          AND starts_with(path, ${prefix})
          AND position('/' in substr(path, ${prefix.length + 1}::int)) = 0
-         AND (owner_user_id IS NULL OR owner_user_id = ${me})
+         AND (owner_user_id IS NULL OR owner_user_id = ${me} OR owner_user_id = ${sharedHome})
        ORDER BY ${sortSql(sort, dir, "folders")}`),
   );
   const items: DriveItem[] = [];
@@ -190,14 +192,14 @@ export async function listChildren(args: {
      WHERE workspace_id = ${ws} AND trashed_at IS NULL
        AND starts_with(logical_path, ${prefix})
        AND position('/' in substr(logical_path, ${prefix.length + 1}::int)) = 0
-       AND (owner_user_id IS NULL OR owner_user_id = ${me})`);
+       AND (owner_user_id IS NULL OR owner_user_id = ${me} OR owner_user_id = ${sharedHome})`);
   const fileRows = await prisma.$queryRaw<Array<{ id: string; logical_path: string; filename: string; mime_type: string; size_bytes: number; version: number; created_by: string; created_at: Date; updated_at: Date | null; owner_user_id: string | null; tags: string[] }>>(Prisma.sql`
     SELECT id, logical_path, filename, mime_type, size_bytes, version, created_by, created_at, updated_at, owner_user_id, tags
       FROM workspace_files
      WHERE workspace_id = ${ws} AND trashed_at IS NULL
        AND starts_with(logical_path, ${prefix})
        AND position('/' in substr(logical_path, ${prefix.length + 1}::int)) = 0
-       AND (owner_user_id IS NULL OR owner_user_id = ${me})
+       AND (owner_user_id IS NULL OR owner_user_id = ${me} OR owner_user_id = ${sharedHome})
      ORDER BY ${sortSql(sort, dir, "files")}, id
      LIMIT ${limit} OFFSET ${Math.max(0, offset - folderCount)}`);
   const favs = await favoritesOf(ws, me, [...fileRows.map((f) => f.id), ...items.map((i) => i.id)]);

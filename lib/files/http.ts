@@ -18,6 +18,8 @@ export function filesErrorResponse(err: unknown, context: string): Response {
       err.code === "not_found" ? 404
       : err.code === "conflict" || err.code === "invalid_state" ? 409
       : err.code === "quota_exceeded" || err.code === "too_large" ? 413
+      : err.code === "forbidden" ? 403
+      : err.code === "scanner_unavailable" ? 503
       : 400;
     return Response.json({ error: err.message, code: err.code }, { status });
   }

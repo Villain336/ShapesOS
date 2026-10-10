@@ -14,19 +14,12 @@ import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { badRequest, notFound, requireWorkspaceAccess } from "@/lib/route-utils";
 import { HttpError } from "@/lib/api/errors";
-import {
-  FsError,
-  deleteFile,
-  getFile,
-  moveFile,
-  readFile,
-  renameFile,
-  restoreFile,
-  trashFile,
-} from "@/lib/filesystem/service";
+import { FsError, getFileAuthorised, readFileAuthorised } from "@/lib/filesystem/service";
+// Phase 21B (WS=drive): every change goes through the actor-aware layer (folder ACLs, private homes, journal).
+import { moveItemAs, removeFromTrashAs, renameItemAs, restoreItemAs, trashItemAs } from "@/lib/drive/ops";
 import { buildDownloadHeaders } from "@/lib/filesystem/download";
 // Phase 18.2 (WS=content): per-file access on top of the workspace role.
-import { fileRoleFor, requireFileAction } from "@/lib/files/access";
+import { fileRoleFor } from "@/lib/files/access";
 import { fileActor } from "@/lib/files/http";
 
 export const dynamic = "force-dynamic";
@@ -68,8 +61,13 @@ export async function GET(req: NextRequest, { params }: Params) {
   const access = await requireWorkspaceAccess(user.id, qs.get("workspaceId"), "viewer");
   if ("error" in access) return access.error;
 
+  // Phase 21B: a file in someone's private home reads as missing unless it was shared with this person.
+  const actor = fileActor(user.id, access.workspaceId, access.membership.role);
+  const found = await fileRoleFor(actor, fileId);
+  if (!found) return notFound("File not found");
+
   if (qs.get("download") === "1") {
-    const res = await readFile({ workspaceId: access.workspaceId, fileId }).catch(
+    const res = await readFileAuthorised({ workspaceId: access.workspaceId, fileId }).catch(
       (err) => fsErrorToResponse(err),
     );
     if (res instanceof Response) return res;
@@ -81,14 +79,13 @@ export async function GET(req: NextRequest, { params }: Params) {
     });
   }
 
-  const meta = await getFile({ workspaceId: access.workspaceId, fileId }).catch((err) =>
+  const meta = await getFileAuthorised({ workspaceId: access.workspaceId, fileId }).catch((err) =>
     fsErrorToResponse(err),
   );
   if (meta instanceof Response) return meta;
   if (!meta) return notFound("File not found");
   // Phase 18.2: the caller's role on this file (what the Files UI offers).
-  const fr = await fileRoleFor(fileActor(user.id, access.workspaceId, access.membership.role), fileId);
-  return Response.json({ file: meta, role: fr?.role ?? "viewer" });
+  return Response.json({ file: meta, role: found.role });
 }
 
 const PatchSchema = z
@@ -120,22 +117,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if ("error" in access) return access.error;
 
   try {
-    // Phase 18.2: the file's own access can narrow an editor (trash/rename/move need "edit").
-    await requireFileAction(fileActor(user.id, access.workspaceId, access.membership.role), fileId, action === "trash" ? "trash" : "edit").catch(async (err) => {
-      // Restoring a trashed file: it isn't live, so the per-file check can't load it — the workspace role (editor+) stands.
-      if (action === "restore") return null;
-      throw err;
-    });
-    const ws = { workspaceId: access.workspaceId, fileId };
-    const file =
-      action === "rename"
-        ? await renameFile({ ...ws, filename: parsed.data.filename! })
-        : action === "move"
-          ? await moveFile({ ...ws, newPath: parsed.data.newPath! })
-          : action === "trash"
-            ? await trashFile(ws)
-            : await restoreFile({ ...ws, newPath: parsed.data.newPath });
-    return Response.json({ file });
+    const actor = { workspaceId: access.workspaceId, userId: user.id, role: access.membership.role };
+    if (action === "rename") return Response.json({ file: await renameItemAs(actor, { kind: "file", id: fileId, name: parsed.data.filename! }) });
+    if (action === "move") return Response.json({ file: await moveItemAs(actor, { kind: "file", id: fileId, to: parsed.data.newPath! }) });
+    if (action === "trash") {
+      await trashItemAs(actor, { kind: "file", id: fileId });
+      return Response.json({ file: await getFileAuthorised({ workspaceId: access.workspaceId, fileId }) });
+    }
+    // restore: back from the Trash where it was (a new path is a move after it)
+    await restoreItemAs(actor, { kind: "file", id: fileId });
+    const restored = parsed.data.newPath ? await moveItemAs(actor, { kind: "file", id: fileId, to: parsed.data.newPath }) : await getFileAuthorised({ workspaceId: access.workspaceId, fileId });
+    return Response.json({ file: restored });
   } catch (err) {
     if (err instanceof HttpError) return Response.json({ error: err.message }, { status: err.status });
     return fsErrorToResponse(err);
@@ -155,12 +147,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if ("error" in access) return access.error;
 
   try {
+    const actor = { workspaceId: access.workspaceId, userId: user.id, role: access.membership.role };
     if (purge) {
-      await deleteFile({ workspaceId: access.workspaceId, fileId });
+      // admin+ here, and the file must already be in the Trash and visible to this person (a private home never is).
+      await removeFromTrashAs(actor, fileId);
     } else {
-      // Phase 18.2: the file's own access can narrow an editor.
-      await requireFileAction(fileActor(user.id, access.workspaceId, access.membership.role), fileId, "trash");
-      await trashFile({ workspaceId: access.workspaceId, fileId });
+      await trashItemAs(actor, { kind: "file", id: fileId });
     }
     return Response.json({ ok: true });
   } catch (err) {

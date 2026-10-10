@@ -295,23 +295,49 @@ async function liveRow(workspaceId: string, fileId: string) {
   });
 }
 
-/** Read file bytes + metadata. Registry-scoped; 404s for other workspaces. */
+/**
+ * A file in someone's PRIVATE HOME is invisible to every caller that does not
+ * name that person (viewerUserId) — admins, agents and other services included.
+ * Callers that have already run an access check for the actor (the Files routes,
+ * lib/drive/ops.ts) use readFileAuthorised / getFileAuthorised instead.
+ */
+function visibleTo(row: { ownerUserId: string | null }, viewerUserId: string | undefined): boolean {
+  return row.ownerUserId === null || row.ownerUserId === viewerUserId;
+}
+
+/** Read file bytes + metadata. Registry-scoped; 404s for other workspaces and for private homes of other people. */
 export async function readFile(args: {
   workspaceId: string;
   fileId: string;
+  viewerUserId?: string;
 }): Promise<{ meta: PublicFile; bytes: Buffer } | null> {
   const row = await liveRow(args.workspaceId, args.fileId);
-  if (!row) return null;
+  if (!row || !visibleTo(row, args.viewerUserId)) return null;
   const bytes = await getStorageAdapter().get(row.storageKey);
   if (!bytes) return null;
   return { meta: toPublic(row), bytes };
 }
 
-/** Metadata only (no bytes). Registry-scoped. */
+/** Like readFile, for a caller that has ALREADY checked this person's access to this file (requireFileAction). */
+export async function readFileAuthorised(args: { workspaceId: string; fileId: string }): Promise<{ meta: PublicFile; bytes: Buffer } | null> {
+  const row = await liveRow(args.workspaceId, args.fileId);
+  if (!row) return null;
+  const bytes = await getStorageAdapter().get(row.storageKey);
+  return bytes ? { meta: toPublic(row), bytes } : null;
+}
+
+/** Metadata only (no bytes). Registry-scoped; private homes of other people read as missing. */
 export async function getFile(args: {
   workspaceId: string;
   fileId: string;
+  viewerUserId?: string;
 }): Promise<PublicFile | null> {
+  const row = await liveRow(args.workspaceId, args.fileId);
+  return row && visibleTo(row, args.viewerUserId) ? toPublic(row) : null;
+}
+
+/** Like getFile, for a caller that has ALREADY checked access. */
+export async function getFileAuthorised(args: { workspaceId: string; fileId: string }): Promise<PublicFile | null> {
   const row = await liveRow(args.workspaceId, args.fileId);
   return row ? toPublic(row) : null;
 }
