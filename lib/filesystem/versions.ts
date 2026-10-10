@@ -23,7 +23,12 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditEvent } from "@/lib/auditlog";
 import { getStorageAdapter } from "./storage";
-import { DEFAULT_MAX_FILE_BYTES, DEFAULT_QUOTA_BYTES, FsError } from "./service";
+import { DEFAULT_MAX_FILE_BYTES, DEFAULT_QUOTA_BYTES, FsError } from "./core";
+import { screenUserUpload } from "./service";
+import { normalizeLogicalPath } from "./paths";
+import { recordChange } from "@/lib/drive/changes";
+import { chargeQuota, lockDriveTree, releaseQuota } from "@/lib/drive/quota-store";
+import { quotaScopesFor } from "@/lib/drive/quota";
 import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 
 export const DEFAULT_VERSION_RETENTION = 20;
@@ -104,6 +109,8 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
       throw new FsError("unsafe_content", check.reason);
     }
     mime = check.mime;
+    // Phase 21B: the malware scanner is REQUIRED on hosted deployments.
+    await screenUserUpload(workspaceId, userId, current.filename, bytes);
   }
 
   const adapter = getStorageAdapter();
@@ -113,19 +120,22 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
   let version = 0;
   try {
     const out = await withWorkspaceScope(workspaceId, async (tx) => {
-      await tx.workspaceQuota.upsert({
-        where: { workspaceId },
-        create: { workspaceId, limitBytes: BigInt(DEFAULT_QUOTA_BYTES), usedBytes: BigInt(0) },
-        update: {},
-      });
-      await tx.$queryRaw`SELECT "workspace_id" FROM "workspace_quotas" WHERE "workspace_id" = ${workspaceId} FOR UPDATE`;
+      await lockDriveTree(tx, workspaceId);
       // Re-read the file under the lock (a concurrent overwrite bumps the version).
       const file = await tx.workspaceFile.findFirst({ where: { id: fileId, workspaceId, trashedAt: null } });
       if (!file) throw new FsError("not_found", "File not found.");
-      const quota = await tx.workspaceQuota.findUniqueOrThrow({ where: { workspaceId } });
-      if (quota.usedBytes + BigInt(bytes.length) > quota.limitBytes) {
-        throw new FsError("quota_exceeded", "Workspace storage quota exceeded. Delete old versions or files, or lower the version retention.");
+      const info = normalizeLogicalPath(file.logicalPath);
+      const scopes = info.ok ? quotaScopesFor(info) : [];
+      const quota = await tx.workspaceQuota.findUnique({ where: { workspaceId } });
+      try {
+        await chargeQuota(tx, workspaceId, scopes, bytes.length);
+      } catch (e) {
+        if (e instanceof FsError && e.code === "quota_exceeded" && /^Workspace/.test(e.message)) {
+          throw new FsError("quota_exceeded", "Workspace storage quota exceeded. Delete old versions or files, or lower the version retention.");
+        }
+        throw e;
       }
+      const retention = quota?.versionRetention ?? DEFAULT_VERSION_RETENTION;
       // Who wrote the current bytes, and when: the file's creator for version
       // 1, else whoever replaced the version before it (the file row keeps
       // its creator — that is its owner for per-file access).
@@ -153,15 +163,13 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
         where: { workspaceId, fileId },
         select: { id: true, version: true, storageKey: true, sizeBytes: true },
       });
-      const drop = versionsToPurge(previous, quota.versionRetention);
+      const drop = versionsToPurge(previous, retention);
       if (drop.length) {
         await tx.workspaceFileVersion.deleteMany({ where: { workspaceId, id: { in: drop.map((d) => d.id) } } });
       }
       const freed = drop.reduce((n, d) => n + d.sizeBytes, 0);
-      await tx.workspaceQuota.update({
-        where: { workspaceId },
-        data: { usedBytes: { increment: BigInt(bytes.length - freed) } },
-      });
+      await releaseQuota(tx, workspaceId, scopes, freed);
+      await recordChange(tx, workspaceId, { type: "update", entity: "file", entityId: fileId, path: file.logicalPath, version: updated.version, actorUserId: userId });
       return { version: updated.version, drop };
     });
     version = out.version;

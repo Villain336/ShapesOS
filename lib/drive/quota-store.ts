@@ -55,6 +55,15 @@ export async function chargeQuota(tx: Tx, workspaceId: string, scopes: QuotaScop
   }
 }
 
+/** Free bytes (no limit check; a counter never goes below zero). */
+export async function releaseQuota(tx: Tx, workspaceId: string, scopes: QuotaScopeRef[], bytes: number): Promise<void> {
+  if (bytes <= 0) return;
+  await tx.$executeRaw`UPDATE "workspace_quotas" SET "used_bytes" = GREATEST(0, "used_bytes" - ${BigInt(bytes)}) WHERE "workspace_id" = ${workspaceId}`;
+  for (const s of scopes) {
+    await tx.$executeRaw`UPDATE "workspace_drive_quotas" SET "used_bytes" = GREATEST(0, "used_bytes" - ${BigInt(bytes)}) WHERE "workspace_id" = ${workspaceId} AND "scope" = ${s.key}`;
+  }
+}
+
 /** Set (or clear with null) the separate limit of a scope. */
 export async function setScopeLimit(tx: Tx, workspaceId: string, scope: string, limitBytes: number | null): Promise<void> {
   await tx.workspaceDriveQuota.upsert({
