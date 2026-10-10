@@ -52,6 +52,12 @@ export interface AgentwebToolDeps {
   saveScreenshot: (ctx: Ctx, png: Buffer) => Promise<string>;
   /** Network for the read channels (documented API, NLWeb): the SSRF guard plus fetch. */
   net: () => NetDeps;
+  /** Phase 21A round 2: browsing-session supervision (pause, take over, review each step, caps). Absent = unsupervised (unit tests). */
+  sessions?: {
+    gate: (ctx: Ctx, tool: string, args: Record<string, unknown>, inner: () => Promise<ToolPreflight | undefined>) => Promise<ToolPreflight>;
+    step: (ctx: Ctx, step: { url?: string; origin?: string | null; channel?: string | null }) => Promise<void>;
+    needs: (ctx: Ctx, reason: "blocked_by_site") => Promise<void>;
+  };
 }
 
 const TEXT_CAP = 6000;
@@ -98,6 +104,7 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       return undefined;
     } finally {
       task.steps += 1;
+      await deps.sessions?.step(ctx, { url: session.url(), origin: originOf(session.url()), channel: "a11y-tree" }).catch(() => undefined);
     }
   }
 
@@ -163,6 +170,11 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       await note(ctx, `Opened ${nav.title || nav.url}`, { tool: "browser_navigate", url: nav.url, status: nav.status, receiptId, provider: task.provider });
       // Learn what the site declares to agents (once per origin per task); failures here never fail the open.
       void learnSite(ctx, task, nav.url);
+      if ((nav as StepOutcome).siteOutcome) {
+        const so = (nav as StepOutcome).siteOutcome!;
+        if (so.kind === "blocked_by_site") await deps.sessions?.needs(ctx, "blocked_by_site").catch(() => undefined);
+        return { summary: outcomeText(nav as StepOutcome, nav.title), details: { url: nav.url, status: nav.status, siteOutcome: so, receiptId, [TOOL_RECORDED_EVENT]: true } };
+      }
       return { summary: `Opened ${nav.title ? `${cleanLabel(nav.title, 120)} — ` : ""}${nav.url} (HTTP ${nav.status}). Call browser_snapshot to read it.`, details: { url: nav.url, title: nav.title, status: nav.status, receiptId, [TOOL_RECORDED_EVENT]: true } };
     },
   };
@@ -401,7 +413,15 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
     },
   };
 
-  return [browser_snapshot, browser_navigate, browser_click, browser_type, browser_tabs, browser_screenshot, web_channels];
+  // Phase 21A round 2: every tool goes through the session gate first (when sessions are wired).
+  const supervised = (t: ToolDef): ToolDef =>
+    deps.sessions
+      ? {
+          ...t,
+          preflight: (c, a) => deps.sessions!.gate(c as Ctx, t.name, a, async () => t.preflight?.(c, a)),
+        }
+      : t;
+  return [browser_snapshot, browser_navigate, browser_click, browser_type, browser_tabs, browser_screenshot, web_channels].map(supervised);
 }
 
 export const AGENTWEB_TOOL_NAMES = ["browser_snapshot", "browser_navigate", "browser_click", "browser_type", "browser_tabs", "browser_screenshot", "web_channels"] as const;
@@ -445,6 +465,20 @@ export const defaultAgentwebDeps: AgentwebToolDeps = {
   async probe(origin, html) {
     const { probeSite } = await import("./probe");
     return probeSite(origin, html);
+  },
+  sessions: {
+    async gate(ctx, tool, args, inner) {
+      const { sessionGate } = await import("./sessions/gate");
+      return sessionGate(ctx, tool, args, inner);
+    },
+    async step(ctx, step) {
+      const { sessionStep } = await import("./sessions/gate");
+      await sessionStep(ctx, step);
+    },
+    async needs(ctx, reason) {
+      const { sessionNeeds } = await import("./sessions/gate");
+      await sessionNeeds(ctx, reason);
+    },
   },
   registry: {
     async recordProbe(w, r) {

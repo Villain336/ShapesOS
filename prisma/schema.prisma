@@ -1133,6 +1133,8 @@ model Workspace {
   // Phase 21A round 2 (WS=agentweb): delegation records and cart mandates.
   agentwebDelegations         AgentwebDelegation[]
   agentwebMandates            AgentwebMandate[]
+  agentwebSessions            AgentwebSession[]
+  agentwebFlows               AgentwebFlow[]
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
@@ -9596,6 +9598,8 @@ model AgentRun {
   sandbox   AgentRunSandbox?
   // Deploy PR: the live-watch frame relay row while the run is watched.
   watchFrame AgentRunWatchFrame?
+  // Phase 21A round 2 (WS=agentweb): the browsing-session state of this run (control, caps, origins).
+  agentwebSession AgentwebSession?
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
@@ -18229,4 +18233,77 @@ model AgentwebMandate {
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, runId])
   @@map("agentweb_mandates")
+}
+
+// ============================================================================
+// Phase 21A round 2 (WS=agentweb): Agent Sessions (M5).
+// Migration 20261101100600_p21_agentweb_sessions.
+// ============================================================================
+
+// The browsing-session state of ONE AgentRun (one row per run that used the governed
+// browser). This extends the run tree, it does not replace it: the run, its children, its
+// timeline and its cost stay in agent_runs / agent_run_events; this row adds what a person
+// needs to supervise the web part: who is in control (agent / paused / human), a step the
+// person has to approve, the per-session caps, and what the session has touched.
+// FORCE RLS.
+model AgentwebSession {
+  runId       String    @id @map("run_id")
+  run         AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  startedBy   String    @map("started_by")
+  // The in-process browsing task this session drives (lib/agentweb/tasks.ts taskKeyOf).
+  taskKey     String    @map("task_key")
+  // agent | paused | human
+  control     String    @default("agent") @db.VarChar(10)
+  controlBy   String?   @map("control_by")
+  controlAt   DateTime? @map("control_at")
+  // auto (the page-aware gate decides) | approve_each (every click/type/navigate waits for the person)
+  stepMode    String    @default("auto") @map("step_mode") @db.VarChar(12)
+  // The step the agent proposed and is waiting on: { id, tool, args, summary, proposedAt }
+  pending     Json?
+  // What the agent is told on its next step (e.g. the person rejected its proposal).
+  lastNote    String?   @map("last_note")
+  maxSteps    Int       @default(60) @map("max_steps")
+  maxSeconds  Int       @default(1800) @map("max_seconds")
+  maxCredits  Int       @default(150) @map("max_credits")
+  steps       Int       @default(0)
+  currentUrl  String?   @map("current_url")
+  channel     String?   @db.VarChar(24)
+  origins     String[]  @default([])
+  // Why a person is needed: cap_steps | cap_time | cap_credits | proposal | blocked_by_site | teach_check
+  needsReason String?   @map("needs_reason") @db.VarChar(24)
+  endedReason String?   @map("ended_reason") @db.VarChar(24)
+  startedAt   DateTime  @default(now()) @map("started_at")
+  lastStepAt  DateTime? @map("last_step_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, startedAt])
+  @@index([workspaceId, needsReason])
+  @@map("agentweb_sessions")
+}
+
+// A recorded web flow ("teach once"): a parameterised, replayable list of steps with
+// locators that heal (stable attributes, then role and name, then text). Starts as a DRAFT;
+// publishing needs a person's approval; typed values are never stored, only parameters.
+// FORCE RLS.
+model AgentwebFlow {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  sourceRunId String?   @map("source_run_id")
+  spec        Json
+  // draft | published
+  status      String    @default("draft") @db.VarChar(10)
+  createdBy   String    @map("created_by")
+  publishedBy String?   @map("published_by")
+  publishedAt DateTime? @map("published_at")
+  lastRunAt   DateTime? @map("last_run_at")
+  lastRunStatus String? @map("last_run_status") @db.VarChar(16)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@map("agentweb_flows")
 }

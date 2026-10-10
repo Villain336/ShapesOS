@@ -62,6 +62,12 @@ function fixtures() {
       { id: `${ws}_cart_expired`, workspaceId: ws, status: "pending", expiresAt: EARLIER, merchantName: "Old", merchantOrigin: "https://old.test", amountMinor: 100, currency: "GBP", cart: { items: [] }, requestedBy: "agent:lead", createdAt: at(90) },
       { id: `${ws}_cart_signed`, workspaceId: ws, status: "signed", expiresAt: LATER, merchantName: "Done", merchantOrigin: "https://done.test", amountMinor: 100, currency: "GBP", cart: { items: [] }, requestedBy: "agent:lead", createdAt: at(80) },
     ]),
+    agentwebSession: both((ws) => [
+      { runId: `${ws}_s1`, workspaceId: ws, startedBy: "u_editor", needsReason: "proposal", endedReason: null, pending: { id: "prop_1", summary: "Click e3" }, currentUrl: "https://shop.test/", steps: 4, updatedAt: at(2), run: { status: "running", agentKey: "lead" } },
+      { runId: `${ws}_s2`, workspaceId: ws, startedBy: "u_editor", needsReason: "cap_steps", endedReason: null, pending: null, currentUrl: "https://shop.test/x", steps: 60, updatedAt: at(4), run: { status: "running", agentKey: "lead" } },
+      { runId: `${ws}_s3`, workspaceId: ws, startedBy: "u_editor", needsReason: null, endedReason: null, pending: null, currentUrl: null, steps: 1, updatedAt: at(5), run: { status: "running", agentKey: "lead" } },
+      { runId: `${ws}_s4`, workspaceId: ws, startedBy: "u_editor", needsReason: "proposal", endedReason: null, pending: { id: "prop_9", summary: "old" }, currentUrl: null, steps: 1, updatedAt: at(500), run: { status: "succeeded", agentKey: "lead" } },
+    ]),
     esignEnvelope: both((ws) => [
       { id: `${ws}_env`, workspaceId: ws, status: "draft", title: "MSA", documentName: "msa.pdf", createdBy: "agent:pipeline", createdAt: at(15), events: [{ event: "agent_draft_prepared" }] },
       { id: `${ws}_env_human`, workspaceId: ws, status: "draft", title: "Mine", documentName: null, createdBy: "u_editor", createdAt: at(15), events: [] },
@@ -134,8 +140,8 @@ describe("approvals inbox: workspace scoping", () => {
     const h = harness();
     await loadInbox(viewer("owner"), h.opts);
     // mission_approvals, report_send_approvals, composio_action_approvals,
-    // social_publications, agentweb_mandates (Phase 21A round 2)
-    assert.equal(h.scoped.length, 5);
+    // social_publications, agentweb_mandates + agentweb_sessions (Phase 21A round 2)
+    assert.equal(h.scoped.length, 6);
     assert.ok(h.scoped.every((w) => w === A));
   });
 
@@ -152,7 +158,7 @@ describe("approvals inbox: workspace scoping", () => {
     assert.ok(!ids.has(`${A}_nudge2`), "approved nudge is gone");
     assert.ok(ids.has(`${A}_social`), "submitted social post");
     assert.ok(!ids.has(`${A}_social_draft`), "a draft post is not an approval");
-    assert.equal(res.total, 19, "16 + the autopilot draft and the workflow gate (Phase 18.3) + the pending cart (Phase 21A round 2)");
+    assert.equal(res.total, 21, "16 + the autopilot draft and the workflow gate (Phase 18.3) + the pending cart and two sessions that need a person (Phase 21A round 2)");
     assert.ok(!ids.has(`${A}_ap_done`), "a decided autopilot item is gone");
   });
 
@@ -339,7 +345,7 @@ describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17
 describe("approvals inbox: cart approvals (Phase 21A round 2, source 18)", () => {
   it("lists only pending, unexpired carts, as a high-risk card whose approve action is a ui_click signature", async () => {
     const res = await loadInbox(viewer("editor", { userId: "u_other" }), harness().opts);
-    const carts = res.items.filter((i) => i.source === "agentweb");
+    const carts = res.items.filter((i) => i.source === "agentweb" && !i.href.includes("/runs/sessions/"));
     assert.deepEqual(carts.map((i) => i.id), [`${A}_cart`]);
     const c = carts[0]!;
     assert.equal(c.risk, "high");
@@ -356,6 +362,24 @@ describe("approvals inbox: cart approvals (Phase 21A round 2, source 18)", () =>
     assert.equal(c.canDecide, false);
     assert.equal(c.approve, null);
     assert.equal(c.deny, null);
+  });
+
+  it("sessions that need a person: a proposal can be approved or rejected inline; a cap or a block links to the session", async () => {
+    const res = await loadInbox(viewer("editor", { userId: "u_other" }), harness().opts);
+    const sess = res.items.filter((i) => i.href.includes("/runs/sessions/"));
+    assert.deepEqual(sess.map((i) => i.id).sort(), [`${A}_s1`, `${A}_s2`]);
+    const proposal = sess.find((i) => i.id === `${A}_s1`)!;
+    assert.equal(proposal.title, "Approve this step? Click e3");
+    assert.deepEqual(proposal.approve, { method: "POST", url: `/api/agentweb/sessions/${A}_s1`, body: { op: "approve", proposalId: "prop_1" } });
+    assert.deepEqual(proposal.deny, { method: "POST", url: `/api/agentweb/sessions/${A}_s1`, body: { op: "reject", proposalId: "prop_1" } });
+    const cap = sess.find((i) => i.id === `${A}_s2`)!;
+    assert.equal(cap.approve, null);
+    assert.equal(cap.href, `/dashboard/runs/sessions/${A}_s2`);
+  });
+
+  it("a finished session and one that needs nothing are not in the inbox", async () => {
+    const res = await loadInbox(viewer("owner"), harness().opts);
+    assert.ok(!res.items.some((i) => i.id === `${A}_s3` || i.id === `${A}_s4`));
   });
 
   it("never shows another workspace's cart", async () => {

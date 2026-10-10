@@ -80,6 +80,13 @@ export interface ToolContext {
   runId?: string;
   /** Phase 5: aborted when the run is stopped. */
   signal?: AbortSignal;
+  /**
+   * Phase 21A round 2 (WS=agentweb): set ONLY by server code when a person sends a browser step
+   * from Agent sessions (take over / approve a proposal). It lets that one step past the session
+   * gate (pause, human control, review-each-step); the page-aware gate still applies in full.
+   * Built by the server, never from model output.
+   */
+  humanStep?: boolean;
 }
 
 export interface ToolResult {

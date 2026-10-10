@@ -985,7 +985,38 @@ const agentweb: InboxSource = {
     const rows = await ctx.scoped((tx) =>
       tx.agentwebMandate.findMany({ where: { workspaceId: viewer.workspaceId, status: "pending", expiresAt: { gt: now } }, orderBy: { createdAt: "desc" }, take: ctx.limit }),
     );
-    return rows.map((r) => {
+    const sessions = await ctx.scoped((tx) =>
+      tx.agentwebSession.findMany({ where: { workspaceId: viewer.workspaceId, needsReason: { not: null }, endedReason: null, run: { status: { in: ["queued", "running", "awaiting_confirmation"] } } }, orderBy: { updatedAt: "desc" }, take: ctx.limit, include: { run: { select: { agentKey: true } } } }),
+    );
+    const sessionItems = sessions.map((sRow) => {
+      const reason = sRow.needsReason ?? "";
+      const pending = sRow.pending as { id?: string; summary?: string } | null;
+      const TITLES: Record<string, string> = {
+        proposal: `Approve this step? ${pending?.summary ?? "A browser step"}`,
+        cap_steps: "A browsing session hit its step limit",
+        cap_time: "A browsing session hit its time limit",
+        cap_credits: "A browsing session hit its credit limit",
+        blocked_by_site: "A site would not let the agent in",
+        teach_check: "A taught flow needs a person to check a step",
+      };
+      return makeItem({
+        id: sRow.runId,
+        source: "agentweb",
+        typeLabel: reason === "proposal" ? "Browser step" : "Browsing session",
+        title: TITLES[reason] ?? "A browsing session needs you",
+        detail: [sRow.currentUrl, `${sRow.steps} steps`].filter(Boolean).join(" · "),
+        requestedBy: sRow.startedBy,
+        createdAt: sRow.updatedAt,
+        risk: reason === "proposal" ? "medium" : "low",
+        href: `/dashboard/runs/sessions/${enc(sRow.runId)}`,
+        canDecide: isEditor(viewer),
+        blockedReason: EDITOR_REASON,
+        approve: reason === "proposal" && pending?.id ? post(`/api/agentweb/sessions/${enc(sRow.runId)}`, { op: "approve", proposalId: pending.id }) : null,
+        deny: reason === "proposal" && pending?.id ? post(`/api/agentweb/sessions/${enc(sRow.runId)}`, { op: "reject", proposalId: pending.id }) : null,
+        agent: sRow.run?.agentKey ?? "Agent",
+      });
+    });
+    const cartItems = rows.map((r) => {
       const items = ((r.cart as { items?: Array<{ name: string; qty: number; unitMinor: number }> } | null)?.items ?? []).slice(0, 8);
       const amount = `${(r.amountMinor / 100).toFixed(2)} ${r.currency}`;
       return makeItem({
@@ -1008,6 +1039,7 @@ const agentweb: InboxSource = {
         lineTotal: ((r.cart as { items?: unknown[] } | null)?.items ?? []).length,
       });
     });
+    return [...cartItems, ...sessionItems];
   },
 };
 

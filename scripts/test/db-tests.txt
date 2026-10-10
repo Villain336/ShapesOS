@@ -270,3 +270,5 @@ lib/agentweb/__tests__/delegation-db.test.ts
 lib/agentweb/__tests__/mandate-db.test.ts
 # Phase 21A round 2 (WS=agentweb): the cart flow through the real tool gate and routes as the app role — an agent can ask but a chat/spoken yes never approves, no tool signs or completes, the signing route refuses every channel but a same-origin ui_click by an editor+, a click completes once through a MOCK ACP merchant or stops at payment without using the mandate up, a moved price is cancelled, card numbers are refused and absent from the audit chain.
 lib/agentweb/__tests__/commerce-flow-db.test.ts
+# Phase 21A round 2 (WS=agentweb): Agent Sessions as the app role through the real executeTool and the sessions route logic — the first browser step creates the session on the run, pause/resume and take over/hand back (the person's step goes through the same page-aware gate), review-each-step (typed text never stored, approve runs it as the person's, reject is told to the agent), step caps and the Phase 16 live-session limit, RLS, viewers cannot supervise, replay from signed receipts.
+lib/agentweb/__tests__/sessions-db.test.ts
