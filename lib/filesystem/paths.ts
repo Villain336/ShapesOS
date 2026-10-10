@@ -308,3 +308,37 @@ export function dirnameOf(normalizedPath: string): string {
   const i = normalizedPath.lastIndexOf("/");
   return normalizedPath.slice(0, i) || "/";
 }
+
+/**
+ * The folders that exist as rows on the way down to `folderPath`, top first.
+ * The tops of the drive tree (/shared, /home, /apps, /apps/<app>, /agents,
+ * /mounts) are virtual: they are never rows. Containers (the four system
+ * folders, /home/<id>, /apps/<app>/<install>, /agents/<run>, /mounts/<p>)
+ * are rows marked `system`.
+ */
+export function folderChain(folderPath: string): Array<{ path: string; system: boolean }> {
+  const segs = folderPath.split("/").filter(Boolean);
+  if (segs.length === 0) return [];
+  const top = `/${segs[0]}`;
+  // How many leading segments are virtual, and how many make the container row.
+  let virtual = 0;
+  let containerLen = 1;
+  if (top === "/shared") {
+    virtual = 1;
+    containerLen = 0; // /shared/<name> is an ordinary folder, not a system container
+  } else if (top === "/home") {
+    containerLen = 2;
+  } else if (top === "/apps") {
+    containerLen = 3;
+  } else if (top === "/agents" || top === "/mounts") {
+    containerLen = 2;
+  }
+  const out: Array<{ path: string; system: boolean }> = [];
+  for (let n = virtual + 1; n <= segs.length; n++) {
+    if (top === "/home" && n < 2) continue;
+    if (top === "/apps" && n < 3) continue;
+    if ((top === "/agents" || top === "/mounts") && n < 2) continue;
+    out.push({ path: `/${segs.slice(0, n).join("/")}`, system: containerLen > 0 && n === containerLen });
+  }
+  return out;
+}

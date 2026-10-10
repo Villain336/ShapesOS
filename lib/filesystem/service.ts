@@ -14,40 +14,32 @@
 
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import type { WorkspaceFileKind } from "@prisma/client";
+import type { Prisma, WorkspaceFileKind } from "@prisma/client";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   KIND_ROOT,
   basenameOf,
+  collisionKey,
   dirnameOf,
   normalizeLogicalPath,
   type FileKind,
+  type PathInfo,
 } from "./paths";
 import { getStorageAdapter } from "./storage";
 import { validateUploadBuffer } from "@/lib/security/upload-safety";
+import { screenUploadBuffer } from "@/lib/security/upload-audit";
 import { auditEvent } from "@/lib/auditlog";
 // Phase 18.1 (WS=find): Spotlight indexes the text inside each new file.
 import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
+// Phase 21B (WS=drive): folders, the change journal and scope quotas.
+import { FsError, DEFAULT_QUOTA_BYTES, TRASH_RETENTION_DAYS, DEFAULT_MAX_FILE_BYTES, type FsErrorCode } from "./core";
+import { ensureFolderChain } from "./folders";
+import { recordChange, recordChanges, type NewChange } from "@/lib/drive/changes";
+import { chargeQuota, lockDriveTree } from "@/lib/drive/quota-store";
+import { quotaScopesFor } from "@/lib/drive/quota";
 
-export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
-export const TRASH_RETENTION_DAYS = 30;
-export const DEFAULT_MAX_FILE_BYTES = 25 * 1024 * 1024; // W1 upload cap
-
-export type FsErrorCode =
-  | "not_found"
-  | "conflict"
-  | "quota_exceeded"
-  | "invalid_path"
-  | "unsafe_content"
-  | "too_large"
-  | "invalid_state";
-
-export class FsError extends Error {
-  readonly code: FsErrorCode;
-  constructor(code: FsErrorCode, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
+export { FsError, DEFAULT_QUOTA_BYTES, TRASH_RETENTION_DAYS, DEFAULT_MAX_FILE_BYTES };
+export type { FsErrorCode };
 
 /** Public file metadata — storageKey is NEVER exposed. */
 export interface PublicFile {
@@ -63,6 +55,9 @@ export interface PublicFile {
   trashedAt: string | null;
   /** Phase 18.2 (WS=content): the current version number. */
   version: number;
+  /** Phase 21B: the person whose private home this is (null = the workspace's). */
+  ownerUserId: string | null;
+  tags: string[];
 }
 
 function toPublic(f: {
@@ -77,6 +72,8 @@ function toPublic(f: {
   createdAt: Date;
   trashedAt: Date | null;
   version?: number;
+  ownerUserId?: string | null;
+  tags?: string[];
 }): PublicFile {
   return {
     id: f.id,
@@ -90,6 +87,8 @@ function toPublic(f: {
     createdAt: f.createdAt.toISOString(),
     trashedAt: f.trashedAt ? f.trashedAt.toISOString() : null,
     version: f.version ?? 1,
+    ownerUserId: f.ownerUserId ?? null,
+    tags: f.tags ?? [],
   };
 }
 
@@ -125,9 +124,45 @@ export interface WriteOptions {
   skipSafety?: boolean;
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  return !!err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "P2002";
+}
+
+type Tx = Prisma.TransactionClient;
+
+/** True when a live file or folder already has this name (case/NFC-insensitive), optionally ignoring one file. */
+async function nameTaken(tx: Tx, workspaceId: string, path: string, exceptFileId?: string): Promise<boolean> {
+  const key = collisionKey(path);
+  const file = await tx.workspaceFile.findFirst({
+    where: {
+      workspaceId,
+      trashedAt: null,
+      ...(exceptFileId ? { id: { not: exceptFileId } } : {}),
+      OR: [{ pathKey: key }, { pathKey: null, logicalPath: { equals: path, mode: "insensitive" } }],
+    },
+    select: { id: true },
+  });
+  if (file) return true;
+  const folder = await tx.workspaceFolder.findFirst({ where: { workspaceId, trashedAt: null, pathKey: key }, select: { id: true } });
+  return !!folder;
+}
+
+/** Run the malware screen on a user upload (hosted deployments refuse when no scanner is configured). */
+export async function screenUserUpload(workspaceId: string, createdBy: string, filename: string, bytes: Buffer): Promise<void> {
+  const screened = await screenUploadBuffer(bytes);
+  if (!screened.ok) {
+    await auditEvent({ workspaceId, projectId: null, action: "file_rejected", summary: `Filesystem upload rejected: ${screened.reason}`, actorUserId: createdBy }).catch(() => {});
+    throw new FsError(screened.status === 503 ? "scanner_unavailable" : "unsafe_content", screened.reason);
+  }
+}
+
 /**
  * Write a file into the workspace filesystem. Upload-safety runs by default;
- * quota is checked under a row lock so concurrent writers serialize.
+ * quota is checked under row locks so concurrent writers serialize. The file
+ * lands in its folder (created on demand, in the spelling an existing folder
+ * already has), counts against the workspace AND its scope (a person's home,
+ * an app container), and writes its create event to the change journal in the
+ * same transaction.
  */
 export async function writeFile(opts: WriteOptions): Promise<PublicFile> {
   const { workspaceId, kind, createdBy } = opts;
@@ -164,52 +199,58 @@ export async function writeFile(opts: WriteOptions): Promise<PublicFile> {
       throw new FsError("unsafe_content", check.reason);
     }
     mime = check.mime;
+    // Phase 21B: the malware scanner is REQUIRED on hosted deployments.
+    await screenUserUpload(workspaceId, createdBy, basenameOf(pathCheck.path), bytes);
   }
 
   const storageKey = randomUUID();
   const adapter = getStorageAdapter();
+  // Bytes go to storage BEFORE the transaction (a slow object store must not
+  // hold the workspace locks); they are removed again if the transaction fails.
+  await adapter.put(storageKey, bytes, mime);
 
-  const row = await prisma.$transaction(async (tx) => {
-    // Eager quota row (default 10 GB) + row lock: concurrent writers
-    // serialize here, so the check below can't be raced past. The quota is
-    // re-read AFTER the lock — the upsert's snapshot may be stale under
-    // concurrency.
-    await tx.workspaceQuota.upsert({
-      where: { workspaceId },
-      create: { workspaceId, limitBytes: BigInt(DEFAULT_QUOTA_BYTES), usedBytes: BigInt(0) },
-      update: {},
-    });
-    await tx.$queryRaw`SELECT "workspace_id" FROM "workspace_quotas" WHERE "workspace_id" = ${workspaceId} FOR UPDATE`;
-    const quota = await tx.workspaceQuota.findUniqueOrThrow({ where: { workspaceId } });
-    if (quota.usedBytes + BigInt(bytes.length) > quota.limitBytes) {
-      throw new FsError("quota_exceeded", "Workspace storage quota exceeded.");
-    }
-    await adapter.put(storageKey, bytes, mime);
-    const created = await tx.workspaceFile.create({
-      data: {
-        workspaceId,
-        logicalPath: pathCheck.path,
-        storageKey,
-        filename: basenameOf(pathCheck.path).slice(0, 255),
-        mimeType: mime,
-        sizeBytes: bytes.length,
-        kind: kind as WorkspaceFileKind,
-        createdBy,
+  let row;
+  try {
+    row = await withWorkspaceScope(
+      workspaceId,
+      async (tx) => {
+        await lockDriveTree(tx, workspaceId);
+        await chargeQuota(tx, workspaceId, quotaScopesFor(pathCheck), bytes.length);
+        // The folder first: if it exists under another spelling of its name,
+        // that spelling wins and the file takes it.
+        const dir = dirnameOf(pathCheck.path);
+        const chain = await ensureFolderChain(tx, workspaceId, dir, createdBy);
+        const finalPath = chain.leaf ? `${chain.leaf.path}/${basenameOf(pathCheck.path)}` : pathCheck.path;
+        if (await nameTaken(tx, workspaceId, finalPath)) throw new FsError("conflict", `A file already exists at ${finalPath}.`);
+        const created = await tx.workspaceFile.create({
+          data: {
+            workspaceId,
+            logicalPath: finalPath,
+            pathKey: collisionKey(finalPath),
+            ownerUserId: pathCheck.ownerUserId,
+            storageKey,
+            filename: basenameOf(finalPath).slice(0, 255),
+            mimeType: mime,
+            sizeBytes: bytes.length,
+            kind: kind as WorkspaceFileKind,
+            createdBy,
+          },
+        });
+        await recordChanges(tx, workspaceId, [
+          ...chain.events,
+          { type: "create", entity: "file", entityId: created.id, path: created.logicalPath, version: 1, actorUserId: createdBy },
+        ]);
+        return created;
       },
-    });
-    await tx.workspaceQuota.update({
-      where: { workspaceId },
-      data: { usedBytes: { increment: BigInt(bytes.length) } },
-    });
-    return created;
-  }).catch((err) => {
-    // A unique-violation on the live-path index means a file already exists
+      { timeoutMs: 30_000 },
+    );
+  } catch (err) {
+    await adapter.delete(storageKey).catch(() => {});
+    // A unique-violation on a live-path index means a file already exists
     // at this logical path. Map Prisma's P2002 to a clean 409.
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      throw new FsError("conflict", `A file already exists at ${pathCheck.path}.`);
-    }
+    if (isUniqueViolation(err)) throw new FsError("conflict", `A file already exists at ${pathCheck.path}.`);
     throw err;
-  });
+  }
 
   await auditEvent({
     workspaceId,
@@ -260,11 +301,13 @@ export interface DirListing {
 /**
  * List direct children of a directory prefix. Prefix must be "/" or a
  * /<root>(/<segment>...)* directory. Only live files are listed; trashed
- * files are never visible in the tree.
+ * files are never visible in the tree. A private home is listed only to its
+ * owner (`viewerUserId`); with no viewer, private homes are left out.
  */
 export async function listDir(args: {
   workspaceId: string;
   prefix?: string;
+  viewerUserId?: string;
 }): Promise<DirListing> {
   const raw = (args.prefix ?? "/").trim() || "/";
   let prefix: string;
@@ -281,6 +324,7 @@ export async function listDir(args: {
       workspaceId: args.workspaceId,
       trashedAt: null,
       logicalPath: { startsWith: prefix === "/" ? "/" : `${prefix}/` },
+      OR: [{ ownerUserId: null }, ...(args.viewerUserId ? [{ ownerUserId: args.viewerUserId }] : [])],
     },
     orderBy: { logicalPath: "asc" },
     take: 1000,
@@ -299,109 +343,136 @@ export async function listDir(args: {
   return { prefix, dirs: [...dirs].sort(), files };
 }
 
-/** Rename a file within its directory. Registry-scoped; collision → 409. */
-export async function renameFile(args: {
+interface MoveArgs {
   workspaceId: string;
   fileId: string;
-  filename: string;
-}): Promise<PublicFile> {
-  const row = await liveRow(args.workspaceId, args.fileId);
-  if (!row) throw new FsError("not_found", "File not found.");
-  const newPath = `${dirnameOf(row.logicalPath)}/${args.filename}`;
-  const check = normalizeLogicalPath(newPath);
+  actorUserId?: string;
+}
+
+/**
+ * Re-point a live file at a new path inside one transaction: collision check
+ * (case/NFC-insensitive), the destination folder chain, ownership and quota
+ * scope changes, and the journal event.
+ */
+async function relocateFile(args: MoveArgs & { newPath: string; sameRootOnly: boolean }): Promise<PublicFile> {
+  const check = normalizeLogicalPath(args.newPath);
   if (!check.ok) throw new FsError("invalid_path", check.reason);
-  if (check.kind !== (row.kind as FileKind)) {
-    throw new FsError("invalid_path", "Rename cannot move a file across roots.");
-  }
   try {
-    const updated = await prisma.workspaceFile.update({
-      where: { id: row.id },
-      data: { logicalPath: check.path, filename: basenameOf(check.path).slice(0, 255) },
+    return await withWorkspaceScope(args.workspaceId, async (tx) => {
+      await lockDriveTree(tx, args.workspaceId);
+      const row = await tx.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId, trashedAt: null } });
+      if (!row) throw new FsError("not_found", "File not found.");
+      const from = normalizeLogicalPath(row.logicalPath);
+      if (args.sameRootOnly && check.kind !== (row.kind as FileKind)) {
+        throw new FsError("invalid_path", "Rename cannot move a file across roots.");
+      }
+      // Files of the managed roots stay in them; plain files move anywhere writable.
+      if (row.kind !== "file" && check.root !== (from.ok ? from.root : check.root)) throw new FsError("invalid_path", "Files cannot be moved across roots.");
+      if (row.kind === "file" && check.kind !== "file") throw new FsError("invalid_path", "Files cannot be moved into /skills, /memory or /artifacts.");
+      if (check.path === row.logicalPath) return toPublic(row);
+      const chain = await ensureFolderChain(tx, args.workspaceId, dirnameOf(check.path), args.actorUserId ?? row.createdBy);
+      const finalPath = chain.leaf ? `${chain.leaf.path}/${basenameOf(check.path)}` : check.path;
+      if (await nameTaken(tx, args.workspaceId, finalPath, row.id)) throw new FsError("conflict", `A file already exists at ${finalPath}.`);
+      const final = normalizeLogicalPath(finalPath);
+      if (from.ok && final.ok) {
+        const a = quotaScopesFor(from).map((s) => s.key).join("|");
+        const b = quotaScopesFor(final).map((s) => s.key).join("|");
+        if (a !== b) {
+          const versions = await tx.workspaceFileVersion.aggregate({ where: { workspaceId: args.workspaceId, fileId: row.id }, _sum: { sizeBytes: true } });
+          const bytes = row.sizeBytes + (versions._sum.sizeBytes ?? 0);
+          await chargeQuota(tx, args.workspaceId, quotaScopesFor(from), -bytes);
+          await chargeQuota(tx, args.workspaceId, quotaScopesFor(final), bytes);
+        }
+      }
+      const updated = await tx.workspaceFile.update({
+        where: { id: row.id },
+        data: {
+          logicalPath: finalPath,
+          pathKey: collisionKey(finalPath),
+          filename: basenameOf(finalPath).slice(0, 255),
+          ownerUserId: final.ok ? final.ownerUserId : row.ownerUserId,
+        },
+      });
+      await recordChanges(tx, args.workspaceId, [
+        ...chain.events,
+        { type: "move", entity: "file", entityId: row.id, path: finalPath, prevPath: row.logicalPath, version: row.version, actorUserId: args.actorUserId ?? null },
+      ]);
+      return toPublic(updated);
     });
-    return toPublic(updated);
   } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      throw new FsError("conflict", `A file already exists at ${check.path}.`);
-    }
+    if (isUniqueViolation(err)) throw new FsError("conflict", `A file already exists at ${check.path}.`);
     throw err;
   }
 }
 
-/** Move a file to a new logical path within the same root. Collision → 409. */
-export async function moveFile(args: {
-  workspaceId: string;
-  fileId: string;
-  newPath: string;
-}): Promise<PublicFile> {
+/** Rename a file within its directory. Registry-scoped; collision → 409. */
+export async function renameFile(args: MoveArgs & { filename: string }): Promise<PublicFile> {
   const row = await liveRow(args.workspaceId, args.fileId);
   if (!row) throw new FsError("not_found", "File not found.");
-  const check = normalizeLogicalPath(args.newPath);
-  if (!check.ok) throw new FsError("invalid_path", check.reason);
-  if (check.kind !== (row.kind as FileKind)) {
-    throw new FsError("invalid_path", "Files cannot be moved across roots.");
-  }
-  if (check.path === row.logicalPath) return toPublic(row);
-  try {
-    const updated = await prisma.workspaceFile.update({
-      where: { id: row.id },
-      data: { logicalPath: check.path, filename: basenameOf(check.path).slice(0, 255) },
-    });
-    return toPublic(updated);
-  } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      throw new FsError("conflict", `A file already exists at ${check.path}.`);
-    }
-    throw err;
-  }
+  return relocateFile({ ...args, newPath: `${dirnameOf(row.logicalPath)}/${args.filename}`, sameRootOnly: true });
+}
+
+/**
+ * Move a file to a new logical path. Collision → 409. Plain files (kind
+ * "file") may move between /files and any of the Drive roots; files in
+ * /skills, /memory and /artifacts stay in their root.
+ */
+export async function moveFile(args: MoveArgs & { newPath: string }): Promise<PublicFile> {
+  return relocateFile({ ...args, sameRootOnly: false });
 }
 
 /** Soft-delete: trash with 30-day retention. Idempotent; quota unchanged. */
-export async function trashFile(args: {
-  workspaceId: string;
-  fileId: string;
-}): Promise<PublicFile> {
-  const row = await prisma.workspaceFile.findFirst({
-    where: { id: args.fileId, workspaceId: args.workspaceId },
+export async function trashFile(args: MoveArgs): Promise<PublicFile> {
+  return withWorkspaceScope(args.workspaceId, async (tx) => {
+    await lockDriveTree(tx, args.workspaceId);
+    const row = await tx.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId } });
+    if (!row) throw new FsError("not_found", "File not found.");
+    if (row.trashedAt) return toPublic(row);
+    const updated = await tx.workspaceFile.update({ where: { id: row.id }, data: { trashedAt: new Date() } });
+    await recordChange(tx, args.workspaceId, { type: "trash", entity: "file", entityId: row.id, path: row.logicalPath, version: row.version, actorUserId: args.actorUserId ?? null });
+    return toPublic(updated);
   });
-  if (!row) throw new FsError("not_found", "File not found.");
-  if (row.trashedAt) return toPublic(row);
-  const updated = await prisma.workspaceFile.update({
-    where: { id: row.id },
-    data: { trashedAt: new Date() },
-  });
-  return toPublic(updated);
 }
 
 /**
  * Restore a trashed file. Target path defaults to the original; restore
  * fails with 409 when the path is now occupied by a live file.
  */
-export async function restoreFile(args: {
-  workspaceId: string;
-  fileId: string;
-  newPath?: string;
-}): Promise<PublicFile> {
-  const row = await prisma.workspaceFile.findFirst({
-    where: { id: args.fileId, workspaceId: args.workspaceId },
-  });
-  if (!row) throw new FsError("not_found", "File not found.");
-  if (!row.trashedAt) return toPublic(row); // already live — idempotent
-  const targetRaw = args.newPath ?? row.logicalPath;
-  const check = normalizeLogicalPath(targetRaw);
-  if (!check.ok) throw new FsError("invalid_path", check.reason);
+export async function restoreFile(args: MoveArgs & { newPath?: string }): Promise<PublicFile> {
   try {
-    const updated = await prisma.workspaceFile.update({
-      where: { id: row.id },
-      data: {
-        logicalPath: check.path,
-        filename: basenameOf(check.path).slice(0, 255),
-        trashedAt: null,
-      },
+    return await withWorkspaceScope(args.workspaceId, async (tx) => {
+      await lockDriveTree(tx, args.workspaceId);
+      const row = await tx.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId } });
+      if (!row) throw new FsError("not_found", "File not found.");
+      if (!row.trashedAt) return toPublic(row); // already live — idempotent
+      const targetRaw = args.newPath ?? row.logicalPath;
+      const check = normalizeLogicalPath(targetRaw);
+      if (!check.ok) throw new FsError("invalid_path", check.reason);
+      const chain = await ensureFolderChain(tx, args.workspaceId, dirnameOf(check.path), args.actorUserId ?? row.createdBy);
+      const finalPath = chain.leaf ? `${chain.leaf.path}/${basenameOf(check.path)}` : check.path;
+      if (await nameTaken(tx, args.workspaceId, finalPath, row.id)) {
+        throw new FsError("conflict", `A file already exists at ${finalPath}; restore to a different path.`);
+      }
+      const updated = await tx.workspaceFile.update({
+        where: { id: row.id },
+        data: {
+          logicalPath: finalPath,
+          pathKey: collisionKey(finalPath),
+          filename: basenameOf(finalPath).slice(0, 255),
+          ownerUserId: check.ownerUserId,
+          trashedAt: null,
+          trashBatch: null,
+        },
+      });
+      await recordChanges(tx, args.workspaceId, [
+        ...chain.events,
+        { type: "restore", entity: "file", entityId: row.id, path: finalPath, version: row.version, actorUserId: args.actorUserId ?? null },
+      ]);
+      return toPublic(updated);
     });
-    return toPublic(updated);
   } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      throw new FsError("conflict", `A file already exists at ${check.path}; restore to a different path.`);
+    if (isUniqueViolation(err)) {
+      throw new FsError("conflict", `A file already exists at ${args.newPath ?? "that path"}; restore to a different path.`);
     }
     throw err;
   }
@@ -410,12 +481,9 @@ export async function restoreFile(args: {
 /**
  * Permanent purge. Requires the file to be trashed first (a live file can
  * never be purged — protects against accidental/malicious data loss).
- * Quota is decremented transactionally with the row delete.
+ * Quota (workspace and scope) is decremented transactionally with the row delete.
  */
-export async function deleteFile(args: {
-  workspaceId: string;
-  fileId: string;
-}): Promise<void> {
+export async function deleteFile(args: MoveArgs): Promise<void> {
   const row = await prisma.workspaceFile.findFirst({
     where: { id: args.fileId, workspaceId: args.workspaceId },
   });
@@ -428,12 +496,17 @@ export async function deleteFile(args: {
   const { versionBlobsOf } = await import("./versions");
   const versions = await versionBlobsOf(args.workspaceId, [row.id]);
   const versionBytes = versions.reduce((n, v) => n + v.sizeBytes, 0);
-  await prisma.$transaction(async (tx) => {
+  const info = normalizeLogicalPath(row.logicalPath);
+  await withWorkspaceScope(args.workspaceId, async (tx) => {
+    await lockDriveTree(tx, args.workspaceId);
     await tx.workspaceFile.delete({ where: { id: row.id } });
-    await tx.workspaceQuota.update({
-      where: { workspaceId: args.workspaceId },
-      data: { usedBytes: { decrement: BigInt(row.sizeBytes + versionBytes) } },
-    });
+    await tx.$executeRaw`UPDATE "workspace_quotas" SET "used_bytes" = GREATEST(0, "used_bytes" - ${BigInt(row.sizeBytes + versionBytes)}) WHERE "workspace_id" = ${args.workspaceId}`;
+    if (info.ok) {
+      for (const sc of quotaScopesFor(info)) {
+        await tx.$executeRaw`UPDATE "workspace_drive_quotas" SET "used_bytes" = GREATEST(0, "used_bytes" - ${BigInt(row.sizeBytes + versionBytes)}) WHERE "workspace_id" = ${args.workspaceId} AND "scope" = ${sc.key}`;
+      }
+    }
+    await recordChange(tx, args.workspaceId, { type: "delete", entity: "file", entityId: row.id, path: row.logicalPath, actorUserId: args.actorUserId ?? null });
   });
   await adapter.delete(row.storageKey);
   for (const v of versions) await adapter.delete(v.storageKey).catch(() => {});
@@ -476,7 +549,8 @@ export async function setQuotaLimit(args: {
 /**
  * Purge files trashed more than TRASH_RETENTION_DAYS ago. Plain exported
  * function the scheduler track can invoke on a schedule. Quota is decremented
- * transactionally per batch.
+ * transactionally per file; each purge is a journal event. Trashed folders
+ * past retention lose their rows too (their files are purged here first).
  */
 export async function purgeExpiredTrash(now = new Date()): Promise<{ purged: number }> {
   const cutoff = new Date(now.getTime() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
@@ -484,23 +558,23 @@ export async function purgeExpiredTrash(now = new Date()): Promise<{ purged: num
     where: { trashedAt: { lt: cutoff } },
     take: 500,
   });
-  const adapter = getStorageAdapter();
-  // Phase 18.2 (WS=content): previous versions go with the file.
-  const { versionBlobsOf } = await import("./versions");
   let purged = 0;
   for (const row of expired) {
-    const versions = await versionBlobsOf(row.workspaceId, [row.id]).catch(() => []);
-    const versionBytes = versions.reduce((n, v) => n + v.sizeBytes, 0);
-    await prisma.$transaction(async (tx) => {
-      await tx.workspaceFile.delete({ where: { id: row.id } });
-      await tx.workspaceQuota.updateMany({
-        where: { workspaceId: row.workspaceId },
-        data: { usedBytes: { decrement: BigInt(row.sizeBytes + versionBytes) } },
-      });
-    });
-    await adapter.delete(row.storageKey).catch(() => {});
-    for (const v of versions) await adapter.delete(v.storageKey).catch(() => {});
+    await deleteFile({ workspaceId: row.workspaceId, fileId: row.id }).catch(() => {});
     purged++;
+  }
+  // Folder rows go once nothing remains inside them (visited workspaces only:
+  // a trashed folder's files expire with it, so its workspace shows up above).
+  const wsIds = new Set<string>();
+  for (const r of expired) wsIds.add(r.workspaceId);
+  for (const workspaceId of wsIds) {
+    await withWorkspaceScope(workspaceId, async (tx) => {
+      const old = await tx.workspaceFolder.findMany({ where: { workspaceId, trashedAt: { lt: cutoff } }, select: { id: true, path: true } });
+      for (const f of old) {
+        const left = await tx.workspaceFile.count({ where: { workspaceId, logicalPath: { startsWith: `${f.path}/` } } });
+        if (left === 0) await tx.workspaceFolder.deleteMany({ where: { id: f.id, workspaceId } });
+      }
+    }).catch(() => {});
   }
   return { purged };
 }
@@ -516,3 +590,4 @@ export async function purgeOrphans(): Promise<{ checked: number }> {
 }
 
 export { KIND_ROOT };
+export type { PathInfo };

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   collisionKey,
   displayPath,
+  folderChain,
   normalizeDrivePath,
   normalizeFolderPath,
   normalizeLogicalPath,
@@ -194,5 +195,37 @@ describe("sanitizeUploadName", () => {
     assert.equal(sanitizeUploadName("..\\..\\evil.txt"), "evil.txt");
     assert.equal(sanitizeUploadName(""), "file");
     assert.equal(sanitizeUploadName("a/b/c.txt"), "c.txt");
+  });
+});
+
+describe("folderChain (which folders exist as rows above a path)", () => {
+  it("lists the materialised folders from the top, marking containers as system", () => {
+    assert.deepEqual(folderChain("/files/reports/q3"), [
+      { path: "/files", system: true },
+      { path: "/files/reports", system: false },
+      { path: "/files/reports/q3", system: false },
+    ]);
+    assert.deepEqual(folderChain("/shared/Marketing/plans"), [
+      { path: "/shared/Marketing", system: false },
+      { path: "/shared/Marketing/plans", system: false },
+    ]);
+    assert.deepEqual(folderChain("/home/u1/Taxes"), [
+      { path: "/home/u1", system: true },
+      { path: "/home/u1/Taxes", system: false },
+    ]);
+    assert.deepEqual(folderChain("/apps/crm/i1/data"), [
+      { path: "/apps/crm/i1", system: true },
+      { path: "/apps/crm/i1/data", system: false },
+    ]);
+    assert.deepEqual(folderChain("/agents/r1"), [{ path: "/agents/r1", system: true }]);
+    assert.deepEqual(folderChain("/mounts/google-drive/Docs"), [
+      { path: "/mounts/google-drive", system: true },
+      { path: "/mounts/google-drive/Docs", system: false },
+    ]);
+  });
+  it("has nothing for the virtual tops themselves", () => {
+    assert.deepEqual(folderChain("/shared"), []);
+    assert.deepEqual(folderChain("/home"), []);
+    assert.deepEqual(folderChain("/apps/crm"), []);
   });
 });
