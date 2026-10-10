@@ -14,7 +14,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BookmarkPlus, ChevronDown, ChevronUp, FileDown, FileText, Info, Loader2, Mail, Radar, Search, Settings2, ShieldCheck, UserPlus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BookmarkPlus, ChevronDown, ChevronUp, FileDown, FileText, Info, Loader2, Mail, Radar, Search, Settings2, ShieldCheck, Telescope, UserPlus, X } from "lucide-react";
 import { aosButton, FilterPill, NeutralBadge } from "@/components/aos";
 import { Switch } from "@/components/aos/Controls";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -68,6 +69,8 @@ export interface AskAppProps {
   canAct: boolean;
   isAdmin: boolean;
   showCosts: boolean;
+  /** Phase 21A round 2: the research session a follow-up attaches to (?research=<id>), and the member's own sessions. */
+  research?: { attachTo: { id: string; title: string } | null; mine: Array<{ id: string; title: string }> };
 }
 
 const usd = (micro: number) => `$${(micro / 1e6).toFixed(4)}`;
@@ -82,8 +85,9 @@ async function api<T>(url: string, init?: RequestInit): Promise<{ ok: true; data
   }
 }
 
-export function AskApp({ history: initialHistory, initial, config, providers, canAct, isAdmin, showCosts }: AskAppProps) {
+export function AskApp({ history: initialHistory, initial, config, providers, canAct, isAdmin, showCosts, research }: AskAppProps) {
   const { t, format } = useI18n();
+  const router = useRouter();
   const [question, setQuestion] = useState(initial?.payload.question ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +96,8 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
   const [activeSource, setActiveSource] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<{ loading: boolean; data: ReceiptData | null; failed: boolean } | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [attachTo, setAttachTo] = useState(research?.attachTo ?? null);
+  const [pickResearch, setPickResearch] = useState("");
   const rowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const mockOnly = !providers.some((p) => !p.mock && p.configured);
 
@@ -106,17 +112,19 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
       setError(null);
       setReceipt(null);
       setActiveSource(null);
-      const res = await api<{ id: string; status: string; payload: AnswerPayload; usage: Usage }>("/api/answer", { method: "POST", body: JSON.stringify({ question: text }) });
+      const res = await api<{ id: string; status: string; payload: AnswerPayload; usage: Usage; attached?: { researchId?: string; error?: string } }>("/api/answer", { method: "POST", body: JSON.stringify({ question: text, ...(attachTo ? { researchId: attachTo.id } : {}) }) });
       setBusy(false);
       if (!res.ok) {
         setError(res.error);
         return;
       }
       setShown(res.data);
+      if (res.data.attached?.error) toastError(t("askApp.research.attachFailed", { error: res.data.attached.error }));
+      else if (res.data.attached?.researchId) toast({ title: t("askApp.research.attached", { title: attachTo?.title ?? "" }), status: "done" });
       window.history.replaceState(window.history.state, "", `/dashboard/ask?answer=${encodeURIComponent(res.data.id)}`);
       setHistory((h) => [{ id: res.data.id, question: text, status: res.data.status, mock: res.data.usage.mock, createdAt: new Date().toISOString() }, ...h].slice(0, 15));
     },
-    [t],
+    [t, attachTo],
   );
 
   async function openReceipt(id: string) {
@@ -142,6 +150,24 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
     toast({ title: t("askApp.actions.saved"), description: res.data.summary?.slice(0, 160) });
   }
 
+  async function startResearch() {
+    if (!shown) return;
+    setActing("research");
+    const res = await api<{ research?: { id: string } }>("/api/agentweb/research", { method: "POST", body: JSON.stringify({ op: "create", question: shown.payload.question, answerId: shown.id }) });
+    setActing(null);
+    if (!res.ok || !res.data.research) return toastError(t("askApp.research.failed"), res.ok ? undefined : res.error);
+    router.push(`/dashboard/research/${encodeURIComponent(res.data.research.id)}`);
+  }
+
+  async function addToResearch(id: string) {
+    if (!shown) return;
+    setActing("research");
+    const res = await api<Record<string, unknown>>("/api/agentweb/research", { method: "POST", body: JSON.stringify({ op: "attach_answer", id, answerId: shown.id }) });
+    setActing(null);
+    if (!res.ok) return toastError(t("askApp.research.failed"), res.error);
+    router.push(`/dashboard/research/${encodeURIComponent(id)}`);
+  }
+
   function jumpTo(id: number) {
     setActiveSource(id);
     rowRefs.current[id]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -164,6 +190,13 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
           <span>
             <strong className="font-semibold text-ink">{t("askApp.mock.label")}.</strong> {t("askApp.mock.body")}
           </span>
+        </p>
+      ) : null}
+
+      {attachTo ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink" role="note">
+          <span>{t("askApp.research.attachingTo", { title: attachTo.title })}</span>
+          <button type="button" onClick={() => setAttachTo(null)} className={aosButton({ variant: "quiet", size: "xs" })}>{t("askApp.research.detach")}</button>
         </p>
       ) : null}
 
@@ -285,6 +318,26 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
                   <FileDown className="size-4" aria-hidden />
                   {t("askApp.actions.saveDrive")}
                 </button>
+                {research ? (
+                  <>
+                    <button type="button" disabled={acting !== null} onClick={() => void startResearch()} className={aosButton({ variant: "secondary", size: "sm" })}>
+                      <Telescope className="size-4" aria-hidden />
+                      {t("askApp.research.start")}
+                    </button>
+                    {research.mine.length > 0 ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <label className="sr-only" htmlFor="ask-research-pick">{t("askApp.research.pick")}</label>
+                        <select id="ask-research-pick" value={pickResearch} onChange={(e) => setPickResearch(e.target.value)} className="h-9 max-w-[14rem] rounded-md border-[1.5px] border-control bg-paper px-2 text-sm text-ink outline-none focus:border-focus focus:shadow-[0_0_0_3px_var(--aos-focus-halo)]">
+                          <option value="">{t("askApp.research.pick")}</option>
+                          {research.mine.map((r) => (
+                            <option key={r.id} value={r.id}>{r.title}</option>
+                          ))}
+                        </select>
+                        <button type="button" disabled={acting !== null || !pickResearch} onClick={() => void addToResearch(pickResearch)} className={aosButton({ variant: "secondary", size: "sm" })}>{t("askApp.research.add")}</button>
+                      </span>
+                    ) : null}
+                  </>
+                ) : null}
                 <button type="button" disabled={!canAct || acting !== null} onClick={() => void act("draft_email", activeSource ?? undefined)} className={aosButton({ variant: "secondary", size: "sm" })}>
                   <Mail className="size-4" aria-hidden />
                   {t("askApp.actions.draftEmail")}

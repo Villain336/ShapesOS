@@ -5,23 +5,18 @@
 // The workflow still has to be switched on by a person, and runs as the person who linked it.
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { httpErrorResponse } from "@/lib/enrichment/guard";
 import { answerActor } from "@/lib/answer/http";
 import { humanClickGuard } from "@/lib/agentweb/commerce/http";
-import { linkMonitor, listMonitorLinks, MonitorLinkError, unlinkMonitor } from "@/lib/agentweb/research/monitors";
+import { linkMonitor, MonitorLinkError, monitorsOverview, unlinkMonitor } from "@/lib/agentweb/research/monitors";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const { workspace } = await answerActor();
-    const [monitors, workflows, links] = await Promise.all([
-      prisma.monitor.findMany({ where: { workspaceId: workspace.id, status: { not: "archived" } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, url: true, cadence: true, status: true, lastChangeAt: true, lastCheckedAt: true } }),
-      prisma.workflow.findMany({ where: { project: { workspaceId: workspace.id } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, enabled: true, status: true } }),
-      listMonitorLinks(workspace.id),
-    ]);
-    return NextResponse.json({ monitors, workflows, links }, { headers: { "Cache-Control": "no-store" } });
+    const overview = await monitorsOverview(workspace.id);
+    return NextResponse.json(overview, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return httpErrorResponse(e);
   }

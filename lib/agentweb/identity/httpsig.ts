@@ -258,11 +258,12 @@ export interface SignInput {
   signatureAgent?: SignatureAgentInput;
 }
 
-export interface SignedHeaders {
+/** A type alias, not an interface, so it is assignable to a plain string map (the fetcher's Signer). */
+export type SignedHeaders = {
   "Signature-Input": string;
   Signature: string;
   "Signature-Agent"?: string;
-}
+};
 
 export function signRequest(input: SignInput): SignedHeaders {
   const u = new URL(input.url);

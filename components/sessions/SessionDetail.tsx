@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, GraduationCap, Hand, Loader2, Pause, Play, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { aosButton, NeutralBadge, StatusBadge } from "@/components/aos";
 import { SwitchRow } from "@/components/aos/Controls";
@@ -29,6 +30,7 @@ const TOOLS = ["browser_navigate", "browser_click", "browser_type", "browser_sna
 
 export function SessionDetail({ initial, replay: initialReplay, canSupervise }: { initial: SessionView; replay: ReplayStep[]; canSupervise: boolean }) {
   const { t, format } = useI18n();
+  const router = useRouter();
   const [s, setS] = useState(initial);
   const [replay, setReplay] = useState(initialReplay);
   const [busy, setBusy] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export function SessionDetail({ initial, replay: initialReplay, canSupervise }: 
         toastError(json.code === "nothing_to_teach" ? t("sessionsApp.detail.teachNone") : t("sessionsApp.detail.failed"), json.code === "nothing_to_teach" ? undefined : json.error);
         return;
       }
-      toast({ title: t("sessionsApp.detail.teachDone", { name: json.flow.name }), status: "done", action: { label: t("flowsApp.title"), onClick: () => window.location.assign("/dashboard/runs/sessions#flows") } });
+      toast({ title: t("sessionsApp.detail.teachDone", { name: json.flow.name }), status: "done", action: { label: t("flowsApp.title"), onClick: () => router.push("/dashboard/runs/sessions#flows") } });
     } finally {
       setBusy(null);
     }

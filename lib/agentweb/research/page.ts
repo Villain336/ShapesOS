@@ -45,7 +45,7 @@ export async function addPageToResearch(workspaceId: string, userId: string, res
       html: read.text,
       text: read.text,
       fetchedAt: now,
-      step: { action: "attach_page", klass: "benign", tier: 0, decision: "allow" },
+      step: { action: "read", klass: "benign", tier: 0, decision: "allow" },
       delegation: { delegatedBy: userId, runId: null, agent: "research", scope: { origins: [url.origin], classes: ["benign"] }, expiresAt: new Date(now.getTime() + 5 * 60_000) },
     },
   );

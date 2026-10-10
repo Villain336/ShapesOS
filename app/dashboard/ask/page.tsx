@@ -9,6 +9,7 @@ import { getI18n } from "@/lib/i18n/server";
 import { getConfig } from "@/lib/agentweb/settings";
 import { getAnswer, listAnswers } from "@/lib/answer/service";
 import { providerStatus } from "@/lib/answer/providers/status";
+import { listResearch } from "@/lib/agentweb/research/store";
 import { AskApp } from "@/components/ask/AskApp";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +27,16 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
   if (!membership) redirect("/dashboard");
   const sp = await searchParams;
   const answerId = typeof sp.answer === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(sp.answer) ? sp.answer : null;
-  const [history, config, initial] = await Promise.all([
+  const researchId = typeof sp.research === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(sp.research) ? sp.research : null;
+  const [history, config, initial, mySessions] = await Promise.all([
     listAnswers(workspace.id, user.id, 15),
     getConfig(workspace.id),
     answerId ? getAnswer(workspace.id, user.id, answerId) : Promise.resolve(null),
+    listResearch(workspace.id, user.id),
   ]);
+  // Only the member's own, open research sessions can take an answer.
+  const mine = mySessions.filter((r) => r.owner && r.status === "open").map((r) => ({ id: r.id, title: r.title }));
+  const attachTo = researchId ? (mine.find((r) => r.id === researchId) ?? null) : null;
   const providers = providerStatus();
   return (
     <AskApp
@@ -41,6 +47,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
       canAct={roleAtLeast(membership.role, "editor")}
       isAdmin={roleAtLeast(membership.role, "admin")}
       showCosts={process.env.NODE_ENV !== "production"}
+      research={{ attachTo, mine }}
     />
   );
 }

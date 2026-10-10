@@ -100,6 +100,7 @@ export const es: Catalogue = {
       "/dashboard/reminders": { label: "Recordatorios", description: "Tus tareas con hora límite" },
       // Phase 21A (WS=agentweb)
       "/dashboard/ask": { label: "Preguntar", description: "Respuestas con fuentes de la web y de tu espacio de trabajo" },
+      "/dashboard/research": { label: "Investigación", description: "Preguntas, fuentes y comprobantes que guardas, y tu memoria de navegación" },
       "/dashboard/prospects": { label: "Prospectos", description: "Listas de prospectos y enriquecimiento" },
       "/dashboard/nurture": { label: "Seguimiento", description: "Secuencias de seguimiento y difusiones" },
       "/dashboard/projects": { label: "Proyectos SEO", description: "Sitios, palabras clave, posiciones, contenido" },

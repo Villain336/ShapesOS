@@ -104,6 +104,7 @@ export const en = {
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
       // Phase 21A (WS=agentweb)
       "/dashboard/ask": { label: "Ask", description: "Sourced answers from the web and your workspace" },
+      "/dashboard/research": { label: "Research", description: "Questions, sources and receipts you keep, plus your browsing memory" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
       "/dashboard/projects": { label: "SEO projects", description: "Sites, keywords, rankings, content" },

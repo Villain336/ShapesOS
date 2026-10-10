@@ -58,7 +58,7 @@ async function request(args: Record<string, unknown> = ARGS, ctx: ToolContext = 
   await executeTool(ctx, "cart_request_signature", c.args, c);
   return c;
 }
-const idOf = (c: ChatToolCall) => (c.details as { mandateId?: string } | undefined)?.mandateId ?? /man_[0-9a-f]{20}/.exec(c.resultSummary ?? "")![0];
+const idOf = (c: ChatToolCall) => ((c as ChatToolCall & { details?: unknown }).details as { mandateId?: string } | undefined)?.mandateId ?? /man_[0-9a-f]{20}/.exec(c.resultSummary ?? "")![0];
 
 describe("the agent can ask, never approve", () => {
   it("creates a pending card, and a chat or spoken 'yes' (confirmed: true) does not approve it", async () => {

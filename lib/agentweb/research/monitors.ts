@@ -121,3 +121,13 @@ export async function fireMonitorTriggers(workspaceId: string, change: MonitorCh
   }
   return started;
 }
+
+/** Everything the Page monitors tab and its API show: the workspace's monitors, workflows and links. */
+export async function monitorsOverview(workspaceId: string) {
+  const [monitors, workflows, links] = await Promise.all([
+    prisma.monitor.findMany({ where: { workspaceId, status: { not: "archived" } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, url: true, cadence: true, status: true, lastChangeAt: true } }),
+    prisma.workflow.findMany({ where: { project: { workspaceId } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, enabled: true, status: true } }),
+    listMonitorLinks(workspaceId),
+  ]);
+  return { monitors: monitors.map((m) => ({ ...m, lastChangeAt: m.lastChangeAt?.toISOString() ?? null })), workflows, links };
+}

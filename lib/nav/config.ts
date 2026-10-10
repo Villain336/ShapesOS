@@ -17,6 +17,7 @@ import {
   ArrowLeftRight, // Phase 18.1: Switch app
   Columns2, // Phase 18.1: Split view
   Compass, // Phase 21A: Ask
+  Telescope, // Phase 21A round 2: Research
   BookOpen,
   Bell,
   Building2, // Phase 10 (ops-core): Operations
@@ -124,6 +125,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo, description: "Your to-dos with due times", keywords: "todo to-do tasks remind me personal due checklist" },
       // Phase 21A (WS=agentweb): the answer-and-action engine (lib/answer).
       { href: "/dashboard/ask", label: "Ask", icon: Compass, description: "Sourced answers from the web and your workspace", keywords: "ask search answer web research question cite sources receipts google perplexity" },
+      // Phase 21A round 2 (WS=agentweb): research sessions, browsing memory, page monitors.
+      { href: "/dashboard/research", label: "Research", icon: Telescope, description: "Questions, sources and receipts you keep, plus your browsing memory", keywords: "research notebook sources receipts export share browsing memory history monitors page changes watch" },
     ],
   },
   {

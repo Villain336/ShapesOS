@@ -31,7 +31,7 @@ import { storeCapture } from "../captures-store";
 import { storeDelegation } from "../identity/delegation-store";
 import { sessionGate, sessionStep, sessionNeeds } from "../sessions/gate";
 import { getSessionView, setStepMode } from "../sessions/store";
-import { createFlowFromRun, getFlow, listFlows, publishFlow, recordFlowRun } from "../flows/store";
+import { getFlow, listFlows, publishFlow, recordFlowRun } from "../flows/store";
 import { handleFlowOp } from "../flows/route-core";
 import "@/lib/agents/runs/browser-tools";
 
@@ -206,7 +206,7 @@ describe("teach once", () => {
     const evil = { ...f.spec, steps: [f.spec.steps[0], { kind: "click", locator: { role: "button", name: "Place order" } }] };
     await withWorkspaceScope(WS, (tx) => tx.agentwebFlow.update({ where: { id: flowId }, data: { spec: evil as never } }));
     const rid = await newRun();
-    const out = await runFlowTool(rid, { flowId, params: { p1: "x" } }, { confirmed: true });
+    const out = await runFlowTool(rid, { flowId, params: { p1: "x" } });
     assert.match(out.resultSummary ?? "", /stopped at step 2/);
     assert.deepEqual(posts, [], "no order was placed, even though the person confirmed the flow");
     await withWorkspaceScope(WS, (tx) => tx.agentwebFlow.update({ where: { id: flowId }, data: { spec: f.spec as never } }));
