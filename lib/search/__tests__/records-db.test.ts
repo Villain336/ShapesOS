@@ -101,6 +101,7 @@ describe("record search (DB)", () => {
     const onlyLeads = await searchRecords(WS, "viewer", "zephyrine", { kinds: ["lead"] });
     assert.ok(onlyLeads.length > 0 && onlyLeads.every((h) => h.kind === "lead"));
     // Phase 18.2: +2 — comms' personal "mail" kind (Mail app threads) and content's "note".
-    assert.equal(RECORD_KINDS.length, 25);
+    // Phase 21B (WS=drive): +1 — "folder" (folders are searchable, empty ones included).
+    assert.equal(RECORD_KINDS.length, 26);
   });
 });

@@ -10,6 +10,9 @@ import {
   collisionKey,
   displayPath,
   folderChain,
+  homePathOf,
+  homeSegment,
+  userIdFromHomeSegment,
   normalizeDrivePath,
   normalizeFolderPath,
   normalizeLogicalPath,
@@ -227,5 +230,32 @@ describe("folderChain (which folders exist as rows above a path)", () => {
     assert.deepEqual(folderChain("/shared"), []);
     assert.deepEqual(folderChain("/home"), []);
     assert.deepEqual(folderChain("/apps/crm"), []);
+  });
+});
+
+describe("home folder names (any person id, not only plain ones)", () => {
+  const ids = ["cl9abc123", "admin:e2e-admin@example.com", "Mixed_Case-ID", "josé@café.com", "a b"];
+  it("round-trips every id and only ever uses safe, lower-case characters", () => {
+    for (const id of ids) {
+      const seg = homeSegment(id);
+      assert.match(seg, /^[a-z0-9_-]+$/, id);
+      assert.equal(userIdFromHomeSegment(seg), id);
+    }
+    assert.equal(homeSegment("cl9abc123"), "cl9abc123", "a plain id is its own folder name");
+    assert.notEqual(homeSegment("Bob"), homeSegment("bob"), "ids differing by case never share a home");
+  });
+  it("is a valid home path whose owner is the person", () => {
+    for (const id of ids) {
+      const p = normalizeFolderPath(homePathOf(id));
+      assert.ok(p.ok, id);
+      if (p.ok) assert.equal(p.ownerUserId, id);
+      const f = normalizeLogicalPath(`${homePathOf(id)}/Taxes/return.txt`);
+      assert.ok(f.ok && f.ownerUserId === id, id);
+    }
+  });
+  it("refuses a raw id that is not in canonical form (no second spelling of the same home)", () => {
+    assert.equal(normalizeFolderPath("/home/admin:e2e-admin@example.com").ok, false);
+    assert.equal(normalizeFolderPath("/home/_61bc").ok, false, "an escape for a character that needs none");
+    assert.equal(normalizeFolderPath("/home/_zz").ok, false);
   });
 });

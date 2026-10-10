@@ -55,6 +55,34 @@ export const MAX_DRIVE_PATH_LEN = 1024;
 export const MAX_DRIVE_SEGMENTS = 32;
 export const MAX_NAME_BYTES = 255;
 
+/**
+ * A person's id as a folder name. Ids are not always plain: the self-host admin login is
+ * "admin:<email>". Letters a-z, digits and "-" pass through; every other byte (an uppercase
+ * letter included, so two ids that differ only by case never share a folder on a
+ * case-insensitive match) becomes "_" + two hex digits. Reversible and injective.
+ */
+export function homeSegment(userId: string): string {
+  let out = "";
+  for (const b of Buffer.from(userId, "utf8")) {
+    const c = String.fromCharCode(b);
+    out += /[a-z0-9-]/.test(c) ? c : `_${b.toString(16).padStart(2, "0")}`;
+  }
+  return out;
+}
+
+/** The person id behind a home folder name, or null if the name is not in canonical form. */
+export function userIdFromHomeSegment(seg: string): string | null {
+  if (!/^(?:[a-z0-9-]|_[0-9a-f]{2})+$/.test(seg)) return null;
+  const bytes = Buffer.from(seg.replace(/_([0-9a-f]{2})/g, (_m, h: string) => String.fromCharCode(parseInt(h, 16))), "latin1");
+  const id = bytes.toString("utf8");
+  return id && homeSegment(id) === seg ? id : null;
+}
+
+/** The canonical path of a person's private home. */
+export function homePathOf(userId: string): string {
+  return `/home/${homeSegment(userId)}`;
+}
+
 export interface PathInfo {
   /** Canonical stored path (single slashes, NFC, no trailing slash). */
   path: string;
@@ -184,8 +212,8 @@ function parseDriveRoot(input: string, allowContainer: boolean): PathCheck {
     }
     case "/home": {
       if (names.length === 1) return { ok: false, reason: "Files in /home live in a person's folder: /home/<userId>/…" };
-      const uid = names[1]!;
-      if (!ID_RE.test(uid)) return { ok: false, reason: "A home folder is named after the person's id (letters, numbers, dashes, underscores)." };
+      const uid = userIdFromHomeSegment(names[1]!);
+      if (uid === null) return { ok: false, reason: "A home folder is named after the person's id (see homeSegment)." };
       const miss = needFile(3, "home folder");
       if (miss) return miss;
       return { ok: true, ...base, ownerUserId: uid };

@@ -15,6 +15,8 @@
 //   entity   file | folder
 // A person's private home appears only in that person's feed.
 
+import { userIdFromHomeSegment } from "../filesystem/paths";
+
 export type DriveChangeType = "create" | "update" | "move" | "trash" | "restore" | "delete";
 
 export interface DriveChange {
@@ -45,7 +47,8 @@ export function parseCursor(cursor: string | null | undefined): bigint {
 
 function privateOwner(path: string | null): string | null {
   if (!path || !path.startsWith("/home/")) return null;
-  return path.split("/")[2] ?? null;
+  const seg = path.split("/")[2];
+  return seg ? (userIdFromHomeSegment(seg) ?? seg) : null;
 }
 
 /**

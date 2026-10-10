@@ -10,7 +10,7 @@ import { Prisma, type WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { NotFoundError } from "@/lib/api/errors";
-import { displayPath, folderChain, normalizeFolderPath, FS_ROOTS, basenameOf, collisionKey, type PathInfo } from "../filesystem/paths";
+import { displayPath, folderChain, normalizeFolderPath, FS_ROOTS, basenameOf, collisionKey, homePathOf, type PathInfo } from "../filesystem/paths";
 import { FsError } from "../filesystem/core";
 import { ensureFolderChain } from "../filesystem/folders";
 import { recordChanges } from "./changes";
@@ -96,7 +96,7 @@ export async function ensureSystemFolders(workspaceId: string, userId: string): 
 
 /** Make a person's home container exist (/home/<id>). Idempotent. */
 export async function ensureHome(workspaceId: string, userId: string): Promise<void> {
-  const path = `/home/${userId}`;
+  const path = homePathOf(userId);
   const found = await withWorkspaceScope(workspaceId, (tx) => tx.workspaceFolder.findFirst({ where: { workspaceId, pathKey: collisionKey(path), trashedAt: null }, select: { id: true } }));
   if (found) return;
   await withWorkspaceScope(workspaceId, async (tx) => {
@@ -232,7 +232,7 @@ export interface RootEntry {
 export async function listRoots(actor: DriveActor): Promise<RootEntry[]> {
   await Promise.all([ensureSystemFolders(actor.workspaceId, actor.userId), ensureHome(actor.workspaceId, actor.userId)]);
   const out: RootEntry[] = [
-    { key: "home", name: "Home", path: `/home/${actor.userId}` },
+    { key: "home", name: "Home", path: homePathOf(actor.userId) },
     { key: "shared", name: "Shared", path: "/shared" },
   ];
   const has = async (prefix: string) =>
