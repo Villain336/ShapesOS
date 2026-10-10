@@ -7,7 +7,11 @@ tested server-side (`lib/drive/__tests__/*`); real-disk behaviour is for the des
 ## The model in one picture
 
 ```
-/home/<userId>/…            private to that person (files.ownerUserId = userId)
+/home/<homeName>/…          private to that person (files.ownerUserId = their id). <homeName> is
+                            the id itself when it is lower-case letters, digits and "-" (cuid ids);
+                            otherwise every other byte becomes "_" + 2 hex digits (admin:a@b.c
+                            is admin_3aa_40b_2ec). Ask GET /api/drive/tree?view=roots for the
+                            path; never build it by hand.
 /shared/…                   the workspace's folders (ownerUserId = null)
   /shared/{skills,memory,artifacts,files}   the four system folders, STORED as /skills /memory
                             /artifacts /files, SHOWN under /shared (one canonical spelling:
