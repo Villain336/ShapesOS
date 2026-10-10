@@ -90,6 +90,7 @@ export const driveEn = {
       actions: "Actions for the selection",
       count: "{count, plural, one {# item selected} other {# items selected}}",
       clear: "Clear selection",
+      hint: "Select a file or folder to see what you can do with it.",
     },
     states: {
       loadFailed: "Couldn't load this folder.",

@@ -29,7 +29,7 @@ delete process.env.CLAMAV_HOST;
 
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope, countWithoutScope } from "@/lib/substrate/memory/rls";
-import { FsError, deleteFile, getQuota, moveFile, renameFile, restoreFile, setQuotaLimit, trashFile, writeFile } from "@/lib/filesystem/service";
+import { FsError, deleteFile, getQuota, moveFile, renameFile, setQuotaLimit, trashFile, writeFile } from "@/lib/filesystem/service";
 import { createFolder, moveFolder, restoreFolder, trashFolder, renameFolder } from "@/lib/filesystem/folders";
 import { listChanges } from "@/lib/drive/changes";
 import { requireFileAction, listFileAccess, setFileAccess, type FileActor } from "@/lib/files/access";

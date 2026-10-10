@@ -34,7 +34,7 @@ import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 // Phase 21B (WS=drive): folders, the change journal and scope quotas.
 import { FsError, DEFAULT_QUOTA_BYTES, TRASH_RETENTION_DAYS, DEFAULT_MAX_FILE_BYTES, type FsErrorCode } from "./core";
 import { ensureFolderChain } from "./folders";
-import { recordChange, recordChanges, type NewChange } from "@/lib/drive/changes";
+import { recordChange, recordChanges } from "@/lib/drive/changes";
 import { chargeQuota, lockDriveTree } from "@/lib/drive/quota-store";
 import { quotaScopesFor } from "@/lib/drive/quota";
 

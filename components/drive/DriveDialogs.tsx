@@ -4,7 +4,7 @@
 // share a folder, tags, and "restore this folder as of …". Same dialog shell as the rest of the app
 // (white lg card on a night scrim, Esc closes, first field focused).
 
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ChevronRight, Folder, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { aosButton } from "@/components/aos";
@@ -15,13 +15,17 @@ import { ApiError, getJson, postJson, treeUrl } from "./api";
 export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const { t } = useI18n();
   const id = useId();
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-labelledby={id} className={cn("max-h-[90vh] w-full overflow-auto rounded-lg bg-paper p-4 shadow-overlay", wide ? "max-w-xl" : "max-w-sm")}>
@@ -88,28 +92,20 @@ interface ListingApi {
 export function MoveDialog({ workspaceId, count, startPath, busy, error, onChoose, onClose }: { workspaceId: string; count: number; startPath: string; busy: boolean; error: string | null; onChoose: (dir: string) => void; onClose: () => void }) {
   const { t } = useI18n();
   const [path, setPath] = useState(startPath === "/" ? "/shared" : startPath);
-  const [folders, setFolders] = useState<Array<{ id: string; name: string; path: string }> | null>(null);
-  const [canWrite, setCanWrite] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const load = useCallback(
-    async (p: string) => {
-      setFolders(null);
-      setFailed(false);
-      try {
-        const r = await getJson<ListingApi>(treeUrl(workspaceId, "list", { path: p, limit: 500 }));
-        setFolders(r.listing.items.filter((i) => i.kind === "folder"));
-        setCanWrite(r.listing.canEdit);
-      } catch {
-        setFailed(true);
-        setFolders([]);
-        setCanWrite(false);
-      }
-    },
-    [workspaceId],
-  );
+  const [loaded, setLoaded] = useState<{ path: string; folders: Array<{ id: string; name: string; path: string }>; canWrite: boolean; failed: boolean } | null>(null);
   useEffect(() => {
-    void load(path);
-  }, [path, load]);
+    let live = true;
+    getJson<ListingApi>(treeUrl(workspaceId, "list", { path, limit: 500 }))
+      .then((r) => live && setLoaded({ path, folders: r.listing.items.filter((i) => i.kind === "folder"), canWrite: r.listing.canEdit, failed: false }))
+      .catch(() => live && setLoaded({ path, folders: [], canWrite: false, failed: true }));
+    return () => {
+      live = false;
+    };
+  }, [path, workspaceId]);
+  const here = loaded && loaded.path === path ? loaded : null;
+  const folders = here ? here.folders : null;
+  const canWrite = here?.canWrite ?? false;
+  const failed = here?.failed ?? false;
   const crumbs = path.split("/").filter(Boolean);
   return (
     <Modal title={t("drive.dialogs.moveTitle", { count })} onClose={onClose} wide>
@@ -286,7 +282,12 @@ interface Plan {
 /** "Restore this folder as of …": pick a time, see the plan (a dry run), then apply. Nothing is ever deleted. */
 export function RestoreAsOfDialog({ workspaceId, folderPath, onClose, onDone }: { workspaceId: string; folderPath: string; onClose: () => void; onDone: () => void }) {
   const { t } = useI18n();
-  const [when, setWhen] = useState(() => new Date(Date.now() - 24 * 3600_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
+  // Local "now" and "yesterday" as datetime-local strings, fixed when the dialog opens.
+  const [{ initial, latest }] = useState(() => {
+    const local = (ms: number) => new Date(ms - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    return { initial: local(Date.now() - 24 * 3600_000), latest: local(Date.now()) };
+  });
+  const [when, setWhen] = useState(initial);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +317,7 @@ export function RestoreAsOfDialog({ workspaceId, folderPath, onClose, onDone }: 
       <label htmlFor={timeId} className="mt-3 block text-sm font-medium text-ink">
         {t("drive.restoreAsOf.when")}
       </label>
-      <input id={timeId} type="datetime-local" value={when} max={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)} onChange={(e) => { setWhen(e.target.value); setPlan(null); setApplied(null); }} className={cn(inputCls, "mt-1")} />
+      <input id={timeId} type="datetime-local" value={when} max={latest} onChange={(e) => { setWhen(e.target.value); setPlan(null); setApplied(null); }} className={cn(inputCls, "mt-1")} />
       {error ? (
         <p role="alert" className="mt-2 flex items-start gap-2 text-sm font-semibold text-failed-text">
           <span className="mt-1.5 size-2 shrink-0 bg-failed" aria-hidden />

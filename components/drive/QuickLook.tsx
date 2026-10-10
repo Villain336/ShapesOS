@@ -17,17 +17,28 @@ export function QuickLook({ workspaceId, row, onClose, onDetails }: { workspaceI
   const { t } = useI18n();
   const ws = encodeURIComponent(workspaceId);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // One listener for the dialog's whole life: the latest onClose is read through a ref, so a parent
+  // re-render never leaves a gap where Esc would be missed.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === " ") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    // Registered a tick late: Space opened this very dialog, and the same keydown is still bubbling
+    // up to window, where a listener added now would see it and close the dialog again.
+    const arm = setTimeout(() => window.addEventListener("keydown", onKey), 0);
+    return () => {
+      clearTimeout(arm);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
   const handlers = openWithFor(row).filter((h) => h.id !== "drive:quick-look");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

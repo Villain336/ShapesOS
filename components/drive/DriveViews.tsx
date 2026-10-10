@@ -201,7 +201,6 @@ export function ColumnsView({
   onSelectFile,
   onOpenFile,
   caption,
-  reloadKey,
 }: {
   startPath: string;
   load: (path: string) => Promise<Row[]>;
@@ -210,22 +209,22 @@ export function ColumnsView({
   onSelectFile: (row: Row | null) => void;
   onOpenFile: (row: Row) => void;
   caption: string;
-  reloadKey: number;
 }) {
   const { t } = useI18n();
   const [cols, setCols] = useState<Column[]>([{ path: startPath, rows: null, selectedId: null }]);
   const scroller = useRef<HTMLDivElement>(null);
 
+  // The parent re-keys this component when the start folder or a reload changes, so the first
+  // column is loaded once per mount and state is only set when the answer arrives.
   useEffect(() => {
     let live = true;
-    setCols([{ path: startPath, rows: null, selectedId: null }]);
     load(startPath)
       .then((rows) => live && setCols([{ path: startPath, rows, selectedId: null }]))
       .catch(() => live && setCols([{ path: startPath, rows: [], selectedId: null, error: true }]));
     return () => {
       live = false;
     };
-  }, [startPath, load, reloadKey]);
+  }, [startPath, load]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ left: scroller.current.scrollWidth, behavior: "smooth" });

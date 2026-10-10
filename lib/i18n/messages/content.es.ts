@@ -142,7 +142,7 @@ export const contentEs: Catalogue<typeof contentEn> = {
   },
   filesApp: {
     title: "Archivos",
-    subtitle: "Los archivos de tu espacio de trabajo: skills, memoria, artefactos y subidas. Cada archivo guarda sus versiones anteriores y se puede compartir con un enlace.",
+    subtitle: "Tu carpeta privada y las carpetas compartidas del espacio de trabajo, en un solo lugar. Cada archivo guarda sus versiones anteriores y se puede compartir con un enlace.",
     loadFailed: "No se pudo cargar esta carpeta.",
     uploadFailed: "No se pudo subir.",
     actionFailed: "No funcionó.",

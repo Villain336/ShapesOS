@@ -91,6 +91,7 @@ export const driveEs: Catalogue<typeof driveEn> = {
       actions: "Acciones para la selección",
       count: "{count, plural, one {# elemento seleccionado} other {# elementos seleccionados}}",
       clear: "Borrar la selección",
+      hint: "Selecciona un archivo o una carpeta para ver qué puedes hacer con él.",
     },
     states: {
       loadFailed: "No se pudo cargar esta carpeta.",

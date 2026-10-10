@@ -43,6 +43,7 @@ async function main() {
   await executeTool(ctx, "save_drive_file", { ...call.args }, call);
   if (call.status !== "executed") throw new Error(`save_drive_file: ${call.resultSummary}`);
   await withWorkspaceScope(ws.id, (tx) => tx.agentRun.update({ where: { id: run.id }, data: { status: "succeeded", endedAt: new Date() } }));
+  await new Promise((r) => setTimeout(r, 1500)); // background text-index jobs finish before the connection closes
   console.log(JSON.stringify({ workspaceId: ws.id, projectId: project.id, runId: run.id }));
   await prisma.$disconnect();
 }

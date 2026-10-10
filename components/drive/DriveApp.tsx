@@ -7,8 +7,9 @@
 // "restore this folder as of …". Everything here goes through /api/drive/*; the server decides what
 // this person may do, the buttons just follow `canEdit`.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { ArrowLeft, Check, FolderPlus, FolderUp, History, LayoutGrid, List, Columns3, Search, Star, Upload, Users, X, FileArchive, Tag, Pencil, Trash, RotateCcw, Download, FolderInput, PackageCheck, Eye } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent } from "react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, FolderOpen, Check, FolderPlus, FolderUp, History, Search, Star, Upload, Users, X, FileArchive, Tag, Pencil, Trash, RotateCcw, Download, FolderInput, PackageCheck, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { aosButton } from "@/components/aos";
 import { Segmented } from "@/components/aos/Controls";
@@ -48,13 +49,83 @@ type Dialog =
   | { type: "saveSmart"; query: string }
   | null;
 
+// The chosen view survives reloads (localStorage), and falls back to memory where storage is blocked.
+let memoryView: ViewMode = "list";
+const viewListeners = new Set<() => void>();
 function readView(): ViewMode {
   try {
     const v = window.localStorage.getItem(VIEW_KEY);
-    return v === "icons" || v === "columns" || v === "list" ? v : "list";
+    if (v === "icons" || v === "columns" || v === "list") return v;
   } catch {
-    return "list";
+    /* private window */
   }
+  return memoryView;
+}
+function writeView(v: ViewMode): void {
+  memoryView = v;
+  try {
+    window.localStorage.setItem(VIEW_KEY, v);
+  } catch {
+    /* the choice just isn't remembered */
+  }
+  viewListeners.forEach((cb) => cb());
+}
+function subscribeView(cb: () => void): () => void {
+  viewListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    viewListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+interface Loaded {
+  /** Which place/sort/reload this answer is for; a stale one is ignored. */
+  key: string;
+  rows: Row[];
+  total: number;
+  canEdit: boolean;
+  error: string | null;
+}
+
+type SideAnswer = {
+  roots: { roots: SidebarData["roots"] } | null;
+  favorites: { items: ApiItem[] } | null;
+  tags: { tags: SidebarData["tags"] } | null;
+  smart: { smartFolders: SidebarData["smart"] } | null;
+  usage: { usage: NonNullable<SidebarData["usage"]> } | null;
+};
+
+/** The sidebar's five reads; each one that fails is null (the sidebar keeps what it had). */
+async function sideData(workspaceId: string): Promise<SideAnswer> {
+  const [roots, favorites, tags, smart, usage] = await Promise.all([
+    getJson<{ roots: SidebarData["roots"] }>(treeUrl(workspaceId, "roots")).catch(() => null),
+    getJson<{ items: ApiItem[] }>(treeUrl(workspaceId, "favorites")).catch(() => null),
+    getJson<{ tags: SidebarData["tags"] }>(treeUrl(workspaceId, "tags")).catch(() => null),
+    getJson<{ smartFolders: SidebarData["smart"] }>(treeUrl(workspaceId, "smart")).catch(() => null),
+    getJson<{ usage: NonNullable<SidebarData["usage"]> }>(treeUrl(workspaceId, "usage")).catch(() => null),
+  ]);
+  return { roots, favorites, tags, smart, usage };
+}
+
+/** A selection-bar action: an icon button that shows its label when the bar is wide enough (container query). */
+function Act({ icon: Icon, label, onClick, href, disabled, variant, pressed }: { icon: LucideIcon; label: string; onClick?: () => void; href?: string; disabled?: boolean; variant?: "deny"; pressed?: boolean }) {
+  const cls = cn(aosButton({ variant, size: "xs" }), "shrink-0");
+  const inner = (
+    <>
+      <Icon className={cn("size-3.5", pressed && "fill-current")} aria-hidden />
+      <span className="hidden @4xl:inline">{label}</span>
+    </>
+  );
+  return href ? (
+    <a href={href} aria-label={label} title={label} className={cls}>
+      {inner}
+    </a>
+  ) : (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} aria-pressed={pressed} title={label} className={cls}>
+      {inner}
+    </button>
+  );
 }
 
 export function DriveApp({
@@ -75,11 +146,9 @@ export function DriveApp({
   const { t } = useI18n();
   const [place, setPlace] = useState<Place>({ t: "folder", path: initialPath ?? "" });
   const [back, setBack] = useState<Place[]>([]);
-  const [view, setView] = useState<ViewMode>("list");
+  const view = useSyncExternalStore(subscribeView, readView, () => "list" as ViewMode);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [folderCanEdit, setFolderCanEdit] = useState(false);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [side, setSide] = useState<SidebarData>({ roots: [], favorites: [], tags: [], smart: [], usage: null });
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [colFile, setColFile] = useState<Row | null>(null);
@@ -101,32 +170,19 @@ export function DriveApp({
   const folderInput = useRef<HTMLInputElement>(null);
   const zipInput = useRef<HTMLInputElement>(null);
   const anchor = useRef<string | null>(null);
-  const token = useRef(0);
 
-  useEffect(() => setView(readView()), []);
   const changeView = (v: ViewMode) => {
-    setView(v);
+    writeView(v);
     setColFile(null);
     setColDeep(null);
-    try {
-      window.localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      /* a private window: the choice just isn't remembered */
-    }
   };
 
   const homePath = side.roots.find((r) => r.key === "home")?.path ?? null;
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   // ---- sidebar data ----
-  const loadSide = useCallback(async () => {
-    const [roots, favorites, tags, smart, usage] = await Promise.all([
-      getJson<{ roots: SidebarData["roots"] }>(treeUrl(workspaceId, "roots")).catch(() => null),
-      getJson<{ items: ApiItem[] }>(treeUrl(workspaceId, "favorites")).catch(() => null),
-      getJson<{ tags: SidebarData["tags"] }>(treeUrl(workspaceId, "tags")).catch(() => null),
-      getJson<{ smartFolders: SidebarData["smart"] }>(treeUrl(workspaceId, "smart")).catch(() => null),
-      getJson<{ usage: NonNullable<SidebarData["usage"]> }>(treeUrl(workspaceId, "usage")).catch(() => null),
-    ]);
+  const applySide = useCallback((d: SideAnswer) => {
+    const { roots, favorites, tags, smart, usage } = d;
     setSide((s) => ({
       roots: roots?.roots ?? s.roots,
       favorites: favorites ? favorites.items.map((i) => ({ id: i.id, kind: i.kind, name: i.name, path: i.path })) : s.favorites,
@@ -136,10 +192,15 @@ export function DriveApp({
     }));
     const home = roots?.roots.find((r) => r.key === "home")?.path;
     if (home) setPlace((p) => (p.t === "folder" && p.path === "" ? { t: "folder", path: home } : p));
-  }, [workspaceId]);
+  }, []);
+  const loadSide = useCallback(() => sideData(workspaceId).then(applySide), [workspaceId, applySide]);
   useEffect(() => {
-    void loadSide();
-  }, [loadSide, reloadKey]);
+    let live = true;
+    sideData(workspaceId).then((d) => live && applySide(d));
+    return () => {
+      live = false;
+    };
+  }, [workspaceId, reloadKey, applySide]);
 
   useEffect(() => {
     if (!canAdmin) return;
@@ -193,35 +254,32 @@ export function DriveApp({
     [workspaceId, sort.key, sort.dir, t],
   );
 
+  const placeKey = place.t === "folder" && place.path === "" ? null : JSON.stringify([place, sort.key, sort.dir, reloadKey]); // "" = waiting for the roots to name the home folder
   useEffect(() => {
-    if (place.t === "folder" && place.path === "") return; // waiting for the roots to name the home folder
-    const mine = ++token.current;
-    setError(null);
-    setRows(null);
-    setSelected(new Set());
-    setColFile(null);
+    if (placeKey === null) return;
+    let live = true;
     fetchPlace(place, 0)
-      .then((r) => {
-        if (mine !== token.current) return;
-        setRows(r.rows);
-        setTotal(r.total);
-        setFolderCanEdit(r.canEdit);
-      })
-      .catch((e) => {
-        if (mine !== token.current) return;
-        setRows([]);
-        setTotal(0);
-        setError(e instanceof Error ? e.message : t("filesApp.loadFailed"));
-      });
-    // A reload bumps reloadKey; a place or sort change refetches too.
-  }, [place, fetchPlace, reloadKey, t]);
+      .then((r) => live && setLoaded({ key: placeKey, rows: r.rows, total: r.total, canEdit: r.canEdit, error: null }))
+      .catch((e) => live && setLoaded({ key: placeKey, rows: [], total: 0, canEdit: false, error: e instanceof Error ? e.message : t("filesApp.loadFailed") }));
+    return () => {
+      live = false;
+    };
+  }, [place, placeKey, fetchPlace, t]);
+  const current = loaded && loaded.key === placeKey ? loaded : null;
+  const rows = current ? current.rows : null;
+  const total = current?.total ?? 0;
+  const folderCanEdit = current?.canEdit ?? false;
+  const loadError = current?.error ?? null;
+
+  // Stable identity: the columns view reloads when this changes.
+  const loadColumn = useCallback((path: string) => fetchPlace({ t: "folder", path }, 0).then((r) => r.rows), [fetchPlace]);
 
   async function loadMore() {
     if (!rows || place.t !== "folder") return;
     setLoadingMore(true);
     try {
       const r = await fetchPlace(place, rows.length);
-      setRows((cur) => [...(cur ?? []), ...r.rows]);
+      setLoaded((cur) => (cur && cur.key === placeKey ? { ...cur, rows: [...cur.rows, ...r.rows] } : cur));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("filesApp.loadFailed"));
     } finally {
@@ -236,6 +294,9 @@ export function DriveApp({
       return p;
     });
     setColDeep(null);
+    setColFile(null);
+    setSelected(new Set());
+    setError(null);
     setFilter("");
     if (p.t !== "search") setSearchText("");
     try {
@@ -271,7 +332,11 @@ export function DriveApp({
     const offs = [
       registerOpenWith({ id: "drive:quick-look", label: t("drive.actions.quickLook"), order: 0, accepts: (r) => r.kind === "file", open: (r) => setQuick(r) }),
       registerOpenWith({ id: "drive:details", label: t("drive.actions.details"), order: 1, accepts: (r) => r.kind === "file", open: (r) => setFileParam(r.id) }),
-      registerOpenWith({ id: "drive:download", label: t("filesApp.download"), order: 2, accepts: (r) => r.kind === "file", open: (r) => window.location.assign(`/api/files/${encodeURIComponent(r.id)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`) }),
+      registerOpenWith({ id: "drive:download", label: t("filesApp.download"), order: 2, accepts: (r) => r.kind === "file", open: (r) => {
+          const a = document.createElement("a");
+          a.href = `/api/files/${encodeURIComponent(r.id)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`;
+          a.click();
+        } }),
     ];
     return () => offs.forEach((off) => off());
   }, [t, workspaceId, setFileParam]);
@@ -387,7 +452,7 @@ export function DriveApp({
   async function toggleFavorite(row: Row) {
     const r = await run(() => postJson("/api/drive/ops", { workspaceId, action: "favorite", kind: row.kind, id: row.id, on: !row.favorite }), t("filesApp.actionFailed"));
     if (r) {
-      setRows((cur) => cur && cur.map((x) => (x.id === row.id ? { ...x, favorite: !row.favorite } : x)));
+      setLoaded((cur) => (cur ? { ...cur, rows: cur.rows.map((x) => (x.id === row.id ? { ...x, favorite: !row.favorite } : x)) } : cur));
       void loadSide();
     }
   }
@@ -533,7 +598,7 @@ export function DriveApp({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]" onKeyDown={onKeyDown}>
-      <aside>
+      <aside className="max-lg:order-last">
         <DriveSidebar place={place} data={side} onGo={go} onRemoveSmart={(id) => void removeSmart(id)} />
       </aside>
 
@@ -641,92 +706,62 @@ export function DriveApp({
           ) : null}
         </div>
 
-        {/* selection bar */}
+        {/* selection bar: a fixed-height row (icon buttons that gain labels when there is room) so the rows never jump between the two clicks of a double click */}
         {selRows.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-canvas px-3 py-2" role="toolbar" aria-label={t("drive.selection.actions")}>
-            <span className="text-sm font-semibold text-ink" role="status">
+          <div className="@container flex h-12 items-center gap-1.5 overflow-x-auto rounded-lg bg-canvas px-3" role="toolbar" aria-label={t("drive.selection.actions")}>
+            <span className="mr-1 shrink-0 text-sm font-semibold text-ink" role="status">
               {t("drive.selection.count", { count: selRows.length })}
             </span>
             {inTrash ? (
               <>
-                <button type="button" onClick={() => void restoreSelected()} disabled={busy} className={btn()}>
-                  <RotateCcw className="size-3.5" aria-hidden /> {t("filesApp.restore")}
-                </button>
-                {canPurge && selRows.some((r) => r.kind === "file") ? (
-                  <button type="button" onClick={() => void purgeSelected()} disabled={busy} className={btn("deny")}>
-                    {t("filesApp.deleteForever")}
-                  </button>
-                ) : null}
+                <Act icon={RotateCcw} label={t("filesApp.restore")} onClick={() => void restoreSelected()} disabled={busy} />
+                {canPurge && selRows.some((r) => r.kind === "file") ? <Act icon={Trash} label={t("filesApp.deleteForever")} onClick={() => void purgeSelected()} disabled={busy} variant="deny" /> : null}
               </>
             ) : (
               <>
                 {single && single.kind === "file" ? (
                   <>
-                    <button type="button" onClick={() => setQuick(single)} className={btn()}>
-                      <Eye className="size-3.5" aria-hidden /> {t("drive.actions.quickLook")}
-                    </button>
-                    <a href={`/api/files/${encodeURIComponent(single.id)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`} className={btn()}>
-                      <Download className="size-3.5" aria-hidden /> {t("filesApp.download")}
-                    </a>
+                    <Act icon={Eye} label={t("drive.actions.quickLook")} onClick={() => setQuick(single)} />
+                    <Act icon={Download} label={t("filesApp.download")} href={`/api/files/${encodeURIComponent(single.id)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`} />
                   </>
                 ) : null}
-                {single ? (
-                  <button type="button" onClick={() => open(single)} className={btn()}>
-                    {t("filesApp.open")}
-                  </button>
-                ) : null}
+                {single ? <Act icon={FolderOpen} label={t("filesApp.open")} onClick={() => open(single)} /> : null}
                 {appHandlers.map((h) => (
-                  <button key={h.id} type="button" onClick={() => void h.open(single!)} className={btn()}>
+                  <button key={h.id} type="button" onClick={() => void h.open(single!)} className={cn(btn(), "shrink-0")}>
                     {h.label}
                   </button>
                 ))}
-                {single && !single.system ? (
-                  <button type="button" onClick={() => void toggleFavorite(single)} aria-pressed={single.favorite} className={btn()}>
-                    <Star className={cn("size-3.5", single.favorite && "fill-current")} aria-hidden /> {single.favorite ? t("drive.actions.unfavoriteShort") : t("drive.actions.favoriteShort")}
-                  </button>
-                ) : null}
-                {isProposal && canEdit ? (
-                  <button type="button" onClick={() => void applyProposal(single!)} disabled={busy} className={btn()}>
-                    <PackageCheck className="size-3.5" aria-hidden /> {t("drive.actions.applyProposal")}
-                  </button>
-                ) : null}
-                {single && single.kind === "folder" && canEdit && !single.system ? (
-                  <button type="button" onClick={() => setDialog({ type: "share", row: single })} className={btn()}>
-                    <Users className="size-3.5" aria-hidden /> {t("drive.actions.share")}
-                  </button>
-                ) : null}
+                {single && !single.system ? <Act icon={Star} label={single.favorite ? t("drive.actions.unfavoriteShort") : t("drive.actions.favoriteShort")} onClick={() => void toggleFavorite(single)} pressed={single.favorite} /> : null}
+                {isProposal && canEdit ? <Act icon={PackageCheck} label={t("drive.actions.applyProposal")} onClick={() => void applyProposal(single!)} disabled={busy} /> : null}
+                {single && single.kind === "folder" && canEdit && !single.system ? <Act icon={Users} label={t("drive.actions.share")} onClick={() => setDialog({ type: "share", row: single })} /> : null}
                 {single && canEdit && !single.system ? (
-                  <button type="button" onClick={() => { setDialogError(null); setDialog({ type: "tags", row: single }); }} className={btn()}>
-                    <Tag className="size-3.5" aria-hidden /> {t("drive.actions.tags")}
-                  </button>
+                  <Act icon={Tag} label={t("drive.actions.tags")} onClick={() => { setDialogError(null); setDialog({ type: "tags", row: single }); }} />
                 ) : null}
                 {single && allEditable && !single.system ? (
-                  <button type="button" onClick={() => { setDialogError(null); setDialog({ type: "rename", row: single }); }} className={btn()}>
-                    <Pencil className="size-3.5" aria-hidden /> {t("filesApp.rename")}
-                  </button>
+                  <Act icon={Pencil} label={t("filesApp.rename")} onClick={() => { setDialogError(null); setDialog({ type: "rename", row: single }); }} />
                 ) : null}
                 {allEditable && !selRows.some((r) => r.system) ? (
                   <>
-                    <button type="button" onClick={() => { setDialogError(null); setDialog({ type: "move", rows: selRows }); }} className={btn()}>
-                      <FolderInput className="size-3.5" aria-hidden /> {t("filesApp.move")}
-                    </button>
-                    <button type="button" onClick={() => void trashSelected()} disabled={busy} className={btn("deny")}>
-                      <Trash className="size-3.5" aria-hidden /> {t("filesApp.trashAction")}
-                    </button>
+                    <Act icon={FolderInput} label={t("filesApp.move")} onClick={() => { setDialogError(null); setDialog({ type: "move", rows: selRows }); }} />
+                    <Act icon={Trash} label={t("filesApp.trashAction")} onClick={() => void trashSelected()} disabled={busy} variant="deny" />
                   </>
                 ) : null}
               </>
             )}
-            <button type="button" onClick={() => { setSelected(new Set()); setColFile(null); }} aria-label={t("drive.selection.clear")} className={aosButton({ variant: "quiet", size: "xs", className: "ml-auto w-8 px-0" })}>
+            <button type="button" onClick={() => { setSelected(new Set()); setColFile(null); }} aria-label={t("drive.selection.clear")} className={aosButton({ variant: "quiet", size: "xs", className: "ml-auto w-8 shrink-0 px-0" })}>
               <X className="size-4" aria-hidden />
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex h-12 items-center rounded-lg bg-canvas px-3">
+            <p className="truncate text-sm text-muted">{t("drive.selection.hint")}</p>
+          </div>
+        )}
 
-        {error ? (
+        {error ?? loadError ? (
           <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint px-3 py-2 text-sm font-semibold text-failed-text">
             <span className="mt-1 size-2 shrink-0 bg-failed" aria-hidden="true" />
-            <span>{error}</span>
+            <span>{error ?? loadError}</span>
           </div>
         ) : null}
 
@@ -775,7 +810,7 @@ export function DriveApp({
           {shown === null ? (
             <p className="px-4 py-8 text-center text-sm text-muted">{t("common.loading")}</p>
           ) : view === "columns" && place.t === "folder" ? (
-            <ColumnsView startPath={place.path} load={(p) => fetchPlace({ t: "folder", path: p }, 0).then((r) => r.rows)} onNavigate={setColDeep} onSelectFile={setColFile} onOpenFile={(r) => setFileParam(r.id)} caption={t("filesApp.folderLabel")} reloadKey={reloadKey} />
+            <ColumnsView key={`${place.path}:${reloadKey}`} startPath={place.path} load={loadColumn} onNavigate={setColDeep} onSelectFile={setColFile} onOpenFile={(r) => setFileParam(r.id)} caption={t("filesApp.folderLabel")} />
           ) : shown.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-muted">{empty}</p>
           ) : view === "icons" && place.t === "folder" ? (

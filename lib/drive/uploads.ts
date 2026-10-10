@@ -231,7 +231,7 @@ export interface UploadStatusView {
 
 /** Ask the provider which parts it holds and fold them into the state (resume). Does not write. */
 async function syncParts(row: UploadRow): Promise<UploadState> {
-  let state = stateOf(row);
+  const state = stateOf(row);
   const held = await adapterOf().listParts(row.storageKey, row.providerUploadId!);
   const next: UploadState = { ...state, parts: {} };
   let cur = next;
