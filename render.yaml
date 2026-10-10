@@ -255,7 +255,7 @@ envVarGroups:
         generateValue: true
   # Web and worker.
   - name: shapesos-shared
-    # Plus 122 keys you paste in the dashboard (15 before the first deploy):
+    # Plus 124 keys you paste in the dashboard (15 before the first deploy):
     # docs/deploy/RENDER.md, "Values you paste".
     envVars:
       - key: NEXTAUTH_URL

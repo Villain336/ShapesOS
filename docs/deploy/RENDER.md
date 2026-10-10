@@ -184,6 +184,10 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 # mailto: or https: contact for the push services
 VAPID_SUBJECT=
+# Brave Search API key for Ask; unset = labelled mock results
+BRAVE_SEARCH_API_KEY=
+# Exa API key for Ask; unset = that provider is skipped
+EXA_API_KEY=
 LIVEKIT_URL=
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
@@ -300,7 +304,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (258 keys)</summary>
+<details><summary>Not set on Render, on purpose (259 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -324,6 +328,7 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | default OpenAI endpoint | `OPENAI_BASE_URL` |
 | only for a self-hosted push service | `WEB_PUSH_EXTRA_HOSTS` |
 | default 256 is right | `SNAPSHOT_MAX_MB` |
+| default is right: the server browser (Playwright); set server-http only where no browser is installed | `AGENTWEB_PROVIDER` |
 | default gpt-image-2 is right | `LLM_IMAGE_MODEL` |
 | default vendor price is right | `DATAFORSEO_PRICE_PER_1K`, `SERPER_PRICE_PER_1K`, `TALORDATA_PRICE_PER_1K` |
 | default production is right | `QUICKBOOKS_ENVIRONMENT` |

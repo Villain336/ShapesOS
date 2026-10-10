@@ -189,6 +189,10 @@ export const TABLE = [
   ["VAPID_SUBJECT", { cls: "paste", group: S, why: "mailto: or https: contact for the push services" }],
   ["WEB_PUSH_EXTRA_HOSTS", { cls: "exclude", why: "only for a self-hosted push service" }],
   ["SNAPSHOT_MAX_MB", { cls: "exclude", why: "default 256 is right" }],
+  // Phase 21A (WS=agentweb): Ask web search (LIVE, metered; mock results without a key) and the agent browser.
+  ["BRAVE_SEARCH_API_KEY", { cls: "paste", group: S, why: "Brave Search API key for Ask; unset = labelled mock results" }],
+  ["EXA_API_KEY", { cls: "paste", group: S, why: "Exa API key for Ask; unset = that provider is skipped" }],
+  ["AGENTWEB_PROVIDER", { cls: "exclude", why: "default is right: the server browser (Playwright); set server-http only where no browser is installed" }],
   ["LIVEKIT_URL", { cls: "paste", group: S }],
   ["LIVEKIT_API_KEY", { cls: "paste", group: S }],
   ["LIVEKIT_API_SECRET", { cls: "paste", group: S }],
