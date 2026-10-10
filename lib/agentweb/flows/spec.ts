@@ -77,7 +77,7 @@ export function buildFlow(events: readonly EventLike[], opts: { name: string }):
     if (e.type !== "browser") continue;
     const p = (e.payload ?? {}) as Record<string, unknown>;
     const tool = String(p.tool ?? "");
-    if (p.decision === "handoff" || p.decision === "refuse" || p.blocked) continue; // the person's own act, or never done
+    if (p.decision || p.blocked) continue; // stopped, asked or handed over: not done by the agent (a confirmed retry is recorded on its own)
     if (tool === "browser_navigate" && typeof p.url === "string") {
       const o = originOf(p.url);
       if (!o) continue;

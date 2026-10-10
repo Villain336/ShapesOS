@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Hand, Loader2, Pause, Play, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, GraduationCap, Hand, Loader2, Pause, Play, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { aosButton, NeutralBadge, StatusBadge } from "@/components/aos";
 import { SwitchRow } from "@/components/aos/Controls";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -93,6 +93,21 @@ export function SessionDetail({ initial, replay: initialReplay, canSupervise }: 
     if (!res.ok) return setOpen((o) => ({ ...o, [captureId]: "gone" }));
     const d = (await res.json()) as Receipt;
     setOpen((o) => ({ ...o, [captureId]: d }));
+  }
+
+  async function teach() {
+    setBusy("teach");
+    try {
+      const res = await fetch("/api/agentweb/flows", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "teach", runId: s.runId }) });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string; flow?: { name: string } };
+      if (!res.ok || !json.flow) {
+        toastError(json.code === "nothing_to_teach" ? t("sessionsApp.detail.teachNone") : t("sessionsApp.detail.failed"), json.code === "nothing_to_teach" ? undefined : json.error);
+        return;
+      }
+      toast({ title: t("sessionsApp.detail.teachDone", { name: json.flow.name }), status: "done", action: { label: t("flowsApp.title"), onClick: () => window.location.assign("/dashboard/runs/sessions#flows") } });
+    } finally {
+      setBusy(null);
+    }
   }
 
   const key = statusLabelKey(s);
@@ -226,6 +241,17 @@ export function SessionDetail({ initial, replay: initialReplay, canSupervise }: 
           </aside>
         </div>
       ) : null}
+
+      <section aria-labelledby="ss-teach" className="flex flex-col gap-2 rounded-lg bg-paper p-4 shadow-hairline sm:p-5">
+        <h2 id="ss-teach" className="aos-subheading">{t("sessionsApp.detail.teach")}</h2>
+        <p className="max-w-[72ch] text-sm text-muted">{t("sessionsApp.detail.teachHelp")}</p>
+        <div>
+          <button type="button" disabled={!canSupervise || busy !== null || s.steps === 0} onClick={() => void teach()} className={aosButton({ variant: "secondary", size: "sm" })}>
+            {busy === "teach" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <GraduationCap className="size-4" aria-hidden />}
+            {busy === "teach" ? t("sessionsApp.detail.teaching") : t("sessionsApp.detail.teachButton")}
+          </button>
+        </div>
+      </section>
 
       <section aria-labelledby="ss-replay" className="flex flex-col gap-2 rounded-lg bg-paper p-4 shadow-hairline sm:p-5">
         <h2 id="ss-replay" className="aos-subheading">{t("sessionsApp.detail.replay")}</h2>

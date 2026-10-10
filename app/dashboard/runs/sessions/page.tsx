@@ -4,10 +4,12 @@
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { getMembership } from "@/lib/authz";
+import { getMembership, roleAtLeast } from "@/lib/authz";
 import { getI18n } from "@/lib/i18n/server";
 import { listSessions } from "@/lib/agentweb/sessions/store";
+import { listFlows } from "@/lib/agentweb/flows/store";
 import { SessionsPanel } from "@/components/sessions/SessionsPanel";
+import { FlowsPanel } from "@/components/sessions/FlowsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -22,5 +24,11 @@ export default async function SessionsPage() {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   const membership = await getMembership(user.id, workspace.id);
   if (!membership) redirect("/dashboard");
-  return <SessionsPanel initial={await listSessions(workspace.id, { limit: 100 })} />;
+  const [sessions, flows] = await Promise.all([listSessions(workspace.id, { limit: 100 }), listFlows(workspace.id)]);
+  return (
+    <div className="flex flex-col gap-6">
+      <SessionsPanel initial={sessions} />
+      <FlowsPanel initial={flows} canEdit={roleAtLeast(membership.role, "editor")} />
+    </div>
+  );
 }

@@ -28,10 +28,13 @@ import { detectChannels, selectChannel, type ChannelId, type ChannelReport } fro
 import { runApiOperation, runNlweb, runStructured, type ChannelRun, type NetDeps } from "./channel-exec";
 import { originOf } from "./capabilities";
 import { cleanLabel } from "./elements";
+import { locatorOf, type FlowSpec } from "./flows/spec";
+import { runFlow, type ActorResult, type FlowActor } from "./flows/run";
 import { recordReceipt, receiptSecret, type ReceiptDeps, type StepRecord } from "./receipts";
 import { actorView, wrapUntrusted, type ReaderModel } from "./reader";
 import { MAX_STEPS_PER_TASK, taskKeyOf, webTasks, type TaskRegistry, type WebTask } from "./tasks";
 import type { BrowserProvider, BrowserSession, StepOutcome } from "./provider";
+import type { ChatToolCall } from "@/lib/chat/tool-exec";
 import type { ElementInfo, StepDecision } from "./types";
 import type { SiteProbe } from "./channels";
 
@@ -56,11 +59,30 @@ export interface AgentwebToolDeps {
   sessions?: {
     gate: (ctx: Ctx, tool: string, args: Record<string, unknown>, inner: () => Promise<ToolPreflight | undefined>) => Promise<ToolPreflight>;
     step: (ctx: Ctx, step: { url?: string; origin?: string | null; channel?: string | null }) => Promise<void>;
-    needs: (ctx: Ctx, reason: "blocked_by_site") => Promise<void>;
+    needs: (ctx: Ctx, reason: "blocked_by_site" | "teach_check") => Promise<void>;
+  };
+  /** Phase 21A round 2: taught flows (a person publishes them; the tool refuses a draft). Absent = no flows. */
+  flows?: {
+    load: (ctx: Ctx, id: string) => Promise<{ name: string; status: "draft" | "published"; spec: FlowSpec } | null>;
+    ran: (ctx: Ctx, id: string, status: "done" | "stopped") => Promise<void>;
   };
 }
 
 const TEXT_CAP = 6000;
+
+/**
+ * An address without its query string or fragment. After a click or typing step the page's address
+ * can carry what was typed (a search form puts it in the URL), so run events, receipts and the
+ * session's "where" show the address without it: typed values never appear in a log or a receipt.
+ */
+export function stripQuery(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return url.split(/[?#]/)[0] ?? url;
+  }
+}
 
 function refuseText(d: StepDecision): string {
   const why = d.reasons.join("; ");
@@ -98,13 +120,13 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
         scope: { origins: [...task.kernel.caps.allowedOrigins], classes: [...task.kernel.caps.allowedActions] },
         expiresAt: new Date(now + 5 * 60_000), // until the task goes idle (tasks.ts IDLE_MS)
       };
-      const r = await recordReceipt(deps.receipts(ctx), { workspaceId: ctx.workspaceId, actor: `agent:${ctx.agentKey ?? "lead"}`, url: session.url(), html, fetchedAt: new Date(now), step, delegation });
+      const r = await recordReceipt(deps.receipts(ctx), { workspaceId: ctx.workspaceId, actor: `agent:${ctx.agentKey ?? "lead"}`, url: step.action === "click" || step.action === "type" ? stripQuery(session.url()) : session.url(), html, fetchedAt: new Date(now), step, delegation });
       return r.id;
     } catch {
       return undefined;
     } finally {
       task.steps += 1;
-      await deps.sessions?.step(ctx, { url: session.url(), origin: originOf(session.url()), channel: "a11y-tree" }).catch(() => undefined);
+      await deps.sessions?.step(ctx, { url: step.action === "click" || step.action === "type" ? stripQuery(session.url()) : session.url(), origin: originOf(session.url()), channel: "a11y-tree" }).catch(() => undefined);
     }
   }
 
@@ -245,7 +267,7 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
     return o.blocked
       ? `Paused: the page tried to go to ${o.blocked.origin ?? "another address"}, which this task did not start with. Nothing from it was loaded. Ask the person before going there.`
       : o.navigated
-        ? `Now on ${cleanLabel(title, 120)} — ${o.url}. Call browser_snapshot to read it.`
+        ? `Now on ${cleanLabel(title, 120)} — ${stripQuery(o.url)}. Call browser_snapshot to read it.`
         : "Done. The address did not change; call browser_snapshot to see the page.";
   }
 
@@ -286,8 +308,8 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       task.lastControls = [];
       const snapTitle = outcome.blocked ? "" : (await session.snapshot().catch(() => ({ title: "" }))).title;
       const receiptId = await receipt(ctx, task, session, { ...step, decision: ctx.confirmed && decision.decision === "confirm" ? "confirmed" : "allow" });
-      await note(ctx, `Clicked "${cleanLabel(element.name, 60)}"${outcome.blocked ? " (paused: left the task's site)" : ""}`, { tool: "browser_click", ref, klass: decision.klass, tier: decision.tier, url: outcome.url, receiptId, ...(outcome.blocked ? { blocked: outcome.blocked } : {}) });
-      return { summary: outcomeText(outcome, snapTitle), details: { url: outcome.url, navigated: outcome.navigated, blocked: outcome.blocked ?? null, siteOutcome: outcome.siteOutcome ?? null, receiptId, [TOOL_RECORDED_EVENT]: true } };
+      await note(ctx, `Clicked "${cleanLabel(element.name, 60)}"${outcome.blocked ? " (paused: left the task's site)" : ""}`, { tool: "browser_click", ref, klass: decision.klass, tier: decision.tier, url: stripQuery(outcome.url), receiptId, locator: locatorOf(element), ...(outcome.blocked ? { blocked: outcome.blocked } : {}) });
+      return { summary: outcomeText(outcome, snapTitle), details: { url: stripQuery(outcome.url), navigated: outcome.navigated, blocked: outcome.blocked ?? null, siteOutcome: outcome.siteOutcome ?? null, receiptId, [TOOL_RECORDED_EVENT]: true } };
     },
   };
 
@@ -324,8 +346,8 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       }
       const outcome = await session.type(ref, text);
       const receiptId = await receipt(ctx, task, session, step);
-      await note(ctx, `Typed ${text.length} characters into "${cleanLabel(element.name, 60)}"`, { tool: "browser_type", ref, chars: text.length, receiptId });
-      return { summary: `Typed ${text.length} characters into "${cleanLabel(element.name, 60)}".`, details: { url: outcome.url, receiptId, [TOOL_RECORDED_EVENT]: true } };
+      await note(ctx, `Typed ${text.length} characters into "${cleanLabel(element.name, 60)}"`, { tool: "browser_type", ref, chars: text.length, receiptId, locator: locatorOf(element) });
+      return { summary: `Typed ${text.length} characters into "${cleanLabel(element.name, 60)}".`, details: { url: stripQuery(outcome.url), receiptId, [TOOL_RECORDED_EVENT]: true } };
     },
   };
 
@@ -413,6 +435,92 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
     },
   };
 
+
+  // ---------------------------------------------------------------- web_flow_run
+  // A taught flow a person published. Every step goes through executeTool as a normal browser tool
+  // call, so the session gate and the page-aware gate apply in full. The person's yes to start the
+  // flow covers steps the gate would let through ("allow") and nothing else: a step that would ask
+  // (sending, posting, an unclear one, another site) or be refused (paying, removing, signing in)
+  // is NOT run with that yes. The flow stops there for the person.
+  async function flowStep(ctx: Ctx, tool: string, args: Record<string, unknown>): Promise<ActorResult> {
+    const [{ getTool }, { executeTool }, { preflightFor }] = await Promise.all([import("@/lib/chat/tools"), import("@/lib/chat/tool-exec"), import("./gate")]);
+    const def = getTool(tool);
+    if (!def) return { ok: false, kind: "error", message: `${tool} is not available.` };
+    const pre = await preflightFor({ ...ctx, confirmed: false }, def, args);
+    if (pre.verdict !== "allow") return { ok: false, kind: "needs_person", message: pre.reason ?? `${tool} needs a person.` };
+    const call: ChatToolCall = { tool, args, status: "executed" };
+    const result = await executeTool({ ...ctx, confirmed: true }, tool, args, call);
+    if (call.status === "cancelled") return { ok: false, kind: "stopped", message: call.resultSummary ?? "The task was stopped." };
+    if (call.status !== "executed") return { ok: false, kind: call.status === "error" ? "error" : "needs_person", message: call.resultSummary ?? `${tool} did not run.` };
+    const d = (result?.details ?? {}) as { siteOutcome?: { kind?: string } | null; blocked?: unknown; decision?: string };
+    if (d.siteOutcome?.kind === "blocked_by_site") return { ok: false, kind: "blocked_by_site", message: result?.summary ?? "The site did not let this agent in." };
+    if (d.siteOutcome?.kind === "payment_required") return { ok: false, kind: "payment_required", message: result?.summary ?? "The site asks for payment." };
+    if (d.blocked) return { ok: false, kind: "needs_person", message: result?.summary ?? "The page tried to leave the task's site." };
+    if (d.decision) return { ok: false, kind: "needs_person", message: result?.summary ?? "A person has to do this step." };
+    return { ok: true };
+  }
+
+  const web_flow_run: ToolDef = {
+    name: "web_flow_run",
+    description:
+      "Run a taught web flow that a person has published: it repeats the recorded clicks and typing on the same site with the values given, finding each control again if the page changed. It stops for a person when a control cannot be found, when a step needs an OK, and at password or card fields. It never works around a site that says no.",
+    kind: "publish",
+    minRole: "editor",
+    argsSchema: {
+      type: "object",
+      properties: {
+        flowId: { type: "string", description: "The flow's id (required)." },
+        params: { type: "object", description: "Values for the flow's fields, by key, e.g. {\"p1\": \"boots\"}." },
+      },
+      required: ["flowId"],
+    },
+    async execute(rawCtx, args) {
+      const ctx = rawCtx as Ctx;
+      const flowId = typeof args.flowId === "string" ? args.flowId.trim() : "";
+      if (!flowId) throw new Error("Say which flow to run (flowId).");
+      if (!deps.flows) throw new Error("Taught flows are not available here.");
+      const flow = await deps.flows.load(ctx, flowId);
+      if (!flow) throw new Error("That flow was not found.");
+      if (flow.status !== "published") throw new Error(`"${cleanLabel(flow.name, 80)}" is a draft. A person has to review and publish it before an agent can run it.`);
+      let raw: unknown = args.params;
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw) as unknown;
+        } catch {
+          raw = {};
+        }
+      }
+      const params: Record<string, string> = {};
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if ((typeof v === "string" || typeof v === "number") && String(v) !== "") params[k.slice(0, 20)] = String(v).slice(0, 2000);
+      const actor: FlowActor = {
+        navigate: (url) => flowStep(ctx, "browser_navigate", { url }),
+        async controls() {
+          const task = taskWithPage(ctx);
+          const snap = await task.session!.snapshot();
+          task.lastControls = snap.controls;
+          task.lastPage = { url: snap.url, origin: new URL(snap.url).origin, title: snap.title };
+          return snap.controls;
+        },
+        click: (ref) => flowStep(ctx, "browser_click", { ref }),
+        type: (ref, text) => flowStep(ctx, "browser_type", { ref, text }),
+      };
+      const outcome = await runFlow(flow.spec, params, actor, { signal: ctx.signal });
+      await deps.flows.ran(ctx, flowId, outcome.status === "done" ? "done" : "stopped").catch(() => undefined);
+      if (outcome.status === "done") {
+        const healed = outcome.healed.length ? ` ${outcome.healed.length} control${outcome.healed.length === 1 ? " was" : "s were"} found again after the page changed.` : "";
+        await note(ctx, `Ran flow "${cleanLabel(flow.name, 60)}" (${outcome.stepsRun} steps)`, { tool: "web_flow_run", flowId, steps: outcome.stepsRun, healed: outcome.healed });
+        return { summary: `Ran the flow "${cleanLabel(flow.name, 80)}": ${outcome.stepsRun} steps done.${healed} Call browser_snapshot to read the page.`, details: { status: "done", steps: outcome.stepsRun, healed: outcome.healed, [TOOL_RECORDED_EVENT]: true } };
+      }
+      if (outcome.reason !== "aborted" && outcome.reason !== "blocked_by_site") await deps.sessions?.needs(ctx, "teach_check").catch(() => undefined);
+      const names = (outcome.candidates ?? []).map((c) => cleanLabel(c, 60));
+      await note(ctx, `Flow "${cleanLabel(flow.name, 60)}" stopped at step ${outcome.at + 1}: ${outcome.reason}`, { tool: "web_flow_run", flowId, stoppedAt: outcome.at, reason: outcome.reason, stepsRun: outcome.stepsRun });
+      return {
+        summary: `The flow "${cleanLabel(flow.name, 80)}" stopped at step ${outcome.at + 1} of ${flow.spec.steps.length} (${outcome.stepsRun} done). ${outcome.message} A person has to check it; do not try another way around.`,
+        details: { status: "stopped", at: outcome.at, reason: outcome.reason, stepsRun: outcome.stepsRun, candidates: names, [TOOL_RECORDED_EVENT]: true },
+      };
+    },
+  };
+
   // Phase 21A round 2: every tool goes through the session gate first (when sessions are wired).
   const supervised = (t: ToolDef): ToolDef =>
     deps.sessions
@@ -421,10 +529,11 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
           preflight: (c, a) => deps.sessions!.gate(c as Ctx, t.name, a, async () => t.preflight?.(c, a)),
         }
       : t;
-  return [browser_snapshot, browser_navigate, browser_click, browser_type, browser_tabs, browser_screenshot, web_channels].map(supervised);
+  // web_flow_run is not wrapped: each step it takes is a browser tool call that is.
+  return [...[browser_snapshot, browser_navigate, browser_click, browser_type, browser_tabs, browser_screenshot, web_channels].map(supervised), web_flow_run];
 }
 
-export const AGENTWEB_TOOL_NAMES = ["browser_snapshot", "browser_navigate", "browser_click", "browser_type", "browser_tabs", "browser_screenshot", "web_channels"] as const;
+export const AGENTWEB_TOOL_NAMES = ["browser_snapshot", "browser_navigate", "browser_click", "browser_type", "browser_tabs", "browser_screenshot", "web_channels", "web_flow_run"] as const;
 
 // ---------------------------------------------------------------------------
 // Production wiring (lazy imports keep this module light for tests and routes)
@@ -478,6 +587,17 @@ export const defaultAgentwebDeps: AgentwebToolDeps = {
     async needs(ctx, reason) {
       const { sessionNeeds } = await import("./sessions/gate");
       await sessionNeeds(ctx, reason);
+    },
+  },
+  flows: {
+    async load(ctx, id) {
+      const { getFlow } = await import("./flows/store");
+      const f = await getFlow(ctx.workspaceId, id);
+      return f ? { name: f.name, status: f.status, spec: f.spec } : null;
+    },
+    async ran(ctx, id, status) {
+      const { recordFlowRun } = await import("./flows/store");
+      await recordFlowRun(ctx.workspaceId, id, status);
     },
   },
   registry: {

@@ -77,6 +77,7 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // Phase 21A (WS=agentweb): the governed browser. Auto-run covers ordinary steps only; the page decides.
   { action: "browser_click", label: "Click in the governed browser", description: "Click a link or button on a page. Ordinary clicks can run on their own; sending, posting and unclear steps always ask; paying, removing and signing in are never done for you." },
   { action: "browser_type", label: "Type in the governed browser", description: "Type into a field on a page. Never a password or card field; text taken from a web page asks first." },
+  { action: "run_taught_flow", label: "Run a taught web flow", description: "Repeat a web flow a person recorded and published, on the same site. The page still decides each step: sending asks, paying and signing in are never done for you." },
   { action: "search_web_answer", label: "Answer a question from the web", description: "Search the web and write a sourced answer (metered; a hard credit cap applies to each answer)." },
   { action: "write_web_monitor", label: "Watch a web page", description: "Check a page on a schedule and record what changed (Context.dev)." },
   // Phase 21A round 2 (WS=agentweb): asking for a cart to be approved. Only the person's click on the card approves it.

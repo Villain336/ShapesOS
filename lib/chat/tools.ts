@@ -1247,6 +1247,7 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   browser_tabs: "web",
   browser_screenshot: "web",
   web_channels: "web",
+  web_flow_run: "web", // Phase 21A round 2: a taught flow a person published
   // Phase 21A (WS=agentweb): the answer-and-action engine (lib/answer/tools.ts).
   ask_web: "web",
   web_monitor_page: "web",
@@ -1383,6 +1384,7 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // unclear steps always ask even under an Auto-run rule (lib/agentweb/kernel.ts).
   browser_click: "browser_click",
   browser_type: "browser_type",
+  web_flow_run: "run_taught_flow",
   // Phase 21A: a search (Tier 0 by its action name, metered, asks until a rule says Auto-run);
   // watching a page is a standing task on someone else's site (Tier 2, always asks unless a rule allows).
   ask_web: "search_web_answer",
