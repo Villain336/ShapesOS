@@ -265,7 +265,7 @@ export function assessReadiness(input: ReadinessInput): ReadinessReport {
     return {
       kind,
       task: TASKS[kind].task,
-      can: sel.channel !== "vision" && (!drives || hasForm || kind === "ask"),
+      can: sel.channel !== "vision" && (!drives || hasForm),
       channel: sel.channel,
       via,
       note: drives

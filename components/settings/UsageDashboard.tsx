@@ -106,6 +106,8 @@ const ACTION_LABELS: Record<string, string> = {
   enrichment_lookup: "Enrichment lookups",
   prospect_research: "Prospect research (AI)",
   penpot_import: "Penpot imports",
+  // Phase 21A (WS=agentweb)
+  web_search_call: "Web searches (Ask)",
 };
 
 function actionLabel(a: string): string {

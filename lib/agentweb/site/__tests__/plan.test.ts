@@ -90,7 +90,7 @@ describe("planAgentReady", () => {
 
   it("changing the policy changes only the AI section", () => {
     const strict = run(plan.files, { search: false, input: false, train: false });
-    assert.deepEqual(policyOf(read(strict.files, "/robots.txt")), { search: false, input: false, train: false });
+    assert.deepEqual(policyOf(read(strict.files, "/robots.txt") ?? null), { search: false, input: false, train: false });
     assert.deepEqual(strict.changes.map((c) => c.path), ["/robots.txt"]);
   });
 
