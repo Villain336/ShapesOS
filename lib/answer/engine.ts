@@ -26,7 +26,7 @@ import { WEB_SEARCH_MULTIPLIER } from "@/lib/metering/credits";
 import { wrapUntrusted } from "@/lib/agentweb/reader";
 import { extractClaims, parseSynthesis, verifyClaims } from "./claims";
 import { rankResults, validateRerank } from "./rank";
-import type { AnswerPayload, Claim, Plan, QueryKind, SearchProvider, SearchResult, Source } from "./types";
+import type { AnswerPayload, BlockedSource, Claim, DepthBlock, Plan, QueryKind, SearchProvider, SearchResult, Source } from "./types";
 
 export type ModelWorkload = "plan" | "rerank" | "synth";
 
@@ -48,7 +48,7 @@ export interface EngineDeps {
   /** The workspace index, already limited to what the caller's role may read. */
   workspaceSearch?: (question: string) => Promise<SearchResult[]>;
   /** The page text behind a result (depth). Null when it cannot be fetched. */
-  fetchDepth?: (url: string, question: string) => Promise<string | null>;
+  fetchDepth?: (url: string, question: string) => Promise<string | null | { blocked: DepthBlock }>;
   /** Store a receipt for a cited source; returns the capture id. */
   captureSource: (source: Source, answerId: string) => Promise<string | null>;
   /** Record a paid provider call (credits already worked out). */
@@ -245,11 +245,17 @@ export async function answerQuestion(req: AnswerRequest, deps: EngineDeps): Prom
     const order = raw ? validateRerank((() => { try { return (JSON.parse(/\{[\s\S]*\}/.exec(raw)?.[0] ?? "{}") as { order?: unknown }).order; } catch { return null; } })(), sources.length) : null;
     if (order) sources = order.map((id, i) => ({ ...sources.find((s) => s.id === id)!, id: i + 1 }));
   }
+  const blocked: BlockedSource[] = [];
   if (plan.use.includes("depth") && deps.fetchDepth) {
     await Promise.all(
       sources.slice(0, 2).filter((s) => !s.providers.includes("workspace")).map(async (s) => {
         try {
-          const text = await deps.fetchDepth!(s.url, req.question);
+          const got = await deps.fetchDepth!(s.url, req.question);
+          if (got && typeof got === "object") {
+            blocked.push({ sourceId: s.id, url: s.url, ...got.blocked });
+            return;
+          }
+          const text = got;
           // The page adds to the snippet, never replaces it (a cookie wall must not erase good evidence).
           if (text) s.text = `${s.text} ${bestExcerpt(text, req.question, 1200 - Math.min(s.text.length, 600) - 1)}`.slice(0, 1200);
         } catch {
@@ -294,5 +300,5 @@ export async function answerQuestion(req: AnswerRequest, deps: EngineDeps): Prom
     }
   }
   usage.credits = usage.providerCredits + usage.modelCredits;
-  return { payload: { question: req.question, plan, claims, sources, followUps, notes, partial, writtenBy }, usage, captureIds };
+  return { payload: { question: req.question, plan, claims, sources, followUps, notes, partial, writtenBy, ...(blocked.length ? { blocked: blocked.sort((a, b) => a.sourceId - b.sourceId) } : {}) }, usage, captureIds };
 }

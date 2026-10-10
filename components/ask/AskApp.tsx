@@ -232,6 +232,31 @@ export function AskApp({ history: initialHistory, initial, config, providers, ca
                 </div>
               ) : null}
 
+              {p.blocked?.length ? (
+                <div>
+                  <h3 className="text-sm font-semibold text-ink">{t("askApp.blocked.title")}</h3>
+                  <ul className="mt-1 flex flex-col gap-1 text-sm text-muted">
+                    {p.blocked.map((b) => (
+                      <li key={b.sourceId}>
+                        <span className="font-semibold text-ink">{`[${b.sourceId}] `}</span>
+                        {b.kind === "blocked_by_site"
+                          ? t(`askApp.blocked.reason.${b.reason ?? "forbidden"}` as MessageKey)
+                          : b.kind === "payment_required"
+                            ? b.price
+                              ? t("askApp.blocked.paymentPrice", { price: b.price })
+                              : t("askApp.blocked.payment")
+                            : t(`askApp.blocked.reason.${b.reason ?? "robots"}` as MessageKey)}{" "}
+                        {/^https?:\/\//i.test(b.url) ? (
+                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-ink underline">
+                            {t("askApp.blocked.openIt")}
+                          </a>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {p.followUps.length ? (
                 <div role="group" aria-label={t("askApp.answer.followUps")} className="flex flex-wrap gap-1.5">
                   {p.followUps.map((f) => (

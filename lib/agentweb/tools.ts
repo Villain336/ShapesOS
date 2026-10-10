@@ -216,6 +216,12 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
   }
 
   function outcomeText(o: StepOutcome, title: string): string {
+    if (o.siteOutcome?.kind === "blocked_by_site") {
+      return `The site did not let this agent in (${o.siteOutcome.reason}). Do NOT try to get around it. Tell the person, and suggest they open ${o.url} themselves.`;
+    }
+    if (o.siteOutcome?.kind === "payment_required") {
+      return `The site asks for payment before agents may read it${o.siteOutcome.price ? ` (${o.siteOutcome.price})` : ""}. Nothing was paid. Ask the person whether they want to pay; do not continue on your own.`;
+    }
     return o.blocked
       ? `Paused: the page tried to go to ${o.blocked.origin ?? "another address"}, which this task did not start with. Nothing from it was loaded. Ask the person before going there.`
       : o.navigated
@@ -261,7 +267,7 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       const snapTitle = outcome.blocked ? "" : (await session.snapshot().catch(() => ({ title: "" }))).title;
       const receiptId = await receipt(ctx, task, session, { ...step, decision: ctx.confirmed && decision.decision === "confirm" ? "confirmed" : "allow" });
       await note(ctx, `Clicked "${cleanLabel(element.name, 60)}"${outcome.blocked ? " (paused: left the task's site)" : ""}`, { tool: "browser_click", ref, klass: decision.klass, tier: decision.tier, url: outcome.url, receiptId, ...(outcome.blocked ? { blocked: outcome.blocked } : {}) });
-      return { summary: outcomeText(outcome, snapTitle), details: { url: outcome.url, navigated: outcome.navigated, blocked: outcome.blocked ?? null, receiptId, [TOOL_RECORDED_EVENT]: true } };
+      return { summary: outcomeText(outcome, snapTitle), details: { url: outcome.url, navigated: outcome.navigated, blocked: outcome.blocked ?? null, siteOutcome: outcome.siteOutcome ?? null, receiptId, [TOOL_RECORDED_EVENT]: true } };
     },
   };
 

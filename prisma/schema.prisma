@@ -1130,6 +1130,9 @@ model Workspace {
   webAnswers                  WebAnswer[]
   agentwebSettings            AgentwebSettings?
   agentwebSiteCapabilities    AgentwebSiteCapability[]
+  // Phase 21A round 2 (WS=agentweb): delegation records and cart mandates.
+  agentwebDelegations         AgentwebDelegation[]
+  agentwebMandates            AgentwebMandate[]
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
@@ -18134,4 +18137,96 @@ model AgentwebSiteCapability {
 
   @@unique([workspaceId, origin])
   @@map("agentweb_site_capabilities")
+}
+
+// ============================================================================
+// Phase 21A round 2 (WS=agentweb): identity, delegation and commerce (M4).
+// Migration 20261101100500_p21_agentweb_identity_commerce.
+// ============================================================================
+
+// The deployment's Web Bot Auth signing keys (lib/agentweb/identity/keys-store.ts).
+// NOT tenant data: one key pair per deployment, so no workspace_id and no RLS. The
+// private half is only ever stored as a secrets() envelope (AES-GCM under
+// MARKETR_CREDENTIALS_KEY, or the managed KMS provider on hosted) and is never sent
+// out. A partial unique index keeps at most one "active" key; retired keys stay in
+// the public directory for a grace period so in-flight signatures still verify.
+model AgentwebIdentityKey {
+  // The JWK thumbprint of the public key (the signature keyid).
+  id          String    @id
+  publicX     String    @map("public_x")
+  privateEnc  String    @map("private_enc")
+  // active | retired
+  status      String    @default("active") @db.VarChar(12)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  rotateAfter DateTime  @map("rotate_after")
+  retiredAt   DateTime? @map("retired_at")
+
+  @@index([status, createdAt])
+  @@map("agentweb_identity_keys")
+}
+
+// One row per agent web action that was authorised: who delegated it, the scope it ran
+// under, the run, when the delegation expires and the tier decision. The same facts go
+// into the audit hash chain (lib/agentweb/receipts.ts) and are attached to the receipt.
+// FORCE RLS.
+model AgentwebDelegation {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId       String?   @map("run_id")
+  // The person (user id) whose authority the agent was acting under.
+  delegatedBy String    @map("delegated_by")
+  // The acting agent ("lead", a sub-agent key, "chat", ...).
+  agent       String
+  // { origins: string[], classes: string[] } the task was started with.
+  scope       Json      @default("{}")
+  expiresAt   DateTime  @map("expires_at")
+  action      String    @db.VarChar(24)
+  url         String
+  origin      String
+  tier        Int
+  // allow | confirm | handoff | refuse
+  decision    String    @db.VarChar(16)
+  reason      String?
+  captureId   String?   @map("capture_id")
+  auditEventId String?  @map("audit_event_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, runId])
+  @@index([workspaceId, createdAt])
+  @@map("agentweb_delegations")
+}
+
+// A cart mandate: the person's signed authorisation of ONE cart (merchant, items,
+// amount, currency, expiry, run, hash). Created pending by the agent; signed only by a
+// click on the Tier 3 card (lib/agentweb/commerce/mandate.ts); single use. FORCE RLS.
+model AgentwebMandate {
+  id             String    @id
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId          String?   @map("run_id")
+  requestedBy    String    @map("requested_by")
+  merchantName   String    @map("merchant_name")
+  merchantOrigin String    @map("merchant_origin")
+  cart           Json
+  cartHash       String    @map("cart_hash")
+  amountMinor    Int       @map("amount_minor")
+  currency       String    @db.VarChar(3)
+  expiresAt      DateTime  @map("expires_at")
+  // pending | signed | rejected | used
+  status         String    @default("pending") @db.VarChar(12)
+  signedBy       String?   @map("signed_by")
+  signedAt       DateTime? @map("signed_at")
+  // ui_click is the only channel that can sign (voice, API keys and agents cannot)
+  via            String?   @db.VarChar(16)
+  alg            String?   @db.VarChar(16)
+  signature      String?
+  usedAt         DateTime? @map("used_at")
+  // The merchant's checkout session / order reference once used.
+  checkoutRef    String?   @map("checkout_ref")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, runId])
+  @@map("agentweb_mandates")
 }

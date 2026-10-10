@@ -14,7 +14,7 @@
 import { randomBytes } from "node:crypto";
 import type { WorkspaceRole } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
-import { fetchPageText } from "@/lib/agentweb/page-fetch";
+import { readPage } from "@/lib/agentweb/page-fetch";
 import { receiptSecret, recordReceipt } from "@/lib/agentweb/receipts";
 import { storeCapture } from "@/lib/agentweb/captures-store";
 import { getConfig } from "@/lib/agentweb/settings";
@@ -107,7 +107,16 @@ export async function runAnswer(input: RunAnswerInput, opts: RunAnswerOptions = 
     capCredits,
     now,
     workspaceSearch: (q) => workspaceResults(input, q),
-    fetchDepth: (url) => fetchPageText(url),
+    fetchDepth: async (url) => {
+      const r = await readPage(url);
+      if (r.ok) return r.text;
+      const o = r.outcome;
+      if (o.kind === "blocked_by_site") return { blocked: { kind: "blocked_by_site", reason: o.reason } };
+      if (o.kind === "payment_required") return { blocked: { kind: "payment_required", price: o.price } };
+      if (o.kind === "disallowed_by_robots") return { blocked: { kind: "disallowed", reason: "robots" } };
+      if (o.kind === "disallowed_by_preference") return { blocked: { kind: "disallowed", reason: "preference" } };
+      return null;
+    },
     async captureSource(s, id) {
       const r = await recordReceipt(
         {

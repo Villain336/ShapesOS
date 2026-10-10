@@ -96,4 +96,19 @@ export interface AnswerPayload {
   partial: boolean;
   /** How the claims were written. */
   writtenBy: "model" | "extract";
+  /** Sources whose page the agent could not read: the site said no, or wants payment (round 2). */
+  blocked?: BlockedSource[];
 }
+
+/** A page the agent did not read, and why. The UI explains it and offers the manual path. */
+export interface BlockedSource {
+  sourceId: number;
+  url: string;
+  kind: "blocked_by_site" | "payment_required" | "disallowed";
+  /** challenge | forbidden | unauthorized | rate_limited | robots | preference */
+  reason?: string;
+  price?: string | null;
+}
+
+/** What a depth reader may report instead of text. */
+export type DepthBlock = { kind: BlockedSource["kind"]; reason?: string; price?: string | null };

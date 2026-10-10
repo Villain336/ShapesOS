@@ -7,12 +7,13 @@
 import { assertSafeUrl } from "@/lib/safe-url";
 import { HttpBrowserProvider } from "./provider-http";
 import { PlaywrightProvider } from "./provider-server";
+import { deploymentSigner } from "./identity/signer";
 import { getBrowserProvider, ProviderUnavailableError, registerBrowserProvider, type BrowserProvider } from "./provider";
 
 const checkUrl = (url: string) => assertSafeUrl(url);
 
-registerBrowserProvider("server", () => new PlaywrightProvider({ checkUrl }));
-registerBrowserProvider("server-http", () => new HttpBrowserProvider({ checkUrl }));
+registerBrowserProvider("server", () => new PlaywrightProvider({ checkUrl, signer: deploymentSigner() }));
+registerBrowserProvider("server-http", () => new HttpBrowserProvider({ checkUrl, signer: deploymentSigner() }));
 
 export function defaultProviderId(env: Record<string, string | undefined> = process.env): "server" | "server-http" {
   return (env.AGENTWEB_PROVIDER ?? "").trim().toLowerCase() === "server-http" ? "server-http" : "server";

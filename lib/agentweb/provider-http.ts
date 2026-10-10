@@ -13,6 +13,7 @@
 import { scanControls, formDefaults, type ControlNode } from "./elements";
 import { attr, findAll, parseHtml, textOf } from "./html";
 import { checkNavigation, grantOrigin, type TaskCapabilities } from "./capabilities";
+import { classifyResponse, signedNavigationHeaders, type Signer } from "./identity/agent-fetch";
 import type { BrowserProvider, BrowserSession, OpenOptions, PageSnapshot, ScreenshotResult, StepOutcome, TabInfo, BlockedNavigation } from "./provider";
 
 export interface HttpProviderDeps {
@@ -20,6 +21,8 @@ export interface HttpProviderDeps {
   /** SSRF guard: resolves to the URL to fetch or throws. */
   checkUrl: (url: string) => Promise<string>;
   userAgent?: string;
+  /** Web Bot Auth signer (null/undefined = unsigned). Each hop is signed for its own host. */
+  signer?: Signer | null;
 }
 
 const MAX_BYTES = 2_000_000;
@@ -108,12 +111,9 @@ class HttpSession implements BrowserSession {
         const b = this.blocked(url, "unsafe-address");
         return { ...b, title: this.current.title, status: 0, blocked: b.blocked! };
       }
-      const res = await fetchFn(url, {
-        method,
-        body,
-        redirect: "manual",
-        headers: { "user-agent": this.deps.userAgent ?? "ShapesOS-Agent/1.0 (+https://shapesos.com/agents)", accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}) },
-      });
+      const baseHeaders = { "user-agent": this.deps.userAgent ?? "ShapesOS-Agent/1.0 (+https://shapesos.com/agents)", accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}) };
+      const headers = (await signedNavigationHeaders(this.deps.signer, { url, method, headers: baseHeaders })) ?? baseHeaders;
+      const res = await fetchFn(url, { method, body, redirect: "manual", headers });
       const loc = res.headers.get("location");
       if (res.status >= 300 && res.status < 400 && loc) {
         url = new URL(loc, url).toString();
@@ -129,7 +129,8 @@ class HttpSession implements BrowserSession {
       this.current = { url, html: text, title: titleNode ? textOf(titleNode).trim().slice(0, 200) : "", status: res.status };
       this.controls = scanControls(text, url);
       this.typed.clear();
-      return { url, navigated: true, title: this.current.title, status: res.status };
+      const site = classifyResponse(res, text);
+      return { url, navigated: true, title: this.current.title, status: res.status, ...(site.kind === "blocked_by_site" || site.kind === "payment_required" ? { siteOutcome: site } : {}) };
     }
     throw new Error("Too many redirects.");
   }

@@ -138,3 +138,27 @@ describe("provider registry", () => {
     assert.throws(() => getBrowserProvider("desktop-tab"), (e: unknown) => e instanceof ProviderUnavailableError && /Desktop browser/.test((e as Error).message));
   });
 });
+
+// ---- round 2: signed navigation and honest outcomes ----
+import { generateKeyPair, signRequest, verifyRequest } from "../identity/httpsig";
+
+describe("HttpBrowserProvider: Web Bot Auth and site refusals", () => {
+  it("signs every hop for the host it goes to, and says when a site refuses agents", async () => {
+    const keys = generateKeyPair();
+    const NOW = 1_800_000_000;
+    const signer = async ({ url, method }: { url: string; method?: string }) => signRequest({ url, method, keys, created: NOW, expires: NOW + 60, signatureAgent: { url: "https://app.shapesos.test" } });
+    const seen: Record<string, Record<string, string>> = {};
+    const fetchFn: typeof fetch = async (input, init) => {
+      seen[String(input)] = Object.fromEntries(new Headers(init?.headers).entries());
+      if (String(input) === "https://a.test/") return new Response("<title>Home</title>", { status: 200 });
+      return new Response("<title>Attention Required! | Cloudflare</title>", { status: 403 });
+    };
+    const provider = new HttpBrowserProvider({ fetchFn, checkUrl: async (u) => u, signer });
+    const session = await provider.open({ caps: capabilitiesFor("https://a.test/") });
+    await session.navigate("https://a.test/");
+    assert.equal(verifyRequest({ url: "https://a.test/", headers: seen["https://a.test/"]!, resolveKey: (id) => (id === keys.kid ? keys.x : null), now: NOW }).ok, true);
+    const out = await session.navigate("https://a.test/blocked");
+    assert.deepEqual((out as { siteOutcome?: unknown }).siteOutcome, { kind: "blocked_by_site", reason: "challenge", status: 403, manualPath: true });
+    await session.close();
+  });
+});

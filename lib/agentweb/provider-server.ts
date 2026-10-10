@@ -21,6 +21,7 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { checkNavigation, grantOrigin, type TaskCapabilities } from "./capabilities";
 import { cleanLabel } from "./elements";
 import { parseAriaSnapshot } from "./aria";
+import { classifyResponse, signedNavigationHeaders, type Signer } from "./identity/agent-fetch";
 import type { BlockedNavigation, BrowserProvider, BrowserSession, OpenOptions, PageSnapshot, ScreenshotResult, StepOutcome, TabInfo } from "./provider";
 import type { ElementInfo, FieldInfo } from "./types";
 
@@ -35,6 +36,8 @@ export interface ServerProviderDeps {
   checkUrl: (url: string) => Promise<string>;
   /** Appended to the browser's own user agent. */
   agentToken?: string;
+  /** Web Bot Auth: signs top-level navigations for the host they go to (null/undefined = unsigned). */
+  signer?: Signer | null;
 }
 
 export class PlaywrightProvider implements BrowserProvider {
@@ -149,6 +152,10 @@ class PlaywrightSession implements BrowserSession {
         if (req.isNavigationRequest() && req.frame() === this.page.mainFrame()) this.blocked = { url, origin: null, reason: "unsafe-address" };
         return route.abort("blockedbyclient");
       }
+      if (req.isNavigationRequest() && req.frame() === this.page.mainFrame()) {
+        const headers = await signedNavigationHeaders(this.deps.signer, { url, method: req.method(), headers: req.headers() });
+        if (headers) return route.continue({ headers });
+      }
       return route.continue();
     });
     await this.context.routeWebSocket(/.*/, async (ws) => {
@@ -189,6 +196,12 @@ class PlaywrightSession implements BrowserSession {
     try {
       const res = await this.page.goto(url, { waitUntil: "domcontentloaded" });
       status = res?.status() ?? 0;
+      if (res) {
+        // A refusal is reported as one (never worked around): look at the status, the headers and the start of the page.
+        const text = await this.page.locator("body").innerText({ timeout: 2000 }).catch(() => "");
+        const site = classifyResponse(new Response(null, { status, headers: res.headers() }), `${await this.title()} ${text}`.slice(0, 4000));
+        if (site.kind === "blocked_by_site" || site.kind === "payment_required") return { url: this.page.url(), navigated: true, title: await this.title(), status, siteOutcome: site };
+      }
     } catch (err) {
       const blocked = this.takeBlocked();
       if (blocked) return { url: this.page.url(), navigated: false, blocked, title: await this.title(), status: 0 };

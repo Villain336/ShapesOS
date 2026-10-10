@@ -7,19 +7,22 @@
 // disallows for agents, goes through the SSRF-safe fetch, and clips what it
 // reads. No CAPTCHA handling, no evasion: a refusal is reported as one.
 
-import { safeFetch } from "@/lib/connectors/safe-fetch";
 import { isAllowed, parseRobots } from "@/lib/intelligence/fleet/robots";
 import { UnsafeUrlError, type ResolveFn } from "@/lib/safe-url";
 import { PROBE_PATHS, type SiteProbe } from "./channels";
+import { agentFetch, type Signer } from "./identity/agent-fetch";
+import { deploymentSigner } from "./identity/signer";
 
 export const AGENT_BOT_TOKEN = "shapesos-agent";
-export const AGENT_USER_AGENT = "ShapesOS-Agent/1.0 (+https://shapesos.com/agents)";
+export { AGENT_USER_AGENT } from "./identity/agent-fetch";
 const FILE_CAP = 200_000;
 const TIMEOUT_MS = 8_000;
 
 export interface ProbeDeps {
   fetchFn?: typeof fetch;
   resolve?: ResolveFn;
+  /** undefined = the deployment's Web Bot Auth signer; null = unsigned. */
+  signer?: Signer | null;
 }
 
 export async function probeSite(origin: string, html: string, deps: ProbeDeps = {}): Promise<SiteProbe> {
@@ -28,10 +31,10 @@ export async function probeSite(origin: string, html: string, deps: ProbeDeps = 
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
     try {
-      const res = await safeFetch(
+      const res = await agentFetch(
         `${origin}${path}`,
-        { headers: { "user-agent": AGENT_USER_AGENT, accept: "application/json, text/plain, text/html;q=0.8, */*;q=0.5" }, signal: ctl.signal },
-        { fetchFn: deps.fetchFn, resolve: deps.resolve, maxRedirects: 2 },
+        { headers: { accept: "application/json, text/plain, text/html;q=0.8, */*;q=0.5" } },
+        { fetchFn: deps.fetchFn, resolve: deps.resolve, signer: deps.signer === undefined ? deploymentSigner() : deps.signer, maxRedirects: 2, signal: ctl.signal },
       );
       return { status: res.status, body: (await res.text()).slice(0, FILE_CAP) };
     } finally {

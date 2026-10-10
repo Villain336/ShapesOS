@@ -41,8 +41,12 @@ export interface BlockedNavigation {
   reason: "new-origin" | "unsafe-address" | "bad-scheme";
 }
 
+import type { FetchOutcome } from "./identity/agent-fetch";
+
 export interface StepOutcome {
   url: string;
+  /** The site's answer when it refused the agent or wants payment (never worked around). */
+  siteOutcome?: Exclude<FetchOutcome, { kind: "ok" } | { kind: "error" }>;
   /** The step changed the page address. */
   navigated: boolean;
   /** Set when the step tried to move off the task's origins; the page content was NOT loaded. */

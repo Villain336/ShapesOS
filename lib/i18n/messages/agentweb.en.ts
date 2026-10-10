@@ -37,6 +37,20 @@ export const agentwebEn = {
       cost: "{credits} of {cap} credits",
       costDev: "Search {provider} · model {model}",
     },
+    blocked: {
+      title: "Pages the agent did not read",
+      reason: {
+        challenge: "The site asked for a human check (a bot challenge). The agent does not try to get around it.",
+        forbidden: "The site refuses agent access.",
+        unauthorized: "The page needs a sign-in the agent does not have.",
+        rate_limited: "The site asked agents to slow down.",
+        robots: "The site's robots.txt asks agents not to read it, and the agent honours that.",
+        preference: "The site says AI should not use its pages to answer questions, and the agent honours that.",
+      },
+      payment: "The site asks for payment to be read by agents. Nothing was paid; that is your decision.",
+      paymentPrice: "The site asks {price} to be read by agents. Nothing was paid; that is your decision.",
+      openIt: "Open it yourself",
+    },
     actions: {
       label: "Actions",
       saveNote: "Save to Notes",

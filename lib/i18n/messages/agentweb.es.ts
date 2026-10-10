@@ -40,6 +40,20 @@ export const agentwebEs: Catalogue<typeof agentwebEn> = {
       cost: "{credits} de {cap} créditos",
       costDev: "Búsqueda {provider} · modelo {model}",
     },
+    blocked: {
+      title: "Páginas que el agente no leyó",
+      reason: {
+        challenge: "El sitio pidió una comprobación humana (un desafío anti-bots). El agente no intenta saltárselo.",
+        forbidden: "El sitio rechaza el acceso de agentes.",
+        unauthorized: "La página requiere iniciar sesión y el agente no tiene acceso.",
+        rate_limited: "El sitio pidió a los agentes que vayan más despacio.",
+        robots: "El robots.txt del sitio pide a los agentes que no la lean, y el agente lo respeta.",
+        preference: "El sitio indica que la IA no debe usar sus páginas para responder preguntas, y el agente lo respeta.",
+      },
+      payment: "El sitio pide un pago para que los agentes lo lean. No se pagó nada; es decisión tuya.",
+      paymentPrice: "El sitio pide {price} para que los agentes lo lean. No se pagó nada; es decisión tuya.",
+      openIt: "Ábrela tú mismo",
+    },
     actions: {
       label: "Acciones",
       saveNote: "Guardar en Notas",

@@ -262,3 +262,5 @@ lib/answer/__tests__/answer-db.test.ts
 lib/agentweb/__tests__/agent-ready-draft-db.test.ts
 # Phase 21A (WS=agentweb): the public storefront agent routes (ask, mcp, llms.txt) as the app role — published stores only, answers from that store's own catalogue (another tenant's product invisible), per-store+IP rate limit, MCP read-only tool surface and request refusals, valid llms.txt.
 lib/agentweb/__tests__/storefront-routes-db.test.ts
+# Phase 21A round 2 (WS=agentweb): the deployment's Web Bot Auth keys and public directory as the app role — one active key even under racing creators, the private half stored only as an envelope, the directory route lists public keys only and is signed over the asked host, rotation (grace, prune, aged key rotates itself, emergency prune).
+lib/agentweb/__tests__/identity-keys-db.test.ts

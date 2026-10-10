@@ -190,6 +190,19 @@ describe("answerQuestion", () => {
     assert.equal(out.payload.claims[0]!.status, "supported");
   });
 
+  it("depth: a site that blocks agents or wants payment is reported as such, never worked around", async () => {
+    const plan = { kind: "research", use: ["web", "depth"], queries: ["q"], recent: false };
+    const synth = { claims: [{ text: "Riverside Dental is open Monday to Friday from 9:00 to 17:00.", cites: [1], evidence: ["open Monday to Friday, 9:00 to 17:00"] }] };
+    const blocked = rig({ providers: [provider("brave", [HOURS], 5000)], fetchDepth: async () => ({ blocked: { kind: "blocked_by_site", reason: "challenge" } }) }, model({ plan, synth }));
+    const out = await answerQuestion(ASK, blocked.deps);
+    assert.deepEqual(out.payload.blocked, [{ sourceId: 1, url: HOURS.url, kind: "blocked_by_site", reason: "challenge" }]);
+    assert.equal(out.payload.claims[0]!.status, "supported", "the search snippet still stands as evidence");
+    const paid = rig({ providers: [provider("brave", [HOURS], 5000)], fetchDepth: async () => ({ blocked: { kind: "payment_required", price: "USD 0.01" } }) }, model({ plan, synth }));
+    assert.deepEqual((await answerQuestion(ASK, paid.deps)).payload.blocked, [{ sourceId: 1, url: HOURS.url, kind: "payment_required", price: "USD 0.01" }]);
+    const plain = rig({ providers: [provider("brave", [HOURS], 5000)], fetchDepth: async () => "Full page text." }, model({ plan, synth }));
+    assert.equal((await answerQuestion(ASK, plain.deps)).payload.blocked, undefined);
+  });
+
   it("an unusable model reply degrades to the extract, with a note", async () => {
     const r = rig({ providers: [provider("brave", [HOURS], 5000)] }, model({ synth: "Sorry, I can't." }));
     const out = await answerQuestion(ASK, r.deps);
