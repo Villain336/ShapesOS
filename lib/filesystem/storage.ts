@@ -537,6 +537,8 @@ export const BLOB_NAMESPACES = {
   system: { localDir: () => join(localBlobRoot(), "system"), workspaceScoped: false },
   /** Phase 18.3 (WS=flow): Time Machine workspace snapshots: <workspaceId>/<snapshotId>.json.gz. */
   snapshots: { localDir: () => envDir("SNAPSHOT_STORAGE_DIR") ?? join(localBlobRoot(), "snapshots"), workspaceScoped: true },
+  /** Phase 21A (WS=agentweb): page captures and browser-step screenshots: <workspaceId>/<captureId>.{txt,png}. */
+  "web-captures": { localDir: () => join(localBlobRoot(), "web-captures"), workspaceScoped: true },
 } as const satisfies Record<string, { localDir: () => string; workspaceScoped: boolean }>;
 
 export type BlobNamespace = keyof typeof BLOB_NAMESPACES;

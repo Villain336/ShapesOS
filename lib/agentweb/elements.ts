@@ -57,9 +57,41 @@ function fieldInfo(root: HtmlNode, f: HtmlNode): FieldInfo {
   };
 }
 
+export interface ControlNode {
+  info: ElementInfo;
+  node: HtmlNode;
+  formNode?: HtmlNode;
+}
+
 export function controlsOf(html: string, pageUrl: string): ElementInfo[] {
+  return scanControls(html, pageUrl).map((c) => c.info);
+}
+
+/** The values a browser would submit for a form before the person types anything. */
+export function formDefaults(form: HtmlNode): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of findAll(form, (n) => ["input", "textarea", "select"].includes(n.tag ?? ""))) {
+    const name = attr(f, "name");
+    if (!name) continue;
+    const type = (attr(f, "type") ?? "text").toLowerCase();
+    if (["submit", "button", "reset", "image", "file"].includes(type)) continue;
+    if ((type === "checkbox" || type === "radio") && !("checked" in (f.attrs ?? {}))) continue;
+    if (f.tag === "select") {
+      const opts = findAll(f, (n) => n.tag === "option");
+      const chosen = opts.find((o) => "selected" in (o.attrs ?? {})) ?? opts[0];
+      if (chosen) out[name] = attr(chosen, "value") ?? textOf(chosen).trim();
+    } else if (f.tag === "textarea") {
+      out[name] = textOf(f);
+    } else {
+      out[name] = attr(f, "value") ?? (type === "checkbox" || type === "radio" ? "on" : "");
+    }
+  }
+  return out;
+}
+
+export function scanControls(html: string, pageUrl: string): ControlNode[] {
   const root = parseHtml(html);
-  const out: ElementInfo[] = [];
+  const out: ControlNode[] = [];
   const nodes = findAll(root, (n) => n.type === "element" && ["a", "button", "input", "textarea", "select", "summary"].includes(n.tag ?? ""));
   for (const n of nodes) {
     if (hiddenByAncestor(n)) continue;
@@ -96,7 +128,7 @@ export function controlsOf(html: string, pageUrl: string): ElementInfo[] {
       const fields = findAll(form, (x) => ["input", "textarea", "select"].includes(x.tag ?? "") && !["submit", "button", "reset", "image", "hidden"].includes((attr(x, "type") ?? "").toLowerCase())).map((f) => fieldInfo(root, f));
       el.form = { action: resolve(pageUrl, attr(form, "action") ?? ""), method: (attr(form, "method") ?? "get").toLowerCase(), fields };
     }
-    out.push(el);
+    out.push({ info: el, node: n, formNode: form });
   }
   return out;
 }

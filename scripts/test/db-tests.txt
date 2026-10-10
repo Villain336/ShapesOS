@@ -252,3 +252,5 @@ lib/push/__tests__/web-push-db.test.ts
 lib/timemachine/__tests__/snapshots-db.test.ts
 # Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
 lib/timemachine/__tests__/undo-db.test.ts
+# Phase 21A (WS=agentweb): the agent web layer under RLS as the app role — every new table invisible without the workspace GUC and across workspaces, captures stored/listed/verified/expired inside their own workspace (retention setting decides the lifetime), the site capability registry per workspace (declared vs worked counts feed the selector), settings validated (cap, retention, provider order).
+lib/agentweb/__tests__/agentweb-db.test.ts

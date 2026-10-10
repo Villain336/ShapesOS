@@ -1125,6 +1125,11 @@ model Workspace {
   sraEnvelopes                SraEnvelope[]
   // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
   webhookEndpoints            WebhookEndpoint[]
+  // Phase 21A (WS=agentweb): answer engine, captures and the agent web layer.
+  webCaptures                 WebCapture[]
+  webAnswers                  WebAnswer[]
+  agentwebSettings            AgentwebSettings?
+  agentwebSiteCapabilities    AgentwebSiteCapability[]
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
@@ -18023,4 +18028,110 @@ model WorkspaceSnapshot {
 
   @@index([workspaceId, createdAt])
   @@map("workspace_snapshots")
+}
+
+// =====================================================================
+// Phase 21A (WS=agentweb): answer engine (M3), agent web layer (M2).
+// All four tables are FORCE RLS on app.workspace_id (migration
+// 20261101100000_p21_agentweb_core).
+// =====================================================================
+
+// A capture of a web page: the receipt behind a cited source or a browser step
+// (lib/agentweb/receipts.ts). URL, fetch time, content hashes, a short excerpt;
+// the screenshot only when the fetch went through a browser. Signed (HMAC) when
+// the app has a secret, else alg "none". Deleted after retention_until.
+model WebCapture {
+  id             String    @map("id")
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  url            String
+  fetchedAt      DateTime  @map("fetched_at")
+  domHash        String    @map("dom_hash")
+  textHash       String    @map("text_hash")
+  excerpt        String
+  screenshotRef  String?   @map("screenshot_ref")
+  // blob ref (web-captures namespace) of the stored page text, when kept
+  bodyRef        String?   @map("body_ref")
+  alg            String    @default("none") @db.VarChar(16)
+  signature      String?
+  // search-snippet | fetch | browser | step
+  via            String    @db.VarChar(24)
+  // search provider that returned the result (brave | exa | mock | workspace | crawler | contextdev)
+  provider       String?   @db.VarChar(24)
+  answerId       String?   @map("answer_id")
+  runId          String?   @map("run_id")
+  stepAction     String?   @map("step_action") @db.VarChar(24)
+  stepClass      String?   @map("step_class") @db.VarChar(24)
+  tier           Int?
+  retentionUntil DateTime  @map("retention_until")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@id([workspaceId, id])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, answerId])
+  @@index([retentionUntil])
+  @@map("web_captures")
+}
+
+// One answer from the answer-and-action engine (lib/answer): the question, the
+// claims with their citations (capture ids), what it cost, and whether it
+// stopped early on the credit cap (partial).
+model WebAnswer {
+  id                  String    @id @default(cuid())
+  workspaceId         String    @map("workspace_id")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId              String    @map("user_id")
+  question            String
+  // done | partial | failed
+  status              String    @default("done") @db.VarChar(12)
+  // true when any result came from a mock provider
+  mock                Boolean   @default(false)
+  // { plan, claims[], sources[], notes[] } (lib/answer/types.ts AnswerPayload)
+  payload             Json      @default("{}")
+  captureIds          String[]  @default([]) @map("capture_ids")
+  providerCostMicroUsd Int      @default(0) @map("provider_cost_micro_usd")
+  modelCostMicroUsd   Int       @default(0) @map("model_cost_micro_usd")
+  credits             Int       @default(0)
+  capCredits          Int       @default(0) @map("cap_credits")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, userId, createdAt])
+  @@map("web_answers")
+}
+
+// Per-workspace settings of the agent web layer: which search providers run and
+// in what order, how long captures are kept, and the hard per-answer credit cap.
+model AgentwebSettings {
+  workspaceId          String    @id @map("workspace_id")
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // ordered provider ids ("brave", "exa", "mock"); empty = the platform default
+  providerOrder        String[]  @default([]) @map("provider_order")
+  captureRetentionDays Int       @default(30) @map("capture_retention_days")
+  answerCapCredits     Int       @default(25) @map("answer_cap_credits")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("agentweb_settings")
+}
+
+// Site capability registry: per workspace and origin, what the site DECLARED to
+// agents (declared tools, documented APIs, structured data) and what actually
+// WORKED for our agents (lib/agentweb/registry.ts).
+model AgentwebSiteCapability {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  origin      String
+  // { tools: [{source,name}], apis: n, actions: n, llmsTxt: bool }
+  declared    Json      @default("{}")
+  // { "<channel>": { ok: n, failed: n, lastAt: iso } }
+  worked      Json      @default("{}")
+  // learned flows: [{ intent, channel, steps, at }]
+  flows       Json      @default("[]")
+  probedAt    DateTime? @map("probed_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, origin])
+  @@map("agentweb_site_capabilities")
 }
