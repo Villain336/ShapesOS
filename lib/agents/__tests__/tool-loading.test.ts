@@ -306,6 +306,11 @@ describe("A2 — shortened descriptions keep every tool's tier (Phase 14 tier tr
   // sends and calendar writes 2 (their connectors' own actions).
   Object.assign(PINNED, {"list_reminders":0,"create_reminder":1,"complete_reminder":1,"find_contact":0,"suggest_merge":0,"confirm_merge":1,"calendar_list_events":0,"calendar_find_time":0,"calendar_create_event_google":2,"calendar_create_event_outlook":2,"mail_list_threads":0,"mail_read_thread":0,"mail_label_thread":0,"mail_draft_reply":0,"mail_send":2,"social_send_dm":2});
 
+  // Phase 21B (WS=drive): the agent's Drive tools, tier by effect (lib/drive/tools.ts header):
+  // reads 0, saving a NEW file 1, replacing / moving / trashing one 2, trashing many 3,
+  // mounting a folder into the sandbox 0, syncing new files back 1.
+  Object.assign(PINNED, {"list_drive_folder":0,"read_drive_file":0,"save_drive_file":1,"replace_drive_file":2,"move_drive_file":2,"trash_drive_file":2,"trash_many_drive_files":3,"mount_drive_folder":0,"sync_drive_folder":1});
+
   it("every catalog tool evaluates to the same tier as before", () => {
     assert.equal(Object.keys(PINNED).length, TOOLS.length, "the snapshot covers the whole catalog");
     for (const t of TOOLS) {

@@ -294,6 +294,8 @@ export async function releaseRunSandbox(
       }
     }
     const sb = await attach(row);
+    // Phase 21B (WS=drive): a mounted Drive folder is synced out before the sandbox goes (best effort, lazy).
+    if (sb) await import("@/lib/drive/sandbox-hooks").then((m) => m.syncRunMount(workspaceId, runId, sb, "exit")).catch(() => undefined);
     if (sb) await sb.destroy().catch(() => undefined);
     const changed = await markSandboxDestroyed(workspaceId, runId);
     if (changed) await note(workspaceId, runId, `Code sandbox destroyed (${reason})`, { kind: "sandbox.destroyed", sandboxId: row.sandboxId, reason });

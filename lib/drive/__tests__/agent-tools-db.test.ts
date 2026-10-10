@@ -146,7 +146,9 @@ describe("tier by effect", () => {
   const tier = (n: string) => evaluateTier({ kind: TOOL_ACTION[n]!, description: `${n}: ${defOf(n).description}` }, ON);
 
   it("registers every Drive tool with an action and a deliberate tier", () => {
-    assert.deepEqual(DRIVE_TOOLS.map((t) => t.name), ["list_drive_folder", "read_drive_file", "save_drive_file", "replace_drive_file", "move_drive_file", "trash_drive_file", "trash_many_drive_files"]);
+    assert.deepEqual(DRIVE_TOOLS.map((t) => t.name), ["list_drive_folder", "read_drive_file", "save_drive_file", "replace_drive_file", "move_drive_file", "trash_drive_file", "trash_many_drive_files", "mount_drive_folder", "sync_drive_folder"]);
+    assert.equal(tier("mount_drive_folder"), 0);
+    assert.equal(tier("sync_drive_folder"), 1);
     for (const t of DRIVE_TOOLS) assert.ok(getTool(t.name), t.name);
     assert.equal(tier("save_drive_file"), 1);
     for (const n of ["replace_drive_file", "move_drive_file", "trash_drive_file"]) assert.equal(tier(n), 2, n);

@@ -14,11 +14,13 @@
 //   move_drive_file                       publish · Tier 2, always asks, never auto
 //   trash_drive_file                      publish · Tier 2, always asks, never auto — one file, to the Trash
 //   trash_many_drive_files                publish · Tier 3 (delete_many_agent_files), never auto — 5+ files
+//   mount_drive_folder · sync_drive_folder  spend · group "code" (off without a sandbox): copy a folder into
+//                                         the sandbox (Tier 0) / save its NEW files back (Tier 1; never overwrites)
 // Every change keeps the old bytes as a version or in the Trash, and reports
 // what it touched so "Undo this agent run" can put it back (lib/timemachine/undo.ts).
 // Descriptions avoid every Tier-3 word except the bulk tool's own.
 
-import type { ToolDef, ToolResult } from "@/lib/chat/tools";
+import type { ToolContext, ToolDef, ToolResult } from "@/lib/chat/tools";
 import { getStorageAdapter } from "../filesystem/storage";
 import { FsError, DEFAULT_MAX_FILE_BYTES } from "../filesystem/core";
 import { displayPath, normalizeFolderPath, normalizeLogicalPath, dirnameOf, basenameOf } from "../filesystem/paths";
@@ -267,7 +269,69 @@ export const trash_many_drive_files: ToolDef = {
   },
 };
 
-export const DRIVE_TOOLS: readonly ToolDef[] = [list_drive_folder, read_drive_file, save_drive_file, replace_drive_file, move_drive_file, trash_drive_file, trash_many_drive_files];
+// ---------------------------------------------------------------------------
+// The code sandbox bridge (lib/drive/sandbox-bridge.ts). Both tools belong to the
+// "code" group, so they are off whenever no sandbox provider is available.
+// ---------------------------------------------------------------------------
+
+let sandboxOverride: ((ctx: ToolContext) => Promise<import("@/lib/sandbox/types").Sandbox>) | null = null;
+/** Tests: hand the tools a sandbox without the database (null restores). */
+export function setDriveSandboxForTests(fn: typeof sandboxOverride): void {
+  sandboxOverride = fn;
+}
+
+async function sandboxOf(ctx: ToolContext) {
+  if (sandboxOverride) return sandboxOverride(ctx);
+  const { sandboxForRun } = await import("@/lib/sandbox");
+  return sandboxForRun(ctx);
+}
+
+export const mount_drive_folder: ToolDef = {
+  name: "mount_drive_folder",
+  description: "Copy a Drive folder this run can use into the code sandbox (at ./workspace) so programs can read and write its files. New files are saved back to Drive when you sync; changed files wait for the person to apply them.",
+  kind: "spend",
+  minRole: "editor",
+  argsSchema: { type: "object", properties: { path: { type: "string", description: "Folder path, e.g. /shared/Reports" } }, required: ["path"] },
+  async execute(ctx, args): Promise<ToolResult> {
+    const path = canonical(args.path);
+    if (!path) return refuse("path must be a Drive folder path.");
+    const grant = await loadGrant(ctx.workspaceId, ctx.runId, ctx.userId);
+    const v = checkAgentFileOp(grant, { kind: "read", path });
+    if (!v.allowed) return refuse(v.reason);
+    const { mountFolder } = await import("./sandbox-bridge");
+    try {
+      const sb = await sandboxOf(ctx);
+      const m = await mountFolder({ sandbox: sb, actor: actorOf(ctx), folder: path, grant });
+      return { summary: `Copied ${m.files} file${m.files === 1 ? "" : "s"} (${m.bytes} bytes) from ${displayPath(m.folder)} to ${m.mountDir}.${m.skipped.length ? ` Not copied: ${m.skipped.slice(0, 5).map((s) => `${s.path} (${s.reason})`).join("; ")}.` : ""}`, details: { ...m } };
+    } catch (err) {
+      return refuse(`Couldn't mount the folder: ${errText(err)}`);
+    }
+  },
+};
+
+export const sync_drive_folder: ToolDef = {
+  name: "sync_drive_folder",
+  description: "Save what changed in the mounted Drive folder back to Drive: new files are created; a file that already exists is NOT overwritten (the new content waits for the person to apply). A file you take out of the sandbox folder stays in Drive.",
+  kind: "spend",
+  minRole: "editor",
+  argsSchema: { type: "object", properties: {} },
+  async execute(ctx): Promise<ToolResult> {
+    const grant = await loadGrant(ctx.workspaceId, ctx.runId, ctx.userId);
+    const { syncOut } = await import("./sandbox-bridge");
+    try {
+      const sb = await sandboxOf(ctx);
+      const r = await syncOut({ sandbox: sb, actor: actorOf(ctx), mode: "agent", grant });
+      const parts = [`${r.created.length} new file${r.created.length === 1 ? "" : "s"} saved`, `${r.staged.length} changed file${r.staged.length === 1 ? "" : "s"} waiting for the person to apply`, `${r.unchanged} unchanged`];
+      if (r.removedInSandbox.length) parts.push(`${r.removedInSandbox.length} removed in the sandbox (left in Drive)`);
+      if (r.skipped.length) parts.push(`skipped: ${r.skipped.slice(0, 5).map((s) => `${s.path} (${s.reason})`).join("; ")}`);
+      return { summary: `Synced ${r.folder ? displayPath(r.folder) : "the mounted folder"}: ${parts.join(", ")}.`, details: { ...r }, touched: r.touched };
+    } catch (err) {
+      return refuse(`Couldn't sync: ${errText(err)}`);
+    }
+  },
+};
+
+export const DRIVE_TOOLS: readonly ToolDef[] = [list_drive_folder, read_drive_file, save_drive_file, replace_drive_file, move_drive_file, trash_drive_file, trash_many_drive_files, mount_drive_folder, sync_drive_folder];
 
 /** Each tool's group (lib/agents/grants.ts TOOL_GROUPS). */
 export const DRIVE_TOOL_GROUP = {
@@ -278,6 +342,8 @@ export const DRIVE_TOOL_GROUP = {
   move_drive_file: "content",
   trash_drive_file: "content",
   trash_many_drive_files: "content",
+  mount_drive_folder: "code",
+  sync_drive_folder: "code",
 } as const;
 
 /** The automation action each non-safe tool stands for (what the platform tiers). */
@@ -289,4 +355,7 @@ export const DRIVE_TOOL_ACTION: Readonly<Record<string, string>> = {
   move_drive_file: "move_agent_file",
   trash_drive_file: "trash_agent_file",
   trash_many_drive_files: "delete_many_agent_files",
+  // Copying into the isolated sandbox is Tier 0 (like write_file); syncing saves NEW files only.
+  mount_drive_folder: "edit_sandbox_files",
+  sync_drive_folder: "save_agent_file",
 };

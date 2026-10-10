@@ -264,3 +264,6 @@ lib/drive/providers/__tests__/native-db.test.ts
 
 # Phase 21B (drive): the agent's Drive tools through executeTool — grants (own run folder + attached folders; look-alikes, other runs, .., other homes refused), the person's own rights, tier by effect (save Tier 1; replace/move/trash Tier 2 never auto; many Tier 3), and "Undo this agent run" for files (create/replace/move/trash; a later edit by a person is left alone).
 lib/drive/__tests__/agent-tools-db.test.ts
+
+# Phase 21B (drive): the Drive <-> sandbox bridge on the FAKE sandbox engine — mount a folder at <workdir>/workspace, sync out (agent: creates inside its grant, changed files staged for a person, never overwrites; person: new versions; nothing deleted; symlinks/bad names skipped; tampered marker refused), terminal upload/download with the person's rights.
+lib/drive/__tests__/sandbox-bridge-db.test.ts
