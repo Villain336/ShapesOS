@@ -80,6 +80,8 @@ export interface OverwriteOptions {
   /** Audit wording: "version" (an upload) or "restore". */
   reason?: "version" | "restore";
   restoredFrom?: number;
+  /** The version the writer started from; a newer one on the server refuses the write (stale_version). */
+  expectVersion?: number;
 }
 
 export interface OverwriteResult {
@@ -116,7 +118,7 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
   const adapter = getStorageAdapter();
   const newKey = randomUUID();
   await adapter.put(newKey, bytes, mime);
-  return commitOverwrite({ workspaceId, fileId, userId, newKey, sizeBytes: bytes.length, mime, filename: current.filename, reason: opts.reason, restoredFrom: opts.restoredFrom });
+  return commitOverwrite({ workspaceId, fileId, userId, newKey, sizeBytes: bytes.length, mime, filename: current.filename, reason: opts.reason, restoredFrom: opts.restoredFrom, expectVersion: opts.expectVersion });
 }
 
 /**
@@ -130,7 +132,7 @@ export async function overwriteFromStoredBlob(args: { workspaceId: string; fileI
   return commitOverwrite({ workspaceId: args.workspaceId, fileId: args.fileId, userId: args.userId, newKey: args.storageKey, sizeBytes: args.sizeBytes, mime: args.mime, filename: current.filename });
 }
 
-async function commitOverwrite(c: { workspaceId: string; fileId: string; userId: string; newKey: string; sizeBytes: number; mime: string; filename: string; reason?: "version" | "restore"; restoredFrom?: number }): Promise<OverwriteResult> {
+async function commitOverwrite(c: { workspaceId: string; fileId: string; userId: string; newKey: string; sizeBytes: number; mime: string; filename: string; reason?: "version" | "restore"; restoredFrom?: number; expectVersion?: number }): Promise<OverwriteResult> {
   const { workspaceId, fileId, userId, newKey, mime } = c;
   const adapter = getStorageAdapter();
   let purged: Array<{ version: number; storageKey: string; sizeBytes: number }> = [];
@@ -141,6 +143,9 @@ async function commitOverwrite(c: { workspaceId: string; fileId: string; userId:
       // Re-read the file under the lock (a concurrent overwrite bumps the version).
       const file = await tx.workspaceFile.findFirst({ where: { id: fileId, workspaceId, trashedAt: null } });
       if (!file) throw new FsError("not_found", "File not found.");
+      if (c.expectVersion !== undefined && file.version !== c.expectVersion) {
+        throw new FsError("stale_version", `This file changed on the server: it is at version ${file.version}, you started from ${c.expectVersion}.`, { currentVersion: file.version });
+      }
       const info = normalizeLogicalPath(file.logicalPath);
       const scopes = info.ok ? quotaScopesFor(info) : [];
       const quota = await tx.workspaceQuota.findUnique({ where: { workspaceId } });

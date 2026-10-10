@@ -1,9 +1,10 @@
 // ShapesOS — Phase 21B (WS=drive): upload through the browser form, for files up to 25 MB and
 // for whole folders (the browser sends one request per file with its relative path).
-// POST /api/drive/upload  multipart: workspaceId, dir, file, relativePath?, replace?   (editor+)
+// POST /api/drive/upload  multipart: workspaceId, dir, file, relativePath?, replace?, baseVersion?   (editor+)
 //   dir            the folder to put it in (display path: /home/<me>/Docs, /shared/Marketing, …)
 //   relativePath   "MyFolder/sub/a.txt" from webkitdirectory: the folders are created beneath dir
 //   replace=1      a file already there gets a NEW VERSION instead of a 409
+//   baseVersion=n  (sync clients) replace only if the file is still at version n, else 409 stale_version
 // Bigger files use the resumable multipart protocol (POST /api/drive/uploads). Upload safety, the
 // malware scan (required on hosted), quota, versions and the change journal all apply.
 
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   if (!dirIn.ok) return badRequest(dirIn.reason);
   const dir = [dirIn.path, ...relativeDirs(typeof form.get("relativePath") === "string" ? (form.get("relativePath") as string) : null)].join("/");
   const actor = { workspaceId: access.workspaceId, userId: user.id, role: access.membership.role };
+  // A sync client names the version it started from; a newer one on the server refuses the write (409 stale_version).
+  const baseRaw = form.get("baseVersion");
+  const baseVersion = typeof baseRaw === "string" && /^\d{1,9}$/.test(baseRaw) ? Number(baseRaw) : undefined;
+  if (typeof baseRaw === "string" && baseRaw !== "" && baseVersion === undefined) return badRequest("baseVersion must be a whole number.");
   try {
     const { file, created, version } = await writeFileAs(actor, {
       dir,
@@ -46,6 +51,7 @@ export async function POST(req: NextRequest) {
       bytes: Buffer.from(await uploaded.arrayBuffer()),
       mimeType: uploaded.type || undefined,
       overwrite: form.get("replace") === "1",
+      baseVersion,
       maxBytes: DEFAULT_MAX_FILE_BYTES,
     });
     return Response.json({ file, created, version }, { status: created ? 201 : 200 });

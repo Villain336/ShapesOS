@@ -73,8 +73,12 @@ tested server-side (`lib/drive/__tests__/*`); real-disk behaviour is for the des
   setting caps how many).
 * **Conflicts.** The server never merges. A client that edited a file offline sends the version it
   started from and compares: if `GET /api/files/<id>` shows a newer `version`, keep both — upload
-  the local copy as `name (conflicted copy).ext` — and let the person decide. (Server-enforced
-  `baseVersion` is on the roadmap for round 2 of the desktop work.)
+  the local copy as `name (conflicted copy).ext` — and let the person decide. To have the server
+  enforce it, send `baseVersion=<n>` with the single-request upload (`POST /api/drive/upload`): it
+  implies replace, and if the file is no longer at version `n` the answer is
+  `409 {code: "stale_version", currentVersion}` (`currentVersion: null` when the file is gone) and
+  nothing is written. The resumable (over 25 MB) upload does not take `baseVersion` yet: compare
+  `version` before you complete it.
 * Hashes: the server does not expose a content hash yet; clients compare `version` and size, and
   hash locally.
 

@@ -68,17 +68,20 @@ export async function findLiveFolderByPath(workspaceId: string, path: string) {
  */
 export async function writeFileAs(
   actor: DriveActor,
-  args: { dir: string; filename: string; bytes: Buffer; mimeType?: string; overwrite?: boolean; maxBytes?: number },
+  args: { dir: string; filename: string; bytes: Buffer; mimeType?: string; overwrite?: boolean; maxBytes?: number; baseVersion?: number },
 ): Promise<{ file: PublicFile; created: boolean; version: number }> {
   const dir = await requireDirWrite(actor, args.dir);
   const name = sanitizeUploadName(args.filename);
   const target = normalizeLogicalPath(`${dir.path}/${name}`);
   if (!target.ok) throw new FsError("invalid_path", target.reason);
   const existing = await findLiveFileByPath(actor.workspaceId, target.path);
+  if (args.baseVersion !== undefined && !existing) {
+    throw new FsError("stale_version", "This file no longer exists on the server (moved or in the Trash).", { currentVersion: null });
+  }
   if (existing) {
-    if (!args.overwrite) throw new FsError("conflict", `A file already exists at ${existing.logicalPath}.`);
+    if (!args.overwrite && args.baseVersion === undefined) throw new FsError("conflict", `A file already exists at ${existing.logicalPath}.`);
     await requireFileAction(actor, existing.id, "version");
-    const res = await overwriteFile({ workspaceId: actor.workspaceId, fileId: existing.id, bytes: args.bytes, mimeType: args.mimeType, userId: actor.userId, maxBytes: args.maxBytes });
+    const res = await overwriteFile({ workspaceId: actor.workspaceId, fileId: existing.id, bytes: args.bytes, mimeType: args.mimeType, userId: actor.userId, maxBytes: args.maxBytes, expectVersion: args.baseVersion });
     const row = await prisma.workspaceFile.findFirstOrThrow({ where: { id: existing.id } });
     const { getFileAuthorised } = await import("../filesystem/service");
     return { file: (await getFileAuthorised({ workspaceId: actor.workspaceId, fileId: row.id }))!, created: false, version: res.version };

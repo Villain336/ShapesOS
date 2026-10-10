@@ -31,12 +31,16 @@ export type FsErrorCode =
   | "too_large"
   | "invalid_state"
   | "scanner_unavailable"
-  | "forbidden";
+  | "forbidden"
+  /** A write that named the version it started from found a newer one (meta.currentVersion). */
+  | "stale_version";
 
 export class FsError extends Error {
   readonly code: FsErrorCode;
-  constructor(code: FsErrorCode, message: string) {
+  readonly meta?: Record<string, unknown>;
+  constructor(code: FsErrorCode, message: string, meta?: Record<string, unknown>) {
     super(message);
     this.code = code;
+    this.meta = meta;
   }
 }

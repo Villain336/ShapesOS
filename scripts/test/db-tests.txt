@@ -276,3 +276,6 @@ lib/drive/__tests__/restore-db.test.ts
 
 # Phase 21B (drive): folder sharing (inheritance, private-home shares, no admin break-glass), tree reads (roots, /shared with system folders, sorting/paging, Trash, shared with me, recents, usage), favourites, tags, smart folders.
 lib/drive/__tests__/library-db.test.ts
+
+# Phase 21B (drive): the sync precondition (baseVersion) on single-request uploads - a stale write is refused with the server version, a trashed file reports null, no blob left behind.
+lib/drive/__tests__/base-version-db.test.ts
