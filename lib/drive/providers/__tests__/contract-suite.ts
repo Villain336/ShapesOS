@@ -130,13 +130,15 @@ export function runProviderContract(name: string, make: () => Promise<ProviderHa
       await p.move("/Feed/one.txt", "/Feed/two.txt");
       await p.remove("/Feed/two.txt");
       const feed = await p.changes(start.cursor);
-      assert.deepEqual(feed.changes.map((c) => [c.type, c.entry.path]), [
-        ["create", "/Feed"],
-        ["create", "/Feed/one.txt"],
-        ["move", "/Feed/two.txt"],
-        ["trash", "/Feed/two.txt"],
-      ]);
-      assert.equal(feed.changes[2]!.prevPath, "/Feed/one.txt");
+      // A provider may report only the LATEST state of each item (Google Drive does), so a
+      // create that was renamed and trashed can arrive as one "trash". What must hold is the
+      // order, that the folder shows up, and that the file's last change is the trash.
+      const paths = feed.changes.map((c) => c.entry.path);
+      assert.ok(feed.changes.some((c) => c.type === "create" && c.entry.path === "/Feed"), "the folder was created");
+      const last = feed.changes.at(-1)!;
+      assert.deepEqual([last.type, last.entry.path], ["trash", "/Feed/two.txt"]);
+      assert.ok(paths.indexOf("/Feed") < paths.lastIndexOf("/Feed/two.txt"), "changes arrive oldest first");
+      for (const c of feed.changes) if (c.type === "move") assert.equal(c.prevPath, "/Feed/one.txt");
       assert.equal(feed.hasMore, false);
       const again = await p.changes(feed.cursor);
       assert.deepEqual(again.changes, []);

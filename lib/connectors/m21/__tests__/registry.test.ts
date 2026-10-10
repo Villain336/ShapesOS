@@ -78,12 +78,20 @@ describe("built-in connector registry", () => {
     for (const key of EXPECTED_KEYS) assert.equal(hasLiveWiring(key), true, key);
   });
 
-  it("the six Phase 6 adapters are read-only and expose a live health check", () => {
+  it("the six Phase 6 adapters expose a live health check; all but Google Drive stay read-only", () => {
     for (const key of ["google-search-console", "ga4", "google-drive", "notion", "meta-ads", "google-ads"]) {
       const adapter = resolveAdapter(key);
       assert.equal(typeof adapter.healthCheck, "function", key);
+      if (key === "google-drive") continue;
       for (const t of adapter.listTools()) assert.equal(t.mutating, false, `${key}.${t.name} must stay read-only`);
     }
+  });
+
+  it("Google Drive (Phase 21B) reads freely and every write tool is mutating, so it asks", () => {
+    const tools = resolveAdapter("google-drive").listTools();
+    const writes = ["create_folder", "upload_text_file", "rename_or_move_file", "trash_file", "delete_folder"];
+    for (const t of tools) assert.equal(t.mutating, writes.includes(t.name), `google-drive.${t.name}`);
+    assert.deepEqual(tools.filter((t) => !t.mutating).map((t) => t.name).sort(), ["get_file_text", "list_files", "search_files"]);
   });
 
   it("every oauth2 connector has a vault OAuth config with the registry's scopes", () => {

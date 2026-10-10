@@ -290,6 +290,11 @@ export function connectorAction(connectorKey: string, tool: string): string {
       return "schedule_owned_content";
     case "buffer.delete_post":
       return "delete_social_post";
+    // Phase 21B (drive): removing a Drive folder for good is irreversible — the
+    // key carries "delete", so it is Tier 3 (never auto). The other Drive writes
+    // fall to write_google_drive (Tier 2, asks unless a rule says Auto-run).
+    case "google-drive.delete_folder":
+      return "delete_drive_folder";
     case "wordpress.save_content":
     case "webflow.publish_site":
       return "publish_owned";
