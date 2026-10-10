@@ -4,6 +4,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  Bot,
   Rocket,
   CodeXml,
   Clock,
@@ -82,6 +83,8 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
       { href: "programmatic", label: "Programmatic SEO", description: "Template-driven pages at scale", icon: Layers },
       { href: "local", label: "Local SEO", description: "Grid rankings and reviews", icon: MapPin },
       { href: "internal-links", label: "Internal links", description: "Suggested links between your pages", icon: Network },
+      // Phase 21A (WS=agentweb)
+      { href: "agent-ready", label: "Agent readiness", description: "Can AI agents find and use your site?", icon: Bot },
     ],
   },
   {

@@ -260,3 +260,5 @@ lib/agentweb/__tests__/agentweb-gate-db.test.ts
 lib/answer/__tests__/answer-db.test.ts
 # Phase 21A (WS=agentweb): agent-ready changes reach a SiteBuilder site only as a DRAFT revision (live working copy untouched, diff + base fingerprint saved, other workspaces see nothing, applying is the human step and the next run finds nothing to do, no origin refused).
 lib/agentweb/__tests__/agent-ready-draft-db.test.ts
+# Phase 21A (WS=agentweb): the public storefront agent routes (ask, mcp, llms.txt) as the app role — published stores only, answers from that store's own catalogue (another tenant's product invisible), per-store+IP rate limit, MCP read-only tool surface and request refusals, valid llms.txt.
+lib/agentweb/__tests__/storefront-routes-db.test.ts

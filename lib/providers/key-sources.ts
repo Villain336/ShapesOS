@@ -121,6 +121,9 @@ export const KEY_SOURCES: readonly KeySourceEntry[] = [
   P("system-mail", "Resend / SMTP system mail", "messaging", ["SMTP_HOST", "SMTP_FROM", "SMTP_USER", "SMTP_PASS", "INVITE_MAIL_FROM"],
     "Invites, magic links and alerts. System mail is free."),
   P("e2b", "E2B sandboxes", "compute", ["E2B_API_KEY", "SANDBOX_PROVIDER"], "Agent code sandboxes (1 credit per started minute)."),
+  // Phase 21A (WS=agentweb): Ask. LIVE/metered; both adapters are tested only against recorded fixtures, so they are UNVERIFIED-LIVE until a key is added.
+  P("web-search", "Web search for Ask (Brave Search, Exa)", "data", ["BRAVE_SEARCH_API_KEY", "EXA_API_KEY"],
+    "Live web search for Ask, metered: the provider's cost × 4 in credits per request (about 2 credits for a Brave query), plus model tokens. Not yet verified against the live APIs. Without a key Ask shows labelled mock results."),
   P("github-app", "GitHub App", "compute", ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY"], "Repos, branches and pull requests."),
   P("expo", "Expo", "compute", ["EXPO_ACCESS_TOKEN"], "Mobile app builds."),
   P("livekit", "LiveKit", "compute", ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "LIVEKIT_URL"], "Realtime voice and video."),

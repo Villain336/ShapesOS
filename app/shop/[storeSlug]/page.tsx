@@ -6,7 +6,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Package } from "lucide-react";
 import { loadPublicListings } from "@/lib/ops/store/catalog";
-import { getPublishedStore } from "@/lib/ops/store/page-data";
+import { getPublishedStore, siteOrigin } from "@/lib/ops/store/page-data";
+// Phase 21A (WS=agentweb): agent-ready storefront (search action + contact point, read-only ask/MCP links).
+import { storefrontJsonLd } from "@/lib/agentweb/site/storefront";
 import { fmtPrice } from "@/lib/ops/store/view";
 import { shopCard, shopChip, stockLabel } from "@/components/store/styles";
 
@@ -32,9 +34,18 @@ export default async function CataloguePage({ params }: PageProps<"/shop/[storeS
     itemListElement: listings.map((l, i) => ({ "@type": "ListItem", position: i + 1, url: `${base}/p/${l.slug}`, name: l.title })),
   };
 
+  // Phase 21A (WS=agentweb): needs an absolute origin (APP_URL / NEXTAUTH_URL); without one only the ItemList above is emitted.
+  const origin = siteOrigin();
+  const agentLd = origin ? storefrontJsonLd(store, { origin, base }) : [];
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      {agentLd.map((block, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(block).replace(/</g, "\\u003c") }} />
+      ))}
+      <link rel="nlweb" href={`${base}/ask`} />
+      <link rel="mcp" href={`${base}/mcp`} />
       <div className="mb-8 max-w-2xl">
         <h1 className="aos-display">{store.name}</h1>
         {store.description && <p className="mt-2 whitespace-pre-line text-[0.9375rem] text-muted">{store.description}</p>}

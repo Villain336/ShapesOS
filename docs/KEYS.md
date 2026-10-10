@@ -71,6 +71,7 @@ registry, then run `npx tsx scripts/docs/generate-keys-md.mts`.
 | Twilio SMS and voice | Platform | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | — | SMS (4 credits a segment), voice minutes, tracking numbers and transcription. |
 | Resend / SMTP system mail | Platform | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASS`, `INVITE_MAIL_FROM` | — | Invites, magic links and alerts. System mail is free. |
 | E2B sandboxes | Platform | `E2B_API_KEY`, `SANDBOX_PROVIDER` | — | Agent code sandboxes (1 credit per started minute). |
+| Web search for Ask (Brave Search, Exa) | Platform | `BRAVE_SEARCH_API_KEY`, `EXA_API_KEY` | — | Live web search for Ask, metered: the provider's cost × 4 in credits per request (about 2 credits for a Brave query), plus model tokens. Not yet verified against the live APIs. Without a key Ask shows labelled mock results. |
 | GitHub App | Platform | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | — | Repos, branches and pull requests. |
 | Expo | Platform | `EXPO_ACCESS_TOKEN` | — | Mobile app builds. |
 | LiveKit | Platform | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` | — | Realtime voice and video. |
