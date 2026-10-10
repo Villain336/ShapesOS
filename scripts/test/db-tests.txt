@@ -258,3 +258,5 @@ lib/agentweb/__tests__/agentweb-db.test.ts
 lib/agentweb/__tests__/agentweb-gate-db.test.ts
 # Phase 21A (WS=agentweb): the answer engine with the real model path (router -> scripted fake of the OpenAI Responses API) and a fake paid search provider — an answer stored with claim citations and a signed receipt chained into the audit log, the ledger reconciling (web_search_call + llm_tokens) with the reported cost, the hard per-answer credit cap stopping cleanly with an honest partial, the workspace index returning only what the caller could open (a private note stays out; its receipt is the author's alone), other workspaces seeing nothing, an ended trial refused.
 lib/answer/__tests__/answer-db.test.ts
+# Phase 21A (WS=agentweb): agent-ready changes reach a SiteBuilder site only as a DRAFT revision (live working copy untouched, diff + base fingerprint saved, other workspaces see nothing, applying is the human step and the next run finds nothing to do, no origin refused).
+lib/agentweb/__tests__/agent-ready-draft-db.test.ts
