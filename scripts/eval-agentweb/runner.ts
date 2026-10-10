@@ -58,7 +58,8 @@ export async function runAgentwebEval(opts: Options, env: Record<string, string 
       const { priceFor } = await import("../../lib/llm/pricing");
       const model = "claude-sonnet-5-5";
       const p = priceFor(model);
-      const price = { inputPerMTok: p?.inputPerMTok ?? 20, outputPerMTok: p?.outputPerMTok ?? 100 };
+      // An unknown price is charged at a deliberately high rate, never at zero.
+      const price = { inputPerMTok: p?.input ?? 20, outputPerMTok: p?.output ?? 100 };
       const llm = new AnthropicLlmProvider(key, model);
       models = { reader: liveReader(llm, budget, price), actor: liveActor(llm, budget, price) };
     }

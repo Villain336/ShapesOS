@@ -59,8 +59,8 @@ export async function recordOutcome(workspaceId: string, origin: string, channel
     if (ok && flow) flows.push({ intent: flow.intent.slice(0, 120), channel, at: new Date().toISOString() });
     await tx(t).agentwebSiteCapability.upsert({
       where: { workspaceId_origin: { workspaceId, origin } },
-      create: { workspaceId, origin, worked, flows },
-      update: { worked, flows },
+      create: { workspaceId, origin, worked: worked as Prisma.InputJsonValue, flows: flows as Prisma.InputJsonValue },
+      update: { worked: worked as Prisma.InputJsonValue, flows: flows as Prisma.InputJsonValue },
     });
   });
 }

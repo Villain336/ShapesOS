@@ -184,7 +184,7 @@ describe("browser tools", () => {
       const act = createBrowserTools(deps).find((t) => t.name === "browser_act")!;
       return { act, calls, actions };
     }
-    const run = (act: ToolDef, steps: unknown[], over: Partial<ToolContext> = {}) => act.execute({ ...ctx, threadId: `g-${Math.random()}`, ...over }, { url: "https://www.example.com/start", steps });
+    const run = (act: ToolDef, steps: unknown[], over: Partial<ToolContext> = {}) => act.execute({ ...ctx, threadId: `g-${Math.random()}`, ...over } as ToolContext, { url: "https://www.example.com/start", steps });
 
     it("ordinary steps run", async () => {
       const g = gated();

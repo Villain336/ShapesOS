@@ -188,7 +188,7 @@ describe("page text flowing into other tools", () => {
 
   it("another task's page text does not follow a send in an unrelated thread", async () => {
     const c = call(t_reply.name, { to: "refunds@scam.example" });
-    await executeTool({ ...ctxBase(), threadId: `${RUN}-other-thread`, confirmed: true }, t_reply.name, c.args, c);
+    await executeTool({ ...ctxBase(), threadId: `${RUN}-other-thread`, confirmed: true } as ToolContext, t_reply.name, c.args, c);
     assert.equal(c.status, "executed");
   });
 });

@@ -203,6 +203,12 @@ export const CREDIT_COSTS = {
    * per 1,000 credits = $0.0022; ~4× → 1 credit). A workspace's own
    * Context.dev key is free. Charged at the budget gate before the call. */
   contextdev_call: { credits: 1, basis: "cost-plus", description: "Context.dev (platform key): per Context.dev credit", category: "data" },
+  /** Phase 21A (WS=agentweb): one call to a web search provider (Brave, Exa) on
+   * the PLATFORM key for the answer engine: the provider's cost in USD ×
+   * WEB_SEARCH_MULTIPLIER (4×), rounded up (vendorUsdCredits(), passed as
+   * `credits`); 1 is the floor. A mock provider spends nothing and is not
+   * metered. The model work inside an answer is metered as llm_tokens. */
+  web_search_call: { credits: 1, basis: "cost-plus", description: "Web search provider call (answer engine) at 4× cost", category: "data" },
   /** Penpot design-token import. 0 credits: Penpot is the user's own
    * instance (BYO) — the event exists for per-tenant usage visibility only
    * (the import route has metered it since Phase 11; the action was missing
@@ -237,6 +243,9 @@ export const CONTEXTDEV_PLATFORM_CREDITS_PER_VENDOR_CREDIT = 1;
 
 /** Phase 10 intelligence vendor calls are charged at 4× their USD cost. */
 export const INTELLIGENCE_VENDOR_MULTIPLIER = 4;
+
+/** Phase 21A: web search provider calls are charged at 4× their USD cost. */
+export const WEB_SEARCH_MULTIPLIER = 4;
 
 /**
  * Credits for one model call: ceil(cost USD × 100 × LLM_TOKEN_COST_MULTIPLIER).
