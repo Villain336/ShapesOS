@@ -348,8 +348,8 @@ export async function storageUsage(actor: DriveActor): Promise<StorageUsage> {
            sum(size_bytes) AS bytes, count(*) AS files
       FROM workspace_files WHERE workspace_id = ${ws} AND trashed_at IS NULL GROUP BY 1`);
   return {
-    workspace: { usedBytes: Number(q?.usedBytes ?? 0n), limitBytes: Number(q?.limitBytes ?? 10n * 1024n ** 3n) },
-    personal: { usedBytes: Number(mine?.usedBytes ?? 0n), limitBytes: mine?.limitBytes == null ? null : Number(mine.limitBytes) },
+    workspace: { usedBytes: Number(q?.usedBytes ?? BigInt(0)), limitBytes: Number(q?.limitBytes ?? BigInt(10 * 1024 * 1024 * 1024)) },
+    personal: { usedBytes: Number(mine?.usedBytes ?? BigInt(0)), limitBytes: mine?.limitBytes == null ? null : Number(mine.limitBytes) },
     // Other people's private bytes are folded into the workspace total, never itemised.
     byArea: rows.filter((r) => r.area !== "other").map((r) => ({ area: r.area, bytes: toNum(r.bytes), files: toNum(r.files) })),
   };

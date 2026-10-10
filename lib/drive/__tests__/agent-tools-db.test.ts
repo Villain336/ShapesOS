@@ -116,7 +116,7 @@ describe("where a run may write", () => {
 
   it("saving never changes an existing file: it points to replace_drive_file", async () => {
     const { r } = await call(ctxFor(r1), "save_drive_file", { path: "/shared/Reports/q3.md", content: "second" });
-    assert.match(r.summary, /already exists.*replace_drive_file/s);
+    assert.match(r.summary, /already exists[\s\S]*replace_drive_file/);
     const row = await prisma.workspaceFile.findFirstOrThrow({ where: { workspaceId: WS, logicalPath: "/shared/Reports/q3.md" } });
     assert.equal(row.version, 1);
   });

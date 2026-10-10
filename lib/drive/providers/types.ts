@@ -74,7 +74,7 @@ export interface FileProvider {
   /** The entry at a path, or null. */
   stat(path: string): Promise<ProviderEntry | null>;
   /** The bytes, as a stream of chunks (optionally a byte range, inclusive). `not_found` if absent. */
-  read(path: string, range?: { start: number; end: number }): Promise<AsyncIterable<Buffer>>;
+  read(path: string, range?: { start: number; end: number }): AsyncIterable<Buffer>;
   /** Create a file (and nothing else: parents must exist). `conflict` if it exists and overwrite is not set. */
   write(path: string, data: Buffer | AsyncIterable<Buffer>, opts?: WriteOptions): Promise<ProviderEntry>;
   /** Create a folder. `conflict` if it exists. */

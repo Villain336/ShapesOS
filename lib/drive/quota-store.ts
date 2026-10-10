@@ -75,5 +75,5 @@ export async function setScopeLimit(tx: Tx, workspaceId: string, scope: string, 
 
 export async function getScopeUsage(tx: Tx, workspaceId: string, scope: string): Promise<{ limitBytes: number | null; usedBytes: number }> {
   const row = await tx.workspaceDriveQuota.findUnique({ where: { workspaceId_scope: { workspaceId, scope } } });
-  return { limitBytes: row?.limitBytes == null ? null : Number(row.limitBytes), usedBytes: Number(row?.usedBytes ?? 0n) };
+  return { limitBytes: row?.limitBytes == null ? null : Number(row.limitBytes), usedBytes: Number(row?.usedBytes ?? BigInt(0)) };
 }

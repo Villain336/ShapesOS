@@ -105,7 +105,7 @@ export async function ensureFolderChain(
   createdBy: string,
 ): Promise<{ leaf: FolderRow | null; created: FolderRow[]; events: NewChange[] }> {
   const chain = folderChain(folderPath);
-  let parent: FolderRow | null = null;
+  let parent = null as FolderRow | null;
   const created: FolderRow[] = [];
   const events: NewChange[] = [];
   let canonicalPrefix = "";

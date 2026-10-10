@@ -152,3 +152,16 @@ DATABASE_URL=<schema owner> SMOKE_APP_DATABASE_URL=<app role> \
 Its checks are unit-tested against stub replicas
 (`scripts/smoke/__tests__/multi-instance-lib.test.ts`), including the failure
 modes they must catch (replay from the start, no `reconnect`, an unshared bucket).
+
+## Large files (Phase 21B)
+
+`S3CompatibleAdapter` also speaks multipart: `createMultipartUpload`, `presignUploadPart` (SigV4
+query-string auth, `lib/filesystem/s3-presign.ts`), `listParts`, `completeMultipartUpload`,
+`abortMultipartUpload`, plus `getRange` and `size`. The local-disk adapter has `getRange`/`size`
+but no multipart: it keeps the buffered 25 MB path. The browser PUTs parts straight to the bucket,
+so the bucket needs a CORS rule allowing `PUT` from the app origin. Set a lifecycle rule to abort
+incomplete multipart uploads after 2 days (the app also sweeps them: `expireUploadsFor`).
+The in-process S3 fake (`lib/filesystem/fake-s3.ts`) implements multipart and presigned requests so
+the flow is tested end to end; real R2/S3 is UNVERIFIED-LIVE. Settings: `DRIVE_MAX_FILE_BYTES`,
+`DRIVE_UPLOAD_TTL_HOURS`; hosted deployments require `CLAMAV_HOST` (clamd's `StreamMaxLength` must
+exceed the largest file you allow).

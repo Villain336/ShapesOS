@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { CursorError, formatCursor, parseCursor, redactChange, type DriveChange } from "../journal";
 
 const change = (over: Partial<DriveChange> = {}): DriveChange => ({
-  seq: 7n,
+  seq: BigInt(7),
   type: "create",
   entity: "file",
   entityId: "f1",
@@ -20,14 +20,14 @@ const change = (over: Partial<DriveChange> = {}): DriveChange => ({
 
 describe("cursor", () => {
   it("formats as an opaque versioned token and parses back", () => {
-    assert.equal(formatCursor(0n), "v1.0");
-    assert.equal(formatCursor(123456789012n), "v1.123456789012");
-    assert.equal(parseCursor("v1.42"), 42n);
+    assert.equal(formatCursor(BigInt(0)), "v1.0");
+    assert.equal(formatCursor(BigInt("123456789012")), "v1.123456789012");
+    assert.equal(parseCursor("v1.42"), BigInt(42));
   });
   it("starts from the beginning when there is no cursor", () => {
-    assert.equal(parseCursor(null), 0n);
-    assert.equal(parseCursor(""), 0n);
-    assert.equal(parseCursor(undefined), 0n);
+    assert.equal(parseCursor(null), BigInt(0));
+    assert.equal(parseCursor(""), BigInt(0));
+    assert.equal(parseCursor(undefined), BigInt(0));
   });
   it("refuses anything that is not a cursor we issued", () => {
     for (const bad of ["42", "v2.1", "v1.-1", "v1.1.2", "v1.abc", "v1.", "v1. 5", "v1.0x10"]) {

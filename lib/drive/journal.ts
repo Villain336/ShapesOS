@@ -37,7 +37,7 @@ export function formatCursor(seq: bigint): string {
 }
 
 export function parseCursor(cursor: string | null | undefined): bigint {
-  if (cursor === null || cursor === undefined || cursor === "") return 0n;
+  if (cursor === null || cursor === undefined || cursor === "") return BigInt(0);
   const m = /^v1\.(\d{1,19})$/.exec(cursor);
   if (!m) throw new CursorError("Unknown cursor. Start again without one.");
   return BigInt(m[1]!);

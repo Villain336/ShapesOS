@@ -430,7 +430,7 @@ describe("RLS", () => {
       await tx.workspaceSmartFolder.create({ data: { workspaceId: WS, userId: ANA, name: "s", query: "q" } });
       await tx.agentRunFolder.create({ data: { workspaceId: WS, runId: "r1", folderPath: "/shared/Marketing", attachedBy: ANA } });
       await tx.workspaceUpload.create({
-        data: { workspaceId: WS, logicalPath: "/shared/u.txt", filename: "u.txt", mimeType: "text/plain", totalBytes: 10n, partSize: 5242880, partCount: 1, storageKey: randomUUID(), createdBy: ANA, expiresAt: new Date(Date.now() + 1000) },
+        data: { workspaceId: WS, logicalPath: "/shared/u.txt", filename: "u.txt", mimeType: "text/plain", totalBytes: BigInt(10), partSize: 5242880, partCount: 1, storageKey: randomUUID(), createdBy: ANA, expiresAt: new Date(Date.now() + 1000) },
       });
     });
     for (const t of TABLES) {

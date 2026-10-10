@@ -43,6 +43,10 @@ export const fileContent: SearchSource = {
             WHERE x.search_text_id = b.search_text_id AND x.workspace_id = ${ws}
               AND x.search_tsv @@ ${tsQuery(ctx.q.excluded.join(" or "))})`
       : Prisma.empty;
+    // Phase 21B (WS=drive): text inside a file in someone's private home is theirs alone to find.
+    const ownerFilter = ctx.userId
+      ? Prisma.sql`AND (f.owner_user_id IS NULL OR f.owner_user_id = ${ctx.userId})`
+      : Prisma.sql`AND f.owner_user_id IS NULL`;
     return tx.$queryRaw<SourceRow[]>`
       WITH qq AS (SELECT ${tsQuery(text)} AS tq),
       cand AS (
@@ -73,6 +77,7 @@ export const fileContent: SearchSource = {
           FROM best b
           JOIN search_texts st ON st.id = b.search_text_id AND st.workspace_id = ${ws}
           LEFT JOIN workspace_files f ON f.id = st.file_id AND f.workspace_id = st.workspace_id AND f.trashed_at IS NULL
+               ${ownerFilter}
           LEFT JOIN univer_docs d ON d.id = st.univer_doc_id AND d.workspace_id = st.workspace_id
          WHERE ((st.source = 'file' AND f.id IS NOT NULL) OR (st.source = 'doc' AND d.id IS NOT NULL AND d.kind <> 'note')) ${excluded}
          ORDER BY (${RANK_WEIGHTS.text} * (coalesce(b.fts_rank, 0) / (coalesce(b.fts_rank, 0) + 0.1))

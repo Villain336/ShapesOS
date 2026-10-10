@@ -238,7 +238,7 @@ export async function liveRequest<T = unknown>(req: LiveRequest, deps: LiveDeps 
     try {
       res = await safeFetch(
         url.toString(),
-        { method: req.method ?? "GET", headers, body },
+        { method: req.method ?? "GET", headers, body: body as BodyInit | undefined },
         { fetchFn: fetchImpl, resolve: deps.resolve },
       );
     } catch {

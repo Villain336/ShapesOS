@@ -80,8 +80,8 @@ export async function listChanges(args: { workspaceId: string; viewerUserId: str
   const limit = Math.min(Math.max(1, Math.floor(args.limit ?? 200)), MAX_CHANGES_PAGE);
   return withWorkspaceScope(args.workspaceId, async (tx) => {
     const cur = await tx.workspaceDriveCursor.findUnique({ where: { workspaceId: args.workspaceId } });
-    const head = cur?.seq ?? 0n;
-    const floor = cur?.floorSeq ?? 0n;
+    const head = cur?.seq ?? BigInt(0);
+    const floor = cur?.floorSeq ?? BigInt(0);
     if (from > head) throw new CursorError("That cursor is from the future. Start again without one.");
     if (from < floor) throw new CursorExpiredError("That cursor is older than the journal keeps. Do a full listing, then follow changes from the head cursor.");
     const rows = await tx.workspaceDriveChange.findMany({

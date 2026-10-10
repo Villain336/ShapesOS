@@ -384,6 +384,7 @@ export const es: Catalogue = {
       mail: "Correo",
       // Phase 18.2 (WS=content)
       note: "Nota",
+      folder: "Carpeta",
     },
   },
 

@@ -389,6 +389,7 @@ export const en = {
       mail: "Mail",
       // Phase 18.2 (WS=content)
       note: "Note",
+      folder: "Folder",
     },
   },
 

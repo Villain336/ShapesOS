@@ -98,7 +98,7 @@ export function appContainer(install: AppInstallRef): AppContainer {
         await lockDriveTree(tx, ws);
         const { events } = await ensureFolderChain(tx, ws, root, by);
         await recordChanges(tx, ws, events);
-        await tx.workspaceDriveQuota.upsert({ where: { workspaceId_scope: { workspaceId: ws, scope } }, create: { workspaceId: ws, scope, limitBytes: BigInt(DEFAULT_APP_QUOTA_BYTES), usedBytes: 0n }, update: {} });
+        await tx.workspaceDriveQuota.upsert({ where: { workspaceId_scope: { workspaceId: ws, scope } }, create: { workspaceId: ws, scope, limitBytes: BigInt(DEFAULT_APP_QUOTA_BYTES), usedBytes: BigInt(0) }, update: {} });
       });
     },
     async write(relPath, bytes, opts = {}) {

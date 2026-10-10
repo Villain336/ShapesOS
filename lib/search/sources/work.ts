@@ -41,7 +41,10 @@ export const file: SearchSource = {
   query: (tx, ctx) =>
     tableSearch(tx, ctx, {
       from: "workspace_files t",
-      scope: Prisma.sql`t.workspace_id = ${ctx.workspaceId} AND t.trashed_at IS NULL`,
+      // Phase 21B (WS=drive): a file in someone's private home is theirs alone to find.
+      scope: ctx.userId
+        ? Prisma.sql`t.workspace_id = ${ctx.workspaceId} AND t.trashed_at IS NULL AND (t.owner_user_id IS NULL OR t.owner_user_id = ${ctx.userId})`
+        : Prisma.sql`t.workspace_id = ${ctx.workspaceId} AND t.trashed_at IS NULL AND t.owner_user_id IS NULL`,
       select: "t.id, t.filename AS title, t.logical_path AS sub, t.mime_type AS extra, t.size_bytes AS n, t.created_at AS updated_at",
       // Same expression as workspace_files_search_trgm_idx.
       nameMatch: "(t.filename || ' ' || t.logical_path)",
