@@ -51,8 +51,8 @@ export async function linkMonitor(workspaceId: string, userId: string, role: str
   if (!monitor) throw new MonitorLinkError("not_found", "That page monitor was not found.");
   if (!workflow) throw new MonitorLinkError("not_found", "That workflow was not found.");
   const row = await withWorkspaceScope(workspaceId, async (tx) => {
-    const existing = await (tx as Tx).agentwebMonitorTrigger.findUnique({ where: { monitorId_workflowId: { monitorId, workflowId } } });
-    if (existing) return (tx as Tx).agentwebMonitorTrigger.update({ where: { id: existing.id }, data: { enabled: true, createdBy: userId, lastError: null } });
+    const existing = await (tx as Tx).agentwebMonitorTrigger.findUnique({ where: { monitorId_workflowId: { monitorId, workflowId }, workspaceId } });
+    if (existing) return (tx as Tx).agentwebMonitorTrigger.update({ where: { id: existing.id, workspaceId }, data: { enabled: true, createdBy: userId, lastError: null } });
     if ((await (tx as Tx).agentwebMonitorTrigger.count({ where: { workspaceId, monitorId } })) >= MAX_LINKS_PER_MONITOR) throw new MonitorLinkError("limit", `A page monitor can start up to ${MAX_LINKS_PER_MONITOR} workflows.`);
     return (tx as Tx).agentwebMonitorTrigger.create({ data: { id: `mt_${randomBytes(9).toString("hex")}`, workspaceId, monitorId, workflowId, createdBy: userId } });
   });
@@ -91,7 +91,7 @@ export async function fireMonitorTriggers(workspaceId: string, change: MonitorCh
       try {
         const member = await prisma.workspaceMember.findFirst({ where: { workspaceId, userId: link.createdBy }, select: { role: true } });
         if (!member || !roleAtLeast(member.role, "editor")) {
-          await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebMonitorTrigger.update({ where: { id: link.id }, data: { enabled: false, lastError: "The person who linked this is no longer an editor in this workspace, so it was switched off." } }));
+          await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebMonitorTrigger.update({ where: { id: link.id, workspaceId }, data: { enabled: false, lastError: "The person who linked this is no longer an editor in this workspace, so it was switched off." } }));
           continue;
         }
         const workflow = await prisma.workflow.findFirst({ where: { id: link.workflowId, project: { workspaceId } }, select: { id: true, projectId: true } });
@@ -113,7 +113,7 @@ export async function fireMonitorTriggers(workspaceId: string, change: MonitorCh
         error = e instanceof Error ? e.message.slice(0, 300) : "The workflow did not start.";
       }
       await withWorkspaceScope(workspaceId, (tx) =>
-        (tx as Tx).agentwebMonitorTrigger.update({ where: { id: link.id }, data: error ? { lastError: error } : { firedCount: { increment: 1 }, lastFiredAt: new Date(), lastError: null } }),
+        (tx as Tx).agentwebMonitorTrigger.update({ where: { id: link.id, workspaceId }, data: error ? { lastError: error } : { firedCount: { increment: 1 }, lastFiredAt: new Date(), lastError: null } }),
       ).catch(() => undefined);
     }
   } catch {

@@ -80,6 +80,7 @@ const AUTHZ_PRIMITIVES = [
   "roleAtLeast",                                // inline owner-or-admin checks (lib/authz.ts)
   "requireMcpAuth",                             // MCP bearer auth (lib/mcp/auth.ts) — tenant from credential
   "guardWorkspace",                              // lib/enrichment/guard.ts R6 helper — requireUser + requireWorkspaceRole(editor) for mutations
+  "answerActor",                                // Phase 21A (agentweb) lib/answer/http.ts — guardWorkspace (signed-in + current workspace) + getMembership (403 for non-members); the route logic then applies the role each operation needs (roleAtLeast editor+ for sessions, flows, clipping, sharing, monitor links) and a same-origin JSON click guard
   "authorityGuard",                              // Phase 6 authority session guard (app/api/authority/_lib.ts) — role-gated per route
   "flywheelGuard",                              // Phase 7 flywheel guard (app/api/flywheel/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
   "dspGuard",                                   // Phase 7 DSP guard (app/api/flywheel/dsp/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations

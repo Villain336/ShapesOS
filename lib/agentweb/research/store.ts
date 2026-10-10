@@ -146,7 +146,7 @@ export async function updateResearch(workspaceId: string, userId: string, role: 
       data.runId = patch.runId;
       linkRun = patch.runId;
     }
-    await (tx as Tx).agentwebResearch.update({ where: { id }, data });
+    await (tx as Tx).agentwebResearch.update({ where: { id, workspaceId }, data });
   });
   if (linkRun) await backfillFromRun(workspaceId, userId, id, linkRun);
   return (await getResearch(workspaceId, userId, id, { includeWorkspace: true }))!;
@@ -155,7 +155,7 @@ export async function updateResearch(workspaceId: string, userId: string, role: 
 export async function removeResearch(workspaceId: string, userId: string, id: string): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
     await loadOwned(tx as Tx, workspaceId, userId, id);
-    await (tx as Tx).agentwebResearch.delete({ where: { id } });
+    await (tx as Tx).agentwebResearch.delete({ where: { id, workspaceId } });
   });
 }
 
@@ -167,11 +167,11 @@ export async function attachAnswer(workspaceId: string, userId: string, id: stri
     if (!a) throw new ResearchError("not_found", "That answer was not found.");
     if ((await (tx as Tx).agentwebResearchItem.count({ where: { workspaceId, researchId: id } })) >= MAX_ITEMS_PER_RESEARCH) throw new ResearchError("limit", `A research session holds up to ${MAX_ITEMS_PER_RESEARCH} items.`);
     await (tx as Tx).agentwebResearchItem.upsert({
-      where: { researchId_kind_refId: { researchId: id, kind: "answer", refId: answerId } },
+      where: { researchId_kind_refId: { researchId: id, kind: "answer", refId: answerId }, workspaceId },
       create: { id: `ri_${randomBytes(9).toString("hex")}`, workspaceId, researchId: id, kind: "answer", refId: answerId, addedBy: userId },
       update: {},
     });
-    await (tx as Tx).agentwebResearch.update({ where: { id }, data: { updatedAt: new Date() } });
+    await (tx as Tx).agentwebResearch.update({ where: { id, workspaceId }, data: { updatedAt: new Date() } });
     return a;
   });
   // The person asked for this answer, so the pages it read for them may be remembered (only if they opted in).
@@ -189,11 +189,11 @@ export async function attachCapture(workspaceId: string, userId: string, id: str
     if (!c || c.provider === "workspace") throw new ResearchError("not_found", "That page was not found.");
     if ((await (tx as Tx).agentwebResearchItem.count({ where: { workspaceId, researchId: id } })) >= MAX_ITEMS_PER_RESEARCH) throw new ResearchError("limit", `A research session holds up to ${MAX_ITEMS_PER_RESEARCH} items.`);
     await (tx as Tx).agentwebResearchItem.upsert({
-      where: { researchId_kind_refId: { researchId: id, kind: "capture", refId: captureId } },
+      where: { researchId_kind_refId: { researchId: id, kind: "capture", refId: captureId }, workspaceId },
       create: { id: `ri_${randomBytes(9).toString("hex")}`, workspaceId, researchId: id, kind: "capture", refId: captureId, addedBy: userId },
       update: {},
     });
-    await (tx as Tx).agentwebResearch.update({ where: { id }, data: { updatedAt: new Date() } });
+    await (tx as Tx).agentwebResearch.update({ where: { id, workspaceId }, data: { updatedAt: new Date() } });
   });
 }
 

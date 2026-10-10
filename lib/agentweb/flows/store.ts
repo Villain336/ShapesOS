@@ -108,7 +108,7 @@ export async function publishFlow(workspaceId: string, id: string, userId: strin
   const f = await getFlow(workspaceId, id);
   if (!f) throw new FlowStoreError("not_found", "That flow was not found.");
   if (f.status === "published") return f;
-  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id }, data: { status: "published", publishedBy: userId, publishedAt: new Date() } }));
+  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id, workspaceId }, data: { status: "published", publishedBy: userId, publishedAt: new Date() } }));
   return viewOf(row);
 }
 
@@ -116,7 +116,7 @@ export async function publishFlow(workspaceId: string, id: string, userId: strin
 export async function unpublishFlow(workspaceId: string, id: string): Promise<FlowView> {
   const f = await getFlow(workspaceId, id);
   if (!f) throw new FlowStoreError("not_found", "That flow was not found.");
-  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id }, data: { status: "draft", publishedBy: null, publishedAt: null } }));
+  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id, workspaceId }, data: { status: "draft", publishedBy: null, publishedAt: null } }));
   return viewOf(row);
 }
 
@@ -126,7 +126,7 @@ export async function renameFlow(workspaceId: string, id: string, name: string):
   const f = await getFlow(workspaceId, id);
   if (!f) throw new FlowStoreError("not_found", "That flow was not found.");
   const spec: FlowSpec = { ...f.spec, name: clean };
-  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id }, data: { name: clean, spec: spec as unknown as Prisma.InputJsonValue } }));
+  const row = await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebFlow.update({ where: { id, workspaceId }, data: { name: clean, spec: spec as unknown as Prisma.InputJsonValue } }));
   return viewOf(row);
 }
 

@@ -21,7 +21,6 @@ import { randomBytes, randomUUID } from "node:crypto";
 process.env.MARKETR_CREDENTIALS_KEY ||= randomBytes(32).toString("hex");
 process.env.MARKETR_STORAGE ||= "local";
 process.env.SPOTLIGHT_INDEX_ON_WRITE = "off";
-process.env.AGENTWEB_RECEIPT_SECRET ||= "test-receipt-secret-for-research";
 
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";

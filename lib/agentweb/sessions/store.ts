@@ -140,7 +140,7 @@ const RUN_SELECT = { status: true, kind: true, agentKey: true } as const;
 export async function ensureSession(workspaceId: string, input: { runId: string; startedBy: string; taskKey: string }): Promise<{ ok: true; created: boolean } | { ok: false; reason: "no_run" | "limit"; message: string }> {
   const settings = await loadDelegationSettings(workspaceId);
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const have = await (tx as Tx).agentwebSession.findUnique({ where: { runId: input.runId }, select: { runId: true } });
+    const have = await (tx as Tx).agentwebSession.findUnique({ where: { runId: input.runId, workspaceId }, select: { runId: true } });
     if (have) return { ok: true as const, created: false };
     const run = await (tx as Tx).agentRun.findFirst({ where: { id: input.runId, workspaceId }, select: { id: true } });
     if (!run) return { ok: false as const, reason: "no_run" as const, message: "This run is not recorded, so its browsing cannot be supervised." };
@@ -161,7 +161,7 @@ export interface Loaded {
 
 export async function loadSession(workspaceId: string, runId: string): Promise<Loaded | null> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = (await (tx as Tx).agentwebSession.findUnique({ where: { runId }, include: { run: { select: RUN_SELECT } } })) as Row | null;
+    const row = (await (tx as Tx).agentwebSession.findUnique({ where: { runId, workspaceId }, include: { run: { select: RUN_SELECT } } })) as Row | null;
     if (!row || row.workspaceId !== workspaceId) return null;
     const costMicroUsd = await costOf(tx as Tx, workspaceId, runId);
     return {
@@ -183,7 +183,7 @@ export async function evaluate(workspaceId: string, runId: string, tool: string,
     if (row.needsReason && row.needsReason !== "proposal" && row.needsReason !== "blocked_by_site" && row.needsReason !== "teach_check") data.needsReason = null;
   } else if (g.needs && row.needsReason !== g.needs) data.needsReason = g.needs;
   if (!g.allow && g.consumeNote) data.lastNote = null;
-  if (Object.keys(data).length) await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId }, data }));
+  if (Object.keys(data).length) await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data }));
   return g;
 }
 
@@ -196,17 +196,17 @@ export function proposalSummary(tool: string, args: Record<string, unknown>): st
 
 export async function persistProposal(workspaceId: string, runId: string, tool: string, args: Record<string, unknown>, now: Date = new Date()): Promise<Pending> {
   const pending: Pending = { id: `prop_${randomBytes(6).toString("hex")}`, tool, args: redactArgs(args), summary: proposalSummary(tool, args), proposedAt: now.toISOString() };
-  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId }, data: { pending: pending as unknown as Prisma.InputJsonValue, needsReason: "proposal" } }));
+  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data: { pending: pending as unknown as Prisma.InputJsonValue, needsReason: "proposal" } }));
   return pending;
 }
 
 /** One executed step: counts it and records where the session is. */
 export async function recordStep(workspaceId: string, runId: string, step: { url?: string; origin?: string | null; channel?: string | null }, now: Date = new Date()): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await (tx as Tx).agentwebSession.findUnique({ where: { runId }, select: { origins: true } });
+    const row = await (tx as Tx).agentwebSession.findUnique({ where: { runId, workspaceId }, select: { origins: true } });
     if (!row) return;
     const origins = step.origin && !row.origins.includes(step.origin) ? [...row.origins, step.origin].slice(0, 20) : undefined;
-    await (tx as Tx).agentwebSession.update({ where: { runId }, data: { steps: { increment: 1 }, lastStepAt: now, ...(step.url ? { currentUrl: step.url.slice(0, 500) } : {}), ...(step.channel ? { channel: step.channel } : {}), ...(origins ? { origins } : {}) } });
+    await (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data: { steps: { increment: 1 }, lastStepAt: now, ...(step.url ? { currentUrl: step.url.slice(0, 500) } : {}), ...(step.channel ? { channel: step.channel } : {}), ...(origins ? { origins } : {}) } });
   });
 }
 
@@ -222,7 +222,7 @@ export async function control(workspaceId: string, runId: string, userId: string
   if (!t.ok) throw new SessionError("bad_state", t.error);
   await withWorkspaceScope(workspaceId, (tx) =>
     (tx as Tx).agentwebSession.update({
-      where: { runId },
+      where: { runId, workspaceId },
       data: { control: t.to, controlBy: t.to === "agent" ? null : userId, controlAt: now, ...(t.to === "agent" ? { needsReason: loaded.row.needsReason === "proposal" ? loaded.row.needsReason : null } : {}) },
     }),
   );
@@ -233,7 +233,7 @@ export async function setStepMode(workspaceId: string, runId: string, mode: Step
   if (mode !== "auto" && mode !== "approve_each") throw new SessionError("bad_state", "Unknown step mode.");
   const loaded = await loadSession(workspaceId, runId);
   if (!loaded) throw new SessionError("not_found", "That session was not found.");
-  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId }, data: { stepMode: mode, ...(mode === "auto" ? { pending: null as unknown as Prisma.NullTypes.DbNull, needsReason: loaded.row.needsReason === "proposal" ? null : loaded.row.needsReason } : {}) } }));
+  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data: { stepMode: mode, ...(mode === "auto" ? { pending: null as unknown as Prisma.NullTypes.DbNull, needsReason: loaded.row.needsReason === "proposal" ? null : loaded.row.needsReason } : {}) } }));
   return (await getSessionView(workspaceId, runId))!;
 }
 
@@ -250,17 +250,17 @@ export async function setCaps(workspaceId: string, runId: string, caps: { maxSte
   if (!loaded) throw new SessionError("not_found", "That session was not found.");
   // Raising a cap that stopped the session clears the reason it was waiting for a person.
   if (loaded.row.needsReason?.startsWith("cap_")) data.needsReason = null;
-  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId }, data }));
+  await withWorkspaceScope(workspaceId, (tx) => (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data }));
   return (await getSessionView(workspaceId, runId))!;
 }
 
 /** Take the pending proposal out of the session (the caller approves and runs it, or rejects it). */
 export async function takePending(workspaceId: string, runId: string, proposalId: string, outcome: { note: string }): Promise<Pending> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await (tx as Tx).agentwebSession.findUnique({ where: { runId } });
+    const row = await (tx as Tx).agentwebSession.findUnique({ where: { runId, workspaceId } });
     const pending = (row?.pending as Pending | null) ?? null;
     if (!row || row.workspaceId !== workspaceId || !pending || pending.id !== proposalId) throw new SessionError("not_found", "That proposed step is no longer waiting.");
-    await (tx as Tx).agentwebSession.update({ where: { runId }, data: { pending: null as unknown as Prisma.NullTypes.DbNull, needsReason: null, lastNote: outcome.note } });
+    await (tx as Tx).agentwebSession.update({ where: { runId, workspaceId }, data: { pending: null as unknown as Prisma.NullTypes.DbNull, needsReason: null, lastNote: outcome.note } });
     return pending;
   });
 }
