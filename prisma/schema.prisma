@@ -18168,8 +18168,8 @@ model WorkspaceUpload {
   storageKey       String    @unique @map("storage_key")
   // The storage provider's multipart id (S3 UploadId).
   providerUploadId String?   @map("provider_upload_id")
-  // Put the finished upload on top of an existing file as a new version.
-  replace          Boolean   @default(false)
+  // Put the finished upload on top of this existing file as a new version.
+  replaceFileId    String?   @map("replace_file_id")
   createdBy        String    @map("created_by")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")

@@ -97,7 +97,7 @@ CREATE TABLE "workspace_uploads" (
     "parts" JSONB NOT NULL DEFAULT '{}',
     "storage_key" TEXT NOT NULL,
     "provider_upload_id" TEXT,
-    "replace" BOOLEAN NOT NULL DEFAULT false,
+    "replace_file_id" TEXT,
     "created_by" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

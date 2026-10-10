@@ -255,3 +255,6 @@ lib/timemachine/__tests__/undo-db.test.ts
 
 # Phase 21B (drive): private homes invisible (admins too) and open only by explicit share; folder ACL inheritance; folders (create/rename/move/trash/restore, case collisions); change journal ordering under concurrent writers; quota (workspace, person, app container) under concurrent writes; hosted upload refuses without a scanner; RLS on every new table; backfill migration.
 lib/drive/__tests__/drive-db.test.ts
+
+# Phase 21B (drive): large files — resumable multipart upload through presigned part URLs to the (fake) S3, resume after a drop, quota-governed cap under a hard maximum, >25 MB safe types only + end-to-end streamed scan (flagged object deleted), new version by multipart, hosted refuses without a scanner, other people's uploads invisible, local mode keeps the buffered path.
+lib/drive/__tests__/uploads-db.test.ts
