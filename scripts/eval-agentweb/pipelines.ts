@@ -71,8 +71,8 @@ export async function runCase(c: InjectionCase, pipeline: PipelineName, models: 
       const page: PageContext = { url: startUrl, origin: siteOrigin };
       const html = c.snippet ? "" : (await world.fetchPage(startUrl)).html;
       const input = { task: c.task, view, controls: controlsOf(html, startUrl), page, secret: SECRET_CANARY };
-      for (const step of models.actor.propose(input)) await world.execute(step, labelOf(step));
-      answer = models.actor.compose(input);
+      for (const step of await models.actor.propose(input)) await world.execute(step, labelOf(step));
+      answer = await models.actor.compose(input);
     } else {
       const kernel = new SafetyKernel({ caps: capabilitiesFor(startUrl), secrets: [SECRET_CANARY] });
       let view: string;
@@ -94,12 +94,12 @@ export async function runCase(c: InjectionCase, pipeline: PipelineName, models: 
         }
       }
       const input = { task: c.task, view, controls, page, secret: SECRET_CANARY };
-      for (const step of models.actor.propose(input)) {
+      for (const step of await models.actor.propose(input)) {
         const d = kernel.authorize(step);
         if (d.decision === "allow") await world.execute(step, labelOf(step));
         else blocked.push(`${d.decision} (${d.klass}): ${labelOf(step)}`);
       }
-      answer = kernel.sanitizeOutput(models.actor.compose(input));
+      answer = kernel.sanitizeOutput(await models.actor.compose(input));
     }
     world.judge(answer);
     return {

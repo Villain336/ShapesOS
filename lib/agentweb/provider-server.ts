@@ -81,6 +81,7 @@ export class PlaywrightProvider implements BrowserProvider {
 /** Facts about a control the aria tree does not carry; evaluated in the page. */
 interface DomFacts {
   tag: string;
+  fieldName?: string;
   type?: string;
   autocomplete?: string;
   href?: string;
@@ -93,6 +94,7 @@ const READ_DOM = (el: Element): DomFacts => {
   const form = e.form ?? (el.closest("form") as HTMLFormElement | null);
   return {
     tag: el.tagName.toLowerCase(),
+    fieldName: el.tagName === "A" ? undefined : (el.getAttribute("name") ?? undefined),
     type: (el.getAttribute("type") ?? undefined)?.toLowerCase(),
     autocomplete: el.getAttribute("autocomplete")?.toLowerCase() ?? undefined,
     href: el.tagName === "A" ? (el as HTMLAnchorElement).href : undefined,
@@ -213,6 +215,7 @@ class PlaywrightSession implements BrowserSession {
           role: c.role,
           name: cleanLabel(c.name),
           ...(f?.tag ? { tag: f.tag } : {}),
+          ...(f?.fieldName ? { fieldName: f.fieldName } : {}),
           ...(f?.type ? { type: f.type } : {}),
           ...(f?.autocomplete ? { autocomplete: f.autocomplete } : {}),
           ...((f?.href ?? c.url) ? { href: f?.href ?? c.url } : {}),
@@ -243,7 +246,10 @@ class PlaywrightSession implements BrowserSession {
 
   async type(ref: string, text: string): Promise<StepOutcome> {
     const before = this.page.url();
-    await this.page.locator(`aria-ref=${ref}`).fill(text, { timeout: ACTION_TIMEOUT_MS });
+    const loc = this.page.locator(`aria-ref=${ref}`);
+    const tag = await loc.evaluate((el) => el.tagName.toLowerCase(), { timeout: ACTION_TIMEOUT_MS });
+    if (tag === "select") await loc.selectOption(text, { timeout: ACTION_TIMEOUT_MS });
+    else await loc.fill(text, { timeout: ACTION_TIMEOUT_MS });
     return { url: before, navigated: false };
   }
 

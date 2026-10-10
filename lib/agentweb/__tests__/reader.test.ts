@@ -86,3 +86,13 @@ describe("actorView", () => {
     assert.doesNotMatch(v, /Contact us<\/a>/);
   });
 });
+
+describe("readPage: failures", () => {
+  it("a reader that fails gives empty fields, said plainly", async () => {
+    const r = await readPage({ url: "https://a.test/", html: HTML }, { read: async () => { throw new Error("rate limited"); } });
+    assert.equal(r.ok, false);
+  });
+  it("a fatal failure (a spend cap) stops the caller instead of passing as an empty page", async () => {
+    await assert.rejects(() => readPage({ url: "https://a.test/", html: HTML }, { read: async () => { throw Object.assign(new Error("cap"), { fatal: true }); } }), /cap/);
+  });
+});

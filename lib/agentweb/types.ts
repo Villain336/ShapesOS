@@ -37,6 +37,8 @@ export interface ElementInfo {
   /** Accessible name (page-controlled text: untrusted, length-capped). */
   name: string;
   tag?: string;
+  /** The field's name attribute (what a form submits it under). */
+  fieldName?: string;
   /** input type attribute. */
   type?: string;
   autocomplete?: string;

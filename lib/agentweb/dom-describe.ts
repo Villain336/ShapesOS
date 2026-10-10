@@ -35,6 +35,7 @@ export const DESCRIBE_ELEMENT = (el: Element): DescribedElement => {
     role,
     name,
     tag,
+    ...(el.getAttribute("name") && tag !== "a" ? { fieldName: el.getAttribute("name")! } : {}),
     ...(type ? { type } : {}),
     ...(el.getAttribute("autocomplete") ? { autocomplete: el.getAttribute("autocomplete")!.toLowerCase() } : {}),
     ...(tag === "a" ? { href: (el as HTMLAnchorElement).href } : {}),

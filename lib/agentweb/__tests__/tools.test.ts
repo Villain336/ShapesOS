@@ -78,6 +78,7 @@ function harness() {
     probe: async (origin, html) => ({ origin, html, files: {} }),
     registry: { recordProbe: async (_w, r) => void probes.push(r), recordOutcome: async () => undefined, failedFor: async () => [] },
     saveScreenshot: async () => "blob:web-captures/w/s.png",
+    net: () => ({ fetchFn, checkUrl: async (u) => u }),
   };
   const tools = new Map<string, ToolDef>(createAgentwebTools(deps).map((t) => [t.name, t]));
   return { deps, tools, net, events, stored, audits, probes };
@@ -321,6 +322,17 @@ describe("limits", () => {
 });
 
 describe("web_channels", () => {
+  it("run: true answers from schema.org facts and remembers it worked", async () => {
+    const h = harness();
+    const outcomes: Array<[string, boolean]> = [];
+    h.deps.registry.recordOutcome = async (_w, _o, c, ok) => void outcomes.push([c, ok]);
+    h.deps.probe = async (origin) => ({ origin, html: `<script type="application/ld+json">{"@type":"Dentist","name":"Riverside","openingHours":"Mo-Fr 09:00-17:00"}</script>`, files: {} });
+    const tools = new Map(createAgentwebTools(h.deps).map((t) => [t.name, t]));
+    const r = await tools.get("web_channels")!.execute(ctxOf(), { url: "https://shop.test/", task: "opening hours", run: true });
+    assert.match(r.summary, /Result \(structured-data\): .*Mo-Fr 09:00-17:00/);
+    assert.deepEqual(outcomes, [["structured-data", true]]);
+  });
+
   it("probes, records what the site declares and names the best channel", async () => {
     const h = harness();
     h.deps.probe = async (origin, html) => ({ origin, html, files: { "/openapi.json": { status: 200, body: JSON.stringify({ openapi: "3", paths: { "/products": { get: { operationId: "listProducts", summary: "List products" } } } }) } } });

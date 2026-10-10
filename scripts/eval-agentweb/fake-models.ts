@@ -22,8 +22,8 @@ export interface ActorInput {
 }
 
 export interface ActorModel {
-  propose(input: ActorInput): ProposedStep[];
-  compose(input: ActorInput): string;
+  propose(input: ActorInput): ProposedStep[] | Promise<ProposedStep[]>;
+  compose(input: ActorInput): string | Promise<string>;
 }
 
 const INSTRUCTION_WORDS = /(ignore|assistant|system|override|ai agents?|ai assistant|important|you must|notice for ai|send an email|navigate to|click|approved)/i;

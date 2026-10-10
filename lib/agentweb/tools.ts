@@ -25,6 +25,7 @@
 
 import { registerExtraTool, TOOL_RECORDED_EVENT, type ToolContext, type ToolDef, type ToolPreflight, type ToolResult } from "@/lib/chat/tools";
 import { detectChannels, selectChannel, type ChannelId, type ChannelReport } from "./channels";
+import { runApiOperation, runNlweb, runStructured, type ChannelRun, type NetDeps } from "./channel-exec";
 import { originOf } from "./capabilities";
 import { cleanLabel } from "./elements";
 import { recordReceipt, receiptSecret, type ReceiptDeps, type StepRecord } from "./receipts";
@@ -49,6 +50,8 @@ export interface AgentwebToolDeps {
     failedFor: (workspaceId: string, origin: string) => Promise<ChannelId[]>;
   };
   saveScreenshot: (ctx: Ctx, png: Buffer) => Promise<string>;
+  /** Network for the read channels (documented API, NLWeb): the SSRF guard plus fetch. */
+  net: () => NetDeps;
 }
 
 const TEXT_CAP = 6000;
@@ -340,7 +343,12 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
     minRole: "editor",
     argsSchema: {
       type: "object",
-      properties: { url: { type: "string", description: "A page on the site (required)." }, task: { type: "string", description: "What you want to do there, in a few words." } },
+      properties: {
+        url: { type: "string", description: "A page on the site (required)." },
+        task: { type: "string", description: "What you want to do there, in a few words." },
+        run: { type: "boolean", description: "Also run the chosen channel when it is a read (schema.org facts, a documented GET operation, NLWeb /ask)." },
+        query: { type: "string", description: "With run: the question or search text for the channel." },
+      },
       required: ["url"],
     },
     async execute(rawCtx, args) {
@@ -356,13 +364,26 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
       const report = detectChannels(await deps.probe(origin, html), { browserAvailable: true });
       await deps.registry.recordProbe(ctx.workspaceId, report).catch(() => undefined);
       const sel = selectChannel(report, { intent: typeof args.task === "string" ? args.task : "", failed: await deps.registry.failedFor(ctx.workspaceId, origin).catch(() => []) });
+      const intent = typeof args.task === "string" ? args.task : "";
+      let run: ChannelRun | null = null;
+      if (args.run === true) {
+        const q = typeof args.query === "string" && args.query.trim() ? args.query.trim() : intent;
+        if (sel.channel === "structured-data") run = runStructured(report, intent || q);
+        else if (sel.channel === "documented-api" && sel.operation) run = await runApiOperation(sel.operation, origin, { q, query: q, search: q }, deps.net());
+        else if (sel.channel === "declared-tools" && sel.tool?.source === "nlweb" && sel.tool.endpoint) run = await runNlweb(sel.tool.endpoint, q, deps.net(), origin);
+        if (run) await deps.registry.recordOutcome(ctx.workspaceId, origin, run.channel, run.ok, run.ok ? { intent } : undefined).catch(() => undefined);
+      }
       const lines = [
         `${origin}`,
         ...report.channels.map((c) => `- ${c.channel}: ${c.declared ? "yes" : "no"} — ${c.note}`),
         report.declaredTools.length ? `Declared tools: ${report.declaredTools.map((t) => `${t.name} (${t.source})`).join(", ")}` : "",
-        `Best channel for "${typeof args.task === "string" ? args.task : "any task"}": ${sel.channel} — ${sel.reason}`,
+        `Best channel for "${intent || "any task"}": ${sel.channel} — ${sel.reason}`,
+        run ? (run.ok ? `Result (${run.channel}): ${JSON.stringify(run.data).slice(0, 3000)}` : `Result (${run.channel}): did not work — ${run.error}`) : args.run === true ? `Not run: ${sel.channel} is not a read channel this release runs; use browser_navigate and browser_snapshot.` : "",
       ].filter(Boolean);
-      return { summary: wrapUntrusted(lines.join("\n"), origin), details: { origin, channel: sel.channel, declared: report.channels.filter((c) => c.declared).map((c) => c.channel) } };
+      const text = lines.join("\n");
+      const task = await deps.tasks.ensure(taskKeyOf(ctx), ctx.workspaceId);
+      task.kernel.ledger.register(text, origin, "untrusted");
+      return { summary: wrapUntrusted(text, origin), details: { origin, channel: sel.channel, declared: report.channels.filter((c) => c.declared).map((c) => c.channel), ran: run ? { channel: run.channel, ok: run.ok } : null } };
     },
   };
 
@@ -418,6 +439,12 @@ export const defaultAgentwebDeps: AgentwebToolDeps = {
       const reg = await import("./registry");
       return reg.failedChannels(await reg.getSiteCapability(w, o));
     },
+  },
+  net() {
+    return {
+      fetchFn: fetch,
+      checkUrl: async (u) => (await import("@/lib/safe-url")).assertSafeUrl(u),
+    };
   },
   async saveScreenshot(ctx, png) {
     const { blobPut, workspaceBlobPath } = await import("@/lib/filesystem/storage");

@@ -68,6 +68,8 @@ export interface ApiOperation {
   path: string;
   summary: string;
   readOnly: boolean;
+  /** Query parameter names the description lists. */
+  parameters: string[];
 }
 export interface ApiDescription {
   kind: "openapi" | "feed";
@@ -249,7 +251,8 @@ function apis(p: SiteProbe, root: HtmlNode): ApiDescription[] {
     for (const [route, item] of Object.entries(j.paths as Record<string, Record<string, Record<string, unknown>>>)) {
       for (const [method, op] of Object.entries(item ?? {})) {
         if (!["get", "post", "put", "patch", "delete", "head"].includes(method)) continue;
-        operations.push({ operationId: String(op?.operationId ?? `${method} ${route}`), method, path: route, summary: String(op?.summary ?? ""), readOnly: method === "get" || method === "head" });
+        const parameters = (Array.isArray(op?.parameters) ? (op.parameters as Array<Record<string, unknown>>) : []).filter((p) => p?.in === "query" && typeof p.name === "string").map((p) => String(p.name));
+        operations.push({ operationId: String(op?.operationId ?? `${method} ${route}`), method, path: route, summary: String(op?.summary ?? ""), readOnly: method === "get" || method === "head", parameters });
       }
     }
     out.push({ kind: "openapi", source: `${p.origin}${path}`, operations });
@@ -257,7 +260,7 @@ function apis(p: SiteProbe, root: HtmlNode): ApiDescription[] {
   }
   for (const l of findAll(root, (n) => n.tag === "link" && (attr(n, "rel") ?? "").toLowerCase() === "alternate" && /rss|atom/.test(attr(n, "type") ?? ""))) {
     const href = abs(p.origin, attr(l, "href"));
-    if (href) out.push({ kind: "feed", source: href, operations: [{ operationId: "read feed", method: "get", path: href, summary: attr(l, "title") ?? "Feed", readOnly: true }] });
+    if (href) out.push({ kind: "feed", source: href, operations: [{ operationId: "read feed", method: "get", path: href, summary: attr(l, "title") ?? "Feed", readOnly: true, parameters: [] }] });
   }
   return out;
 }

@@ -117,6 +117,7 @@ export function scanControls(html: string, pageUrl: string): ControlNode[] {
       role,
       name,
       tag,
+      ...(attr(n, "name") && tag !== "a" ? { fieldName: attr(n, "name") } : {}),
       ...(type ? { type } : {}),
       ...(attr(n, "autocomplete") ? { autocomplete: attr(n, "autocomplete")!.toLowerCase() } : {}),
       ...(tag === "a" ? { href: resolve(pageUrl, attr(n, "href")) } : {}),

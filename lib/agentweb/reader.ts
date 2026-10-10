@@ -14,7 +14,7 @@
 import { z } from "zod";
 import { parseHtml, visibleText } from "./html";
 
-/** The reader model: text in, text out. No tools, by construction of this interface. */
+/** The reader model: text in, text out. No tools, by construction of this interface. An error with `fatal: true` (a spend cap) stops the caller instead of yielding an empty reading. */
 export interface ReaderModel {
   read(input: { system: string; pageText: string; url: string }): Promise<string>;
 }
@@ -94,7 +94,9 @@ export async function readPage(page: { url: string; html: string }, model: Reade
   let raw: string;
   try {
     raw = await model.read({ system: READER_SYSTEM, pageText, url: page.url });
-  } catch {
+  } catch (err) {
+    // A reader failure is not fatal to the page (empty fields, said so); a fatal one (a spend cap) is.
+    if ((err as { fatal?: boolean } | null)?.fatal === true) throw err;
     return { ok: false, url: page.url, origin, fields: { ...EMPTY }, rejectedFields: [], injectionSuspected };
   }
   const obj = parseJsonObject(raw);
