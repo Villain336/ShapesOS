@@ -11,7 +11,7 @@
 // translated. The pass/partial/missing badges are neutral: colour and shape are for
 // agent states only (DESIGN.md).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import { aosButton, NeutralBadge } from "@/components/aos";
@@ -51,54 +51,57 @@ export function AgentReadyApp({ projectId, domain, sites, canDraft }: { projectI
   const { t } = useI18n();
   const k = (key: string) => key as MessageKey;
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
-  const [data, setData] = useState<Data | null>(null);
-  const [policy, setPolicy] = useState<Policy | null>(null);
-  const [busy, setBusy] = useState(false);
+  // The person's own AI-usage choice; null = whatever the site states now (or our default).
+  const [choice, setChoice] = useState<Policy | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const seq = useRef(0);
+  const [result, setResult] = useState<{ key: string; data: Data | null; error: string | null } | null>(null);
 
-  const load = useCallback(
-    async (id: string, p: Policy | null) => {
-      if (!id) return;
-      const mine = ++seq.current;
-      setBusy(true);
-      setError(null);
-      const q = new URLSearchParams({ projectId });
-      if (p) for (const key of ["search", "input", "train"] as const) q.set(key, p[key] ? "yes" : "no");
-      try {
-        const res = await fetch(`/api/websites/${id}/agent-ready?${q}`);
-        const json = (await res.json()) as Data & { error?: string };
-        if (mine !== seq.current) return;
-        if (!res.ok) throw new Error(json.error ?? t("agentReady.failed"));
-        setData(json);
-        setPolicy((cur) => cur ?? json.policy);
-      } catch (err) {
-        if (mine === seq.current) setError(err instanceof Error ? err.message : t("agentReady.failed"));
-      } finally {
-        if (mine === seq.current) setBusy(false);
-      }
-    },
-    [projectId, t],
-  );
-
+  // One preview per (site, choice). State is only set after the fetch resolves, and
+  // `busy` is derived: the result on screen is for another key than the one asked for.
+  const key = `${siteId}|${choice ? `${+choice.search}${+choice.input}${+choice.train}` : "default"}`;
   useEffect(() => {
-    setPolicy(null);
+    if (!siteId) return;
+    let live = true;
+    const q = new URLSearchParams({ projectId });
+    if (choice) for (const k2 of ["search", "input", "train"] as const) q.set(k2, choice[k2] ? "yes" : "no");
+    (async () => {
+      try {
+        const res = await fetch(`/api/websites/${siteId}/agent-ready?${q}`);
+        const json = (await res.json()) as Data & { error?: string };
+        if (!live) return;
+        setResult(res.ok ? { key, data: json, error: null } : { key, data: null, error: json.error ?? t("agentReady.failed") });
+      } catch (err) {
+        if (live) setResult({ key, data: null, error: err instanceof Error ? err.message : t("agentReady.failed") });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [siteId, choice, key, projectId, t]);
+
+  const busy = !result || result.key !== key;
+  const data = result && result.key.split("|")[0] === siteId ? result.data : null;
+  const policy = choice ?? data?.policy ?? null;
+  const error = saveError ?? (busy ? null : (result?.error ?? null));
+
+  function pickSite(id: string) {
+    setChoice(null);
     setNotice(null);
-    void load(siteId, null);
-  }, [siteId, load]);
+    setSaveError(null);
+    setSiteId(id);
+  }
 
   function change(next: Policy) {
-    setPolicy(next);
+    setChoice(next);
     setNotice(null);
-    void load(siteId, next);
   }
 
   async function save() {
     if (!policy) return;
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     setNotice(null);
     try {
       const res = await fetch(`/api/websites/${siteId}/agent-ready`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, policy }) });
@@ -106,7 +109,7 @@ export function AgentReadyApp({ projectId, domain, sites, canDraft }: { projectI
       if (!res.ok) throw new Error(json.error ?? t("agentReady.failed"));
       setNotice(json.saved && json.revision ? t("agentReady.draft.saved", { n: json.revision.number }) : t("agentReady.draft.nothing"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("agentReady.failed"));
+      setSaveError(err instanceof Error ? err.message : t("agentReady.failed"));
     } finally {
       setSaving(false);
     }
@@ -135,7 +138,7 @@ export function AgentReadyApp({ projectId, domain, sites, canDraft }: { projectI
             {sites.length > 1 ? (
               <label className="flex flex-col gap-1 text-sm font-semibold text-ink">
                 {t("agentReady.site")}
-                <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className="h-control rounded-md border-[1.5px] border-control bg-paper px-3 text-md font-normal text-ink outline-none focus:border-focus focus:shadow-[0_0_0_3px_var(--aos-focus-halo)]">
+                <select value={siteId} onChange={(e) => pickSite(e.target.value)} className="h-control rounded-md border-[1.5px] border-control bg-paper px-3 text-md font-normal text-ink outline-none focus:border-focus focus:shadow-[0_0_0_3px_var(--aos-focus-halo)]">
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}

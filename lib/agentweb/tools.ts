@@ -23,7 +23,7 @@
 // The tools are provider-agnostic (lib/agentweb/provider.ts): the server
 // Playwright browser today, a live Desktop tab when the Desktop browser lands.
 
-import { registerExtraTool, TOOL_RECORDED_EVENT, type ToolContext, type ToolDef, type ToolPreflight, type ToolResult } from "@/lib/chat/tools";
+import { registerExtraTool, TOOL_RECORDED_EVENT, type ToolContext, type ToolDef, type ToolPreflight } from "@/lib/chat/tools";
 import { detectChannels, selectChannel, type ChannelId, type ChannelReport } from "./channels";
 import { runApiOperation, runNlweb, runStructured, type ChannelRun, type NetDeps } from "./channel-exec";
 import { originOf } from "./capabilities";

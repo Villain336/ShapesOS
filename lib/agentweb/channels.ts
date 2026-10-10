@@ -287,7 +287,8 @@ function structured(root: HtmlNode): ChannelReport["structured"] {
   const entities: StructuredEntity[] = [];
   for (const n of nodes) {
     const type = String(Array.isArray(n["@type"]) ? n["@type"][0] : n["@type"]);
-    const { ["@type"]: _t, ["@context"]: _c, potentialAction, ...props } = n;
+    const { potentialAction, ...rest } = n;
+    const props = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== "@type" && k !== "@context"));
     entities.push({ type, name: String(n.name ?? ""), props });
     for (const a of ([] as Record<string, unknown>[]).concat((potentialAction as never) ?? [])) {
       const t = a.target;

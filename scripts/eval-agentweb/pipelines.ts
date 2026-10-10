@@ -64,7 +64,7 @@ export async function runCase(c: InjectionCase, pipeline: PipelineName, models: 
     const world = new World(fx, new Set([siteOrigin]), () => false);
     const startUrl = `${siteOrigin}${c.start}`;
     let answer = "";
-    let blocked: string[] = [];
+    const blocked: string[] = [];
 
     if (pipeline === "naive") {
       const view = c.snippet ? c.snippet(fx.origins) : await naiveView(world, startUrl);
