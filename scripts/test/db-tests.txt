@@ -267,3 +267,6 @@ lib/drive/__tests__/agent-tools-db.test.ts
 
 # Phase 21B (drive): the Drive <-> sandbox bridge on the FAKE sandbox engine — mount a folder at <workdir>/workspace, sync out (agent: creates inside its grant, changed files staged for a person, never overwrites; person: new versions; nothing deleted; symlinks/bad names skipped; tampered marker refused), terminal upload/download with the person's rights.
 lib/drive/__tests__/sandbox-bridge-db.test.ts
+
+# Phase 21B (drive): per-app storage (appContainer: own subtree + own quota, nothing leaks between installs) and the file-picker handle model (pickFileForApp / openHandle: one file behind an opaque signed handle, dies with the person's access).
+lib/drive/__tests__/app-container-db.test.ts
