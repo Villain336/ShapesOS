@@ -1135,6 +1135,11 @@ model Workspace {
   agentwebMandates            AgentwebMandate[]
   agentwebSessions            AgentwebSession[]
   agentwebFlows               AgentwebFlow[]
+  agentwebResearch            AgentwebResearch[]
+  agentwebResearchItems       AgentwebResearchItem[]
+  agentwebMemorySettings      AgentwebMemorySettings[]
+  agentwebMemory              AgentwebMemory[]
+  agentwebMonitorTriggers     AgentwebMonitorTrigger[]
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
@@ -18306,4 +18311,118 @@ model AgentwebFlow {
 
   @@index([workspaceId, status, createdAt])
   @@map("agentweb_flows")
+}
+
+// =====================================================================
+// Phase 21A round 2 (WS=agentweb), M6: research workspace and browsing memory.
+// All five tables are FORCE RLS on app.workspace_id (migration
+// 20261101100700_p21_agentweb_research). A member's research and browsing memory
+// are theirs: the code filters by user on top of the workspace scope.
+// =====================================================================
+
+// A research session: a question, the answers asked about it (each with claims and
+// citations, kept in web_answers), pages attached directly (web_captures), the owner's
+// notes, and optionally the browsing session (agent run) doing the reading. Private to
+// its owner until they share it with the workspace (the Notes share states).
+model AgentwebResearch {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  title       String
+  question    String
+  // open | archived
+  status      String    @default("open") @db.VarChar(10)
+  // private | workspace
+  shareState  String    @default("private") @map("share_state") @db.VarChar(10)
+  notes       String    @default("")
+  // the agent run (browsing session) doing the reading, when the owner linked one
+  runId       String?   @map("run_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  items AgentwebResearchItem[]
+
+  @@index([workspaceId, userId, updatedAt])
+  @@index([workspaceId, shareState, updatedAt])
+  @@map("agentweb_research")
+}
+
+// What is attached to a research session: an answer (web_answers.id) or a capture (web_captures.id).
+model AgentwebResearchItem {
+  id          String           @id
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  researchId  String           @map("research_id")
+  research    AgentwebResearch @relation(fields: [researchId], references: [id], onDelete: Cascade)
+  // answer | capture
+  kind        String           @db.VarChar(10)
+  refId       String           @map("ref_id")
+  addedBy     String           @map("added_by")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@unique([researchId, kind, refId])
+  @@index([workspaceId, researchId])
+  @@map("agentweb_research_items")
+}
+
+// Per member: is browsing memory on (default OFF), how long it is kept, the sites never remembered.
+model AgentwebMemorySettings {
+  workspaceId   String    @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId        String    @map("user_id")
+  enabled       Boolean   @default(false)
+  retentionDays Int       @default(30) @map("retention_days")
+  excludedSites String[]  @default([]) @map("excluded_sites")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@id([workspaceId, userId])
+  @@map("agentweb_memory_settings")
+}
+
+// One page a member's research read for them: address without query or fragment, title, a short
+// excerpt, when. A member's own record: deleted after retention_until or when they forget it.
+model AgentwebMemory {
+  id             String    @id
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId         String    @map("user_id")
+  url            String
+  urlKey         String    @map("url_key")
+  origin         String
+  title          String
+  excerpt        String
+  captureId      String?   @map("capture_id")
+  researchId     String?   @map("research_id")
+  runId          String?   @map("run_id")
+  seenCount      Int       @default(1) @map("seen_count")
+  capturedAt     DateTime  @default(now()) @map("captured_at")
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at")
+  retentionUntil DateTime  @map("retention_until")
+
+  @@unique([workspaceId, userId, urlKey])
+  @@index([workspaceId, userId, lastSeenAt])
+  @@index([retentionUntil])
+  @@map("agentweb_memory")
+}
+
+// "When this page changes, run that workflow": a Context.dev monitor (monitors.id) linked to a
+// workflow (workflows.id). The workflow still has to be switched on by a person; the run acts as
+// the person who linked it.
+model AgentwebMonitorTrigger {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  monitorId   String    @map("monitor_id")
+  workflowId  String    @map("workflow_id")
+  createdBy   String    @map("created_by")
+  enabled     Boolean   @default(true)
+  firedCount  Int       @default(0) @map("fired_count")
+  lastFiredAt DateTime? @map("last_fired_at")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([monitorId, workflowId])
+  @@index([workspaceId, monitorId])
+  @@map("agentweb_monitor_triggers")
 }
