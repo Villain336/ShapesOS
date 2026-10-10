@@ -101,6 +101,7 @@ describe("record search (DB)", () => {
     const onlyLeads = await searchRecords(WS, "viewer", "zephyrine", { kinds: ["lead"] });
     assert.ok(onlyLeads.length > 0 && onlyLeads.every((h) => h.kind === "lead"));
     // Phase 18.2: +2 — comms' personal "mail" kind (Mail app threads) and content's "note".
-    assert.equal(RECORD_KINDS.length, 25);
+    // Phase 21A round 2: +1 — agentweb's personal "page_memory" kind (a member's browsing memory).
+    assert.equal(RECORD_KINDS.length, 26);
   });
 });
