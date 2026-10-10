@@ -154,6 +154,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 6. The shortest monitor cadence is hourly; a 15-minute sweep checks each due monitor within 15 minutes of its slot. Each check is budget-gated before the vendor is hit.",
     timeoutMs: LONG,
   },
+  // Phase 21A round 2 (agentweb): stored web pages (receipts) and browsing memory expire at their retention.
+  {
+    key: "agentweb-retention",
+    path: "/api/cron/agentweb-retention",
+    cron: "17 3 * * *",
+    source: "picked",
+    note: "New in Phase 21A. Both also expire lazily on write; this sweeps quiet workspaces once a day.",
+    timeoutMs: SHORT,
+  },
   // Phase 18.1 (find): Spotlight's text index — files/docs the write hook missed, and chunk embeddings.
   {
     key: "search-index",

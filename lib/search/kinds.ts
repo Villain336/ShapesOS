@@ -37,6 +37,8 @@ export const RECORD_KINDS = [
   "mail",
   // Phase 18.2 (WS=content)
   "note",
+  // Phase 21A round 2 (WS=agentweb): a member's own browsing memory.
+  "page_memory",
 ] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -67,6 +69,7 @@ export const RECORD_KIND_LABELS: Record<RecordKind, string> = {
   app: "App",
   mail: "Mail",
   note: "Note",
+  page_memory: "Researched page",
 };
 
 /** How a result matched (Spotlight shows these; the ranking blends them). */
@@ -129,4 +132,7 @@ export const KIND_ALIASES: Record<string, readonly RecordKind[]> = {
   // Phase 18.2 (WS=content)
   note: ["note"],
   notes: ["note"],
+  // Phase 21A round 2 (WS=agentweb)
+  memory: ["page_memory"],
+  pages: ["page_memory"],
 };

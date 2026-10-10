@@ -395,6 +395,8 @@ export const en = {
       mail: "Mail",
       // Phase 18.2 (WS=content)
       note: "Note",
+      // Phase 21A round 2 (WS=agentweb)
+      page_memory: "Researched page",
     },
   },
 

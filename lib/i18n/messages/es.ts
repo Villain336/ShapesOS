@@ -390,6 +390,8 @@ export const es: Catalogue = {
       mail: "Correo",
       // Phase 18.2 (WS=content)
       note: "Nota",
+      // Phase 21A round 2 (WS=agentweb)
+      page_memory: "Página investigada",
     },
   },
 

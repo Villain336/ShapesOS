@@ -296,6 +296,10 @@ export async function runMonitorCheck(
       consecutiveFailures: 0,
     },
   });
+  // Phase 21A round 2 (WS=agentweb): workflows a person linked to this page start now (best effort, never throws).
+  await import("@/lib/agentweb/research/monitors")
+    .then((m) => m.fireMonitorTriggers(workspaceId, { monitorId, name: monitor.name, url: monitor.url, changeId: change.id, digest: diff.digest, excerpt: diff.excerpt || null }))
+    .catch(() => undefined);
   return { monitorId, outcome: "changed", changeId: change.id, researchTaskId };
 }
 

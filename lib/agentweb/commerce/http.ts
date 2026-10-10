@@ -9,7 +9,7 @@
 
 export type GuardResult = { ok: true; body: Record<string, unknown> } | { ok: false; status: 400 | 403 | 415; error: string };
 
-export async function humanClickGuard(req: Request, opts: { requireChannel: boolean; /** What is being decided, for the error text (default "A cart"). */ subject?: string }): Promise<GuardResult> {
+export async function humanClickGuard(req: Request, opts: { requireChannel: boolean; /** What is being decided, for the error text (default "A cart"). */ subject?: string; /** Largest JSON body in characters (default 2000). */ maxChars?: number }): Promise<GuardResult> {
   const what = opts.subject ?? "A cart";
   const site = req.headers.get("sec-fetch-site");
   if (site && site !== "same-origin") return { ok: false, status: 403, error: `${what} can only be decided from this app's own page.` };
@@ -27,7 +27,7 @@ export async function humanClickGuard(req: Request, opts: { requireChannel: bool
   let body: Record<string, unknown> = {};
   try {
     const text = await req.text();
-    if (text.length > 2000) return { ok: false, status: 400, error: "Request too large." };
+    if (text.length > (opts.maxChars ?? 2000)) return { ok: false, status: 400, error: "Request too large." };
     const parsed = text.trim() ? JSON.parse(text) : {};
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
     body = parsed as Record<string, unknown>;

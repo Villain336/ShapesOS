@@ -61,6 +61,11 @@ export interface AgentwebToolDeps {
     step: (ctx: Ctx, step: { url?: string; origin?: string | null; channel?: string | null }) => Promise<void>;
     needs: (ctx: Ctx, reason: "blocked_by_site" | "teach_check") => Promise<void>;
   };
+  /**
+   * Phase 21A round 2 (M6): a page this run read, for browsing memory. Only ever remembers when the
+   * member who started the run linked it to one of their research sessions AND turned memory on.
+   */
+  memory?: (ctx: Ctx, page: { url: string; text: string; captureId: string }) => Promise<void>;
   /** Phase 21A round 2: taught flows (a person publishes them; the tool refuses a draft). Absent = no flows. */
   flows?: {
     load: (ctx: Ctx, id: string) => Promise<{ name: string; status: "draft" | "published"; spec: FlowSpec } | null>;
@@ -121,6 +126,7 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
         expiresAt: new Date(now + 5 * 60_000), // until the task goes idle (tasks.ts IDLE_MS)
       };
       const r = await recordReceipt(deps.receipts(ctx), { workspaceId: ctx.workspaceId, actor: `agent:${ctx.agentKey ?? "lead"}`, url: step.action === "click" || step.action === "type" ? stripQuery(session.url()) : session.url(), html, fetchedAt: new Date(now), step, delegation });
+      if (deps.memory && (step.action === "navigate" || step.action === "click") && (step.decision === "allow" || step.decision === "confirmed")) await deps.memory(ctx, { url: r.url, text: r.excerpt, captureId: r.id }).catch(() => undefined);
       return r.id;
     } catch {
       return undefined;
@@ -588,6 +594,11 @@ export const defaultAgentwebDeps: AgentwebToolDeps = {
       const { sessionNeeds } = await import("./sessions/gate");
       await sessionNeeds(ctx, reason);
     },
+  },
+  async memory(ctx, page) {
+    if (!ctx.runId) return;
+    const { rememberFromRunStep } = await import("./research/store");
+    await rememberFromRunStep(ctx.workspaceId, ctx.userId, ctx.runId, page);
   },
   flows: {
     async load(ctx, id) {
