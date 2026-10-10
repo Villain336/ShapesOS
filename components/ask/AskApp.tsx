@@ -56,6 +56,8 @@ interface ReceiptData {
   signedWith: "hmac-sha256" | "none";
   verified: boolean;
   retentionUntil: string;
+  /** Who the agent acted for, the scope and the expiry (round 2). */
+  delegation?: { byYou: boolean; agent: string; scope: { origins: string[]; classes: string[] }; expiresAt: string; tier: number; decision: string } | null;
 }
 
 export interface AskAppProps {
@@ -509,6 +511,14 @@ function ReceiptPanel({ state, onClose }: { state: { loading: boolean; data: Rec
           <dd className="text-ink">{d.excerpt}</dd>
           <dt className="font-semibold text-muted">{t("askApp.receipt.signature")}</dt>
           <dd className="text-ink">{d.verified ? t("askApp.receipt.verified") : d.signedWith === "none" ? t("askApp.receipt.unsigned") : t("askApp.receipt.broken")}</dd>
+          {d.delegation ? (
+            <>
+              <dt className="font-semibold text-muted">{t("askApp.receipt.delegation")}</dt>
+              <dd className="text-ink">
+                {t(d.delegation.byYou ? "askApp.receipt.delegatedByYou" : "askApp.receipt.delegatedByMember", { agent: d.delegation.agent })} · {t("askApp.receipt.scope", { origins: d.delegation.scope.origins.join(", ") })} · {t("askApp.receipt.until", { date: format.date(d.delegation.expiresAt, "dateTime") })}
+              </dd>
+            </>
+          ) : null}
           <dt className="font-semibold text-muted">{t("askApp.receipt.via")}</dt>
           <dd className="text-ink">
             {d.via}

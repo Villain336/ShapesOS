@@ -84,7 +84,15 @@ export function createAgentwebTools(deps: AgentwebToolDeps): ToolDef[] {
   async function receipt(ctx: Ctx, task: WebTask, session: BrowserSession, step: StepRecord): Promise<string | undefined> {
     try {
       const html = await session.html();
-      const r = await recordReceipt(deps.receipts(ctx), { workspaceId: ctx.workspaceId, actor: `agent:${ctx.agentKey ?? "lead"}`, url: session.url(), html, fetchedAt: new Date(), step });
+      const now = Date.now();
+      const delegation = {
+        delegatedBy: ctx.userId,
+        runId: ctx.runId ?? null,
+        agent: ctx.agentKey ?? "lead",
+        scope: { origins: [...task.kernel.caps.allowedOrigins], classes: [...task.kernel.caps.allowedActions] },
+        expiresAt: new Date(now + 5 * 60_000), // until the task goes idle (tasks.ts IDLE_MS)
+      };
+      const r = await recordReceipt(deps.receipts(ctx), { workspaceId: ctx.workspaceId, actor: `agent:${ctx.agentKey ?? "lead"}`, url: session.url(), html, fetchedAt: new Date(now), step, delegation });
       return r.id;
     } catch {
       return undefined;
@@ -418,6 +426,10 @@ export const defaultAgentwebDeps: AgentwebToolDeps = {
       async store(c) {
         const { storeCapture } = await import("./captures-store");
         await storeCapture(ctx.workspaceId, c, { via: "step", runId: ctx.runId });
+      },
+      async delegate(d) {
+        const { storeDelegation } = await import("./identity/delegation-store");
+        await storeDelegation(ctx.workspaceId, d);
       },
       async audit(e) {
         const { authorityAudit } = await import("@/lib/authority/db");

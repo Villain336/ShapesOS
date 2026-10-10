@@ -100,6 +100,11 @@ export const agentwebEs: Catalogue<typeof agentwebEn> = {
       unsigned: "Sin firmar: no había ningún secreto de firma configurado al guardarlo",
       broken: "La firma no es válida: el registro guardado cambió",
       keptUntil: "Se conserva hasta el {date}",
+      delegation: "Delegación",
+      delegatedByYou: "{agent} actuó en tu nombre",
+      delegatedByMember: "{agent} actuó en nombre de un miembro de este espacio de trabajo",
+      scope: "alcance: {origins}",
+      until: "hasta {date}",
       via: "Guardado desde",
     },
     history: {

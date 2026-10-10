@@ -15,6 +15,7 @@ import { randomBytes } from "node:crypto";
 import type { WorkspaceRole } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { readPage } from "@/lib/agentweb/page-fetch";
+import { storeDelegation } from "@/lib/agentweb/identity/delegation-store";
 import { receiptSecret, recordReceipt } from "@/lib/agentweb/receipts";
 import { storeCapture } from "@/lib/agentweb/captures-store";
 import { getConfig } from "@/lib/agentweb/settings";
@@ -122,9 +123,10 @@ export async function runAnswer(input: RunAnswerInput, opts: RunAnswerOptions = 
         {
           secret,
           store: (c) => storeCapture(input.workspaceId, c, { via: "search-snippet", provider: s.providers[0], answerId: id, bodyText: s.text, retentionDays: config.captureRetentionDays }),
+          delegate: (d) => storeDelegation(input.workspaceId, d),
           audit: (e) => authorityAudit.logAsync(e),
         },
-        { workspaceId: input.workspaceId, actor: `user:${input.userId}`, url: s.url, html: s.text, text: s.text, fetchedAt: now(), step: { action: "answer", klass: "benign", tier: 0, decision: "allow" } },
+        { workspaceId: input.workspaceId, actor: `user:${input.userId}`, url: s.url, html: s.text, text: s.text, fetchedAt: now(), step: { action: "answer", klass: "benign", tier: 0, decision: "allow" }, delegation: { delegatedBy: input.userId, runId: null, agent: "answer", scope: { origins: [(() => { try { return new URL(s.url).origin; } catch { return s.url; } })()], classes: ["benign"] }, expiresAt: new Date(now().getTime() + 5 * 60_000) } },
       );
       return r.id;
     },

@@ -264,3 +264,5 @@ lib/agentweb/__tests__/agent-ready-draft-db.test.ts
 lib/agentweb/__tests__/storefront-routes-db.test.ts
 # Phase 21A round 2 (WS=agentweb): the deployment's Web Bot Auth keys and public directory as the app role — one active key even under racing creators, the private half stored only as an envelope, the directory route lists public keys only and is signed over the asked host, rotation (grace, prune, aged key rotates itself, emergency prune).
 lib/agentweb/__tests__/identity-keys-db.test.ts
+# Phase 21A round 2 (WS=agentweb): delegation records as the app role — stored with the receipt and mirrored in the audit chain entry (who delegated, run, scope, expiry, tier decision), FORCE RLS (no GUC sees nothing, another workspace sees nothing, a cross-workspace write is refused).
+lib/agentweb/__tests__/delegation-db.test.ts

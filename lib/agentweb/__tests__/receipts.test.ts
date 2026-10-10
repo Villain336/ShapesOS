@@ -102,3 +102,56 @@ describe("recordReceipt", () => {
     assert.equal(out.alg, "none");
   });
 });
+
+// ---- round 2: the delegation record on every agent web action ----
+describe("recordReceipt with a delegation", () => {
+  const DELEGATION = { delegatedBy: "user_1", runId: "run_9", agent: "lead", scope: { origins: ["https://a.test"], classes: ["benign"] }, expiresAt: new Date("2026-10-10T12:05:00.000Z") };
+  const STEP = { action: "click" as const, ref: "e3", name: "Send", klass: "send", tier: 2, decision: "confirmed" };
+  function rig(over: Partial<ReceiptDeps> = {}) {
+    const delegations: Array<Record<string, unknown>> = [];
+    const audits: Array<{ detail: Record<string, unknown> }> = [];
+    const deps: ReceiptDeps = {
+      secret: "s".repeat(32),
+      store: async () => undefined,
+      audit: async (e) => {
+        audits.push(e);
+        return { id: "aud_1" };
+      },
+      delegate: async (d) => {
+        delegations.push(d as unknown as Record<string, unknown>);
+        return "dlg_1";
+      },
+      ...over,
+    };
+    return { deps, delegations, audits };
+  }
+
+  it("stores who delegated, the scope, the run, the expiry and the tier decision, linked to the receipt", async () => {
+    const r = rig();
+    const rec = await recordReceipt(r.deps, { workspaceId: "w", actor: "agent:lead", url: "https://a.test/x", html: "x", fetchedAt: AT, step: STEP, delegation: DELEGATION });
+    assert.equal(r.delegations.length, 1);
+    const d = r.delegations[0]!;
+    assert.deepEqual(
+      { by: d.delegatedBy, run: d.runId, agent: d.agent, scope: d.scope, exp: (d.expiresAt as Date).toISOString(), tier: d.tier, decision: d.decision, action: d.action, origin: d.origin, capture: d.captureId },
+      { by: "user_1", run: "run_9", agent: "lead", scope: { origins: ["https://a.test"], classes: ["benign"] }, exp: "2026-10-10T12:05:00.000Z", tier: 2, decision: "confirmed", action: "click", origin: "https://a.test", capture: rec.id },
+    );
+    assert.match(String(d.id), /^dlg_[0-9a-f]{20}$/);
+  });
+
+  it("goes into the audit chain too, so the chain alone can answer who delegated this", async () => {
+    const r = rig();
+    await recordReceipt(r.deps, { workspaceId: "w", actor: "agent:lead", url: "https://a.test/x", html: "x", fetchedAt: AT, step: STEP, delegation: DELEGATION });
+    const detail = r.audits[0]!.detail as { delegation: Record<string, unknown> };
+    assert.deepEqual(detail.delegation, { id: r.delegations[0]!.id, delegatedBy: "user_1", runId: "run_9", expiresAt: "2026-10-10T12:05:00.000Z", scopeOrigins: ["https://a.test"] });
+  });
+
+  it("no delegation, no record; a failing delegation store never loses the receipt", async () => {
+    const none = rig();
+    await recordReceipt(none.deps, { workspaceId: "w", actor: "a", url: "https://a.test/", html: "x", fetchedAt: AT, step: STEP });
+    assert.equal(none.delegations.length, 0);
+    const broken = rig({ delegate: async () => { throw new Error("db"); } });
+    const rec = await recordReceipt(broken.deps, { workspaceId: "w", actor: "a", url: "https://a.test/", html: "x", fetchedAt: AT, step: STEP, delegation: DELEGATION });
+    assert.match(rec.id, /^cap_/);
+    assert.match(String(rec.auditError ?? ""), /delegation/i);
+  });
+});

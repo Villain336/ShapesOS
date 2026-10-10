@@ -8,6 +8,7 @@
 import { httpErrorResponse } from "@/lib/enrichment/guard";
 import { answerActor } from "@/lib/answer/http";
 import { getReceiptFor } from "@/lib/answer/service";
+import { delegationForCapture } from "@/lib/agentweb/identity/delegation-store";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         verified: cap.verified,
         retentionUntil: cap.retentionUntil,
         screenshotRef: cap.screenshotRef ?? null,
+        // Who delegated the action this receipt belongs to, under what scope, until when (round 2).
+        delegation: await delegationForCapture(workspace.id, cap.id).then((d) => (d ? { ...d, delegatedBy: undefined, byYou: d.delegatedBy === user.id } : null)),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

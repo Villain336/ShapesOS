@@ -10,7 +10,7 @@
 // Honesty: with no signing secret configured the capture says alg "none" and
 // never verifies. A receipt is never reported as signed when it is not.
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { parseHtml, visibleText } from "./html";
 import { Redactor } from "./redact";
 
@@ -80,18 +80,73 @@ export interface StepRecord {
   decision: string;
 }
 
+/** Who the agent was acting for, and under what scope (Phase 21A round 2, M4). */
+export interface DelegationInput {
+  delegatedBy: string;
+  runId?: string | null;
+  agent: string;
+  scope: { origins: string[]; classes: string[] };
+  expiresAt: Date;
+}
+
+/** One agent web action's delegation record (agentweb_delegations). */
+export interface DelegationRecord extends DelegationInput {
+  id: string;
+  workspaceId: string;
+  action: string;
+  url: string;
+  origin: string;
+  tier: number;
+  decision: string;
+  reason: string | null;
+  captureId: string;
+  auditEventId: string | null;
+}
+
 export interface ReceiptDeps {
   secret: string | null;
   store: (c: SignedCapture) => Promise<void>;
+  /** Stores the delegation record (returns its id). Optional: callers without a delegation skip it. */
+  delegate?: (d: DelegationRecord) => Promise<unknown>;
   audit: (e: { workspaceId: string; actor: string; action: string; entityType: string; entityId: string; detail: Record<string, unknown> }) => Promise<unknown>;
 }
 
 export async function recordReceipt(
   deps: ReceiptDeps,
-  input: { workspaceId: string; actor: string; url: string; html: string; fetchedAt: Date; screenshotRef?: string; step: StepRecord; text?: string },
+  input: { workspaceId: string; actor: string; url: string; html: string; fetchedAt: Date; screenshotRef?: string; step: StepRecord; text?: string; delegation?: DelegationInput },
 ): Promise<SignedCapture & { auditError?: string }> {
   const signed = signCapture(captureOf({ url: input.url, html: input.html, fetchedAt: input.fetchedAt, screenshotRef: input.screenshotRef, text: input.text }), deps.secret);
   await deps.store(signed);
+  let record: DelegationRecord | null = null;
+  let delegationError: string | null = null;
+  if (input.delegation && deps.delegate) {
+    const origin = (() => {
+      try {
+        return new URL(input.url).origin;
+      } catch {
+        return "";
+      }
+    })();
+    record = {
+      ...input.delegation,
+      id: `dlg_${randomBytes(10).toString("hex")}`,
+      workspaceId: input.workspaceId,
+      action: input.step.action,
+      url: signed.url,
+      origin,
+      tier: input.step.tier,
+      decision: input.step.decision,
+      reason: null,
+      captureId: signed.id,
+      auditEventId: null,
+    };
+    try {
+      await deps.delegate(record);
+    } catch (err) {
+      delegationError = `delegation record not stored: ${err instanceof Error ? err.message : String(err)}`;
+      record = null;
+    }
+  }
   try {
     await deps.audit({
       workspaceId: input.workspaceId,
@@ -111,9 +166,10 @@ export async function recordReceipt(
         klass: input.step.klass,
         tier: input.step.tier,
         decision: input.step.decision,
+        ...(record ? { delegation: { id: record.id, delegatedBy: record.delegatedBy, runId: record.runId ?? null, expiresAt: record.expiresAt.toISOString(), scopeOrigins: record.scope.origins } } : {}),
       },
     });
-    return signed;
+    return delegationError ? { ...signed, auditError: delegationError } : signed;
   } catch (err) {
     return { ...signed, auditError: err instanceof Error ? err.message : String(err) };
   }

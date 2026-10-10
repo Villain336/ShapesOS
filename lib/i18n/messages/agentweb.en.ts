@@ -97,6 +97,11 @@ export const agentwebEn = {
       unsigned: "Not signed: no signing secret was configured when this was stored",
       broken: "The signature does not verify: the stored record changed",
       keptUntil: "Kept until {date}",
+      delegation: "Delegation",
+      delegatedByYou: "{agent} acted for you",
+      delegatedByMember: "{agent} acted for a member of this workspace",
+      scope: "scope: {origins}",
+      until: "until {date}",
       via: "Stored from",
     },
     history: {
