@@ -160,9 +160,17 @@ export function askSite(docs: SiteDoc[], site: SiteInfo, params: AskParams): Ask
     const picked: { s: string; url: string; n: number }[] = [];
     for (const h of hits.slice(0, 3)) {
       let best: { s: string; n: number } | null = null;
+      const title = clean(h.doc.name).toLowerCase();
       for (const s of sentences(h.doc.text)) {
+        if (s.replace(/[.!?]+$/, "").toLowerCase() === title) continue; // the heading repeats the name, it says nothing
         const n = words(s).filter((w) => terms.has(w)).length;
         if (n > 0 && (!best || n > best.n)) best = { s, n };
+      }
+      // A page whose NAME matched but whose sentences share no word with the question
+      // (an "Opening hours" page that just lists the hours): its first real sentence is the answer.
+      if (!best && h === hits[0]) {
+        const first = sentences(h.doc.text).find((s) => s.replace(/[.!?]+$/, "").toLowerCase() !== title);
+        if (first) best = { s: first, n: 0.5 };
       }
       if (best) picked.push({ ...best, url: h.doc.url });
     }
