@@ -66,6 +66,8 @@ export interface Claim {
   supportedBy?: number[];
   /** Why a claim is unsupported (plain words). */
   reason?: string;
+  /** The same reason as a code, so a screen can say it in the person's language. */
+  reasonCode?: "no_citation" | "bad_cite" | "figure" | "quote" | "overlap";
 }
 
 export type QueryKind = "lookup" | "research" | "compare" | "local" | "do" | "workspace";

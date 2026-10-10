@@ -82,3 +82,13 @@ describe("extractClaims (no model: an extract of the top sources, not a written 
     assert.ok(got.length > 0 && got.every((c) => c.status === "supported"));
   });
 });
+
+describe("verifyClaims: reason codes (so a screen can say it in the person's language)", () => {
+  it("each unsupported reason has a stable code", () => {
+    const got = verifyClaims([claim("x is here.", []), claim("A crown costs £450.", [7]), claim("A crown costs £500.", [2]), claim("A crown costs £450.", [2], ["Crowns are free for everyone"]), claim("The practice offers free parking.", [1])], [S1, S2]);
+    assert.deepEqual(got.map((c) => c.reasonCode), ["no_citation", "bad_cite", "figure", "quote", "overlap"]);
+  });
+  it("a supported claim has none", () => {
+    assert.equal(verifyClaims([claim("Check-ups cost £26.80.", [2])], [S1, S2])[0]!.reasonCode, undefined);
+  });
+});

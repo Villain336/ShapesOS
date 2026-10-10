@@ -35,9 +35,12 @@ function keyWords(s: string): string[] {
 }
 const flat = (s: string) => norm(s).replace(/[^a-z0-9:.,]+/g, " ").replace(/\s+/g, " ").trim();
 
+type ReasonCode = NonNullable<Claim["reasonCode"]>;
+
 interface Check {
   ok: boolean;
   reason: string;
+  code?: ReasonCode;
   rank: number;
 }
 
@@ -46,26 +49,26 @@ function checkAgainst(claim: Claim, source: Source): Check {
   const stems = new Set(keyWords(source.text));
   const bodyFigures = new Set(figures(source.text));
   const missing = figures(claim.text).find((f) => !bodyFigures.has(f.replace(/\.$/, "")) && !text.includes(f));
-  if (missing) return { ok: false, reason: `The figure ${missing.replace(/[.,]$/, "")} is not in the cited source.`, rank: 3 };
+  if (missing) return { ok: false, reason: `The figure ${missing.replace(/[.,]$/, "")} is not in the cited source.`, code: "figure", rank: 3 };
   const quotes = claim.evidence.map(flat).filter((q) => q.length >= 12);
-  if (claim.evidence.length > 0 && !quotes.some((q) => text.includes(q))) return { ok: false, reason: "The quote given is not in the cited source.", rank: 2 };
+  if (claim.evidence.length > 0 && !quotes.some((q) => text.includes(q))) return { ok: false, reason: "The quote given is not in the cited source.", code: "quote", rank: 2 };
   const words = keyWords(claim.text);
   const covered = words.filter((w) => stems.has(w)).length;
-  if (words.length > 0 && covered / words.length < 0.6) return { ok: false, reason: "The cited source does not mention this.", rank: 1 };
+  if (words.length > 0 && covered / words.length < 0.6) return { ok: false, reason: "The cited source does not mention this.", code: "overlap", rank: 1 };
   return { ok: true, reason: "", rank: 0 };
 }
 
 export function verifyClaims(claims: Claim[], sources: Source[]): Claim[] {
   const byId = new Map(sources.map((s) => [s.id, s]));
   return claims.map((c) => {
-    if (c.cites.length === 0) return { ...c, status: "unsupported", reason: "No source is cited for this." };
+    if (c.cites.length === 0) return { ...c, status: "unsupported", reason: "No source is cited for this.", reasonCode: "no_citation" };
     const cited = c.cites.map((id) => byId.get(id)).filter((s): s is Source => !!s);
-    if (cited.length === 0) return { ...c, status: "unsupported", reason: "It cites a source that is not in the list." };
+    if (cited.length === 0) return { ...c, status: "unsupported", reason: "It cites a source that is not in the list.", reasonCode: "bad_cite" };
     const checks = cited.map((s) => ({ s, ...checkAgainst(c, s) }));
     const passing = checks.filter((x) => x.ok);
     if (passing.length) return { ...c, status: "supported", supportedBy: passing.map((x) => x.s.id), reason: undefined };
     const worst = checks.sort((a, b) => b.rank - a.rank)[0]!;
-    return { ...c, status: "unsupported", supportedBy: undefined, reason: worst.reason };
+    return { ...c, status: "unsupported", supportedBy: undefined, reason: worst.reason, reasonCode: worst.code };
   });
 }
 

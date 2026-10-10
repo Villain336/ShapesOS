@@ -15,6 +15,8 @@ import { contentEn } from "./content.en";
 import { trustEn } from "./trust.en";
 // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
 import { flowEn } from "./flow.en";
+// Phase 21A (WS=agentweb): Ask (the answer-and-action engine).
+import { agentwebEn } from "./agentweb.en";
 
 export const en = {
   common: {
@@ -100,6 +102,8 @@ export const en = {
       "/dashboard/calendar": { label: "Calendar", description: "Your calendars, bookings and events" },
       "/dashboard/contacts": { label: "Contacts", description: "One address book for everyone you know" },
       "/dashboard/reminders": { label: "Reminders", description: "Your to-dos with due times" },
+      // Phase 21A (WS=agentweb)
+      "/dashboard/ask": { label: "Ask", description: "Sourced answers from the web and your workspace" },
       "/dashboard/prospects": { label: "Prospects", description: "Prospect lists and enrichment" },
       "/dashboard/nurture": { label: "Nurture", description: "Nurture sequences and broadcasts" },
       "/dashboard/projects": { label: "SEO projects", description: "Sites, keywords, rankings, content" },
@@ -998,6 +1002,8 @@ export const en = {
   trust: trustEn,
   // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
   flow: flowEn,
+  // Phase 21A (WS=agentweb): Ask.
+  ...agentwebEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

@@ -34,7 +34,7 @@ export async function workspaceModelPort(ctx: { workspaceId: string; projectId?:
     async complete(w, req) {
       const llm = await getLlmProviderForWorkspace(WORKLOAD[w], { workspaceId: ctx.workspaceId, projectId: ctx.projectId ?? null, actorId: ctx.userId, runId: ctx.runId ?? null, agentKey: "answer", billing: "tokens" });
       const res = await llm.chat({ system: req.system, messages: [{ role: "user", content: req.user }], maxTokens: req.maxTokens });
-      const charge = llmCallCharge({ model: res.model, usage: res.usage, keySource: llm.keySource, serviceTier: res.serviceTier, billing: "tokens" });
+      const charge = llmCallCharge({ model: res.model, usage: res.usage, keySource: llm.keySource ?? undefined, serviceTier: res.serviceTier, billing: "tokens" });
       return { text: res.content.map((b) => (b.type === "text" ? b.text : "")).join(""), credits: charge.credits, costMicroUsd: res.costMicroUsd ?? charge.billableCostMicroUsd };
     },
   };
