@@ -7,6 +7,7 @@ import type { Catalogue } from "./en";
 import { commsEs } from "./comms.es";
 // Phase 18.2 (WS=content): las apps de este flujo, en su propio archivo.
 import { contentEs } from "./content.es";
+import { driveEs } from "./drive.es";
 // Phase 18.3 (WS=trust)
 import { trustEs } from "./trust.es";
 // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
@@ -982,6 +983,7 @@ export const es: Catalogue = {
 
   // Phase 18.2 (WS=content): Notas, Archivos, colaboración, Monitor de actividad, Terminal, Tienda.
   ...contentEs,
+  ...driveEs,
 
   // Phase 18.3 (WS=trust): Ajustes → Tú (Teclado, Privacidad), el centro de privacidad y seguridad, Notificaciones 2.0.
   trust: trustEs,

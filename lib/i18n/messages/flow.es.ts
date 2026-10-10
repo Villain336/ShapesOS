@@ -321,6 +321,10 @@ export const flowEs: Catalogue<typeof flowEn> = {
     canTitle: "Se puede deshacer ({count})",
     cannotTitle: "No se puede deshacer ({count})",
     kinds: {
+      drive_create: "Un archivo que guardó",
+      drive_update: "Un archivo que reemplazó",
+      drive_move: "Un archivo que movió",
+      drive_trash: "Un archivo que envió a la papelera",
       note: "Una nota que escribió",
       reminder: "Un recordatorio que creó",
       file_share: "Un enlace para compartir que creó",

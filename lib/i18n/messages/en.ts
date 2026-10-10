@@ -11,6 +11,7 @@
 import { commsEn } from "./comms.en";
 // Phase 18.2 (WS=content): the core apps' strings live in their own file.
 import { contentEn } from "./content.en";
+import { driveEn } from "./drive.en";
 // Phase 18.3 (WS=trust): system services strings live in their own file.
 import { trustEn } from "./trust.en";
 // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
@@ -994,6 +995,7 @@ export const en = {
 
   // Phase 18.2 (WS=content): Notes, Files, collaboration, Activity Monitor, Terminal, Store.
   ...contentEn,
+  ...driveEn,
 
   // Phase 18.3 (WS=trust): Settings → You (Keyboard, Privacy), the Privacy & Security center, Notifications 2.0.
   trust: trustEn,
