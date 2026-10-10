@@ -35,7 +35,7 @@ const PRICES = R("https://riverside.test/prices", "Prices", "A crown costs £319
 function model(replies: { plan?: unknown; rerank?: unknown; synth?: unknown }, creditsPerCall = 1, live = true): ModelPort & { seen: Array<{ workload: string; user: string }> } {
   const seen: Array<{ workload: string; user: string }> = [];
   return {
-    live,
+    canRun: () => live,
     seen,
     estimateCredits: () => creditsPerCall,
     async complete(workload, req) {

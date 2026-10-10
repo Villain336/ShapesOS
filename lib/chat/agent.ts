@@ -133,6 +133,8 @@ import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
 // Phase 21A (WS=agentweb): the governed browser (snapshot / navigate / click / type / tabs / screenshot / web_channels).
 import "@/lib/agentweb/tools";
+// Phase 21A (WS=agentweb): ask_web and web_monitor_page.
+import "@/lib/answer/tools";
 // Phase 9 (apps): the mini-app tools register themselves on import.
 import "@/lib/apps/tools";
 // Phase 11 (seotools): structured data + sitemap tools (group "site").

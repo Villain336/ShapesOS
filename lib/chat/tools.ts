@@ -1240,6 +1240,9 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   browser_tabs: "web",
   browser_screenshot: "web",
   web_channels: "web",
+  // Phase 21A (WS=agentweb): the answer-and-action engine (lib/answer/tools.ts).
+  ask_web: "web",
+  web_monitor_page: "web",
   // Phase 8: code tools, registered by lib/sandbox/tools.ts (run in the
   // agent run's sandbox, never on the host).
   read_file: "code",
@@ -1370,6 +1373,10 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // unclear steps always ask even under an Auto-run rule (lib/agentweb/kernel.ts).
   browser_click: "browser_click",
   browser_type: "browser_type",
+  // Phase 21A: a search (Tier 0 by its action name, metered, asks until a rule says Auto-run);
+  // watching a page is a standing task on someone else's site (Tier 2, always asks unless a rule allows).
+  ask_web: "search_web_answer",
+  web_monitor_page: "write_web_monitor",
   // Phase 8: sandbox edits are Tier 0 (local to an isolated, checkpointed
   // sandbox — a per-agent auto rule may apply); commands are Tier 2 (ask).
   write_file: "edit_sandbox_files",

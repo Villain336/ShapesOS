@@ -77,6 +77,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // Phase 21A (WS=agentweb): the governed browser. Auto-run covers ordinary steps only; the page decides.
   { action: "browser_click", label: "Click in the governed browser", description: "Click a link or button on a page. Ordinary clicks can run on their own; sending, posting and unclear steps always ask; paying, removing and signing in are never done for you." },
   { action: "browser_type", label: "Type in the governed browser", description: "Type into a field on a page. Never a password or card field; text taken from a web page asks first." },
+  { action: "search_web_answer", label: "Answer a question from the web", description: "Search the web and write a sourced answer (metered; a hard credit cap applies to each answer)." },
+  { action: "write_web_monitor", label: "Watch a web page", description: "Check a page on a schedule and record what changed (Context.dev)." },
   { action: "edit_sandbox_files", label: "Edit files in the code sandbox", description: "Write or change files inside the run's isolated sandbox (checkpointed; nothing leaves it)." },
   { action: "run_sandbox_command", label: "Run a command in the code sandbox", description: "Run a shell command or the tests inside the run's isolated sandbox." },
   // Phase 9 (apps): internal mini-apps (lib/apps/tools.ts).

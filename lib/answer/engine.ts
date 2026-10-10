@@ -30,9 +30,9 @@ import type { AnswerPayload, Claim, Plan, QueryKind, SearchProvider, SearchResul
 
 export type ModelWorkload = "plan" | "rerank" | "synth";
 
-/** A language model behind the router. `live` is false when none is configured. */
+/** A language model behind the router. `canRun` is false for a workload with no live model configured. */
 export interface ModelPort {
-  readonly live: boolean;
+  canRun(workload: ModelWorkload): boolean;
   /** Worst-case credits for a call of this size (0 on the workspace's own key). */
   estimateCredits(workload: ModelWorkload, inputChars: number, maxTokens: number): number;
   complete(workload: ModelWorkload, req: { system: string; user: string; maxTokens: number }): Promise<{ text: string; credits: number; costMicroUsd: number }>;
@@ -162,7 +162,7 @@ export async function answerQuestion(req: AnswerRequest, deps: EngineDeps): Prom
 
   const ask = async (workload: ModelWorkload, system: string, user: string, maxTokens: number): Promise<string | null> => {
     const m = deps.model;
-    if (!m?.live) return null;
+    if (!m?.canRun(workload)) return null;
     const est = m.estimateCredits(workload, system.length + user.length, maxTokens);
     if (!budget.reserve(est)) {
       if (!partial) notes.push(capNote());
@@ -277,7 +277,7 @@ export async function answerQuestion(req: AnswerRequest, deps: EngineDeps): Prom
       claims = extractClaims(req.question, sources);
     }
   } else if (!partial) {
-    if (!deps.model?.live) notes.push("No language model is configured, so this is an extract of the top results, not a written answer.");
+    if (!deps.model?.canRun("synth")) notes.push("No language model is configured, so this is an extract of the top results, not a written answer.");
     claims = extractClaims(req.question, sources);
   }
   claims = verifyClaims(claims, sources);
