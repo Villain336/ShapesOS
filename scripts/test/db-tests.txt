@@ -261,3 +261,6 @@ lib/drive/__tests__/uploads-db.test.ts
 
 # Phase 21B (drive): the native FileProvider (Postgres registry + local disk) passes the provider contract suite and is scoped to its actor.
 lib/drive/providers/__tests__/native-db.test.ts
+
+# Phase 21B (drive): the agent's Drive tools through executeTool — grants (own run folder + attached folders; look-alikes, other runs, .., other homes refused), the person's own rights, tier by effect (save Tier 1; replace/move/trash Tier 2 never auto; many Tier 3), and "Undo this agent run" for files (create/replace/move/trash; a later edit by a person is left alone).
+lib/drive/__tests__/agent-tools-db.test.ts

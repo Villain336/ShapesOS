@@ -16,7 +16,7 @@ describe("grantRoots", () => {
 describe("where an agent may write", () => {
   it("creates new files inside its own workspace and attached folders at Tier 1", () => {
     for (const path of ["/agents/run1/out.csv", "/shared/Reports/q3/summary.md", "/home/u1/Work/notes.txt"]) {
-      assert.deepEqual(checkAgentFileOp(grant, { kind: "create", path }), { allowed: true, tier: 1, action: "save agent file", alwaysAsk: false }, path);
+      assert.deepEqual(checkAgentFileOp(grant, { kind: "create", path }), { allowed: true, tier: 1, action: "save_agent_file", alwaysAsk: false }, path);
     }
   });
 
@@ -49,17 +49,17 @@ describe("where an agent may write", () => {
 
 describe("tiers by effect (the platform sets them, not the tool)", () => {
   it("reading inside the grant is Tier 0; reading outside is refused", () => {
-    assert.deepEqual(checkAgentFileOp(grant, { kind: "read", path: "/shared/Reports/a.md" }), { allowed: true, tier: 0, action: "read agent file", alwaysAsk: false });
+    assert.deepEqual(checkAgentFileOp(grant, { kind: "read", path: "/shared/Reports/a.md" }), { allowed: true, tier: 0, action: "read_agent_file", alwaysAsk: false });
     assert.equal(checkAgentFileOp(grant, { kind: "read", path: "/shared/Other/a.md" }).allowed, false);
   });
 
   it("overwriting an existing file is Tier 2 and always asks, never auto", () => {
-    assert.deepEqual(checkAgentFileOp(grant, { kind: "overwrite", path: "/shared/Reports/a.md" }), { allowed: true, tier: 2, action: "replace agent file", alwaysAsk: true });
+    assert.deepEqual(checkAgentFileOp(grant, { kind: "overwrite", path: "/shared/Reports/a.md" }), { allowed: true, tier: 2, action: "replace_agent_file", alwaysAsk: true });
   });
 
   it("moving a file or sending one file to the trash is Tier 2 and always asks", () => {
-    assert.deepEqual(checkAgentFileOp(grant, { kind: "move", path: "/shared/Reports/a.md", to: "/shared/Reports/b.md" }), { allowed: true, tier: 2, action: "move agent file", alwaysAsk: true });
-    assert.deepEqual(checkAgentFileOp(grant, { kind: "trash", path: "/shared/Reports/a.md", count: 1 }), { allowed: true, tier: 2, action: "trash agent file", alwaysAsk: true });
+    assert.deepEqual(checkAgentFileOp(grant, { kind: "move", path: "/shared/Reports/a.md", to: "/shared/Reports/b.md" }), { allowed: true, tier: 2, action: "move_agent_file", alwaysAsk: true });
+    assert.deepEqual(checkAgentFileOp(grant, { kind: "trash", path: "/shared/Reports/a.md", count: 1 }), { allowed: true, tier: 2, action: "trash_agent_file", alwaysAsk: true });
   });
 
   it("a move must stay inside the grant at both ends", () => {
@@ -70,7 +70,7 @@ describe("tiers by effect (the platform sets them, not the tool)", () => {
   it("trashing many files at once is Tier 3 (never auto, a person confirms on the card)", () => {
     assert.equal(BULK_TRASH_MIN, 5);
     const v = checkAgentFileOp(grant, { kind: "trash", path: "/shared/Reports/old", count: 5 });
-    assert.deepEqual(v, { allowed: true, tier: 3, action: "delete many agent files", alwaysAsk: true });
+    assert.deepEqual(v, { allowed: true, tier: 3, action: "delete_many_agent_files", alwaysAsk: true });
     assert.equal((checkAgentFileOp(grant, { kind: "trash", path: "/shared/Reports/old", count: 4 }) as { tier: number }).tier, 2);
   });
 

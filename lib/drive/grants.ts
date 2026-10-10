@@ -15,7 +15,7 @@
 //   - a move must stay inside the grant at both ends.
 // Every accepted change creates a file version (lib/filesystem/versions.ts), so
 // "Undo this agent run" can put the bytes back (lib/timemachine/undo.ts).
-// The `action` strings are the kinds fed to evaluateTier (lib/orchestrator/
+// The `action` strings are the automation action keys (lib/automation/actions.ts) fed to evaluateTier (lib/orchestrator/
 // authority.ts); the word "delete" appears only in the Tier-3 one on purpose.
 
 import { collisionKey, normalizeFolderPath, normalizeLogicalPath } from "../filesystem/paths";
@@ -69,19 +69,19 @@ export function checkAgentFileOp(g: AgentGrant, op: AgentFileOp): AgentFileVerdi
   }
   switch (op.kind) {
     case "read":
-      return { allowed: true, tier: 0, action: "read agent file", alwaysAsk: false };
+      return { allowed: true, tier: 0, action: "read_agent_file", alwaysAsk: false };
     case "create":
-      return { allowed: true, tier: 1, action: "save agent file", alwaysAsk: false };
+      return { allowed: true, tier: 1, action: "save_agent_file", alwaysAsk: false };
     case "write":
       return op.exists ? checkAgentFileOp(g, { kind: "overwrite", path: op.path }) : checkAgentFileOp(g, { kind: "create", path: op.path });
     case "overwrite":
-      return { allowed: true, tier: 2, action: "replace agent file", alwaysAsk: true };
+      return { allowed: true, tier: 2, action: "replace_agent_file", alwaysAsk: true };
     case "move":
       if (!granted(g, op.to)) return { allowed: false, reason: "The destination is outside the folders this run was given." };
-      return { allowed: true, tier: 2, action: "move agent file", alwaysAsk: true };
+      return { allowed: true, tier: 2, action: "move_agent_file", alwaysAsk: true };
     case "trash":
       return op.count >= BULK_TRASH_MIN
-        ? { allowed: true, tier: 3, action: "delete many agent files", alwaysAsk: true }
-        : { allowed: true, tier: 2, action: "trash agent file", alwaysAsk: true };
+        ? { allowed: true, tier: 3, action: "delete_many_agent_files", alwaysAsk: true }
+        : { allowed: true, tier: 2, action: "trash_agent_file", alwaysAsk: true };
   }
 }
