@@ -14,7 +14,9 @@
 // between what the client signs and what it sends fails here (403).
 
 import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createHash, randomUUID } from "node:crypto";
 import { s3CanonicalPath, s3CanonicalQuery, sha256Hex, signV4 } from "./storage";
+import { presignV4 } from "./s3-presign";
 
 export interface FakeS3Options {
   bucket: string;
@@ -30,6 +32,8 @@ export interface FakeS3 {
   endpoint: string;
   objects: Map<string, { body: Buffer; contentType: string; lastModified: Date }>;
   requests: Array<{ method: string; path: string; signed: boolean }>;
+  /** Phase 21B: in-flight multipart uploads (uploadId -> parts), for tests to inspect. */
+  uploads: Map<string, { key: string; contentType: string; parts: Map<number, { body: Buffer; etag: string }> }>;
   close(): Promise<void>;
 }
 
@@ -87,8 +91,45 @@ function verifySignature(req: IncomingMessage, rawPath: string, rawQuery: string
   return expected.signature === signature && expected.headers.authorization.includes(`SignedHeaders=${signedHeaders}`);
 }
 
+/** Verify a presigned (query-string) request, the way S3 does. */
+function verifyPresigned(req: IncomingMessage, rawPath: string, rawQuery: string, opts: FakeS3Options): boolean {
+  const q: Record<string, string> = {};
+  for (const part of rawQuery.split("&")) {
+    const eq = part.indexOf("=");
+    q[decodeURIComponent(eq < 0 ? part : part.slice(0, eq))] = eq < 0 ? "" : decodeURIComponent(part.slice(eq + 1));
+  }
+  const cred = /^([^/]+)\/(\d{8})\/([^/]+)\/s3\/aws4_request$/.exec(q["X-Amz-Credential"] ?? "");
+  if (!cred || q["X-Amz-Algorithm"] !== "AWS4-HMAC-SHA256" || q["X-Amz-SignedHeaders"] !== "host") return false;
+  if (cred[1] !== opts.accessKeyId || cred[3] !== (opts.region ?? "us-east-1")) return false;
+  const dm = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(q["X-Amz-Date"] ?? "");
+  if (!dm) return false;
+  const signedAt = new Date(Date.UTC(+dm[1]!, +dm[2]! - 1, +dm[3]!, +dm[4]!, +dm[5]!, +dm[6]!));
+  const expires = Number(q["X-Amz-Expires"]);
+  if (!Number.isInteger(expires) || Date.now() > signedAt.getTime() + expires * 1000 || Date.now() < signedAt.getTime() - 15 * 60_000) return false;
+  const extra: Record<string, string> = {};
+  for (const [k, v] of Object.entries(q)) {
+    if (k.startsWith("X-Amz-")) continue;
+    extra[k] = v;
+  }
+  const token = q["X-Amz-Security-Token"];
+  const expected = presignV4({
+    method: req.method ?? "GET",
+    host: String(req.headers.host ?? ""),
+    canonicalPath: s3CanonicalPath(decodeURIComponent(rawPath)),
+    query: extra,
+    region: cred[3]!,
+    credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey, sessionToken: token },
+    now: signedAt,
+    expiresSec: expires,
+  });
+  return expected.signature === q["X-Amz-Signature"];
+}
+
+const MIN_PART = 5 * 1024 * 1024;
+
 export async function startFakeS3(opts: FakeS3Options): Promise<FakeS3> {
   const objects = new Map<string, { body: Buffer; contentType: string; lastModified: Date }>();
+  const uploads: FakeS3["uploads"] = new Map();
   const requests: FakeS3["requests"] = [];
   const server = createServer(async (req, res) => {
     const url = req.url ?? "/";
@@ -96,7 +137,7 @@ export async function startFakeS3(opts: FakeS3Options): Promise<FakeS3> {
     const rawPath = q < 0 ? url : url.slice(0, q);
     const rawQuery = q < 0 ? "" : url.slice(q + 1);
     const body = await readBody(req);
-    const signed = verifySignature(req, rawPath, rawQuery, body, opts);
+    const signed = /(^|&)X-Amz-Signature=/.test(rawQuery) ? verifyPresigned(req, rawPath, rawQuery, opts) : verifySignature(req, rawPath, rawQuery, body, opts);
     requests.push({ method: req.method ?? "", path: rawPath, signed });
     if (!signed) {
       res.writeHead(403, { "content-type": "application/xml" });
@@ -155,6 +196,65 @@ export async function startFakeS3(opts: FakeS3Options): Promise<FakeS3> {
       return;
     }
     const obj = objects.get(key);
+    // ---- multipart (Phase 21B) -------------------------------------------------
+    const mp = new URLSearchParams(rawQuery);
+    if (mp.has("uploads") && req.method === "POST") {
+      const id = randomUUID();
+      uploads.set(id, { key, contentType: String(req.headers["content-type"] ?? "application/octet-stream"), parts: new Map() });
+      res.writeHead(200, { "content-type": "application/xml" });
+      res.end(`<?xml version="1.0"?><InitiateMultipartUploadResult><Bucket>${opts.bucket}</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
+      return;
+    }
+    const uploadId = mp.get("uploadId");
+    if (uploadId) {
+      const up = uploads.get(uploadId);
+      if (!up || up.key !== key) return void res.writeHead(404, { "content-type": "application/xml" }).end("<Error><Code>NoSuchUpload</Code></Error>");
+      if (req.method === "PUT" && mp.has("partNumber")) {
+        const n = Number(mp.get("partNumber"));
+        if (!Number.isInteger(n) || n < 1 || n > 10000) return void res.writeHead(400).end("<Error><Code>InvalidArgument</Code></Error>");
+        const etag = `"${createHash("md5").update(body).digest("hex")}"`;
+        up.parts.set(n, { body, etag });
+        res.writeHead(200, { etag, "access-control-expose-headers": "ETag" }).end();
+        return;
+      }
+      if (req.method === "GET") {
+        const marker = Number(mp.get("part-number-marker") ?? 0);
+        const max = Math.min(Number(mp.get("max-parts") ?? 1000), 1000);
+        const nums = [...up.parts.keys()].sort((a, b) => a - b).filter((n) => n > marker);
+        const page = nums.slice(0, max);
+        const truncated = nums.length > page.length;
+        res.writeHead(200, { "content-type": "application/xml" });
+        res.end(
+          `<?xml version="1.0"?><ListPartsResult><Key>${xmlEsc(key)}</Key><UploadId>${uploadId}</UploadId>` +
+            page.map((n) => `<Part><PartNumber>${n}</PartNumber><ETag>${xmlEsc(up.parts.get(n)!.etag)}</ETag><Size>${up.parts.get(n)!.body.length}</Size></Part>`).join("") +
+            `<IsTruncated>${truncated}</IsTruncated>${truncated ? `<NextPartNumberMarker>${page[page.length - 1]}</NextPartNumberMarker>` : ""}</ListPartsResult>`,
+        );
+        return;
+      }
+      if (req.method === "POST") {
+        const wanted = [...body.toString("utf8").matchAll(/<Part><PartNumber>(\d+)<\/PartNumber><ETag>([^<]*)<\/ETag><\/Part>/g)].map((m) => ({ n: Number(m[1]), etag: m[2]!.replace(/&quot;/g, '"') }));
+        const fail = (code: string) => void res.writeHead(400, { "content-type": "application/xml" }).end(`<Error><Code>${code}</Code></Error>`);
+        if (wanted.length === 0) return fail("MalformedXML");
+        for (let i = 0; i < wanted.length; i++) {
+          const w = wanted[i]!;
+          if (i > 0 && w.n <= wanted[i - 1]!.n) return fail("InvalidPartOrder");
+          const have = up.parts.get(w.n);
+          if (!have || have.etag !== w.etag) return fail("InvalidPart");
+          if (i < wanted.length - 1 && have.body.length < MIN_PART) return fail("EntityTooSmall");
+        }
+        const assembled = Buffer.concat(wanted.map((w) => up.parts.get(w.n)!.body));
+        objects.set(key, { body: assembled, contentType: up.contentType, lastModified: new Date() });
+        uploads.delete(uploadId);
+        res.writeHead(200, { "content-type": "application/xml" });
+        res.end(`<?xml version="1.0"?><CompleteMultipartUploadResult><Key>${xmlEsc(key)}</Key><ETag>"fake-multipart"</ETag></CompleteMultipartUploadResult>`);
+        return;
+      }
+      if (req.method === "DELETE") {
+        uploads.delete(uploadId);
+        res.writeHead(204).end();
+        return;
+      }
+    }
     switch (req.method) {
       case "PUT":
         objects.set(key, { body, contentType: String(req.headers["content-type"] ?? "application/octet-stream"), lastModified: new Date() });
@@ -196,6 +296,7 @@ export async function startFakeS3(opts: FakeS3Options): Promise<FakeS3> {
     endpoint: `http://127.0.0.1:${port}`,
     objects,
     requests,
+    uploads,
     close: () => new Promise<void>((r) => server.close(() => r())),
   };
 }

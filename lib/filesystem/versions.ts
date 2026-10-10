@@ -116,6 +116,23 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
   const adapter = getStorageAdapter();
   const newKey = randomUUID();
   await adapter.put(newKey, bytes, mime);
+  return commitOverwrite({ workspaceId, fileId, userId, newKey, sizeBytes: bytes.length, mime, filename: current.filename, reason: opts.reason, restoredFrom: opts.restoredFrom });
+}
+
+/**
+ * Make bytes that are ALREADY in storage (a finished multipart upload, lib/drive/
+ * uploads.ts) the new version of an existing live file. The caller has already
+ * validated and scanned them; if this throws the caller removes the object.
+ */
+export async function overwriteFromStoredBlob(args: { workspaceId: string; fileId: string; userId: string; storageKey: string; sizeBytes: number; mime: string }): Promise<OverwriteResult> {
+  const current = await prisma.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId, trashedAt: null }, select: { filename: true } });
+  if (!current) throw new FsError("not_found", "File not found.");
+  return commitOverwrite({ workspaceId: args.workspaceId, fileId: args.fileId, userId: args.userId, newKey: args.storageKey, sizeBytes: args.sizeBytes, mime: args.mime, filename: current.filename });
+}
+
+async function commitOverwrite(c: { workspaceId: string; fileId: string; userId: string; newKey: string; sizeBytes: number; mime: string; filename: string; reason?: "version" | "restore"; restoredFrom?: number }): Promise<OverwriteResult> {
+  const { workspaceId, fileId, userId, newKey, mime } = c;
+  const adapter = getStorageAdapter();
   let purged: Array<{ version: number; storageKey: string; sizeBytes: number }> = [];
   let version = 0;
   try {
@@ -128,7 +145,7 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
       const scopes = info.ok ? quotaScopesFor(info) : [];
       const quota = await tx.workspaceQuota.findUnique({ where: { workspaceId } });
       try {
-        await chargeQuota(tx, workspaceId, scopes, bytes.length);
+        await chargeQuota(tx, workspaceId, scopes, c.sizeBytes);
       } catch (e) {
         if (e instanceof FsError && e.code === "quota_exceeded" && /^Workspace/.test(e.message)) {
           throw new FsError("quota_exceeded", "Workspace storage quota exceeded. Delete old versions or files, or lower the version retention.");
@@ -156,7 +173,7 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
       });
       const updated = await tx.workspaceFile.update({
         where: { id: fileId, workspaceId },
-        data: { storageKey: newKey, mimeType: mime, sizeBytes: bytes.length, version: file.version + 1 },
+        data: { storageKey: newKey, mimeType: mime, sizeBytes: c.sizeBytes, version: file.version + 1 },
         select: { version: true },
       });
       const previous = await tx.workspaceFileVersion.findMany({
@@ -182,11 +199,11 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
   await auditEvent({
     workspaceId,
     projectId: null,
-    action: opts.reason === "restore" ? "file_version_restored" : "file_version_created",
+    action: c.reason === "restore" ? "file_version_restored" : "file_version_created",
     summary:
-      opts.reason === "restore"
-        ? `Restored "${current.filename}" to version ${opts.restoredFrom ?? "?"} (now version ${version})`
-        : `New version ${version} of "${current.filename}" (${bytes.length} bytes)`,
+      c.reason === "restore"
+        ? `Restored "${c.filename}" to version ${c.restoredFrom ?? "?"} (now version ${version})`
+        : `New version ${version} of "${c.filename}" (${c.sizeBytes} bytes)`,
     actorUserId: userId,
   }).catch(() => {});
   scheduleIndex(workspaceId, fileId);

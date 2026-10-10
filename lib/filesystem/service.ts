@@ -157,6 +157,65 @@ export async function screenUserUpload(workspaceId: string, createdBy: string, f
 }
 
 /**
+ * Register bytes that are ALREADY in storage under `storageKey` as a new file:
+ * folder chain, workspace + scope quota (under locks), the live-name check, the
+ * row and its journal event, in one transaction. writeFile uses it for
+ * buffered writes; the large-file path (lib/drive/uploads.ts) for multipart
+ * objects. The caller removes the stored bytes if this throws.
+ */
+export async function registerStoredFile(args: {
+  workspaceId: string;
+  pathCheck: PathInfo;
+  storageKey: string;
+  sizeBytes: number;
+  mime: string;
+  kind: FileKind;
+  createdBy: string;
+}) {
+  const { workspaceId, pathCheck, storageKey, kind, createdBy } = args;
+  try {
+    return await withWorkspaceScope(
+      workspaceId,
+      async (tx) => {
+        await lockDriveTree(tx, workspaceId);
+        await chargeQuota(tx, workspaceId, quotaScopesFor(pathCheck), args.sizeBytes);
+        // The folder first: if it exists under another spelling of its name,
+        // that spelling wins and the file takes it.
+        const dir = dirnameOf(pathCheck.path);
+        const chain = await ensureFolderChain(tx, workspaceId, dir, createdBy);
+        const finalPath = chain.leaf ? `${chain.leaf.path}/${basenameOf(pathCheck.path)}` : pathCheck.path;
+        if (await nameTaken(tx, workspaceId, finalPath)) throw new FsError("conflict", `A file already exists at ${finalPath}.`);
+        const created = await tx.workspaceFile.create({
+          data: {
+            workspaceId,
+            logicalPath: finalPath,
+            pathKey: collisionKey(finalPath),
+            ownerUserId: pathCheck.ownerUserId,
+            storageKey,
+            filename: basenameOf(finalPath).slice(0, 255),
+            mimeType: args.mime,
+            sizeBytes: args.sizeBytes,
+            kind: kind as WorkspaceFileKind,
+            createdBy,
+          },
+        });
+        await recordChanges(tx, workspaceId, [
+          ...chain.events,
+          { type: "create", entity: "file", entityId: created.id, path: created.logicalPath, version: 1, actorUserId: createdBy },
+        ]);
+        return created;
+      },
+      { timeoutMs: 30_000 },
+    );
+  } catch (err) {
+    // A unique-violation on a live-path index means a file already exists
+    // at this logical path. Map Prisma's P2002 to a clean 409.
+    if (isUniqueViolation(err)) throw new FsError("conflict", `A file already exists at ${pathCheck.path}.`);
+    throw err;
+  }
+}
+
+/**
  * Write a file into the workspace filesystem. Upload-safety runs by default;
  * quota is checked under row locks so concurrent writers serialize. The file
  * lands in its folder (created on demand, in the spelling an existing folder
@@ -211,44 +270,9 @@ export async function writeFile(opts: WriteOptions): Promise<PublicFile> {
 
   let row;
   try {
-    row = await withWorkspaceScope(
-      workspaceId,
-      async (tx) => {
-        await lockDriveTree(tx, workspaceId);
-        await chargeQuota(tx, workspaceId, quotaScopesFor(pathCheck), bytes.length);
-        // The folder first: if it exists under another spelling of its name,
-        // that spelling wins and the file takes it.
-        const dir = dirnameOf(pathCheck.path);
-        const chain = await ensureFolderChain(tx, workspaceId, dir, createdBy);
-        const finalPath = chain.leaf ? `${chain.leaf.path}/${basenameOf(pathCheck.path)}` : pathCheck.path;
-        if (await nameTaken(tx, workspaceId, finalPath)) throw new FsError("conflict", `A file already exists at ${finalPath}.`);
-        const created = await tx.workspaceFile.create({
-          data: {
-            workspaceId,
-            logicalPath: finalPath,
-            pathKey: collisionKey(finalPath),
-            ownerUserId: pathCheck.ownerUserId,
-            storageKey,
-            filename: basenameOf(finalPath).slice(0, 255),
-            mimeType: mime,
-            sizeBytes: bytes.length,
-            kind: kind as WorkspaceFileKind,
-            createdBy,
-          },
-        });
-        await recordChanges(tx, workspaceId, [
-          ...chain.events,
-          { type: "create", entity: "file", entityId: created.id, path: created.logicalPath, version: 1, actorUserId: createdBy },
-        ]);
-        return created;
-      },
-      { timeoutMs: 30_000 },
-    );
+    row = await registerStoredFile({ workspaceId, pathCheck, storageKey, sizeBytes: bytes.length, mime, kind, createdBy });
   } catch (err) {
     await adapter.delete(storageKey).catch(() => {});
-    // A unique-violation on a live-path index means a file already exists
-    // at this logical path. Map Prisma's P2002 to a clean 409.
-    if (isUniqueViolation(err)) throw new FsError("conflict", `A file already exists at ${pathCheck.path}.`);
     throw err;
   }
 
