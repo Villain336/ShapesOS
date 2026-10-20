@@ -113,3 +113,31 @@ describe("assertAguiSequence ordering invariants", () => {
     assert.doesNotThrow(() => assertAguiSequence(evts));
   });
 });
+
+// Phase 22 (chat) regression: stamping the run correlation must not drop the
+// marketr fields an event already carries (status, toolUseId, ui, payload) —
+// the transcript keys and draws tool results from them.
+describe("withRunMeta keeps an event's own marketr metadata", () => {
+  it("merges runId / threadId / workspaceId into metadata.marketr instead of replacing it", () => {
+    const e = withRunMeta(
+      {
+        type: EventType.TOOL_CALL_RESULT,
+        messageId: "r1",
+        toolCallId: "agui:tool:tu1",
+        content: "5 keywords",
+        metadata: { marketr: { status: "executed", toolUseId: "tu1", ui: "records", payload: { rows: [{ k: 1 }] } }, other: true },
+      },
+      META,
+    ) as { metadata: { marketr: Record<string, unknown>; other?: boolean } };
+    assert.deepEqual(e.metadata.marketr, {
+      status: "executed",
+      toolUseId: "tu1",
+      ui: "records",
+      payload: { rows: [{ k: 1 }] },
+      runId: META.runId,
+      threadId: META.threadId,
+      workspaceId: META.workspaceId,
+    });
+    assert.equal(e.metadata.other, true);
+  });
+});

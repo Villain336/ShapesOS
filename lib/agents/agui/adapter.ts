@@ -291,6 +291,7 @@ function resultMeta(input: Partial<ChatToolCall> | Record<string, unknown>): Rec
   if (typeof call.agentKey === "string") out.agentKey = call.agentKey;
   if (typeof call.autoApproved === "string") out.autoApproved = call.autoApproved;
   if (call.cached === true) out.cached = true;
+  if (call.confirmed === true) out.confirmed = true;
   if (call.edited === true) out.edited = true;
   if (call.delegation && typeof call.delegation === "object") out.delegation = call.delegation;
   if (typeof call.tier === "number") out.tier = call.tier;

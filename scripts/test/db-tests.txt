@@ -252,3 +252,5 @@ lib/push/__tests__/web-push-db.test.ts
 lib/timemachine/__tests__/snapshots-db.test.ts
 # Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
 lib/timemachine/__tests__/undo-db.test.ts
+# Phase 22 (chat): inline decisions — approve from the block runs the held call and the SAME AG-UI stream continues from the proposing transcript (TOOL_CALL_RESULT keyed by the tool_use id, real result to the model, one block per call after a reload); deny runs nothing; edit runs the edited arguments; Tier 3 (money) is refused on a typed yes and runs on a click. MOCK model (fake Responses API).
+lib/chat/__tests__/p22-decisions-db.test.ts

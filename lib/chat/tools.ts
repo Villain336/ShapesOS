@@ -524,6 +524,7 @@ const load_skill: ToolDef = {
 
 const research_keywords: ToolDef = {
   name: "research_keywords",
+  ui: "records",
   description:
     "Run keyword research for a seed phrase via the SEO provider. Costs a SERP call (metered). Returns ideas with volume/difficulty — suggestions only, nothing is saved.",
   kind: "spend",

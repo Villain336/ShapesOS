@@ -67,9 +67,14 @@ export interface AguiRunMeta {
 
 /** Attach run correlation to any event's metadata (non-destructive). */
 export function withRunMeta<E extends AguiEvent>(event: E, meta: AguiRunMeta): E {
+  // Phase 22 (chat): MERGE into the event's own marketr fields (status,
+  // toolUseId, ui, payload …) — replacing them dropped everything the
+  // transcript draws a tool result from.
+  const own = (event.metadata as { marketr?: unknown } | undefined)?.marketr;
+  const base = own && typeof own === "object" && !Array.isArray(own) ? (own as Record<string, unknown>) : {};
   return {
     ...event,
-    metadata: { ...(event.metadata ?? {}), marketr: { runId: meta.runId, threadId: meta.threadId, workspaceId: meta.workspaceId } },
+    metadata: { ...(event.metadata ?? {}), marketr: { ...base, runId: meta.runId, threadId: meta.threadId, workspaceId: meta.workspaceId } },
   } as E;
 }
 

@@ -688,7 +688,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const items = b.items.map((it) => {
           const live = liveFold.blocks.find((x) => x.kind === "approval" && x.items.some((li) => li.toolUseId && li.toolUseId === it.toolUseId));
           const li = live?.kind === "approval" ? live.items.find((x) => x.toolUseId === it.toolUseId) : undefined;
-          return li && li.decision !== "pending" ? { ...it, decision: li.decision } : it;
+          if (li && li.decision !== "pending") return { ...it, decision: li.decision };
+          // The decision's continuation re-runs the held call: its outcome settles the item at once.
+          const ran = it.toolUseId ? liveFold.blocks.find((x) => x.kind === "tool" && x.toolUseId === it.toolUseId) : undefined;
+          if (ran?.kind === "tool" && it.decision === "pending") {
+            if (ran.status === "cancelled") return { ...it, decision: "denied" as const };
+            if (ran.status !== "running" && ran.status !== "pending_confirmation") return { ...it, decision: "approved" as const };
+          }
+          return it;
         });
         return { ...b, items };
       }

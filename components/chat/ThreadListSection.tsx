@@ -56,7 +56,8 @@ export default function ThreadListSection() {
                 aria-current={t.id === activeId ? "true" : undefined}
                 className={cn(
                   "min-w-0 flex-1 justify-start gap-2 rounded-full px-3 py-2 text-left text-[0.8125rem] font-normal hover:bg-transparent",
-                  t.id === activeId && "bg-accent-tint font-medium",
+                  // Phase 22: the current thread is a paper row with ink text (DESIGN.md current-row pattern; the old accent tint failed contrast in dark).
+                  t.id === activeId && "bg-paper font-medium text-ink shadow-hairline",
                 )}
               >
                 <MessageCircle className="size-[15px] shrink-0 text-ink-3" />
