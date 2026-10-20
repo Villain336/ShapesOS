@@ -45,7 +45,7 @@ describe("status derivation", () => {
   it("pending or failed migrations degrade the database; draining degrades the web", () => {
     const mig: LiveSignals = { ...healthy, readiness: { status: "unavailable", checks: { database: { status: "ok", latencyMs: 3 }, migrations: { status: "fail", pending: 2, failed: 0 } } } };
     assert.equal(states(mig).database, "degraded");
-    const drain: LiveSignals = { ...healthy, readiness: { ...healthy.readiness, status: "unavailable", draining: true } };
+    const drain: LiveSignals = { ...healthy, readiness: { ...healthy.readiness!, status: "unavailable", draining: true } };
     assert.equal(states(drain).web, "degraded");
     assert.equal(states(drain).database, "operational");
   });
