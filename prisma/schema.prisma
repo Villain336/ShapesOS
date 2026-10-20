@@ -18024,3 +18024,68 @@ model WorkspaceSnapshot {
   @@index([workspaceId, createdAt])
   @@map("workspace_snapshots")
 }
+
+// ---------------------------------------------------------------------------
+// Beta readiness (WS=legal): the public status page (/status, GET /api/status).
+// Platform-wide operational data, NOT tenant data: no workspace_id and no RLS
+// on purpose. Public read goes through a cached route; writes only through
+// routes gated by requirePlatformOperator (MARKETR_PLATFORM_OPERATORS).
+// lib/status/store.ts, lib/status/derive.ts.
+// ---------------------------------------------------------------------------
+
+// A component's live state is derived from /api/health and the agent queue;
+// a row here is an operator's MANUAL override (maintenance, degraded, …)
+// with a note. Deleting the row returns the component to its derived state.
+model StatusComponentOverride {
+  // web | database | worker | queue (lib/status/derive.ts DEFAULT_COMPONENTS)
+  key       String               @id @db.VarChar(32)
+  state     StatusComponentState
+  note      String?              @db.VarChar(300)
+  setBy     String               @map("set_by")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  @@map("status_components")
+}
+
+enum StatusComponentState {
+  operational
+  degraded
+  partial_outage
+  major_outage
+  maintenance
+}
+
+enum StatusIncidentStatus {
+  investigating
+  identified
+  monitoring
+  resolved
+}
+
+enum StatusIncidentImpact {
+  none
+  minor
+  major
+  critical
+}
+
+// An incident posted by a platform operator. `updates` is the timeline:
+// [{ at, status, message, by }] — `by` is the operator id and is never sent
+// to the public (lib/status/store.ts strips it for the public snapshot).
+model StatusIncident {
+  id            String               @id @default(cuid())
+  title         String               @db.VarChar(140)
+  status        StatusIncidentStatus
+  impact        StatusIncidentImpact
+  // Affected component keys (subset of DEFAULT_COMPONENTS).
+  componentKeys String[]             @map("component_keys")
+  updates       Json                 @default("[]")
+  startedAt     DateTime             @default(now()) @map("started_at")
+  resolvedAt    DateTime?            @map("resolved_at")
+  createdBy     String               @map("created_by")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  @@index([resolvedAt, startedAt])
+  @@map("status_incidents")
+}

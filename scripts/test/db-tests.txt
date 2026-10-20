@@ -252,3 +252,5 @@ lib/push/__tests__/web-push-db.test.ts
 lib/timemachine/__tests__/snapshots-db.test.ts
 # Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
 lib/timemachine/__tests__/undo-db.test.ts
+# Beta readiness (WS=legal): public status page — the snapshot derives the four components live with no tenant GUC (platform-wide tables, no RLS); an operator's manual state overrides and clears; incidents open → update → resolve into recent history; GET /api/status public + cached; write routes platform-operator only (401/403/2xx) with validated bodies (400/404).
+lib/status/__tests__/status-db.test.ts
