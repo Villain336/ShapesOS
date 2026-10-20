@@ -5,10 +5,7 @@
 
 import Link from "next/link";
 import { getI18n } from "@/lib/i18n/server";
-import { LEGAL_PAGES, type LegalPageKey } from "@/lib/legal/public-pages";
-
-const LEGAL_KEYS: readonly LegalPageKey[] = ["terms", "privacy", "dpa", "acceptableUse", "cookies"];
-const TRUST_KEYS: readonly LegalPageKey[] = ["security", "subprocessors", "status", "contact"];
+import { FOOTER_GROUPS, LEGAL_PAGES, type LegalPageKey } from "@/lib/legal/public-pages";
 
 const linkCls = "text-sm text-muted underline-offset-2 hover:text-ink hover:underline";
 
@@ -41,8 +38,8 @@ export async function SiteFooter() {
             {t("legal.site.signIn")}
           </Link>
         </div>
-        {group(t("legal.footer.legal"), LEGAL_KEYS)}
-        {group(t("legal.footer.trust"), TRUST_KEYS)}
+        {group(t("legal.footer.legal"), FOOTER_GROUPS.legal)}
+        {group(t("legal.footer.trust"), FOOTER_GROUPS.trust)}
       </div>
     </footer>
   );

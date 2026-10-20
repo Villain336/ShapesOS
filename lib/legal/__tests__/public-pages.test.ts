@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  FOOTER_GROUPS,
   LEGAL_DRAFT_PENDING_REVIEW,
   LEGAL_PAGES,
   SUPPORT_EMAIL_UNSET,
@@ -52,8 +53,10 @@ describe("public legal pages registry", () => {
   });
 
   it("the website footer links every page, and the sign-in card links terms, privacy, status and contact", () => {
+    const inFooter = [...FOOTER_GROUPS.legal, ...FOOTER_GROUPS.trust].sort();
+    assert.deepEqual(inFooter, LEGAL_PAGES.map((p) => p.key).sort(), "the footer groups list every page exactly once");
     const footer = read("components/site/SiteFooter.tsx");
-    for (const p of LEGAL_PAGES) assert.ok(footer.includes(`"${p.path}"`), `SiteFooter misses ${p.path}`);
+    assert.ok(footer.includes("FOOTER_GROUPS.legal") && footer.includes("FOOTER_GROUPS.trust"), "SiteFooter renders both groups");
     const shell = read("components/auth/AuthShell.tsx");
     for (const path of ["/terms", "/privacy", "/status", "/contact"]) assert.ok(shell.includes(`"${path}"`), `AuthShell misses ${path}`);
     // The marketing pages carry the same footer.

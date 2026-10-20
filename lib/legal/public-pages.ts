@@ -58,6 +58,12 @@ export const LEGAL_PAGES: readonly LegalPageEntry[] = [
   { key: "status", path: "/status", title: "Status", updated: UPDATED, kind: "live" },
 ];
 
+/** The website footer's two link groups (components/site/SiteFooter.tsx renders them). */
+export const FOOTER_GROUPS: Readonly<Record<"legal" | "trust", readonly LegalPageKey[]>> = {
+  legal: ["terms", "privacy", "dpa", "acceptableUse", "cookies"],
+  trust: ["security", "subprocessors", "status", "contact"],
+};
+
 /** The registry entry for a path, or null. */
 export function legalPage(path: string): LegalPageEntry | null {
   return LEGAL_PAGES.find((p) => p.path === path) ?? null;
