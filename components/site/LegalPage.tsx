@@ -41,7 +41,7 @@ export async function LegalPage({
       <main id="main-content" className="mx-auto max-w-3xl px-6 pb-20 pt-12" data-legal-page={pageKey}>
         <h1 className="aos-display text-ink">{title}</h1>
         <p className="mt-3 text-lg text-muted">{lede}</p>
-        <p className="mt-3 text-sm text-subtle">
+        <p className="mt-3 text-sm text-muted">
           {t("legal.page.updated", { date: updated })} · {t("legal.page.englishOnly")}
         </p>
         <div className="mt-6">
@@ -49,11 +49,11 @@ export async function LegalPage({
         </div>
         {sections && sections.length > 0 ? (
           <nav aria-label={t("legal.page.onThisPage")} className="mt-8 rounded-lg bg-paper p-5 shadow-hairline">
-            <h2 className="text-xs font-semibold text-subtle">{t("legal.page.onThisPage")}</h2>
-            <ol className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+            <h2 className="text-xs font-semibold text-muted">{t("legal.page.onThisPage")}</h2>
+            <ol className="mt-2 grid gap-x-6 text-sm sm:grid-cols-2">
               {sections.map((s, i) => (
                 <li key={s.id}>
-                  <a href={`#${s.id}`} className="text-ink underline-offset-2 hover:underline">
+                  <a href={`#${s.id}`} className="flex min-h-8 items-center rounded-sm text-ink underline-offset-2 hover:underline">
                     {i + 1}. {s.title}
                   </a>
                 </li>

@@ -44,8 +44,8 @@ export default function CookiesPage() {
               <tr key={c.name} data-cookie={c.name}>
                 <th scope="row">
                   <code>{c.name}</code>
-                  {c.aliases?.length ? <span className="mt-1 block text-xs text-subtle">also {c.aliases.map((a) => a).join(", ")}</span> : null}
-                  <span className="mt-1 block text-xs text-subtle">{COOKIE_CATEGORY_LABEL[c.category]} · {c.httpOnly ? "HttpOnly" : "readable by scripts"}</span>
+                  {c.aliases?.length ? <span className="mt-1 block text-xs text-muted">also {c.aliases.map((a) => a).join(", ")}</span> : null}
+                  <span className="mt-1 block text-xs text-muted">{COOKIE_CATEGORY_LABEL[c.category]} · {c.httpOnly ? "HttpOnly" : "readable by scripts"}</span>
                 </th>
                 <td>
                   {c.purpose}

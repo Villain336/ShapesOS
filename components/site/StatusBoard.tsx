@@ -43,7 +43,7 @@ export async function StatusBoard({ snapshot }: { snapshot: StatusSnapshot }) {
         <span className="inline-flex h-7 items-center rounded-full bg-hover-paper px-3 text-xs font-semibold text-muted">{t(`legal.status.incidentStatus.${i.status}`)}</span>
         <span className="inline-flex h-7 items-center rounded-full bg-hover-paper px-3 text-xs font-semibold text-muted">{t(`legal.status.impact.${i.impact}`)}</span>
       </div>
-      <p className="mt-1 text-xs text-subtle">
+      <p className="mt-1 text-xs text-muted">
         {t("legal.status.started", { date: format.date(i.startedAt, "dateTime") })}
         {i.resolvedAt ? ` · ${t("legal.status.resolvedAt", { date: format.date(i.resolvedAt, "dateTime") })}` : ""}
         {i.componentKeys.length ? ` · ${t("legal.status.affected")}: ${i.componentKeys.map((k) => snapshot.components.find((c) => c.key === k)?.name ?? k).join(", ")}` : ""}
@@ -52,7 +52,7 @@ export async function StatusBoard({ snapshot }: { snapshot: StatusSnapshot }) {
         {[...i.updates].reverse().map((u, idx) => (
           <li key={`${u.at}-${idx}`} className="text-sm text-ink">
             <span className="font-semibold">{t(`legal.status.incidentStatus.${u.status}`)}</span>
-            <span className="text-subtle"> · {format.date(u.at, "dateTime")}</span>
+            <span className="text-muted"> · {format.date(u.at, "dateTime")}</span>
             <p className="mt-0.5 text-muted">{u.message}</p>
           </li>
         ))}
@@ -64,7 +64,7 @@ export async function StatusBoard({ snapshot }: { snapshot: StatusSnapshot }) {
       <section aria-label={t("legal.status.components")} className="rounded-lg bg-paper p-5 shadow-hairline">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <StatePill state={snapshot.overall} label={t(`legal.status.overall.${snapshot.overall}`)} strong />
-          <span className="text-xs text-subtle">{t("legal.status.checked", { date: format.date(snapshot.generatedAt, "dateTime") })}</span>
+          <span className="text-xs text-muted">{t("legal.status.checked", { date: format.date(snapshot.generatedAt, "dateTime") })}</span>
         </div>
         <table className="mt-4 w-full text-left text-sm">
           <thead>
@@ -79,20 +79,20 @@ export async function StatusBoard({ snapshot }: { snapshot: StatusSnapshot }) {
               <tr key={c.key} className="border-b border-line last:border-0" data-component={c.key}>
                 <th scope="row" className="py-3 pr-3 align-top font-medium text-ink">
                   {c.name}
-                  <span className="mt-0.5 block text-xs font-normal text-subtle">{c.description}</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted">{c.description}</span>
                 </th>
                 <td className="py-3 pr-3 align-top">
                   <StatePill state={c.state} label={stateLabel(c.state)} />
                 </td>
                 <td className="py-3 align-top text-muted">
                   {c.note ?? "—"}
-                  {c.manual ? <span className="mt-0.5 block text-xs text-subtle">{t("legal.status.manual")}</span> : null}
+                  {c.manual ? <span className="mt-0.5 block text-xs text-muted">{t("legal.status.manual")}</span> : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-4 text-xs text-subtle">
+        <p className="mt-4 text-xs text-muted">
           {t("legal.status.derived", { seconds: snapshot.cacheSeconds })}{" "}
           <a href="/api/status" className="underline underline-offset-2 hover:text-ink">
             {t("legal.status.json")}

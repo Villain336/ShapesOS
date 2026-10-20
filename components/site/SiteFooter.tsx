@@ -19,7 +19,7 @@ export function SiteFooter() {
   const byKey = (key: LegalPageKey) => LEGAL_PAGES.find((p) => p.key === key)!;
   const group = (heading: string, keys: readonly LegalPageKey[]) => (
     <div>
-      <h2 className="text-xs font-semibold text-subtle">{heading}</h2>
+      <h2 className="text-xs font-semibold text-muted">{heading}</h2>
       <ul className="mt-2 flex flex-col gap-1.5">
         {keys.map((key) => (
           <li key={key}>
