@@ -27,6 +27,8 @@ import { fileContent } from "./content";
 import { mail } from "./comms";
 // Phase 18.2 (WS=content): Notes.
 import { note } from "./notes";
+// Phase 21B (WS=drive): folders.
+import { folder } from "./folders";
 
 export const SOURCES: readonly SearchSource[] = [
   lead,
@@ -56,6 +58,8 @@ export const SOURCES: readonly SearchSource[] = [
   mail,
   // Phase 18.2 (WS=content)
   note,
+  // Phase 21B (WS=drive)
+  folder,
 ];
 
 export const SOURCE_BY_KIND: ReadonlyMap<RecordKind, SearchSource> = new Map(SOURCES.map((s) => [s.kind, s]));

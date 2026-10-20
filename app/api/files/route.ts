@@ -64,7 +64,8 @@ export async function GET(req: NextRequest) {
     const m = await requireWorkspaceAccess(user.id, workspaceId, "editor");
     if ("error" in m) return m.error;
     const rows = await prisma.workspaceFile.findMany({
-      where: { workspaceId: access.workspaceId, trashedAt: { not: null } },
+      // Phase 21B: another person's private home is never listed, not even in the Trash.
+      where: { workspaceId: access.workspaceId, trashedAt: { not: null }, OR: [{ ownerUserId: null }, { ownerUserId: user.id }] },
       orderBy: { trashedAt: "desc" },
       take: 200,
     });
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const listing = await listDir({ workspaceId: access.workspaceId, prefix: qs.get("prefix") ?? "/" });
+    const listing = await listDir({ workspaceId: access.workspaceId, prefix: qs.get("prefix") ?? "/", viewerUserId: user.id });
     const quota = await getQuota({ workspaceId: access.workspaceId });
     return Response.json({ ...listing, quota });
   } catch (err) {

@@ -123,7 +123,8 @@ describe("annotations and previews", () => {
 
 describe("files agent tools", () => {
   it("are registered with deliberate groups and tiers", () => {
-    assert.equal(FILE_TOOLS.length, 2);
+    // The two Phase 18.2 tools, then the agent's Drive tools (Phase 21B, tested in lib/drive/__tests__/agent-tools-db.test.ts).
+    assert.deepEqual(FILE_TOOLS.slice(0, 2).map((t) => t.name), ["list_file_versions", "share_file_link"]);
     assert.equal(getTool("list_file_versions"), list_file_versions);
     assert.equal(getTool("share_file_link"), share_file_link);
     assert.equal(list_file_versions.kind, "safe");

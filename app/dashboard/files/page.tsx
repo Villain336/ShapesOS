@@ -28,6 +28,9 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const fileId = typeof sp.file === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(sp.file) ? sp.file : null;
 
+  // ?path=<folder> (a Spotlight folder hit): a display path such as /home/…, /shared/files/reports.
+  const folderPath = typeof sp.path === "string" && sp.path.startsWith("/") && sp.path.length <= 1100 ? sp.path : null;
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -40,6 +43,7 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
         canPurge={roleAtLeast(membership.role, "admin")}
         canAdmin={roleAtLeast(membership.role, "admin")}
         initialFileId={fileId}
+        initialPath={folderPath}
       />
     </div>
   );

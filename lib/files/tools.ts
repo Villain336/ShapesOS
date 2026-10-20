@@ -12,6 +12,8 @@ import type { ToolDef, ToolResult } from "@/lib/chat/tools";
 import { listFileVersions } from "@/lib/filesystem/versions";
 import { requireFileAction } from "./access";
 import { createShareLink } from "./shares";
+// Phase 21B (WS=drive): the agent's Drive tools (read / save / replace / move / trash under a run grant).
+import { DRIVE_TOOLS } from "@/lib/drive/tools";
 
 function fileIdOf(v: unknown): string | null {
   const raw = typeof v === "string" ? v.trim().replace(/^(file|file_content):/, "") : "";
@@ -76,4 +78,4 @@ export const share_file_link: ToolDef = {
   },
 };
 
-export const FILE_TOOLS: readonly ToolDef[] = [list_file_versions, share_file_link];
+export const FILE_TOOLS: readonly ToolDef[] = [list_file_versions, share_file_link, ...DRIVE_TOOLS];

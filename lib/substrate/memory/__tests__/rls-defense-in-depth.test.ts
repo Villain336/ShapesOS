@@ -36,6 +36,8 @@ const ALLOW = new Map<string, string>([
   ["lib/files/shares.ts:workspaceFileShare.findFirst", "resolveShareToken: maps a public /r/file/<token> to its link via the SELECT-only app.file_share_route policy (unrevoked rows only)"],
   // Phase 18.3 (WS=flow): the hourly Time Machine sweep lists which workspaces asked for scheduled snapshots (workspace_settings is not a tenant RLS table; ids + schedule only); every snapshot read / write after it runs under that workspace's scope.
   ["lib/timemachine/snapshots.ts:workspaceSettings.findMany", "runDueSnapshots: cron-only fan-out over workspaces with a snapshot schedule (ids only); each snapshot is taken under its own workspace scope"],
+  // Phase 21B (WS=drive): the scheduled trash sweep lists expired files across workspaces (the same cron-only fan-out it always was; the file service is now scanned because it enters workspace scope); each purge runs under that file's own workspace scope.
+  ["lib/filesystem/service.ts:workspaceFile.findMany", "purgeExpiredTrash: cron-only fan-out over files past the trash retention; each purge is workspace-scoped"],
   ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 

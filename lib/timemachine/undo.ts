@@ -10,6 +10,11 @@
 // planUndo() (PURE) classifies each change: revertible, or not and why:
 //   note / reminder the run created      → delete it (deleteNote / removeReminder)
 //   file share link it made              → revoke it (revokeShareLink)
+//   Drive file it created                → move it to the Trash (only while no one has edited it since)
+//   Drive file it replaced               → the earlier version comes back as a new version (only while the run's version is still current)
+//   Drive file it moved                  → moved back (only if its old place is free)
+//   Drive file it trashed                → restored from the Trash
+//   (Not reversible: permanent removal — an agent cannot do that — and any Drive change the tool did not report as touched.)
 //   ops record it updated (free update)  → patch the changed fields back to the
 //                                          values in the event (opsPatch: same
 //                                          checks, its own audit row)
@@ -33,7 +38,7 @@ import { roleAtLeast } from "@/lib/authz";
 import { HttpError } from "@/lib/api/errors";
 import { timeMachineAudit } from "./audit";
 
-export type UndoKind = "note" | "reminder" | "file_share" | "ops_update" | "site_draft" | "site_applied" | "money" | "message" | "external" | "ops_create" | "read" | "unknown";
+export type UndoKind = "note" | "reminder" | "file_share" | "drive_create" | "drive_update" | "drive_move" | "drive_trash" | "ops_update" | "site_draft" | "site_applied" | "money" | "message" | "external" | "ops_create" | "read" | "unknown";
 
 export interface UndoItem {
   /** Stable id within the plan: "<eventSeq>:<n>" or "site:<revisionId>". */
@@ -118,7 +123,10 @@ export function planUndo(input: {
       const ref = { kind: String(t.kind), id: String(t.id), entity: typeof t.entity === "string" ? t.entity : undefined, fileId: typeof t.fileId === "string" ? t.fileId : undefined, before: t.before && typeof t.before === "object" ? (t.before as Record<string, unknown>) : undefined };
       if (t.kind === "note" && t.op === "create") items.push({ id, kind: "note", tool, label: tool, revertible: true, reason: null, ref, at });
       else if (t.kind === "reminder" && t.op === "create") items.push({ id, kind: "reminder", tool, label: tool, revertible: true, reason: null, ref, at });
-      else if (t.kind === "file_share") items.push({ id, kind: "file_share", tool, label: tool, revertible: true, reason: null, ref, at });
+      else if (t.kind === "drive_file" && ref.before && (t.op === "create" || t.op === "update" || t.op === "move" || t.op === "trash")) {
+        const dk = t.op === "create" ? "drive_create" : t.op === "update" ? "drive_update" : t.op === "move" ? "drive_move" : "drive_trash";
+        items.push({ id, kind: dk, tool, label: tool, revertible: true, reason: null, ref, at });
+      } else if (t.kind === "file_share") items.push({ id, kind: "file_share", tool, label: tool, revertible: true, reason: null, ref, at });
       else if (t.kind === "ops" && t.op === "update" && ref.before && ref.entity) items.push({ id, kind: "ops_update", tool, label: tool, revertible: true, reason: null, ref, at });
       else if (t.kind === "ops" && t.op === "create") items.push({ id, kind: "ops_create", tool, label: tool, revertible: false, reason: "created", ref, at });
       else items.push({ id, kind: "unknown", tool, label: tool, revertible: false, reason: "unknown", ref, at });
@@ -227,6 +235,11 @@ async function revertOne(actor: UndoActor, owner: string, item: UndoItem): Promi
       await withWorkspaceScope(ws, (tx) => removeReminder(tx, { workspaceId: ws, userId: exists.assigneeId ?? owner, id: ref.id }));
       return "reverted";
     }
+    case "drive_create":
+    case "drive_update":
+    case "drive_move":
+    case "drive_trash":
+      return revertDriveFile(actor, owner, item);
     case "file_share": {
       const { revokeShareLink } = await import("@/lib/files/shares");
       const link = await withWorkspaceScope(ws, (tx) => tx.workspaceFileShare.findFirst({ where: { id: ref.id, workspaceId: ws }, select: { revokedAt: true, createdBy: true, fileId: true } }));
@@ -264,6 +277,53 @@ async function revertOne(actor: UndoActor, owner: string, item: UndoItem): Promi
       const site = await prisma.site.findFirst({ where: { id: ref.siteId!, project: { workspaceId: ws } }, select: { projectId: true } });
       if (!site) return "already";
       await applySiteRevision({ workspaceId: ws, projectId: site.projectId, siteId: ref.siteId!, revisionId: ref.backupId!, userId: actor.userId });
+      return "reverted";
+    }
+    default:
+      return "skipped";
+  }
+}
+
+
+/**
+ * Put one Drive file change back. The run acted as `owner` (the person it worked
+ * for), so the file is touched with that person's standing. Each revert checks the
+ * file is still as the run left it: if someone has edited, moved or replaced it
+ * since, the revert is refused with a plain reason instead of destroying their work.
+ */
+async function revertDriveFile(actor: UndoActor, owner: string, item: UndoItem): Promise<UndoOutcome["result"]> {
+  const ref = item.ref!;
+  const ws = actor.workspaceId;
+  const before = (ref.before ?? {}) as { version?: number; path?: string; writtenVersion?: number; movedTo?: string };
+  const row = await prisma.workspaceFile.findFirst({ where: { id: ref.id, workspaceId: ws } });
+  if (!row) return "already";
+  const { trashFile, restoreFile, moveFile } = await import("@/lib/filesystem/service");
+  const { restoreFileVersion } = await import("@/lib/filesystem/versions");
+  switch (item.kind) {
+    case "drive_create": {
+      if (row.trashedAt) return "already";
+      if (row.version > (before.version ?? 1)) throw new UndoError(409, "Someone changed this file after the agent made it, so it was left in place.");
+      await trashFile({ workspaceId: ws, fileId: row.id, actorUserId: actor.userId });
+      return "reverted";
+    }
+    case "drive_update": {
+      if (row.trashedAt) throw new UndoError(409, "The file is in the Trash now; restore it first.");
+      if (before.writtenVersion !== undefined && row.version !== before.writtenVersion) throw new UndoError(409, "Someone changed this file after the agent did, so it was left in place.");
+      if (!before.version) return "skipped";
+      await restoreFileVersion(ws, row.id, before.version, owner);
+      return "reverted";
+    }
+    case "drive_move": {
+      if (row.trashedAt) throw new UndoError(409, "The file is in the Trash now; restore it first.");
+      if (!before.path) return "skipped";
+      if (row.logicalPath === before.path) return "already";
+      if (before.movedTo && row.logicalPath !== before.movedTo) throw new UndoError(409, "The file was moved again after the agent moved it, so it was left in place.");
+      await moveFile({ workspaceId: ws, fileId: row.id, newPath: before.path, actorUserId: actor.userId });
+      return "reverted";
+    }
+    case "drive_trash": {
+      if (!row.trashedAt) return "already";
+      await restoreFile({ workspaceId: ws, fileId: row.id, actorUserId: actor.userId });
       return "reverted";
     }
     default:

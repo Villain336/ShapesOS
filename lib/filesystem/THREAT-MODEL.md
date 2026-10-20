@@ -183,3 +183,50 @@ realtime collaboration, S3 versioning, multi-region replication.
 - Local-disk storage is single-box; multi-instance deployments MUST use S3.
   This is enforced by config validation at boot when `MARKETR_STORAGE=s3`
   without credentials.
+
+## Phase 21B (WS=drive) additions
+
+### 11. Private homes (`/home/<userId>`)
+- `files.ownerUserId` marks a file as private to its owner. Every read path checks it: the
+  actor-aware layer (`lib/drive/access.ts`, `lib/files/access.ts` `fileRoleFor`) resolves a role
+  or `null` (a 404, never a 403, so existence is not an oracle); `readFile`/`getFile` themselves
+  refuse a private file unless the caller names its owner (`readFileAuthorised` is only for
+  callers that already ran the access check); `listDir`, the tree reads, the Trash, the change
+  feed, Spotlight (`file`, `file_content`, `folder`) and storage usage all filter it.
+- Admins and workspace owners get nothing special: there is no break-glass (an owner decision).
+- Test: `lib/drive/__tests__/drive-db.test.ts`, `library-db.test.ts`.
+
+### 12. Case-insensitive collisions, Unicode, Windows names
+- Names are NFC; `path_key` (lower-cased NFC) is unique among live rows; reserved device names,
+  forbidden characters, trailing dots/spaces, control/bidi/zero-width characters are refused.
+- Test: `lib/filesystem/__tests__/paths-drive.test.ts`, `drive-db.test.ts`.
+
+### 13. Multipart uploads
+- Presigned PUT URLs name one part, expire in 15 minutes and are signed with SigV4 query auth
+  (verified against the AWS documentation vector). The browser never gets storage credentials.
+- The upload row belongs to the person who started it; others get 404. The assembled object is
+  size-checked, type-checked, and scanned end to end by the malware scanner; a flagged object is
+  deleted. Hosted deployments refuse to start an upload without `CLAMAV_HOST`.
+- Residual: abandoned multipart uploads hold space at the provider until `expireUploadsFor` runs
+  or a bucket lifecycle rule (`AbortIncompleteMultipartUpload`, 2 days recommended) is set.
+
+### 14. Archive extraction
+- `extractZip` (pure) plans before it inflates: unsafe names, symbolic links, special files,
+  case collisions, declared-size and ratio limits, entry-count limit; inflation is capped at the
+  declared size + 1 so a lying header fails. Test: `lib/drive/__tests__/extract.test.ts`.
+
+### 15. Agents and sandboxes
+- A run writes only inside `/agents/<runId>` and the folders the person attached, and never with
+  more rights than that person (`lib/drive/grants.ts`, `tools.ts`). Existing files are changed only
+  with a Tier 2 confirmation (never auto); the sandbox sync never overwrites (it stages for a
+  person); symbolic links in the sandbox are never read. The marker file inside a sandbox is
+  untrusted: the folder it names must be inside the run's grant at sync time.
+- Apps get their own container and quota, and files only through opaque, signed, expiring handles
+  that die with the picker's access (`lib/drive/app-container.ts`, `handles.ts`).
+
+### Residual risks added in 21B
+- Journal writes serialise all structural writes in a workspace behind one lock (correctness over
+  throughput). A very write-heavy workspace will queue.
+- `workspace_files.size_bytes` is a 32-bit integer: files are capped at 2 GiB − 1 until a BIGINT
+  migration.
+- Google Drive and S3 multipart behaviour against the real services is UNVERIFIED-LIVE.

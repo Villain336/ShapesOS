@@ -11,7 +11,10 @@ import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { auditEvent } from "@/lib/auditlog";
 import { ForbiddenError, NotFoundError, BadRequestError } from "@/lib/api/errors";
-import { checkOverride, effectiveFileRole, fileCan, isFileRole, type FileAction, type FileRole } from "./acl";
+import { checkOverride, fileCan, isFileRole, type FileAction, type FileRole } from "./acl";
+// Phase 21B (WS=drive): folder ACLs with inheritance and private homes.
+import { driveRoleFor, loadEntries } from "@/lib/drive/access";
+import { resolveDriveRole } from "@/lib/drive/acl";
 
 export interface FileActor {
   workspaceId: string;
@@ -30,22 +33,20 @@ export interface FileRow {
   createdBy: string;
   createdAt: Date;
   version: number;
+  /** Phase 21B: the person whose private home it is (null = the workspace's). */
+  ownerUserId: string | null;
 }
 
-const FILE_SELECT = { id: true, workspaceId: true, logicalPath: true, filename: true, mimeType: true, sizeBytes: true, kind: true, createdBy: true, createdAt: true, version: true } as const;
+const FILE_SELECT = { id: true, workspaceId: true, logicalPath: true, filename: true, mimeType: true, sizeBytes: true, kind: true, createdBy: true, createdAt: true, version: true, ownerUserId: true } as const;
 
 /** The member's role on one live file; null when the file isn't in this workspace. */
 export async function fileRoleFor(actor: FileActor, fileId: string): Promise<{ file: FileRow; role: FileRole } | null> {
   const file = await prisma.workspaceFile.findFirst({ where: { id: fileId, workspaceId: actor.workspaceId, trashedAt: null }, select: FILE_SELECT });
   if (!file) return null;
-  const override = await withWorkspaceScope(actor.workspaceId, (tx) =>
-    tx.workspaceFileAcl.findFirst({ where: { workspaceId: actor.workspaceId, fileId, userId: actor.userId }, select: { role: true } }),
-  );
-  const role = effectiveFileRole({
-    workspaceRole: actor.role,
-    isCreator: file.createdBy === actor.userId,
-    override: override && isFileRole(override.role) ? override.role : null,
-  });
+  // Folder ACLs above the file and the file's own entry, nearest wins; a file in
+  // someone else's private home is invisible unless explicitly shared (null).
+  const role = await driveRoleFor(actor, { path: file.logicalPath, ownerUserId: file.ownerUserId, createdBy: file.createdBy, fileId });
+  if (!role) return null;
   return { file, role };
 }
 
@@ -76,22 +77,31 @@ export interface FileAccessEntry {
 /** Every member's access to the file (anyone who can see it may look). */
 export async function listFileAccess(actor: FileActor, fileId: string): Promise<{ entries: FileAccessEntry[]; canManage: boolean }> {
   const { file, role } = await requireFileAction(actor, fileId, "view");
-  const [members, overrides] = await Promise.all([
+  const [members, aclEntries] = await Promise.all([
     prisma.workspaceMember.findMany({ where: { workspaceId: actor.workspaceId, userId: { not: null } }, select: { userId: true, name: true, email: true, role: true }, orderBy: { createdAt: "asc" } }),
-    withWorkspaceScope(actor.workspaceId, (tx) => tx.workspaceFileAcl.findMany({ where: { workspaceId: actor.workspaceId, fileId }, select: { userId: true, role: true } })),
+    withWorkspaceScope(actor.workspaceId, (tx) => loadEntries(tx, actor.workspaceId, null, file.logicalPath, fileId)),
   ]);
-  const byUser = new Map(overrides.map((o) => [o.userId, isFileRole(o.role) ? o.role : null]));
-  const entries = members.map((m) => {
-    const override = byUser.get(m.userId!) ?? null;
-    return {
+  const own = new Map(aclEntries.filter((e) => e.path === file.logicalPath).map((e) => [e.userId, e.role]));
+  const entries = members.flatMap((m) => {
+    const effective = resolveDriveRole({
+      workspaceRole: m.role,
+      userId: m.userId!,
+      ownerUserId: file.ownerUserId,
+      createdBy: file.createdBy,
+      path: file.logicalPath,
+      entries: aclEntries,
+    });
+    // A private home hides the file from everyone it was not shared with.
+    if (!effective) return [];
+    return [{
       userId: m.userId!,
       name: m.name,
       email: m.email,
       workspaceRole: m.role,
       isCreator: file.createdBy === m.userId,
-      override,
-      effective: effectiveFileRole({ workspaceRole: m.role, isCreator: file.createdBy === m.userId, override }),
-    };
+      override: own.get(m.userId!) ?? null,
+      effective,
+    }];
   });
   return { entries, canManage: fileCan(role, "manageAccess") };
 }
@@ -103,8 +113,13 @@ export async function setFileAccess(actor: FileActor, fileId: string, targetUser
   if (!target) throw new NotFoundError("That person isn't a member of this workspace.");
   if (role !== null) {
     if (!isFileRole(role)) throw new BadRequestError("role is viewer, editor or owner.");
-    const ok = checkOverride(target.role, role);
-    if (!ok.ok) throw new BadRequestError(ok.reason);
+    if (file.ownerUserId) {
+      // A share into a private home (admins included) is view or edit, never ownership.
+      if (role === "owner") throw new BadRequestError("A share from a private folder is view or edit; ownership stays with the person it belongs to.");
+    } else {
+      const ok = checkOverride(target.role, role);
+      if (!ok.ok) throw new BadRequestError(ok.reason);
+    }
   }
   if (targetUserId === actor.userId && role !== null && role !== "owner") {
     throw new BadRequestError("You can't lower your own access to a file; ask another owner or an admin.");

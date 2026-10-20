@@ -51,6 +51,7 @@ import { COMMS_TOOLS, COMMS_TOOL_ACTION, COMMS_TOOL_GROUP } from "@/lib/comms/to
 // Phase 18.2 (WS=content): the core apps' agent tools (Notes, Files, Activity Monitor, Store).
 import { NOTE_TOOLS } from "@/lib/notes/tools";
 import { FILE_TOOLS } from "@/lib/files/tools";
+import { DRIVE_TOOL_ACTION, DRIVE_TOOL_GROUP } from "@/lib/drive/tools";
 import { PROCESS_TOOLS } from "@/lib/aos/tools";
 import { STORE_TOOLS } from "@/lib/store/tools";
 // Phase 22 (chat): how the transcript draws a tool's result (lib/chat/ui-hints.ts).
@@ -100,7 +101,7 @@ export interface ToolResult {
 export interface TouchedRecord {
   kind: string;
   id: string;
-  op: "create" | "update" | "share";
+  op: "create" | "update" | "share" | "move" | "trash";
   /** Ops entity slug ("deals") for kind "ops". */
   entity?: string;
   /** The file a share link belongs to. */
@@ -1268,6 +1269,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   web_crawl: "web",
   // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
   ...COMMS_TOOL_GROUP,
+  // Phase 21B (WS=drive): the agent's Drive tools (lib/drive/tools.ts).
+  ...DRIVE_TOOL_GROUP,
   // Phase 18.2 (WS=content): the core apps' agent tools (lib/notes/tools.ts,
   // lib/files/tools.ts, lib/aos/tools.ts, lib/store/tools.ts). Reads are
   // workspace; writing a note is content; sharing a file link is content.
@@ -1385,6 +1388,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   web_crawl: "fetch_web_pages",
   // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
   ...COMMS_TOOL_ACTION,
+  // Phase 21B (WS=drive): tier by effect — save is Tier 1, replace/move/trash Tier 2 (never auto), bulk Tier 3.
+  ...DRIVE_TOOL_ACTION,
   // Phase 18.2 (WS=content): a note is internal and reversible — Tier 1
   // (TIER1_KINDS: asks unless an automation rule lets it run). A share link
   // hands a file to people outside the workspace — Tier 2, always asks

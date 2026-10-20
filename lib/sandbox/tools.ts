@@ -173,6 +173,8 @@ export async function checkpoint(ctx: ToolContext, sandbox: Sandbox, label?: str
       sandboxId: sandbox.id,
       createdAt: snap.createdAt,
     });
+    // Phase 21B (WS=drive): a mounted Drive folder is synced out at checkpoints (best effort, lazy).
+    void import("@/lib/drive/sandbox-hooks").then((m) => m.syncRunMount(ctx.workspaceId, ctx.runId!, sandbox, "checkpoint")).catch(() => undefined);
     return snap.id;
   } catch (err) {
     await runNote(ctx, `Checkpoint failed: ${err instanceof Error ? err.message : "unknown error"}`, { kind: "sandbox.checkpoint_failed" });

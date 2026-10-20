@@ -1203,6 +1203,17 @@ model Workspace {
   storePublicationsSent       StorePublication[]          @relation("StorePublicationAgency")
   // Phase 18.3 (WS=flow): Time Machine workspace snapshots (lib/timemachine).
   workspaceSnapshots          WorkspaceSnapshot[]
+  // Phase 21B (WS=drive): folders, folder ACLs, the change journal, scope
+  // quotas, multipart uploads, favourites, smart folders, agent folder grants.
+  driveFolders                WorkspaceFolder[]
+  driveFolderAcls             WorkspaceFolderAcl[]
+  driveCursor                 WorkspaceDriveCursor?
+  driveChanges                WorkspaceDriveChange[]
+  driveQuotas                 WorkspaceDriveQuota[]
+  driveUploads                WorkspaceUpload[]
+  driveFavorites              WorkspaceDriveFavorite[]
+  driveSmartFolders           WorkspaceSmartFolder[]
+  driveRunFolders             AgentRunFolder[]
 
   @@index([creditPoolOwnerId])
   @@map("workspaces")
@@ -3901,9 +3912,20 @@ model WorkspaceFile {
   shareLinks                 WorkspaceFileShare[]
   acl                        WorkspaceFileAcl[]
   annotations                WorkspaceFileAnnotation[]
+  // Phase 21B (WS=drive): who owns it (null = the workspace; a person's id =
+  // their private home), the case/NFC-insensitive identity of the path (unique
+  // among live files when set; null on rows that pre-date Drive), tags, and the
+  // batch id shared by everything a folder trash took with it.
+  ownerUserId                String?                     @map("owner_user_id")
+  pathKey                    String?                     @map("path_key")
+  tags                       String[]                    @default([])
+  trashBatch                 String?                     @map("trash_batch")
+  // When this row last changed (null on rows that pre-date Drive: use createdAt).
+  updatedAt                  DateTime?                   @updatedAt @map("updated_at")
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
+  @@index([workspaceId, ownerUserId])
   @@map("workspace_files")
 }
 
@@ -18023,4 +18045,185 @@ model WorkspaceSnapshot {
 
   @@index([workspaceId, createdAt])
   @@map("workspace_snapshots")
+}
+
+// ===========================================================================
+// Phase 21B (WS=drive): the virtual file system. Everything below is FORCE RLS
+// (migration 20261101200000_p21_drive_model) and reached through
+// withWorkspaceScope. See lib/drive/README via lib/filesystem/paths.ts.
+// ===========================================================================
+
+// A folder is a row, so empty folders, folder sharing, colours and tags work.
+// `path` is the canonical stored path (the four legacy roots stay /files etc.);
+// `pathKey` is its case/NFC-insensitive identity, unique among live folders.
+model WorkspaceFolder {
+  id          String            @id @default(cuid())
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  path        String
+  pathKey     String            @map("path_key")
+  name        String            @db.VarChar(255)
+  parentId    String?           @map("parent_id")
+  parent      WorkspaceFolder?  @relation("DriveFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    WorkspaceFolder[] @relation("DriveFolderTree")
+  // null = the workspace's; a person's id = inside their private home.
+  ownerUserId String?           @map("owner_user_id")
+  // The four legacy roots and the per-root containers (/home/<id>, /apps/<a>/<i>…).
+  system      Boolean           @default(false)
+  color       String?           @db.VarChar(16)
+  tags        String[]          @default([])
+  createdBy   String            @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  trashedAt   DateTime?         @map("trashed_at")
+  trashBatch  String?           @map("trash_batch")
+  acl         WorkspaceFolderAcl[]
+
+  @@index([workspaceId, parentId])
+  @@index([workspaceId, ownerUserId])
+  @@index([workspaceId, path])
+  @@map("workspace_folders")
+}
+
+// Per-member access on a folder; inherited by everything beneath it unless a
+// deeper entry (a subfolder or a file, WorkspaceFileAcl) says otherwise.
+model WorkspaceFolderAcl {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folderId    String          @map("folder_id")
+  folder      WorkspaceFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  userId      String          @map("user_id")
+  role        String          @db.VarChar(16)
+  grantedBy   String          @map("granted_by")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@unique([folderId, userId])
+  @@index([workspaceId, userId])
+  @@map("workspace_folder_acls")
+}
+
+// The per-workspace change sequence. Writers bump `seq` under this row's lock
+// inside their own transaction, so commit order == sequence order.
+// `floorSeq`: events at or below it were purged (a client behind it must resync).
+model WorkspaceDriveCursor {
+  workspaceId String    @id @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seq         BigInt    @default(0)
+  floorSeq    BigInt    @default(0) @map("floor_seq")
+
+  @@map("workspace_drive_cursors")
+}
+
+// The change journal behind GET /api/drive/changes (lib/drive/journal.ts).
+model WorkspaceDriveChange {
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seq          BigInt
+  // create | update | move | trash | restore | delete
+  type         String    @db.VarChar(16)
+  // file | folder
+  entity       String    @db.VarChar(8)
+  entityId     String    @map("entity_id")
+  path         String
+  prevPath     String?   @map("prev_path")
+  version      Int?
+  actorUserId  String?   @map("actor_user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@id([workspaceId, seq])
+  @@index([workspaceId, entityId])
+  @@index([workspaceId, createdAt])
+  @@map("workspace_drive_changes")
+}
+
+// A separate quota for one scope inside the workspace total: a person's home
+// ("user:<id>") or an app install's container ("app:<appId>/<install>").
+// limitBytes null = no separate limit.
+model WorkspaceDriveQuota {
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scope       String
+  limitBytes  BigInt?   @map("limit_bytes")
+  usedBytes   BigInt    @default(0) @map("used_bytes")
+
+  @@id([workspaceId, scope])
+  @@map("workspace_drive_quotas")
+}
+
+// A resumable multipart upload (lib/drive/multipart.ts is the state machine).
+model WorkspaceUpload {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  logicalPath      String    @map("logical_path")
+  filename         String    @db.VarChar(255)
+  mimeType         String    @map("mime_type")
+  totalBytes       BigInt    @map("total_bytes")
+  partSize         Int       @map("part_size")
+  partCount        Int       @map("part_count")
+  // initiated | uploading | completing | completed | aborted | expired
+  status           String    @default("initiated") @db.VarChar(16)
+  // { "<n>": { etag, size } }
+  parts            Json      @default("{}")
+  storageKey       String    @unique @map("storage_key")
+  // The storage provider's multipart id (S3 UploadId).
+  providerUploadId String?   @map("provider_upload_id")
+  // Put the finished upload on top of this existing file as a new version.
+  replaceFileId    String?   @map("replace_file_id")
+  createdBy        String    @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  expiresAt        DateTime  @map("expires_at")
+  completedFileId  String?   @map("completed_file_id")
+
+  @@index([workspaceId, createdBy, status])
+  @@map("workspace_uploads")
+}
+
+model WorkspaceDriveFavorite {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  // file | folder
+  entity      String    @db.VarChar(8)
+  entityId    String    @map("entity_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, entity, entityId])
+  @@index([workspaceId, userId])
+  @@map("workspace_drive_favorites")
+}
+
+// A saved Spotlight query shown in the Files sidebar.
+model WorkspaceSmartFolder {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  name        String    @db.VarChar(120)
+  query       String    @db.VarChar(500)
+  filters     Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, userId])
+  @@map("workspace_smart_folders")
+}
+
+// The folders a person attached to an agent run (its grant, with the run's own
+// /agents/<runId> workspace). lib/drive/grants.ts is the arithmetic.
+model AgentRunFolder {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId       String    @map("run_id")
+  folderPath  String    @map("folder_path")
+  attachedBy  String    @map("attached_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([runId, folderPath])
+  @@index([workspaceId, runId])
+  @@map("agent_run_folders")
 }

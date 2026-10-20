@@ -23,7 +23,12 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditEvent } from "@/lib/auditlog";
 import { getStorageAdapter } from "./storage";
-import { DEFAULT_MAX_FILE_BYTES, DEFAULT_QUOTA_BYTES, FsError } from "./service";
+import { DEFAULT_MAX_FILE_BYTES, DEFAULT_QUOTA_BYTES, FsError } from "./core";
+import { screenUserUpload } from "./service";
+import { normalizeLogicalPath } from "./paths";
+import { recordChange } from "@/lib/drive/changes";
+import { chargeQuota, lockDriveTree, releaseQuota } from "@/lib/drive/quota-store";
+import { quotaScopesFor } from "@/lib/drive/quota";
 import { scheduleFileTextIndex } from "@/lib/search/text-index-schedule";
 
 export const DEFAULT_VERSION_RETENTION = 20;
@@ -75,6 +80,8 @@ export interface OverwriteOptions {
   /** Audit wording: "version" (an upload) or "restore". */
   reason?: "version" | "restore";
   restoredFrom?: number;
+  /** The version the writer started from; a newer one on the server refuses the write (stale_version). */
+  expectVersion?: number;
 }
 
 export interface OverwriteResult {
@@ -104,28 +111,53 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
       throw new FsError("unsafe_content", check.reason);
     }
     mime = check.mime;
+    // Phase 21B: the malware scanner is REQUIRED on hosted deployments.
+    await screenUserUpload(workspaceId, userId, current.filename, bytes);
   }
 
   const adapter = getStorageAdapter();
   const newKey = randomUUID();
   await adapter.put(newKey, bytes, mime);
+  return commitOverwrite({ workspaceId, fileId, userId, newKey, sizeBytes: bytes.length, mime, filename: current.filename, reason: opts.reason, restoredFrom: opts.restoredFrom, expectVersion: opts.expectVersion });
+}
+
+/**
+ * Make bytes that are ALREADY in storage (a finished multipart upload, lib/drive/
+ * uploads.ts) the new version of an existing live file. The caller has already
+ * validated and scanned them; if this throws the caller removes the object.
+ */
+export async function overwriteFromStoredBlob(args: { workspaceId: string; fileId: string; userId: string; storageKey: string; sizeBytes: number; mime: string }): Promise<OverwriteResult> {
+  const current = await prisma.workspaceFile.findFirst({ where: { id: args.fileId, workspaceId: args.workspaceId, trashedAt: null }, select: { filename: true } });
+  if (!current) throw new FsError("not_found", "File not found.");
+  return commitOverwrite({ workspaceId: args.workspaceId, fileId: args.fileId, userId: args.userId, newKey: args.storageKey, sizeBytes: args.sizeBytes, mime: args.mime, filename: current.filename });
+}
+
+async function commitOverwrite(c: { workspaceId: string; fileId: string; userId: string; newKey: string; sizeBytes: number; mime: string; filename: string; reason?: "version" | "restore"; restoredFrom?: number; expectVersion?: number }): Promise<OverwriteResult> {
+  const { workspaceId, fileId, userId, newKey, mime } = c;
+  const adapter = getStorageAdapter();
   let purged: Array<{ version: number; storageKey: string; sizeBytes: number }> = [];
   let version = 0;
   try {
     const out = await withWorkspaceScope(workspaceId, async (tx) => {
-      await tx.workspaceQuota.upsert({
-        where: { workspaceId },
-        create: { workspaceId, limitBytes: BigInt(DEFAULT_QUOTA_BYTES), usedBytes: BigInt(0) },
-        update: {},
-      });
-      await tx.$queryRaw`SELECT "workspace_id" FROM "workspace_quotas" WHERE "workspace_id" = ${workspaceId} FOR UPDATE`;
+      await lockDriveTree(tx, workspaceId);
       // Re-read the file under the lock (a concurrent overwrite bumps the version).
       const file = await tx.workspaceFile.findFirst({ where: { id: fileId, workspaceId, trashedAt: null } });
       if (!file) throw new FsError("not_found", "File not found.");
-      const quota = await tx.workspaceQuota.findUniqueOrThrow({ where: { workspaceId } });
-      if (quota.usedBytes + BigInt(bytes.length) > quota.limitBytes) {
-        throw new FsError("quota_exceeded", "Workspace storage quota exceeded. Delete old versions or files, or lower the version retention.");
+      if (c.expectVersion !== undefined && file.version !== c.expectVersion) {
+        throw new FsError("stale_version", `This file changed on the server: it is at version ${file.version}, you started from ${c.expectVersion}.`, { currentVersion: file.version });
       }
+      const info = normalizeLogicalPath(file.logicalPath);
+      const scopes = info.ok ? quotaScopesFor(info) : [];
+      const quota = await tx.workspaceQuota.findUnique({ where: { workspaceId } });
+      try {
+        await chargeQuota(tx, workspaceId, scopes, c.sizeBytes);
+      } catch (e) {
+        if (e instanceof FsError && e.code === "quota_exceeded" && /^Workspace/.test(e.message)) {
+          throw new FsError("quota_exceeded", "Workspace storage quota exceeded. Delete old versions or files, or lower the version retention.");
+        }
+        throw e;
+      }
+      const retention = quota?.versionRetention ?? DEFAULT_VERSION_RETENTION;
       // Who wrote the current bytes, and when: the file's creator for version
       // 1, else whoever replaced the version before it (the file row keeps
       // its creator — that is its owner for per-file access).
@@ -146,22 +178,20 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
       });
       const updated = await tx.workspaceFile.update({
         where: { id: fileId, workspaceId },
-        data: { storageKey: newKey, mimeType: mime, sizeBytes: bytes.length, version: file.version + 1 },
+        data: { storageKey: newKey, mimeType: mime, sizeBytes: c.sizeBytes, version: file.version + 1 },
         select: { version: true },
       });
       const previous = await tx.workspaceFileVersion.findMany({
         where: { workspaceId, fileId },
         select: { id: true, version: true, storageKey: true, sizeBytes: true },
       });
-      const drop = versionsToPurge(previous, quota.versionRetention);
+      const drop = versionsToPurge(previous, retention);
       if (drop.length) {
         await tx.workspaceFileVersion.deleteMany({ where: { workspaceId, id: { in: drop.map((d) => d.id) } } });
       }
       const freed = drop.reduce((n, d) => n + d.sizeBytes, 0);
-      await tx.workspaceQuota.update({
-        where: { workspaceId },
-        data: { usedBytes: { increment: BigInt(bytes.length - freed) } },
-      });
+      await releaseQuota(tx, workspaceId, scopes, freed);
+      await recordChange(tx, workspaceId, { type: "update", entity: "file", entityId: fileId, path: file.logicalPath, version: updated.version, actorUserId: userId });
       return { version: updated.version, drop };
     });
     version = out.version;
@@ -174,11 +204,11 @@ export async function overwriteFile(opts: OverwriteOptions): Promise<OverwriteRe
   await auditEvent({
     workspaceId,
     projectId: null,
-    action: opts.reason === "restore" ? "file_version_restored" : "file_version_created",
+    action: c.reason === "restore" ? "file_version_restored" : "file_version_created",
     summary:
-      opts.reason === "restore"
-        ? `Restored "${current.filename}" to version ${opts.restoredFrom ?? "?"} (now version ${version})`
-        : `New version ${version} of "${current.filename}" (${bytes.length} bytes)`,
+      c.reason === "restore"
+        ? `Restored "${c.filename}" to version ${c.restoredFrom ?? "?"} (now version ${version})`
+        : `New version ${version} of "${c.filename}" (${c.sizeBytes} bytes)`,
     actorUserId: userId,
   }).catch(() => {});
   scheduleIndex(workspaceId, fileId);

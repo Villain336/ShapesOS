@@ -3,7 +3,7 @@
 // audit row, mirroring the M21 `connector_tool_denied` philosophy.
 
 import { auditEvent } from "@/lib/auditlog";
-import { getMalwareScanner, type MalwareScanResult } from "./malware-scan";
+import { getMalwareScanner, ScannerNotConfiguredError, type MalwareScanResult } from "./malware-scan";
 
 export async function auditUploadRejected(opts: {
   projectId: string | null;
@@ -34,7 +34,8 @@ export async function screenUploadBuffer(buf: Buffer): Promise<ScreenResult> {
   let scan: MalwareScanResult;
   try {
     scan = await getMalwareScanner().scanBuffer(buf);
-  } catch {
+  } catch (err) {
+    if (err instanceof ScannerNotConfiguredError) return { ok: false, status: 503, reason: err.message };
     return {
       ok: false,
       status: 503,

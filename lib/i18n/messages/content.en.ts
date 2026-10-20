@@ -141,7 +141,7 @@ export const contentEn = {
   },
   filesApp: {
     title: "Files",
-    subtitle: "Your workspace's files: skills, memory, artifacts and uploads. Every file keeps its earlier versions and can be shared by link.",
+    subtitle: "Your private home and the workspace's shared folders, in one place. Every file keeps its earlier versions and can be shared by link.",
     loadFailed: "Couldn't load this folder.",
     uploadFailed: "Upload failed.",
     actionFailed: "That didn't work.",

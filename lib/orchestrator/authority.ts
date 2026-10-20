@@ -77,6 +77,11 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   // internal note owned by the person it works for (private by default),
   // no money, no outside audience; reversible (the person deletes it).
   "write_internal_note",
+  // Phase 21B (WS=drive): an agent saving a NEW file in its own run folder or a
+  // folder the person attached to the run (lib/drive/grants.ts). It cannot
+  // touch anything that already exists (replace / move / trash are Tier 2 and
+  // always ask), reversible (the file goes to the Trash), no audience.
+  "save_agent_file",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

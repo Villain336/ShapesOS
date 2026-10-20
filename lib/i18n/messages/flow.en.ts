@@ -319,6 +319,10 @@ export const flowEn = {
     canTitle: "Can be undone ({count})",
     cannotTitle: "Can't be undone ({count})",
     kinds: {
+      drive_create: "A file it saved",
+      drive_update: "A file it replaced",
+      drive_move: "A file it moved",
+      drive_trash: "A file it moved to the Trash",
       note: "A note it wrote",
       reminder: "A reminder it set",
       file_share: "A share link it made",

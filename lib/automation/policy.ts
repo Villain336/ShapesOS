@@ -67,6 +67,11 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<string, AutomationBehaviorName>>
  */
 export const NEVER_AUTO_ACTIONS: ReadonlyMap<string, string> = new Map([
   ["browser_act", "acting in a browser can buy or delete things on any site, so it always asks"],
+  // Phase 21B (WS=drive): changing a file that already exists. The old bytes are
+  // kept as a version, but a person decides each time.
+  ["replace_agent_file", "replacing a file that already exists always asks"],
+  ["move_agent_file", "moving or renaming an existing file always asks"],
+  ["trash_agent_file", "moving an existing file to the Trash always asks"],
 ]);
 
 /**

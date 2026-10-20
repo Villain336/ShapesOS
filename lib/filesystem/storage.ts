@@ -54,6 +54,23 @@ export interface StorageAdapter {
   get(key: string): Promise<Buffer | null>;
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
+  /** Phase 21B: bytes [start, endInclusive] of an object (large files are read in ranges, never whole). */
+  getRange(key: string, start: number, endInclusive: number): Promise<Buffer | null>;
+  /** Phase 21B: the object's size in bytes, or null when it does not exist. */
+  size(key: string): Promise<number | null>;
+}
+
+/** Phase 21B: presigned multipart upload (the S3-compatible adapter only; local disk keeps the buffered path). */
+export interface MultipartStorage {
+  createMultipartUpload(key: string, mimeType: string): Promise<string>;
+  presignUploadPart(key: string, uploadId: string, partNumber: number, expiresSec: number): Promise<string>;
+  listParts(key: string, uploadId: string): Promise<Array<{ partNumber: number; etag: string; size: number }>>;
+  completeMultipartUpload(key: string, uploadId: string, parts: Array<{ partNumber: number; etag: string }>): Promise<void>;
+  abortMultipartUpload(key: string, uploadId: string): Promise<void>;
+}
+
+export function supportsMultipart(a: StorageAdapter): a is StorageAdapter & MultipartStorage {
+  return typeof (a as unknown as MultipartStorage).createMultipartUpload === "function";
 }
 
 /** UUIDv4 keys only — anything else is refused before it touches the path. */
@@ -120,6 +137,31 @@ export class LocalDiskAdapter implements StorageAdapter {
       return s.isFile();
     } catch {
       return false;
+    }
+  }
+
+  async getRange(key: string, start: number, endInclusive: number): Promise<Buffer | null> {
+    const target = this.pathFor(key);
+    let fh;
+    try {
+      fh = await fsOpen(target, "r");
+      const len = endInclusive - start + 1;
+      const buf = Buffer.alloc(Math.max(0, len));
+      const { bytesRead } = await fh.read(buf, 0, buf.length, start);
+      return buf.subarray(0, bytesRead);
+    } catch {
+      return null;
+    } finally {
+      await fh?.close().catch(() => {});
+    }
+  }
+
+  async size(key: string): Promise<number | null> {
+    try {
+      const s = await stat(this.pathFor(key));
+      return s.isFile() ? s.size : null;
+    } catch {
+      return null;
     }
   }
 }
@@ -325,7 +367,7 @@ export interface S3RequestOptions {
   headers?: Record<string, string>;
 }
 
-export class S3CompatibleAdapter implements StorageAdapter {
+export class S3CompatibleAdapter implements StorageAdapter, MultipartStorage {
   readonly name = "s3";
   private readonly cfg: S3Config;
   private readonly host: string;
@@ -420,6 +462,92 @@ export class S3CompatibleAdapter implements StorageAdapter {
     assertKeyShape(key);
     const res = await this.request("HEAD", key);
     return res.ok;
+  }
+
+  async getRange(key: string, start: number, endInclusive: number): Promise<Buffer | null> {
+    assertKeyShape(key);
+    const res = await this.request("GET", key, { headers: { range: `bytes=${start}-${endInclusive}` } });
+    if (res.status === 404 || res.status === 416) return null;
+    if (!res.ok) throw new Error(`S3 GET (range) failed (${res.status}).`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async size(key: string): Promise<number | null> {
+    assertKeyShape(key);
+    const res = await this.request("HEAD", key);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`S3 HEAD failed (${res.status}).`);
+    const n = Number(res.headers.get("content-length"));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // ---- Phase 21B: multipart upload -------------------------------------------------
+
+  async createMultipartUpload(key: string, mimeType: string): Promise<string> {
+    assertKeyShape(key);
+    const res = await this.request("POST", key, { query: { uploads: "" }, headers: { "content-type": mimeType || "application/octet-stream" } });
+    if (!res.ok) throw new Error(`S3 CreateMultipartUpload failed (${res.status}).`);
+    const m = /<UploadId>([^<]+)<\/UploadId>/.exec(await res.text());
+    if (!m) throw new Error("S3 CreateMultipartUpload returned no UploadId.");
+    return m[1]!;
+  }
+
+  /** A presigned PUT URL for ONE part; the browser sends the bytes straight to storage. */
+  async presignUploadPart(key: string, uploadId: string, partNumber: number, expiresSec: number): Promise<string> {
+    assertKeyShape(key);
+    const { host, path } = this.target(key);
+    const { presignV4 } = await import("./s3-presign");
+    const p = presignV4({
+      method: "PUT",
+      host,
+      canonicalPath: path,
+      query: { partNumber: String(partNumber), uploadId },
+      region: this.cfg.region,
+      credentials: await this.credentials(),
+      now: new Date(),
+      expiresSec,
+    });
+    return `${this.scheme}//${host}${path}?${p.queryString}`;
+  }
+
+  async listParts(key: string, uploadId: string): Promise<Array<{ partNumber: number; etag: string; size: number }>> {
+    assertKeyShape(key);
+    const out: Array<{ partNumber: number; etag: string; size: number }> = [];
+    let marker = "0";
+    for (let page = 0; page < 20; page++) {
+      const res = await this.request("GET", key, { query: { uploadId, "part-number-marker": marker, "max-parts": "1000" } });
+      if (res.status === 404) throw new Error("The upload no longer exists at the storage provider.");
+      if (!res.ok) throw new Error(`S3 ListParts failed (${res.status}).`);
+      const xml = await res.text();
+      for (const m of xml.matchAll(/<Part>([\s\S]*?)<\/Part>/g)) {
+        const body = m[1]!;
+        const n = Number(/<PartNumber>(\d+)<\/PartNumber>/.exec(body)?.[1]);
+        const etag = /<ETag>([^<]+)<\/ETag>/.exec(body)?.[1]?.replace(/&quot;/g, '"');
+        const size = Number(/<Size>(\d+)<\/Size>/.exec(body)?.[1]);
+        if (Number.isInteger(n) && etag && Number.isFinite(size)) out.push({ partNumber: n, etag, size });
+      }
+      if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
+      marker = /<NextPartNumberMarker>(\d+)<\/NextPartNumberMarker>/.exec(xml)?.[1] ?? marker;
+    }
+    return out;
+  }
+
+  async completeMultipartUpload(key: string, uploadId: string, parts: Array<{ partNumber: number; etag: string }>): Promise<void> {
+    assertKeyShape(key);
+    const xml =
+      "<CompleteMultipartUpload>" +
+      parts.map((p) => `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag.replace(/"/g, "&quot;")}</ETag></Part>`).join("") +
+      "</CompleteMultipartUpload>";
+    const res = await this.request("POST", key, { query: { uploadId }, body: Buffer.from(xml, "utf8"), headers: { "content-type": "application/xml" } });
+    const body = await res.text();
+    // S3 may answer 200 with an <Error> document when assembling fails.
+    if (!res.ok || /<Error>/.test(body)) throw new Error(`S3 CompleteMultipartUpload failed (${res.status}): ${(/<Code>([^<]+)<\/Code>/.exec(body)?.[1] ?? "").slice(0, 60)}`);
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    assertKeyShape(key);
+    const res = await this.request("DELETE", key, { query: { uploadId } });
+    if (!res.ok && res.status !== 404) throw new Error(`S3 AbortMultipartUpload failed (${res.status}).`);
   }
 }
 

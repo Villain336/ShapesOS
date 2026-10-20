@@ -38,6 +38,16 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "write_internal_note", label: "Write a note", description: "Save a note in the Notes app for the person the agent works for (private unless they share it)." },
   // Phase 18.2 (WS=content): Files — a share link for people outside the workspace (Tier 2).
   { action: "share_file_externally", label: "Share a file by link", description: "Create a share link to a workspace file (view-only or download, expiring)." },
+  // Phase 21B (WS=drive): files an agent run saves in the folders it was given.
+  // Saving a NEW file is Tier 1; replacing, moving or trashing one is Tier 2 and
+  // always asks (NEVER_AUTO_ACTIONS); trashing many at once is Tier 3.
+  { action: "read_agent_file", label: "Read a file", description: "Read a file in the folders the agent was given." },
+  { action: "save_agent_file", label: "Save a new file", description: "Save a new file in the agent's own folder or a folder it was given." },
+  { action: "replace_agent_file", label: "Replace a file", description: "Put new content in a file that already exists (the old version is kept)." },
+  { action: "move_agent_file", label: "Move or rename a file", description: "Move or rename a file inside the folders the agent was given." },
+  { action: "trash_agent_file", label: "Move a file to the Trash", description: "Move one file to the Trash (recoverable for 30 days)." },
+  { action: "delete_many_agent_files", label: "Delete many files", description: "Remove several files at once. Never automated." },
+  { action: "delete_drive_folder", label: "Delete a Google Drive folder", description: "Permanently delete a Google Drive folder and everything in it. Never automated.", group: "connectors" },
   // Tier 2: significant — external audience or above the threshold. Asks
   // unless a rule says Auto-run (Phase 14).
   { action: "publish_external", label: "Publish externally", description: "Publish to audiences you don't own." },
@@ -138,6 +148,7 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   // (email sends, CRM pulls, owned-channel publishes …) use those actions.
   { action: "write_slack", label: "Post in Slack", description: "The agent's own Slack tools: post a message or reply in a thread.", group: "connectors" },
   { action: "write_airtable", label: "Write Airtable records", description: "Create or change records in an Airtable base.", group: "connectors" },
+  { action: "write_google_drive", label: "Change Google Drive", description: "Create folders, save text files, rename, move or trash items in Google Drive.", group: "connectors" },
   { action: "write_google_calendar", label: "Change Google Calendar", description: "Create or change events and invite attendees.", group: "connectors" },
   { action: "write_outlook_calendar", label: "Change Outlook Calendar", description: "Create or change events and invite attendees.", group: "connectors" },
   { action: "write_google_business_profile", label: "Post on Google Business Profile", description: "Reply to reviews and publish local posts.", group: "connectors" },

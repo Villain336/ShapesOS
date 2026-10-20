@@ -170,10 +170,13 @@ export interface LiveRequest {
   headers?: Record<string, string>;
   /** JSON body (serialized with Content-Type: application/json). */
   json?: unknown;
+  /** Phase 21B: a raw body (file bytes, multipart/related) with its Content-Type. Not retried across a token refresh differently from JSON. */
+  rawBody?: Uint8Array;
+  contentType?: string;
   /** Auth: bearer token source. Omit for providers that authenticate in the URL. */
   auth?: TokenSource;
-  /** "json" (default) or "text" (Drive export / media). */
-  responseType?: "json" | "text";
+  /** "json" (default), "text" (Drive export / media) or "buffer" (Phase 21B: file bytes). */
+  responseType?: "json" | "text" | "buffer";
   classify?: Classifier;
   /** Max response bytes for text responses (default 2 MB). */
   maxTextBytes?: number;
@@ -218,21 +221,24 @@ export async function liveRequest<T = unknown>(req: LiveRequest, deps: LiveDeps 
 
   for (;;) {
     const headers: Record<string, string> = {
-      Accept: req.responseType === "text" ? "*/*" : "application/json",
+      Accept: req.responseType === "text" || req.responseType === "buffer" ? "*/*" : "application/json",
       ...(req.headers ?? {}),
     };
     if (token) headers.Authorization = `Bearer ${token}`;
-    let body: string | undefined;
+    let body: string | Uint8Array | undefined;
     if (req.json !== undefined) {
       headers["Content-Type"] = "application/json";
       body = JSON.stringify(req.json);
+    } else if (req.rawBody !== undefined) {
+      headers["Content-Type"] = req.contentType ?? "application/octet-stream";
+      body = req.rawBody;
     }
 
     let res: Response;
     try {
       res = await safeFetch(
         url.toString(),
-        { method: req.method ?? "GET", headers, body },
+        { method: req.method ?? "GET", headers, body: body as BodyInit | undefined },
         { fetchFn: fetchImpl, resolve: deps.resolve },
       );
     } catch {
@@ -246,6 +252,7 @@ export async function liveRequest<T = unknown>(req: LiveRequest, deps: LiveDeps 
 
     if (res.ok) {
       if (res.status === 204) return null as T;
+      if (req.responseType === "buffer") return Buffer.from(await res.arrayBuffer()) as T;
       if (req.responseType === "text") {
         const text = await res.text();
         const cap = req.maxTextBytes ?? 2_000_000;

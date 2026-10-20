@@ -14,6 +14,13 @@
 // writes), refresh-on-401 through the vault; 429/5xx/rate-limit 403 back off.
 // Docs: https://developers.google.com/workspace/drive/api/reference/rest/v3
 //
+// Phase 21B (WS=drive) adds WRITE tools (all mutating, so they ask; they need the
+// broader `drive` OAuth scope — UNVERIFIED-LIVE): create_folder, upload_text_file,
+// rename_or_move_file, trash_file (recoverable), and delete_folder (permanent —
+// its name and description carry "delete", so the platform treats it as Tier 3:
+// always asks, never auto — lib/agents/grants.ts maps it to delete_drive_folder).
+// The same calls back the Drive FileProvider (lib/drive/providers/google-drive.ts).
+//
 // MOCK MODE (no credential): deterministic demo file listing + document
 // text; every row flagged mock: true, titles carry "(MOCK)". No network calls.
 
@@ -27,9 +34,14 @@ import type {
 import { strProp, mockOk, liveOk, fail } from "../types";
 import { clampInt, liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
 import {
+  driveCreateFile,
+  driveCreateFolder,
+  driveDeletePermanently,
   driveGetFileText,
+  driveGetMeta,
   driveListFiles,
   drivePing,
+  driveUpdateMeta,
   folderQuery,
   normalizeDriveId,
   searchQuery,
@@ -47,6 +59,16 @@ const MOCK_TEXT: Record<string, string> = {
   "mock-doc-1": "# Q3 Content Brief (MOCK)\n\nPillars: implant guides, whitening explainers, patient stories. Tone: warm, plain-English. CTA: book a consult.",
   "mock-doc-2": "# Brand Voice Guide (MOCK)\n\nVoice: gentle expert. Avoid: jargon, fear. Sign-off: “Smile brighter.”",
 };
+
+function nameArg(v: unknown, provider: string): string {
+  const s = String(v ?? "").trim();
+  if (!s || s.length > 255 || /[\\/\0]/.test(s)) throw new ConnectorApiError(provider, "bad_request", `${provider}: name must be 1–255 characters without slashes.`);
+  return s;
+}
+
+function shape(f: { id?: string; name?: string; mimeType?: string; size?: string; modifiedTime?: string }) {
+  return { id: f.id ?? "", name: f.name ?? "", mimeType: f.mimeType ?? "", ...(f.size ? { sizeBytes: Number(f.size) } : {}), modifiedTime: f.modifiedTime ?? null };
+}
 
 export class GoogleDriveAdapter implements ConnectorAdapter {
   readonly key = "google-drive";
@@ -101,6 +123,53 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
           required: ["fileId"],
         },
       },
+      {
+        name: "create_folder",
+        description: "Create a folder in Google Drive (inside a parent folder, default Drive root).",
+        mutating: true,
+        argsSchema: {
+          type: "object",
+          properties: { name: strProp("Folder name."), parentId: strProp("Parent folder id (optional, default root).") },
+          required: ["name"],
+        },
+      },
+      {
+        name: "upload_text_file",
+        description: "Save a text file in Google Drive (up to 5 MB). Creates it in the folder; refuses if one with that name exists there.",
+        mutating: true,
+        argsSchema: {
+          type: "object",
+          properties: {
+            name: strProp("File name, e.g. brief.md."),
+            content: strProp("The text to save."),
+            parentId: strProp("Parent folder id (optional, default root)."),
+            mimeType: strProp("MIME type (default text/plain)."),
+          },
+          required: ["name", "content"],
+        },
+      },
+      {
+        name: "rename_or_move_file",
+        description: "Rename a Drive file or folder, and/or move it into another folder.",
+        mutating: true,
+        argsSchema: {
+          type: "object",
+          properties: { fileId: strProp("Drive file or folder id."), name: strProp("New name (optional)."), parentId: strProp("Folder id to move it into (optional).") },
+          required: ["fileId"],
+        },
+      },
+      {
+        name: "trash_file",
+        description: "Move a Drive file or folder to the Drive trash (recoverable there for 30 days).",
+        mutating: true,
+        argsSchema: { type: "object", properties: { fileId: strProp("Drive file or folder id.") }, required: ["fileId"] },
+      },
+      {
+        name: "delete_folder",
+        description: "Delete a Drive folder and everything in it permanently. This cannot be undone.",
+        mutating: true,
+        argsSchema: { type: "object", properties: { folderId: strProp("Drive folder id.") }, required: ["folderId"] },
+      },
     ];
   }
 
@@ -128,6 +197,38 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
         }
         case "get_file_text":
           return liveOk(await driveGetFileText(auth, normalizeDriveId(args.fileId, "fileId"), this.deps));
+        case "create_folder": {
+          const name = nameArg(args.name, this.displayName);
+          const parent = args.parentId ? normalizeDriveId(args.parentId, "parentId") : "root";
+          return liveOk(shape(await driveCreateFolder(auth, parent, name, this.deps)));
+        }
+        case "upload_text_file": {
+          const name = nameArg(args.name, this.displayName);
+          const parent = args.parentId ? normalizeDriveId(args.parentId, "parentId") : "root";
+          const content = typeof args.content === "string" ? args.content : "";
+          return liveOk(shape(await driveCreateFile(auth, parent, name, String(args.mimeType ?? "text/plain"), Buffer.from(content, "utf8"), this.deps)));
+        }
+        case "rename_or_move_file": {
+          const id = normalizeDriveId(args.fileId, "fileId");
+          const name = args.name ? nameArg(args.name, this.displayName) : undefined;
+          let addParent: string | undefined;
+          let removeParent: string | undefined;
+          if (args.parentId) {
+            addParent = normalizeDriveId(args.parentId, "parentId");
+            removeParent = (await driveGetMeta(auth, id, this.deps)).parents?.[0];
+          }
+          if (!name && !addParent) throw new ConnectorApiError(this.displayName, "bad_request", `${this.displayName}: give a new name and/or a folder to move it into.`);
+          return liveOk(shape(await driveUpdateMeta(auth, id, { name, addParent, removeParent: removeParent !== addParent ? removeParent : undefined }, this.deps)));
+        }
+        case "trash_file":
+          return liveOk(shape(await driveUpdateMeta(auth, normalizeDriveId(args.fileId, "fileId"), { trashed: true }, this.deps)));
+        case "delete_folder": {
+          const id = normalizeDriveId(args.folderId, "folderId");
+          const meta = await driveGetMeta(auth, id, this.deps);
+          if (meta.mimeType !== "application/vnd.google-apps.folder") throw new ConnectorApiError(this.displayName, "bad_request", `${this.displayName}: that id is not a folder.`);
+          await driveDeletePermanently(auth, id, this.deps);
+          return liveOk({ deleted: true, id });
+        }
         default:
           return fail(`Unknown tool "${tool}" for connector ${this.key}`);
       }
@@ -148,6 +249,13 @@ export class GoogleDriveAdapter implements ConnectorAdapter {
 
   private mockInvoke(tool: string, args: Record<string, unknown>): InvokeResult {
     switch (tool) {
+      case "create_folder":
+      case "upload_text_file":
+      case "rename_or_move_file":
+      case "trash_file":
+      case "delete_folder":
+        // Nothing is written in mock mode (no credential): say so, never pretend.
+        return mockOk({ mock: true, note: "No Google Drive account is connected, so nothing was changed (MOCK)." });
       case "list_files": {
         const limit = Math.min(Number(args.limit) || 25, 100);
         return mockOk(

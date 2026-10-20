@@ -252,3 +252,33 @@ lib/push/__tests__/web-push-db.test.ts
 lib/timemachine/__tests__/snapshots-db.test.ts
 # Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
 lib/timemachine/__tests__/undo-db.test.ts
+
+# Phase 21B (drive): private homes invisible (admins too) and open only by explicit share; folder ACL inheritance; folders (create/rename/move/trash/restore, case collisions); change journal ordering under concurrent writers; quota (workspace, person, app container) under concurrent writes; hosted upload refuses without a scanner; RLS on every new table; backfill migration.
+lib/drive/__tests__/drive-db.test.ts
+
+# Phase 21B (drive): large files — resumable multipart upload through presigned part URLs to the (fake) S3, resume after a drop, quota-governed cap under a hard maximum, >25 MB safe types only + end-to-end streamed scan (flagged object deleted), new version by multipart, hosted refuses without a scanner, other people's uploads invisible, local mode keeps the buffered path.
+lib/drive/__tests__/uploads-db.test.ts
+
+# Phase 21B (drive): the native FileProvider (Postgres registry + local disk) passes the provider contract suite and is scoped to its actor.
+lib/drive/providers/__tests__/native-db.test.ts
+
+# Phase 21B (drive): the agent's Drive tools through executeTool — grants (own run folder + attached folders; look-alikes, other runs, .., other homes refused), the person's own rights, tier by effect (save Tier 1; replace/move/trash Tier 2 never auto; many Tier 3), and "Undo this agent run" for files (create/replace/move/trash; a later edit by a person is left alone).
+lib/drive/__tests__/agent-tools-db.test.ts
+
+# Phase 21B (drive): the Drive <-> sandbox bridge on the FAKE sandbox engine — mount a folder at <workdir>/workspace, sync out (agent: creates inside its grant, changed files staged for a person, never overwrites; person: new versions; nothing deleted; symlinks/bad names skipped; tampered marker refused), terminal upload/download with the person's rights.
+lib/drive/__tests__/sandbox-bridge-db.test.ts
+
+# Phase 21B (drive): per-app storage (appContainer: own subtree + own quota, nothing leaks between installs) and the file-picker handle model (pickFileForApp / openHandle: one file behind an opaque signed handle, dies with the person's access).
+lib/drive/__tests__/app-container-db.test.ts
+
+# Phase 21B (drive): restore a folder as of a time from version history + the change journal — dry run first, new versions, files brought back from the Trash, nothing created later is deleted, purged history reported, a viewer can plan but not apply.
+lib/drive/__tests__/restore-db.test.ts
+
+# Phase 21B (drive): folder sharing (inheritance, private-home shares, no admin break-glass), tree reads (roots, /shared with system folders, sorting/paging, Trash, shared with me, recents, usage), favourites, tags, smart folders.
+lib/drive/__tests__/library-db.test.ts
+
+# Phase 21B (drive): the sync precondition (baseVersion) on single-request uploads - a stale write is refused with the server version, a trashed file reports null, no blob left behind.
+lib/drive/__tests__/base-version-db.test.ts
+
+# Phase 21B (drive): a person id that is not a plain slug (the self-host "admin:<email>" login) still gets a private home - reversible folder name, owned file, invisible to others in listing and journal.
+lib/drive/__tests__/home-ids-db.test.ts
