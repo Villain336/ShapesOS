@@ -19,6 +19,12 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&#x27;").repl
 describe("/pricing (server render)", () => {
   const html = renderToStaticMarkup(<PricingPage />);
 
+  it("carries the website footer with the legal and trust links (beta legal pages)", () => {
+    for (const href of ["/terms", "/privacy", "/dpa", "/subprocessors", "/security", "/acceptable-use", "/cookies", "/contact", "/status"]) {
+      assert.ok(html.includes(`href="${href}"`), href);
+    }
+  });
+
   it("renders every plan card, including trial and self-hosted", () => {
     for (const id of [...PAID_PLAN_IDS, "trial", "self_hosted"]) assert.ok(html.includes(`data-plan="${id}"`), id);
     assert.match(html, /<h1[^>]*>Simple pricing/);

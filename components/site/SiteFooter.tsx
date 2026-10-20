@@ -1,16 +1,21 @@
+"use client";
+
 // ShapesOS — website footer with the legal and trust links (beta readiness,
 // WS=legal). Used by the landing page, /pricing and every legal page. The
-// link list comes from lib/legal/public-pages.ts LEGAL_PAGES (its unit test
-// checks every path appears here). Server component (getI18n).
+// link groups come from lib/legal/public-pages.ts FOOTER_GROUPS (its unit
+// test checks they cover every page). A client component on purpose: it
+// renders synchronously (useI18n; the root layout's provider carries the
+// visitor's locale), so pages that are rendered synchronously — /pricing in
+// lib/billing/__tests__/pricing-page.test.tsx — never suspend on it.
 
 import Link from "next/link";
-import { getI18n } from "@/lib/i18n/server";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { FOOTER_GROUPS, LEGAL_PAGES, type LegalPageKey } from "@/lib/legal/public-pages";
 
 const linkCls = "text-sm text-muted underline-offset-2 hover:text-ink hover:underline";
 
-export async function SiteFooter() {
-  const { t } = await getI18n();
+export function SiteFooter() {
+  const { t } = useI18n();
   const byKey = (key: LegalPageKey) => LEGAL_PAGES.find((p) => p.key === key)!;
   const group = (heading: string, keys: readonly LegalPageKey[]) => (
     <div>
