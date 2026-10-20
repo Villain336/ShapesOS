@@ -1,7 +1,8 @@
 // ShapesOS — host routing: the public website and the OS on two hostnames.
 //
 // shapesos.com (WEBSITE_HOST) serves the website: the landing page, /pricing,
-// and later /legal, /docs and /download. app.shapesos.com (APP_HOST) serves
+// the legal and trust pages (/terms, /privacy, /status, …) and later /legal,
+// /docs and /download. app.shapesos.com (APP_HOST) serves
 // the OS: the dashboard, sign-in, the client portal, the CMS admin and the API.
 // Both names point at the same web service; proxy.ts calls decideHostRoute()
 // for every page request and redirects a request that arrived on the wrong
@@ -63,13 +64,32 @@ export const APP_ONLY_PATHS = [
   "/reset-password",
   "/invite",
   "/invite-required",
-  "/security",
+  // Beta legal pages (WS=legal): "/security" itself is now the public
+  // security page (a website page below); only the two-factor setup screen
+  // stays on the app host.
+  "/security/setup",
   "/portal",
   "/admin",
 ] as const;
 
 /** Website pages (besides "/"): on the app host they move to the website host. */
-export const WEBSITE_ONLY_PATHS = ["/pricing", "/legal", "/docs", "/download"] as const;
+export const WEBSITE_ONLY_PATHS = [
+  "/pricing",
+  "/legal",
+  "/docs",
+  "/download",
+  // Beta legal and trust pages (lib/legal/public-pages.ts LEGAL_PAGES; the
+  // unit test there keeps this list and the registry in step).
+  "/terms",
+  "/privacy",
+  "/dpa",
+  "/subprocessors",
+  "/security",
+  "/acceptable-use",
+  "/cookies",
+  "/contact",
+  "/status",
+] as const;
 
 /** Served on every host, never redirected. */
 export const SHARED_PATHS = [
@@ -152,6 +172,9 @@ export function decideHostRoute(req: HostRouteRequest, config: HostRoutingConfig
   if (hostMatches(host, config.appHost)) {
     // Keep the port the visitor used on the app host for the same-host hop.
     if (path === "/") return to(host, "/dashboard", 307);
+    // An OS path wins over a website prefix it sits under ("/security/setup"
+    // is the app's two-factor setup; "/security" is the website's page).
+    if (underAny(path, APP_ONLY_PATHS)) return PASS;
     return underAny(path, WEBSITE_ONLY_PATHS) ? to(config.websiteHost, path, 308) : PASS;
   }
   return PASS;
