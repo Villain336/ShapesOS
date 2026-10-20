@@ -144,13 +144,13 @@ export default function PrivacyPage() {
           <tbody>
             <tr><td>Account and workspace content</td><td>Until you delete the workspace or your account, or the beta ends and the export window passes.</td></tr>
             <tr><td>Sign-in sessions</td><td>12 hours (the session token and its registry row expire together); revoked sessions end at once.</td></tr>
-            <tr><td>Sign-in links, verification and reset tokens</td><td>Magic links 15 minutes; verification and reset links 24 hours; single use.</td></tr>
+            <tr><td>Sign-in links, verification and reset tokens</td><td>Magic links 15 minutes; password-reset links 1 hour; email-verification links 24 hours; all single use.</td></tr>
             <tr><td>Client portal and data-room viewer sessions</td><td>7 days and 12 hours respectively.</td></tr>
             <tr><td>Agent run recordings</td><td>Video dropped after 30 days unless pinned; the trace is kept with the run.</td></tr>
             <tr><td>Audit log and usage ledger</td><td>For the life of the workspace. On account deletion your references are pseudonymised (&quot;deleted-user-…&quot;); hash-chained audit rows are not rewritten so the chain stays tamper-evident.</td></tr>
             <tr><td>Time Machine snapshots</td><td>Per the workspace&apos;s own snapshot settings; admins delete them.</td></tr>
-            <tr><td>Database backups</td><td>Point-in-time recovery for 7 days; nightly encrypted backups removed after 35 days. A deleted record can survive in a backup until then and is never restored into a live workspace on its own.</td></tr>
-            <tr><td>Error reports (if enabled)</td><td>Per the Sentry plan (90 days by default).</td></tr>
+            <tr><td>Database backups</td><td>Point-in-time recovery for 7 days; nightly backups in object storage removed after 35 days. A deleted record can survive in a backup until then and is never restored into a live workspace on its own.</td></tr>
+            <tr><td>Error reports (if enabled)</td><td>Per the error tracker&apos;s retention setting.</td></tr>
           </tbody>
         </table>
       </Section>

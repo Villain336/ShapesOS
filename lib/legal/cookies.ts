@@ -134,7 +134,7 @@ export const COOKIES: readonly CookieEntry[] = [
     category: "strictly_necessary",
     setBy: "The CMS admin (/admin, Payload CMS) when a platform operator signs in there.",
     purpose: "The CMS admin session. Only operators use the CMS admin.",
-    lifetime: "Payload's default (7 days).",
+    lifetime: "2 hours (payload/collections/CMSUsers.ts tokenExpiration).",
     httpOnly: true,
     scope: "Whole site.",
   },

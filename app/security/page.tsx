@@ -50,7 +50,7 @@ export default function SecurityPage() {
           <li>TLS everywhere in transit; Cloudflare to Render on SSL Full (strict).</li>
           <li>API keys you add, connected-account tokens, site credentials and two-factor secrets are sealed with AES-256-GCM under a server-side key (<code>MARKETR_CREDENTIALS_KEY</code>) that supports rotation with previous keys; they are decrypted only server-side at use.</li>
           <li>Passwords: scrypt with stored parameters; recovery codes and email sign-in tokens: SHA-256 hashes; magic-link and reset tokens travel in the URL fragment so they never reach server logs.</li>
-          <li>Secrets live in the hosting platform&apos;s environment groups. The repository holds placeholders only; a full-history secret scan is part of the release checks.</li>
+          <li>Secrets live in the hosting platform&apos;s environment groups. The repository holds placeholders only; a full-history secret scan of the repository came back clean (test fixtures only).</li>
         </ul>
       </Section>
 
@@ -79,7 +79,7 @@ export default function SecurityPage() {
           <li>Tiered rate limits (sign-in 10/min per IP, reads 120/min, writes 60/min, AI routes 20/min per user), shared across replicas; a 10 MiB body cap; schema validation of every request body with no echoing of values.</li>
           <li>Every mutating API route must use a recognised authorisation primitive; a scan of all route files fails the release if one does not, and every public route needs a documented reason.</li>
           <li>Every inbound webhook (Stripe, Resend, Twilio, GitHub, platform connectors) verifies its signature before parsing and fails closed without a secret.</li>
-          <li>Dependencies are pinned; production builds run in CI with the security batteries and the end-to-end suite.</li>
+          <li>Dependencies are locked; CI runs the unit, database and end-to-end suites and the security batteries on every change.</li>
         </ul>
       </Section>
 
@@ -94,8 +94,8 @@ export default function SecurityPage() {
 
       <Section id="backups" title="8. Backups and recovery">
         <ul>
-          <li>Point-in-time recovery for the last 7 days on the database; a nightly export copied to encrypted object storage and removed after 35 days.</li>
-          <li>Releases deploy exact image digests with a health smoke and automatic rollback; a restore drill and a rollback test are part of the beta gate.</li>
+          <li>Point-in-time recovery for the last 7 days on the database; a nightly export copied to object storage and removed after 35 days.</li>
+          <li>Releases deploy an exact image tag per commit, behind an approval, with a health smoke and a rollback path; a restore drill and a rollback test are part of the beta gate.</li>
           <li>Workspace-level Time Machine snapshots restore into a new workspace, never over the live one.</li>
         </ul>
       </Section>
