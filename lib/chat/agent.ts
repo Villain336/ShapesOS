@@ -1037,7 +1037,9 @@ export async function loadTurnInputs(turn: AgentTurnInput, confirming: boolean, 
     // 1. "yes" looks for a pending proposal; any other message declines what
     //    sub-agents were waiting on (Phase 16: they carry on without it, as
     //    the proposal said).
-    confirming ? loaders.pendingProposal(turn.threadId) : loaders.declineWaiting(turn).then(() => null),
+    //    Phase 22: a decision from the approval block is a confirmation too
+    //    (it must never decline what it is about to decide).
+    confirming || turn.decisions?.length ? loaders.pendingProposal(turn.threadId) : loaders.declineWaiting(turn).then(() => null),
   ]);
   return { deleg, live, rules, connectorTools, pending };
 }
@@ -1085,7 +1087,7 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   //    Tier 3 / destructive calls are decided ONLY this way (a typed "yes"
   //    leaves them pending and says so).
   if (input.decisions?.length) {
-    const all = (await defaultTurnLoaders.pendingProposal(threadId)) ?? [];
+    const all = pending ?? [];
     return settleProposals(turn, baseCtx, matchDecisions(all, input.decisions), all, toolFilter, { rules, connectorTools });
   }
   if (confirming && pending?.length) {
@@ -1179,8 +1181,8 @@ export interface ProposalChoice {
 export function decisionLine(choices: readonly ProposalChoice[]): string {
   if (choices.length === 0) return "Nothing to decide";
   const word = (c: ProposalChoice) => (c.decision === "deny" ? "Denied" : c.args ? "Edited and approved" : "Approved");
-  if (choices.length === 1) return `${word(choices[0]!)} ${choices[0]!.tool}`;
-  return choices.map((c) => `${word(c)} ${c.tool}`).join(" · ");
+  if (choices.length === 1) return `${word(choices[0]!)} ${choices[0]!.call.tool}`;
+  return choices.map((c) => `${word(c)} ${c.call.tool}`).join(" · ");
 }
 
 /**

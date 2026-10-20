@@ -18,7 +18,8 @@ import { useChat, type ChatTab } from "./ChatContext";
 import AiChatPanel from "@/components/AiChatPanel";
 import TeamChatPanel from "@/components/TeamChatPanel";
 import { AssistantAgentShell } from "@/components/agents/AssistantAgentShell";
-import ThreadListSection from "./ThreadListSection";import { buttonVariants } from "@/components/vault/atoms/Button";
+import ThreadListSection from "./ThreadListSection";
+import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,8 +160,8 @@ export default function AssistantClient({
             showThreads && "bg-accent-tint font-medium text-accent-ink",
           )}
         >
-          <MessagesSquare className="size-[15px]" />
-          MessagesSquare
+          <MessagesSquare className="size-[15px]" aria-hidden />
+          Threads
         </button>
 
         <span className="hidden items-center gap-1.5 text-[0.75rem] text-ink-3 sm:inline-flex">
