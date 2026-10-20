@@ -24,7 +24,7 @@ const labelCls = "mb-1 block text-xs font-medium text-muted";
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnDeny =
@@ -205,7 +205,7 @@ export default function DirectMailSettings() {
     <div className="flex flex-col gap-4">
       <NoticeBar notice={notice} />
 
-      <div className="rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted">
+      <div className="rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted">
         <p className="font-medium text-ink">Test keys are the default.</p>
         <p className="mt-1">
           A test key renders postcards and letters without physically mailing

@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { badRequest, notFound, requireWorkspaceAccess } from "@/lib/route-utils";
+import { HttpError } from "@/lib/api/errors";
 import {
   FsError,
   deleteFile,
@@ -24,6 +25,9 @@ import {
   trashFile,
 } from "@/lib/filesystem/service";
 import { buildDownloadHeaders } from "@/lib/filesystem/download";
+// Phase 18.2 (WS=content): per-file access on top of the workspace role.
+import { fileRoleFor, requireFileAction } from "@/lib/files/access";
+import { fileActor } from "@/lib/files/http";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +86,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   );
   if (meta instanceof Response) return meta;
   if (!meta) return notFound("File not found");
-  return Response.json({ file: meta });
+  // Phase 18.2: the caller's role on this file (what the Files UI offers).
+  const fr = await fileRoleFor(fileActor(user.id, access.workspaceId, access.membership.role), fileId);
+  return Response.json({ file: meta, role: fr?.role ?? "viewer" });
 }
 
 const PatchSchema = z
@@ -114,6 +120,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if ("error" in access) return access.error;
 
   try {
+    // Phase 18.2: the file's own access can narrow an editor (trash/rename/move need "edit").
+    await requireFileAction(fileActor(user.id, access.workspaceId, access.membership.role), fileId, action === "trash" ? "trash" : "edit").catch(async (err) => {
+      // Restoring a trashed file: it isn't live, so the per-file check can't load it — the workspace role (editor+) stands.
+      if (action === "restore") return null;
+      throw err;
+    });
     const ws = { workspaceId: access.workspaceId, fileId };
     const file =
       action === "rename"
@@ -125,6 +137,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             : await restoreFile({ ...ws, newPath: parsed.data.newPath });
     return Response.json({ file });
   } catch (err) {
+    if (err instanceof HttpError) return Response.json({ error: err.message }, { status: err.status });
     return fsErrorToResponse(err);
   }
 }
@@ -145,10 +158,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (purge) {
       await deleteFile({ workspaceId: access.workspaceId, fileId });
     } else {
+      // Phase 18.2: the file's own access can narrow an editor.
+      await requireFileAction(fileActor(user.id, access.workspaceId, access.membership.role), fileId, "trash");
       await trashFile({ workspaceId: access.workspaceId, fileId });
     }
     return Response.json({ ok: true });
   } catch (err) {
+    if (err instanceof HttpError) return Response.json({ error: err.message }, { status: err.status });
     return fsErrorToResponse(err);
   }
 }

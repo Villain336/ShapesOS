@@ -3,12 +3,15 @@
 # the RLS batteries are meaningful. Everything else runs in: npm test
 lib/adplatforms/__tests__/spend-store-scope.test.ts
 lib/agents/agui/__tests__/adapter.test.ts
+lib/agents/runs/__tests__/recording-blobs-db.test.ts
 lib/agents/runs/__tests__/retention-eval.test.ts
 lib/agents/runs/__tests__/retention-sweep.test.ts
 lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/agents/runs/__tests__/watch-relay-db.test.ts
+lib/api/__tests__/shared-state-db.test.ts
 lib/approvals/__tests__/inbox-db.test.ts
 lib/auth/__tests__/member-roles.test.ts
 lib/auth/__tests__/signup-mode.test.ts
@@ -180,3 +183,72 @@ lib/chat/__tests__/delegation-billing-db.test.ts
 lib/zernio/__tests__/zernio-db.test.ts
 # Phase 15.4 (zernio): the /api/zernio routes (session stubbed) on the labelled FAKE Zernio — viewers read without creating a profile; admins connect; the callback works only for the user the state was signed for and records only accounts on that workspace's profile; OpenAI Ads keys pass through unstored; "use in every project" idempotent; the metering cron skips without a live key.
 lib/zernio/__tests__/zernio-routes-db.test.ts
+lib/runtime/__tests__/agent-drain-db.test.ts
+# Phase 17 (latency): async usage metering through the agent_jobs outbox — background ledger write, crash between ledger and run event retried once, dead writer's row finished by a worker, replays idempotent, 0-credit events never take the balance lock, cap still checked before the call.
+lib/llm/__tests__/usage-outbox-db.test.ts
+# Phase 17 (latency): ops overview payments as one SQL aggregate per kind == the in-memory sum (5,200 seeded rows, beyond the old 5,000-row read), RLS-scoped.
+lib/ops/__tests__/overview-payments-db.test.ts
+# Phase 17 (latency): run-event pagination (newest first, seq cursor, every timeline event once, text/usage excluded, RLS).
+lib/agents/runs/__tests__/events-page-db.test.ts
+# Phase 17 (latency): twin change signal — moves exactly when a record the snapshot reads changes (object, stock, booking, site status, delete) or the minute turns; not for another workspace or unrelated tables; the live stream skips unchanged ticks.
+lib/twin/__tests__/twin-signal-db.test.ts
+# Phase 17 (latency): no-model fast paths through the real turn + fake model counter — slash commands 0 model calls, proposing commands through the same gate (asks / Tier 0-2 rule / Tier 3 never auto), answer cache hit + label, data change and tool-using answers never served.
+lib/chat/__tests__/fast-paths-db.test.ts
+# Phase 17 (model): through the real chat turn against a FAKE Anthropic Messages API (MOCK) — byte-stable tools+system prefix across turns/threads/workspaces with 1h breakpoints on the last loaded tool + system; dynamic context in the first user turn; usage_events carry ttft/duration/effort/cache hit/service tier; the thread facts summary stored + injected (labelled); a deferred tool found by tool search runs.
+lib/chat/__tests__/p17-model-db.test.ts
+# Phase 17 (model): Message Batches end to end — llm_batch_jobs (FORCE RLS) + the real agent queue/AgentWorker + the Anthropic adapter against a FAKE Messages/Batches API (MOCK): submit, a worker dying mid-poll, reclaim, results, the nightly learning pass delivered once, llm_tokens at the batch tier (50%), idempotent per night.
+lib/llm/__tests__/batch-db.test.ts
+# Phase 17 (model): AI cost & speed from the llm_tokens ledger (cost per day, cache hits, p50/p95 first token, by model, top runs) and the cache-health alert (admins notified once per day when the 24 h cache-read share is under 60%).
+lib/metering/__tests__/ai-health-db.test.ts
+# Phase 17 (model): the evaluation harness dry run — seed → real chat loop → FAKE Anthropic (MOCK) → ledger → comparison table; every scripted task passes; the $ cap stops the sweep before a task that could cross it (partial table written); a real run refuses without ANTHROPIC_API_KEY in the env.
+scripts/eval/__tests__/eval-dry-run-db.test.ts
+# Phase 18.1 (desk): desktop layout / dock / recents owner-only RLS (workspace AND person) + per-user isolation; the Today briefing once per member per day (direct + batch, mock never writes); Pause all agents (kill switch, every live run stopped, audit, new runs refused until Resume); focus queues notifications and delivers them when it ends; the UserPrefs seam.
+lib/desktop/__tests__/desk-db.test.ts
+# Phase 18.1 (find): per-user preferences — defaults, one-key upserts, ownership (one person's write never touches another; the route reads the subject from the session only), all-or-nothing validation, CHECK constraints against raw SQL, PATCH /api/preferences + shell cookie + 401, notification channel filter (bell/push/muted, fail-open), account deletion lists the table.
+lib/preferences/__tests__/preferences-db.test.ts
+# Phase 18.1 (find): Spotlight — words inside an uploaded PDF (real upload → existing PDF extractor → chunks → GIN) and an Office doc, meaning-search through pgvector (deterministic MOCK embedder), tickets by message, inbox, contacts/companies/deals/people/apps, personal chats (never a teammate's), draft apps hidden from viewers, other workspace never, trashed files gone, FORCE RLS on the chunks, ranking + websearch syntax, idempotent backfill + re-index on change, search_workspace returns the same hits and reads a file by id.
+lib/search/__tests__/spotlight-db.test.ts
+# Phase 18.1 (integration): notification producers apply find's channel filter first (a muted kind is never written, even in focus), then desk's focus hold (written held, not pushed), then push only rows not held; release on focus end (switch-off and cron sweep) delivers to the bell and pushes through the same push filter (push MOCK).
+lib/notifications/__tests__/focus-channels-db.test.ts
+# Phase 18.2 (comms): Reminders — personal project-less OpsTasks (owner-only; never in the generic ops task list or PATCH), repeat roll-forward in the owner's zone, due → one reminder_due notification per occurrence (held under focus, no duplicate, re-armed by a new due time), create_reminder asks unless a Tier-1 rule says auto and is denied outside the grant.
+lib/comms/__tests__/reminders-db.test.ts
+# Phase 18.2 (comms): Contacts — the sync gives every record of the four people stores its own identity and never merges (idempotent), suggestions never cross workspaces (FORCE RLS), confirm merges with who/when, reject is remembered for every record pair across the two people (an agent's re-proposal is refused), unlink undoes, the timeline reads linked activity, Spotlight's contact kind returns one result per person, suggest_merge never merges and confirm_merge asks without a rule.
+lib/comms/__tests__/contacts-db.test.ts
+# Phase 18.2 (comms): Calendar — the view reads this workspace's bookings and the member's OWN reminders and calendar connections (never a teammate's; a failing connector is an error line; the dev mock is labelled and never editable), find time avoids busy bookings, a person's event create is audited and another member's calendar is refused, the agent tool asks first (write_outlook_calendar), the private ICS feed (hash only, own items only, 404 when revoked / other workspace / malformed / member left).
+lib/comms/__tests__/calendar-db.test.ts
+# Phase 18.2 (comms): Mail — the unified inbox shows only the member's OWN Gmail/Outlook mailboxes (a teammate's never; the dev mock labelled and never cached), this workspace's CRM inbox and its Zernio DMs (FAKE Zernio; a stranger account's DM refused); archive/read/tags are owner-only Mail-app state; Spotlight mail is personal; mail_send asks (send_outreach_email) without a rule and a mock send says nothing was sent; a person sends only from their own mailbox, a viewer can't reply to a lead, a CRM reply goes through the dispatcher (one outbound ledger row); social_send_dm asks first and sends with an Idempotency-Key on an owned account.
+lib/comms/__tests__/mail-db.test.ts
+# Phase 18.2 (comms): Messages — public/project channels open to members while private channels and DMs answer 404 outside (read, post, join, stream), one DM per set of people, FORCE RLS keeps other workspaces out, unread follows the read mark, threads, edit/remove, the project chat as a channel; mentions notify only people who can see the message, a DM once, held under focus; presence (active/away/focus, strangers never answered); an @agent mention queues a channel_agent job → tracked turn as the asker → the reply in the thread with its proposal inline → a viewer can't decide → Approve sends the chat's "yes" through executeTool (the reminder is created), Discard drops it, a follow-up continues the same chat thread, a viewer's mention starts nothing.
+lib/comms/__tests__/messages-db.test.ts
+# Phase 18.2 (comms): Meet — a private channel's call is seen only by its members (list, detail, join, Calendar) and the channel gets a Join message, another workspace never (FORCE RLS); joining is 409 "not configured" with no token in rehearsal mode and a token for the meeting's own room when configured, never after it ends, only the starter or an admin ends it; transcripts are post-call (pasted by an editor, or an uploaded recording through the transcriber — 409 without a key, the file's own format passed on); a mock summary saves nothing, a live one saves once: a note in the Notes app via createNote (private to the saver for a private-channel call, shared for an ad hoc one; sourceRef meeting:<id>; linked to the ops project its task went to; a bad ops project writes no orphan note), the chosen items as my reminders (09:00 in my zone, sourceRef meeting:<id>) or ops tasks assigned to the member named.
+lib/comms/__tests__/meet-db.test.ts
+# Phase 18.2 (content): Notes — createNote writes univer_docs kind "note" + record links (private = maker only, shared = members; viewer read-only; delete = maker/admin), a record's notes, another workspace never, FORCE RLS fail-closed on note_links / univer_doc_versions / univer_doc_collab_states, stale expectedVersion refused, version history (idle snapshot, named, restore keeps the current state and drops the collab state), Spotlight kind "note" (words inside, private only for its maker, never via Office/file contents), agents' create_note / read_note / search_workspace.
+lib/notes/__tests__/notes-db.test.ts
+# Phase 18.2 (content): live collaboration — a real Hocuspocus server (lib/collab/server.ts) and two real providers over WebSocket: first open seeds the yjs doc from the note's JSON; an editor's change reaches the other client and is stored as yjs state + JSON snapshot (version + 1); a viewer token is read-only ON THE SERVER (its edits reach no one, never stored); forged / expired / other-document tokens refused; persistence round-trip across a server restart; a version restore resets live editors and the stale copy is never stored over it.
+lib/collab/__tests__/collab-db.test.ts
+# Phase 18.2 (content): Files — versions (an overwrite keeps the old bytes; list/read/restore = a new version; quota counts every version; retention purges the oldest and frees bytes + quota; a purge frees every version; Spotlight re-indexes the new version), per-file access (never wider than the workspace role, admins never narrowed, only owners manage), share links through the PUBLIC route handler (view-only can't download, password → 401 until the signed cookie, wrong password refused, revoked/expired/unknown/trashed all 404, only the token hash stored), PDF annotations per version, FORCE RLS fail-closed on every new Files table.
+lib/files/__tests__/files-db.test.ts
+# Phase 18.2 (content): Activity Monitor — every run (sub-agents nested, cost so far, budget), job, terminal of THIS workspace; Stop through the existing paths (requestAgentRunCancel for the run tree, queued job cancel, run-bound job, terminal end) only for the starter or an admin, audited; health (queue depth, oldest, dead, heartbeat; cron + DB pool admin-only); list_processes (Tier 0).
+lib/aos/__tests__/activity-db.test.ts
+# Phase 18.2 (content): Terminal — on a TEST sandbox provider: no provider → says why, runs nothing; editor+ only; open audited, one live session per person (resume); output streams, the directory carries over, every command recorded (never output); nobody else (no other editor, no admin) can type into it; Ctrl+C records 130; close destroys + audits; idled-out sandboxes close the session; FORCE RLS.
+lib/terminal/__tests__/terminal-db.test.ts
+# Phase 18.2 (content): Store — the catalogue from every registry with this workspace's state; install/remove per workspace through each kind's existing path + permission (registry skill: admin/skills.install; template: admin, hidden from the picker; mini-app: publish/unpublish; Composio toolkit: editor; connectors/MCP → Settings), audited; agency publishing to its own client workspaces only, client admin accept (installed via the same paths) / decline, withdraw, party isolation under FORCE RLS; list_store_items (Tier 0).
+lib/store/__tests__/store-db.test.ts
+# Phase 18.3 (trust): session registry — a revoked session's JWT is refused on its next read and no other; "sign out other sessions" keeps this one, ends the rest and cuts off pre-registry tokens; a missing row ends the token; owner-only FORCE RLS on app.user_id (another person sees/revokes/writes nothing; no GUC = no rows); account deletion covers it.
+lib/auth/__tests__/sessions-db.test.ts
+# Phase 18.3 (trust): agent app permissions — an admin blocks Mail (audited, per workspace); the next turn's grant and toolCatalogForPrompt drop the mail tools; executeTool refuses a mail tool and a Gmail connector tool even with no grant / a stale grant; the Store marks Gmail blocked; allowing it again restores the grant.
+lib/agents/__tests__/app-permissions-db.test.ts
+# Phase 18.3 (trust): audit timeline — one newest-first list across the workspace log, agent run steps (summaries only), ops, the command bar and the mission chain; this workspace only (FORCE RLS sources too); agents vs people + source filters; cursor paging without gaps; the route is admin+ (viewer 403), CSV export audited; the mission chain verifies and a tampered entry is reported.
+lib/audit-timeline/__tests__/timeline-db.test.ts
+# Phase 18.3 (trust): data access log rows for a seeded run (reads only, mapped to their app; ops reads by agents; "for you" = runs you started; other workspace never) and memory controls (person vs admin views; forget deletes the row and its embedding under RLS, recall can't return it, a person can't forget another's memory, audited without the text; citing rows keep existing).
+lib/privacy/__tests__/privacy-db.test.ts
+# Phase 18.3 (trust): Notifications 2.0 — run finished (finishAgentRun; not quick chat turns), invoice paid and ticket assigned (the ops webhook seam), meeting starting (the sweep) each once per event; held under focus and released+pushed per the matrix (MOCK push); a muted kind never written; Slack DMs only for people who turned Slack on (STUB delivery); the email digest through a STUB sender (once a day, per-kind email cells, failed sends retried).
+lib/notifications/__tests__/notifications2-db.test.ts
+# Phase 18.3 (trust): one approvals queue — autopilot drafts and workflow approval gates appear as inbox sources 16/17 for this workspace only, viewers can't decide, and approve/reject through the EXISTING autopilot routes (a gate's approval resumes the paused WorkflowRun, a rejection cancels it).
+lib/approvals/__tests__/inbox-autopilot-db.test.ts
+# Phase 18.3 (WS=flow): Web Push — push_subscriptions owner-only FORCE RLS (no GUC = nothing; another person can't read, write or remove mine), SSRF guard (only known push-service hosts), sendWebPush against a STUB push service (VAPID JWT verifies, aes128gcm body decrypts in the "browser"), 410/404 delete at once, MAX_FAILURES in a row delete, a success resets, no VAPID keys = nothing sent and why, account deletion removes subscriptions.
+lib/push/__tests__/web-push-db.test.ts
+# Phase 18.3 (WS=flow): Time Machine — admins only; a snapshot is the GDPR workspace export gzipped in object storage with a per-table manifest row (FORCE RLS); restore into a NEW workspace: row counts match per restored table, ids re-keyed with references (FKs, note links, self-references) following, file bytes copied to new storage keys, automations come back off, in-flight runs cancelled, members / queues / billing skipped and listed, the source untouched, both workspaces audited; settings, retention, delete.
+lib/timemachine/__tests__/snapshots-db.test.ts
+# Phase 18.3 (WS=flow): Undo this agent run — a run and its sub-agent do real work through executeTool (note, reminder, share link, ops ticket opened then closed) plus labelled synthetic sent-mail / refund events; the plan classifies each from the run's timeline (touched records + prior values); only the starter or an admin, confirmed; undo reverts exactly the revertible changes through each domain's own path and leaves money / sent / created alone; audited and on the timeline; a second undo is a no-op.
+lib/timemachine/__tests__/undo-db.test.ts

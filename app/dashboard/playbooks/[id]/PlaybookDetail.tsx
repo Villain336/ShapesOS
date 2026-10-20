@@ -84,13 +84,13 @@ const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnRun =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
 const btnTiny =
-  "inline-flex h-6 items-center gap-1 rounded-full bg-paper px-2.5 text-[11px] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper disabled:opacity-40";
+  "inline-flex h-6 items-center gap-1 rounded-full bg-paper px-2.5 text-[0.6875rem] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper disabled:opacity-40";
 
 // Sources, lifecycle statuses, labels, and analytic deltas are categories —
 // never agent states, so always a neutral chip.
@@ -113,7 +113,7 @@ function ErrorBox({ message }: { message: string }) {
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className={`relative max-h-[85vh] w-full ${wide ? "max-w-3xl" : "max-w-lg"} overflow-y-auto rounded-lg bg-paper p-5 shadow-overlay`}
         onClick={(e) => e.stopPropagation()}
@@ -361,7 +361,7 @@ export function PlaybookDetail({ playbookId }: { playbookId: string }) {
             {runResult.plan.map((s) => (
               <li key={s.order} className="rounded-lg bg-paper px-3 py-2 shadow-hairline">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas text-[11px] font-semibold text-ink">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas text-[0.6875rem] font-semibold text-ink">
                     {s.order}
                   </span>
                   <span className="text-sm font-medium text-ink">{s.title}</span>
@@ -436,12 +436,12 @@ function VersionsTab({
                       {v.labels.length === 0 && <span className="text-subtle">—</span>}
                     </div>
                   </td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted" title={v.contentHash}>
+                  <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted" title={v.contentHash}>
                     {v.contentHash.slice(0, 8)}
                   </td>
                   <td className="px-3 py-2 text-muted">
                     <div className="text-xs">{new Date(v.createdAt).toLocaleDateString()}</div>
-                    <div className="font-mono text-[11px] text-subtle">{v.createdBy.slice(0, 12)}…</div>
+                    <div className="font-mono text-[0.6875rem] text-subtle">{v.createdBy.slice(0, 12)}…</div>
                   </td>
                   <td className="px-3 py-2">
                     {v.eval ? (
@@ -512,7 +512,7 @@ function VersionsTab({
                           <div className="text-xs font-semibold text-muted">
                             Outcome attribution
                           </div>
-                          <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-paper p-2 font-mono text-[11px] text-muted shadow-hairline">
+                          <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-paper p-2 font-mono text-[0.6875rem] text-muted shadow-hairline">
                             {JSON.stringify(v.outcomeAttribution, null, 2)}
                           </pre>
                         </div>
@@ -767,15 +767,15 @@ function NewVersionModal({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-muted">Flow ID</label>
+            <label className="mb-1 block text-[0.6875rem] font-semibold text-muted">Flow ID</label>
             <input value={autoFlowId} onChange={(e) => setAutoFlowId(e.target.value)} placeholder="e.g. abc123…" className={`${inputCls} w-full font-mono`} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-muted">Flow name (label)</label>
+            <label className="mb-1 block text-[0.6875rem] font-semibold text-muted">Flow name (label)</label>
             <input value={autoFlowName} onChange={(e) => setAutoFlowName(e.target.value)} placeholder="Weekly rank digest" className={`${inputCls} w-full`} />
           </div>
         </div>
-        <label className="mb-1 mt-2 block text-[11px] font-semibold text-muted">Payload template (JSON object)</label>
+        <label className="mb-1 mt-2 block text-[0.6875rem] font-semibold text-muted">Payload template (JSON object)</label>
         <textarea value={autoPayload} onChange={(e) => setAutoPayload(e.target.value)} rows={2} spellCheck={false} className={`${inputCls} w-full font-mono`} />
       </div>
       <div className="flex justify-end gap-2">
@@ -923,7 +923,7 @@ function SharingTab({ playbookId, playbookName }: { playbookId: string; playbook
         </div>
         {exportJson && (
           <div className="mt-3">
-            <pre className="max-h-72 overflow-auto rounded-lg bg-canvas p-3 font-mono text-[11px] text-muted">
+            <pre className="max-h-72 overflow-auto rounded-lg bg-canvas p-3 font-mono text-[0.6875rem] text-muted">
               {exportJson}
             </pre>
             <button onClick={download} className={`${btnGhost} mt-2`}>

@@ -4,12 +4,11 @@
 // Deleting a site also removes its local working copy from disk.
 
 import type { NextRequest } from "next/server";
-import { promises as fs } from "fs";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { requireProjectRole, forbidden } from "@/lib/authz";
 import { ownedSite, publicSite } from "@/lib/connectors/source";
-import { siteWorkingDir } from "@/lib/connectors/local";
+import { deleteSiteWorkingCopy } from "@/lib/connectors/local";
 
 export async function GET(
   req: NextRequest,
@@ -38,9 +37,9 @@ export async function DELETE(
   if (!(await requireProjectRole(user.id, site.projectId, "admin"))) return forbidden();
 
   await prisma.site.delete({ where: { id: site.id } });
-  // Best-effort: remove the working copy from disk.
+  // Best-effort: remove the working copy (local disk or the shared store).
   try {
-    await fs.rm(siteWorkingDir(site.id), { recursive: true, force: true });
+    await deleteSiteWorkingCopy(site.id);
   } catch {
     /* non-fatal */
   }

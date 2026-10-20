@@ -1,0 +1,134 @@
+# ShapesOS — AWS infrastructure (infra/aws, AWS CDK). We run on Render today
+# (docs/deploy/RENDER.md); this keeps the AWS path ready (docs/deploy/AWS.md).
+#
+#   check   every run: npm ci, tests, cdk synth — no AWS credentials.
+#   diff    cdk diff against the account (read-only plan role).
+#   deploy  cdk deploy behind the `production` environment (owner approval).
+# diff and deploy are OFF unless the repository variable AWS_DEPLOY_ENABLED is
+# 'true', and authenticate with GitHub OIDC — no stored AWS keys
+# (infra/aws/bootstrap/bootstrap.yaml creates the roles).
+#
+# Settings: vars.AWS_DEPLOY_ENABLED, vars.AWS_REGION, vars.AWS_DEPLOY_ROLE_ARN,
+# vars.AWS_PLAN_ROLE_ARN, vars.AWS_ACCOUNT_ID, vars.AWS_DOMAIN,
+# vars.AWS_HOSTED_ZONE_ID (optional), vars.AWS_ALARM_EMAIL (optional).
+
+name: infra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/aws/**"
+      - "scripts/deploy/render-env.mjs"
+      - ".github/workflows/infra.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy (otherwise only check and diff)
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: infra-aws
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: infra/aws/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npx cdk synth --quiet
+
+  diff:
+    needs: check
+    if: vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The plan and deploy roles trust only jobs in the production environment.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: infra/aws/package-lock.json
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: cdk diff
+        env:
+          REGION: ${{ vars.AWS_REGION }}
+          ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+          DOMAIN: ${{ vars.AWS_DOMAIN }}
+          ZONE: ${{ vars.AWS_HOSTED_ZONE_ID }}
+          EMAIL: ${{ vars.AWS_ALARM_EMAIL }}
+        run: >-
+          npx cdk diff --all
+          -c region="$REGION" -c account="$ACCOUNT" -c domain="$DOMAIN"
+          ${ZONE:+-c hostedZoneId="$ZONE"} ${EMAIL:+-c alarmEmail="$EMAIL"}
+
+  deploy:
+    needs: diff
+    if: vars.AWS_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: infra/aws/package-lock.json
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: cdk deploy
+        env:
+          REGION: ${{ vars.AWS_REGION }}
+          ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+          DOMAIN: ${{ vars.AWS_DOMAIN }}
+          ZONE: ${{ vars.AWS_HOSTED_ZONE_ID }}
+          EMAIL: ${{ vars.AWS_ALARM_EMAIL }}
+        run: >-
+          npx cdk deploy --all --require-approval never
+          -c region="$REGION" -c account="$ACCOUNT" -c domain="$DOMAIN"
+          ${ZONE:+-c hostedZoneId="$ZONE"} ${EMAIL:+-c alarmEmail="$EMAIL"}

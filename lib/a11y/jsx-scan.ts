@@ -14,12 +14,18 @@
 //                              replacement in the same className, or
 //                              data-focus-ring="container" when a wrapper
 //                              draws it with focus-within.
+//   icon-button-name           (Phase 18.1) a <button> / <a> / <Link> whose
+//                              only content is an icon needs an accessible
+//                              name: aria-label, aria-labelledby or title
+//                              (or visible / sr-only text inside).
+//   positive-tabindex          (Phase 18.1) tabIndex > 0 breaks the natural
+//                              tab order; use 0 or -1.
 //
 // Dev-only tooling: never imported by app code.
 
 import ts from "typescript";
 
-export type A11yRule = "clickable-non-interactive" | "img-alt" | "outline-none";
+export type A11yRule = "clickable-non-interactive" | "img-alt" | "outline-none" | "icon-button-name" | "positive-tabindex";
 
 export interface A11yFinding {
   rule: A11yRule;
@@ -92,6 +98,55 @@ function isTruthyAttr(a: ts.JsxAttribute | undefined): boolean {
   return t !== "false" && t !== '"false"';
 }
 
+/** Elements that render an icon and no text (Lucide components, svg). */
+function isIconElement(el: ts.JsxChild, sf: ts.SourceFile): boolean {
+  if (ts.isJsxSelfClosingElement(el)) {
+    const tag = el.tagName.getText(sf);
+    if (tag === "svg" || tag === "img") return true;
+    // A capitalized component with an icon-ish name or used as one (className size-*/h-* only).
+    if (/^[A-Z]/.test(tag)) {
+      const a = attrs(el);
+      // Components that carry their own label/text props are not "just an icon".
+      if (a.has("label") || a.has("aria-label") || a.has("title") || a.has("children") || a.has("name") || a.has("text")) return false;
+      return /(Icon|^[A-Z][a-zA-Z0-9]*)$/.test(tag) && !/(Badge|Avatar|Label|Text|Title|Pill|Chip|KeyCap|Count|Tooltip|Shape)/.test(tag);
+    }
+    return false;
+  }
+  if (ts.isJsxElement(el)) {
+    const tag = el.openingElement.tagName.getText(sf);
+    if (tag === "svg") return true;
+    return false;
+  }
+  return false;
+}
+
+/** True when the children are only icons (whitespace text ignored, no expressions). */
+function onlyIcons(children: ts.NodeArray<ts.JsxChild>, sf: ts.SourceFile): boolean {
+  let icons = 0;
+  for (const c of children) {
+    if (ts.isJsxText(c)) {
+      if (c.getText(sf).trim()) return false;
+      continue;
+    }
+    if (ts.isJsxExpression(c)) {
+      // {cond ? <A/> : <B/>} of icons only still counts; any other expression may be text.
+      const e = c.expression;
+      if (!e) continue;
+      if (ts.isConditionalExpression(e) && [e.whenTrue, e.whenFalse].every((b) => ts.isJsxSelfClosingElement(b) && isIconElement(b, sf))) {
+        icons++;
+        continue;
+      }
+      return false;
+    }
+    if (isIconElement(c, sf)) {
+      icons++;
+      continue;
+    }
+    return false;
+  }
+  return icons > 0;
+}
+
 export function scanTsx(source: string, fileName = "file.tsx"): A11yFinding[] {
   const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const findings: A11yFinding[] = [];
@@ -144,6 +199,21 @@ export function scanTsx(source: string, fileName = "file.tsx"): A11yFinding[] {
       const containerRing = /"container"/.test(initText(a.get("data-focus-ring")));
       if (cls && OUTLINE_NONE.test(cls) && !FOCUS_REPLACEMENT.test(cls) && !containerRing) {
         push("outline-none", node, tag);
+      }
+
+      // --- positive tabIndex
+      const tabIndex = initText(a.get("tabIndex")).replace(/^\{|\}$/g, "").replace(/^"|"$/g, "").trim();
+      if (/^[1-9]\d*$/.test(tabIndex)) push("positive-tabindex", node, tag);
+    }
+
+    // --- icon-only buttons / links need an accessible name
+    if (ts.isJsxElement(node)) {
+      const open = node.openingElement;
+      const tag = open.tagName.getText(sf);
+      if (tag === "button" || tag === "a" || tag === "Link") {
+        const a = attrs(open);
+        const named = a.has("aria-label") || a.has("aria-labelledby") || a.has("title") || hasSpread(open);
+        if (!named && onlyIcons(node.children, sf)) push("icon-button-name", open, tag);
       }
     }
     ts.forEachChild(node, visit);

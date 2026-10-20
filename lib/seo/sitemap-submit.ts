@@ -21,7 +21,7 @@ import { getGscToken, type GscToken } from "@/lib/intelligence/gsc/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { Prisma } from "@prisma/client";
 import { readSiteWorkingCopy } from "@/lib/sites/files";
-import type { LocalDirProvider } from "@/lib/connectors/local";
+import type { WorkingCopyProvider } from "@/lib/connectors/local";
 import { resolveLiveAuditUrl } from "@/lib/audit/project-audit";
 import { indexNowKey, indexNowSecret, sitemapEntriesForFiles } from "./sitemap";
 
@@ -141,7 +141,7 @@ export interface SiteSubmitInput {
   targets?: SubmitTarget[];
   submittedBy?: string | null;
   /** Test seams. */
-  provider?: LocalDirProvider;
+  provider?: WorkingCopyProvider;
   origin?: string | null;
   secret?: string | null;
 }

@@ -95,7 +95,7 @@ export function ReplayViewer({
     return (
       <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
         <MonitorPlay className="mx-auto h-8 w-8 text-subtle" />
-        <p className="mt-3 text-[13px] text-muted">
+        <p className="mt-3 text-[0.8125rem] text-muted">
           No recordings yet. Recordings appear here once someone views this
           share link.
         </p>
@@ -106,14 +106,14 @@ export function ReplayViewer({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="replay-session" className="text-[13px] font-medium text-ink">
+        <label htmlFor="replay-session" className="text-[0.8125rem] font-medium text-ink">
           Session
         </label>
         <select
           id="replay-session"
           value={selected ?? ""}
           onChange={(e) => setSelected(e.target.value)}
-          className="h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+          className="h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
         >
           {sessions.map((s) => (
             <option key={s.id} value={s.id}>
@@ -130,13 +130,13 @@ export function ReplayViewer({
         </div>
       )}
       {state.kind === "error" && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint p-4 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-lg bg-failed-tint p-4 text-[0.8125rem] text-failed-text">
           <span className="aos-shape aos-shape--failed mt-1 shrink-0" aria-hidden="true" />
           {state.message}
         </div>
       )}
       {state.kind === "empty" && (
-        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline text-[13px] text-muted">
+        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline text-[0.8125rem] text-muted">
           This session captured no events.
         </div>
       )}

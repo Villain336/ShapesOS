@@ -16,7 +16,8 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Tests (~29 min) plus the production build (~16 min with swap) passed 45 on PR #29 (2026-10-07).
+    timeout-minutes: 60
     services:
       postgres:
         # pgvector is required by the memory/substrate migrations.
@@ -87,6 +88,12 @@ jobs:
       - name: DB-backed tests (as non-superuser app role)
         run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npm run test:db
 
+      # Phase 17 (model): the prompt-cache probe — real chat turns against a
+      # FAKE Anthropic server (no key, no cost); fails on a cache breaker in
+      # the tools + system prefix or a missing 1h breakpoint.
+      - name: Prompt-cache probe (Phase 17)
+        run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npx tsx scripts/verify/prompt-cache.mts
+
       - name: Launch-readiness battery (F6)
         run: npx tsx scripts/verify-phase7-launch.mts
 
@@ -100,6 +107,11 @@ jobs:
 
       - name: Credential-free smoke
         run: npx tsx scripts/smoke-no-creds.mts
+
+      - name: Swap for the production build
+        # The build's native compiler outgrows the runner's 8 GB; extra swap
+        # keeps the runner alive (scripts/ci/add-swap.sh explains).
+        run: sh scripts/ci/add-swap.sh 16
 
       - name: Production build
         # Types were already gated by the Typecheck step above; skip Next's
@@ -116,7 +128,7 @@ jobs:
     # services, no private credentials. scripts/e2e/run.sh is the same entry
     # point developers run locally.
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -155,6 +167,9 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=marketr_app
           -v app_password=marketr_app_ci -f scripts/db/create-app-role.sql
 
+      - name: Swap for the production build
+        run: sh scripts/ci/add-swap.sh 16
+
       - name: Production build
         # Types are gated by the verify job; skip Next's duplicate pass.
         env:
@@ -186,6 +201,37 @@ jobs:
             scripts/e2e/report
             test-results
           retention-days: 7
+
+  infra:
+    # Deploy PR: hosting as code never rots. The AWS CDK app (infra/aws, its
+    # own package) type-checks, its assertion tests pass and it synthesizes
+    # with NO AWS credentials; render.yaml validates against Render's schema
+    # and the repo rules; the env plan covers every .env.example key.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: infra/aws/package-lock.json
+
+      - name: Install (infra/aws only)
+        working-directory: infra/aws
+        run: npm ci
+
+      - name: CDK tests (types, assertions, bootstrap template fresh)
+        working-directory: infra/aws
+        run: npm test
+
+      - name: cdk synth (no credentials)
+        working-directory: infra/aws
+        run: npx cdk synth --quiet
+
+      - name: render.yaml (schema + repo rules + env groups)
+        run: node scripts/ci/validate-render-blueprint.mjs
 
   compose:
     # Phase 6: the self-host compose file. Validates `docker compose config`

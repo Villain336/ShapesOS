@@ -51,7 +51,7 @@ export function pushMessageFor(n: NotificationInput, token: string): ExpoPushMes
     title: clip(n.title, 120) ?? "ShapesOS",
     body: clip(n.body, 180),
     sound: "default",
-    priority: n.kind === "approval_needed" || n.kind === "run_failed" ? "high" : "default",
+    priority: n.kind === "approval_needed" || n.kind === "run_failed" || n.kind === "meeting_starting" || n.kind === "direct_message" ? "high" : "default",
     channelId: "default",
     data: {
       kind: n.kind,

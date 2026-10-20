@@ -141,29 +141,29 @@ export function QrDesignerTab() {
       {/* Controls */}
       <div className="space-y-4 rounded-lg border border-line bg-paper p-4">
         <div>
-          <label className="mb-1 block text-[12px] font-semibold text-muted">Target URL</label>
+          <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Target URL</label>
           <input
             value={targetUrl}
             onChange={(e) => setTargetUrl(e.target.value)}
             placeholder="https://…"
-            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
           />
-          <p className="mt-1 text-[11px] text-subtle">The code must decode to exactly this URL — verified by a real scan test.</p>
+          <p className="mt-1 text-[0.6875rem] text-subtle">The code must decode to exactly this URL — verified by a real scan test.</p>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-semibold text-muted">Describe the look</label>
+          <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Describe the look</label>
           <textarea
             value={stylePrompt}
             onChange={(e) => setStylePrompt(e.target.value)}
             rows={3}
-            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
           />
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {EXAMPLES.map((ex) => (
               <button
                 key={ex}
                 onClick={() => setStylePrompt(ex)}
-                className="rounded-full border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink"
+                className="rounded-full border border-line px-2 py-0.5 text-[0.6875rem] text-muted hover:border-line-strong hover:text-ink"
               >
                 {ex.slice(0, 34)}…
               </button>
@@ -172,61 +172,61 @@ export function QrDesignerTab() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-muted">Foreground</label>
+            <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Foreground</label>
             <div className="flex items-center gap-2">
               <input type="color" value={foreground} onChange={(e) => setForeground(e.target.value)} className="h-9 w-10 cursor-pointer rounded-key border border-line bg-paper" />
-              <span className="font-mono text-[11px] text-subtle">{foreground}</span>
+              <span className="font-mono text-[0.6875rem] text-subtle">{foreground}</span>
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-muted">Background</label>
+            <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Background</label>
             <div className="flex items-center gap-2">
               <input type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="h-9 w-10 cursor-pointer rounded-key border border-line bg-paper" />
-              <span className="font-mono text-[11px] text-subtle">{background}</span>
+              <span className="font-mono text-[0.6875rem] text-subtle">{background}</span>
             </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-muted">Shape</label>
+            <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Shape</label>
             <select
               value={shapeMask}
               onChange={(e) => setShapeMask(e.target.value as "square" | "round")}
-              className="w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-2 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+              className="w-full rounded-md border-[1.5px] border-control bg-paper px-2 py-2 text-[0.8125rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
             >
               <option value="square">Square</option>
               <option value="round">Round</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-muted">Center logo</label>
+            <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Center logo</label>
             <input
               type="file"
               accept="image/png"
               onChange={(e) => onLogoFile(e.target.files?.[0] ?? null)}
-              className="w-full text-[12px] text-muted"
+              className="w-full text-[0.75rem] text-muted"
             />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-semibold text-muted">Frame CTA (optional)</label>
+          <label className="mb-1 block text-[0.75rem] font-semibold text-muted">Frame CTA (optional)</label>
           <input
             value={frameCta}
             onChange={(e) => setFrameCta(e.target.value)}
             placeholder="Scan for 20% off"
-            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
+            className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink outline-none focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
           />
         </div>
         <button
           onClick={design}
           disabled={busy}
-          className="flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-[13.5px] font-semibold text-white aos-press disabled:opacity-50"
+          className="flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-[0.84375rem] font-semibold text-white aos-press disabled:opacity-50"
         >
           {busy ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
           {busy ? "Designing + verifying…" : "Design QR code"}
         </button>
-        {error && <p className="text-[12.5px] text-failed-text">{error}</p>}
-        <p className="text-[11px] leading-relaxed text-subtle">
+        {error && <p className="text-[0.78125rem] text-failed-text">{error}</p>}
+        <p className="text-[0.6875rem] leading-relaxed text-subtle">
           Every design is validated before preview: glyph fill, contrast ≥ 3:1, finder-pattern integrity,
           quiet zone, error correction H — then decoded with a real scanner. Styles that fail come back
           with the reason plus a bolder variant. The AI styles artwork only, never the encoded data.
@@ -236,7 +236,7 @@ export function QrDesignerTab() {
       {/* Preview + validation */}
       <div className="space-y-4">
         {!result && (
-          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-line bg-canvas text-[13px] text-subtle">
+          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-line bg-canvas text-[0.8125rem] text-subtle">
             Describe the look and hit “Design QR code” — the verified preview appears here.
           </div>
         )}
@@ -245,9 +245,9 @@ export function QrDesignerTab() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-lg border border-line bg-paper p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-[13px] font-semibold text-ink">Preview</h3>
+                  <h3 className="text-[0.8125rem] font-semibold text-ink">Preview</h3>
                   {result.regenerated && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas px-2 py-0.5 text-[10.5px] font-medium text-muted">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas px-2 py-0.5 text-[0.65625rem] font-medium text-muted">
                       <RefreshCw size={11} /> bolder variant
                     </span>
                   )}
@@ -255,9 +255,9 @@ export function QrDesignerTab() {
                 {result.previewPng ? (
                   <img src={result.previewPng} alt="Styled QR preview" className="mx-auto max-h-80 rounded-lg border border-line" />
                 ) : (
-                  <p className="text-[12.5px] text-failed-text">No preview — the design did not verify (see issues).</p>
+                  <p className="text-[0.78125rem] text-failed-text">No preview — the design did not verify (see issues).</p>
                 )}
-                <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[0.6875rem]">
                   <span className="rounded-full bg-canvas px-2 py-0.5 text-muted">{result.spec.glyphLabel}</span>
                   <span className="rounded-full bg-canvas px-2 py-0.5 text-muted">{result.spec.shapeMask} mask</span>
                   <span className="rounded-full bg-canvas px-2 py-0.5 font-mono text-muted">{result.spec.foreground} / {result.spec.background}</span>
@@ -266,9 +266,9 @@ export function QrDesignerTab() {
                 </div>
               </div>
               <div className="rounded-lg border border-line bg-paper p-4">
-                <h3 className="mb-2 text-[13px] font-semibold text-ink">Validation</h3>
+                <h3 className="mb-2 text-[0.8125rem] font-semibold text-ink">Validation</h3>
                 {v ? (
-                  <div className="space-y-2.5 text-[12.5px]">
+                  <div className="space-y-2.5 text-[0.78125rem]">
                     <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${result.scanTest.passed ? "border-line bg-paper" : "border-failed bg-failed-tint"}`}>
                       {result.scanTest.passed ? <BadgeCheck size={16} className="text-ink" /> : <ShieldAlert size={16} className="text-failed-text" />}
                       <span className={result.scanTest.passed ? "text-ink" : "text-failed-text"}>
@@ -286,7 +286,7 @@ export function QrDesignerTab() {
                         {v.issues.map((i) => (
                           <li key={i.code} className="flex gap-1.5 text-failed-text">
                             <ShieldAlert size={13} className="mt-0.5 shrink-0" />
-                            <span><span className="font-mono text-[11px]">{i.code}</span> — {i.message}</span>
+                            <span><span className="font-mono text-[0.6875rem]">{i.code}</span> — {i.message}</span>
                           </li>
                         ))}
                       </ul>
@@ -296,21 +296,21 @@ export function QrDesignerTab() {
                         <div className="flex items-center gap-1.5 text-ink">
                           <ShieldCheck size={14} /> <span className="font-semibold">Print-locked</span>
                         </div>
-                        <p className="mt-1 font-mono text-[11px] text-subtle">sha256 {hashShort(result.lock.hash)}</p>
-                        <p className="mt-0.5 text-[11px] text-subtle">Bind this hash in the per-buy approval object — it covers the exact verified PNG.</p>
+                        <p className="mt-1 font-mono text-[0.6875rem] text-subtle">sha256 {hashShort(result.lock.hash)}</p>
+                        <p className="mt-0.5 text-[0.6875rem] text-subtle">Bind this hash in the per-buy approval object — it covers the exact verified PNG.</p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[12.5px] text-failed-text">{result.fatal ?? "Validation did not run."}</p>
+                  <p className="text-[0.78125rem] text-failed-text">{result.fatal ?? "Validation did not run."}</p>
                 )}
               </div>
             </div>
 
             {result.attempts.length > 0 && (
               <div className="rounded-lg border border-line bg-paper p-4">
-                <h3 className="mb-2 text-[13px] font-semibold text-ink">Design log</h3>
-                <ul className="space-y-1 text-[12px] text-muted">
+                <h3 className="mb-2 text-[0.8125rem] font-semibold text-ink">Design log</h3>
+                <ul className="space-y-1 text-[0.75rem] text-muted">
                   {result.attempts.map((a, i) => (
                     <li key={i} className="flex gap-2"><span className="font-mono text-subtle">{i + 1}.</span><span>{a}</span></li>
                   ))}
@@ -322,14 +322,14 @@ export function QrDesignerTab() {
               <button
                 onClick={downloadPng}
                 disabled={!result.previewPng}
-                className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[12.5px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[0.78125rem] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
               >
                 <Download size={14} /> Export PNG
               </button>
               <button
                 onClick={downloadSvg}
                 disabled={!result.svg}
-                className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[12.5px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[0.78125rem] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
               >
                 <Download size={14} /> Export SVG
               </button>
@@ -338,7 +338,7 @@ export function QrDesignerTab() {
                   href={result.lock.qrPngUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[12.5px] font-medium text-ink shadow-outline hover:bg-hover-paper"
+                  className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-[0.78125rem] font-medium text-ink shadow-outline hover:bg-hover-paper"
                 >
                   <ShieldCheck size={14} /> Print-locked asset
                 </a>

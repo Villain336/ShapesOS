@@ -65,7 +65,7 @@ export default async function DevelopersPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">API reference</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {String(doc.info.title)} {String(doc.info.version)}: the MCP server, its OAuth flow, public lead capture,
           and the webhooks ShapesOS sends.
         </p>
@@ -124,7 +124,7 @@ export default async function DevelopersPage() {
             return (
               <article key={`${method} ${path}`} className="py-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 items-center rounded-full bg-ink px-2.5 font-mono text-[11px] font-semibold uppercase text-paper">
+                  <span className="inline-flex h-6 items-center rounded-full bg-ink px-2.5 font-mono text-[0.6875rem] font-semibold uppercase text-paper">
                     {method}
                   </span>
                   <code className="font-mono text-sm text-ink">{path}</code>

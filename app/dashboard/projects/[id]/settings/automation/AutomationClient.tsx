@@ -92,7 +92,7 @@ export default function AutomationClient({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <ShieldCheck className="size-4 text-accent-ink" />
-        <span className="text-[13px] text-ink-2">
+        <span className="text-[0.8125rem] text-ink-2">
           {overridden ? (
             <>
               Overriding the workspace default of{" "}
@@ -127,13 +127,13 @@ export default function AutomationClient({
         </Select>
       </Field>
 
-      <p className="max-w-prose text-[13px] leading-relaxed text-ink-2">
+      <p className="max-w-prose text-[0.8125rem] leading-relaxed text-ink-2">
         {active.description}
       </p>
 
       <div className="rounded-control bg-inset p-4">
-        <h4 className="text-[13px] font-medium text-ink">The trust ladder</h4>
-        <ol className="mt-2 flex list-none flex-col gap-1.5 text-[12.5px] text-ink-2">
+        <h4 className="text-[0.8125rem] font-medium text-ink">The trust ladder</h4>
+        <ol className="mt-2 flex list-none flex-col gap-1.5 text-[0.78125rem] text-ink-2">
           <li>
             <span className="font-medium text-ink">Supervised.</span> ShapesOS
             proposes, you approve — drafts, publishes, and sends all wait for a
@@ -150,20 +150,20 @@ export default function AutomationClient({
             requires explicit approval first.
           </li>
         </ol>
-        <p className="mt-2 text-[12.5px] text-ink-3">
+        <p className="mt-2 text-[0.78125rem] text-ink-3">
           Skill tool actions always follow this mode — a skill can never act
           more freely than the project allows.
         </p>
       </div>
 
       {state === "saved" && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-green">
+        <p className="flex items-center gap-1.5 text-[0.78125rem] text-green">
           <CheckCircle className="size-3.5" />
           Saved
         </p>
       )}
       {state === "error" && error && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-red">
+        <p className="flex items-center gap-1.5 text-[0.78125rem] text-red">
           <TriangleAlert className="size-3.5" />
           {error}
         </p>

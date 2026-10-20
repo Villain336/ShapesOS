@@ -5,6 +5,8 @@
 // DELETE /api/chat/threads/[id] → { ok: true }
 // Threads are private to the user who created them; project access is viewer+.
 
+// Phase 18.3 (WS=trust): agent app permissions.
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -56,7 +58,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       id: thread.id,
       title: thread.title,
       agentKey,
-      allowedTools: computeGrant({ agentKey, requested: thread.allowedTools }).groups,
+      // Phase 18.3 (WS=trust): what the next turn will actually get.
+      allowedTools: computeGrant({ agentKey, requested: thread.allowedTools, blockedGroups: await getAgentBlockedGroups(thread.project.workspaceId) }).groups,
       liveRunId: live.find((r) => !r.parentRunId)?.id ?? null,
       createdAt: thread.createdAt.toISOString(),
       updatedAt: thread.updatedAt.toISOString(),

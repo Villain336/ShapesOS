@@ -9,7 +9,7 @@
 // stay their own actions behind their own gates.
 
 import { logSiteChange } from "@/lib/connectors/source";
-import type { LocalDirProvider } from "@/lib/connectors/local";
+import type { WorkingCopyProvider } from "@/lib/connectors/local";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { Prisma } from "@prisma/client";
 import { readSiteWorkingCopy, siteFingerprint, workingCopy, writeSiteWorkingCopy } from "./files";
@@ -37,7 +37,7 @@ export interface ApplyInput {
   /** Apply even though the site changed after the agent checked it out. */
   force?: boolean;
   /** Test seam: the working copy (default: the site's own). */
-  provider?: LocalDirProvider;
+  provider?: WorkingCopyProvider;
   /** Test seam: audit log writer. */
   log?: typeof logSiteChange;
   /** Phase 11 (seotools): rebuild the sitemap after applying a draft (default true). */

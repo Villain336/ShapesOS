@@ -1,15 +1,14 @@
 // Marketr — brand kit logo upload (milestone 12).
 // POST /api/brand-kits/[id]/logo  (multipart form, field "logo"; editor+)
-// Stores under <REPORT_STORAGE_DIR>/logos/<kitId>.<ext>, updates logoPath.
+// Stores in the shared blob store (namespace "logos",
+// <workspaceId>/<kitId>.<ext> — deploy PR) and sets logoPath to the blob ref.
 
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { reportStorageDir } from "@/lib/pdf/generate";
-import { resolveWithinDir, validateUploadBuffer } from "@/lib/security/upload-safety";
+import { deleteLogo, logoBlobPathFor, storeLogo } from "@/lib/brand-logo";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -55,16 +54,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const screen = await screenUploadBuffer(buf);
   if (!screen.ok) return reject(screen.reason, screen.status);
 
-  const dir = path.join(reportStorageDir(), "logos");
-  await fs.mkdir(dir, { recursive: true });
   // The stored extension comes from the sniffed bytes, not the upload name.
-  const filename = `${id}.${check.ext}`;
-  const abs = resolveWithinDir(dir, filename);
-  await fs.writeFile(abs, buf);
+  const logoPath = await storeLogo(workspace.id, `${id}.${check.ext}`, buf);
+  // A previous logo with another extension (or a legacy file) is replaced.
+  if (brandKit.logoPath && logoBlobPathFor(brandKit.logoPath) !== logoBlobPathFor(logoPath)) {
+    await deleteLogo(brandKit.logoPath);
+  }
 
   const updated = await prisma.brandKit.update({
     where: { id },
-    data: { logoPath: path.relative(process.cwd(), abs) },
+    data: { logoPath },
   });
   return Response.json({ brandKit: updated });
 }

@@ -227,7 +227,7 @@ describe("trace fidelity: timeline ↔ artifact existence", () => {
 
     const trace = await resolveRecordingAsset(WS, run.id, "trace");
     assert.ok(trace, "trace asset must resolve");
-    assert.ok(trace.absPath.endsWith("trace.zip"));
+    assert.ok((trace.location.kind === "legacy" ? trace.location.absPath : trace.location.path).endsWith("trace.zip"));
     assert.ok(trace.sizeBytes > 0);
     assert.equal(trace.contentType, "application/zip");
 

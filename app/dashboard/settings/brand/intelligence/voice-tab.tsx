@@ -17,21 +17,21 @@ import {
 } from "lucide-react";
 // ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
 const inputCls =
-  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
-  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
-const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const theadCls = "border-b border-line text-left text-[0.75rem] text-muted";
 const thCls = "px-3 py-2 text-left font-medium";
 const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
-const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted";
 
 // Statuses here are agent/provider states, not agent states — neutral chips.
 function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
@@ -66,10 +66,10 @@ function list(v: unknown): string[] {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} aria-hidden />
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+          <h3 className="text-[0.9375rem] font-semibold text-ink">{title}</h3>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted">
             <X size={16} />
           </button>
@@ -185,7 +185,7 @@ export default function VoiceTab({
       {pending && Object.keys(pendingDims).length > 0 && (
         <section className="rounded-lg border border-line bg-needs-tint aos-shape aos-shape--needs aos-shape--edged p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[14px] font-semibold text-ink">
+            <h2 className="text-[0.875rem] font-semibold text-ink">
               Review pending update
               <span className="ml-2 font-normal text-muted">
                 proposed {pending.proposedAt ? new Date(pending.proposedAt).toLocaleDateString() : "recently"}
@@ -202,7 +202,7 @@ export default function VoiceTab({
               </div>
             )}
           </div>
-          {pending.rationale && <p className="mt-1 text-[12.5px] text-muted">{pending.rationale}</p>}
+          {pending.rationale && <p className="mt-1 text-[0.78125rem] text-muted">{pending.rationale}</p>}
           <div className="mt-3 space-y-2">
             {DIM_META.filter((m) => {
               const v = pendingDims[m.key];
@@ -210,14 +210,14 @@ export default function VoiceTab({
             }).map((m) => (
               <div key={m.key} className="grid gap-2 rounded-md border border-line bg-paper p-2.5 md:grid-cols-2">
                 <div>
-                  <p className="text-[11px] font-medium tracking-wide text-subtle">Current — {m.label}</p>
-                  <p className="mt-0.5 text-[12.5px] text-muted">
+                  <p className="text-[0.6875rem] font-medium tracking-wide text-subtle">Current — {m.label}</p>
+                  <p className="mt-0.5 text-[0.78125rem] text-muted">
                     {m.list ? list(dims[m.key]).join(", ") || "—" : str(dims[m.key]) || "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium tracking-wide text-ink">Proposed — {m.label}</p>
-                  <p className="mt-0.5 text-[12.5px] font-medium text-ink">
+                  <p className="text-[0.6875rem] font-medium tracking-wide text-ink">Proposed — {m.label}</p>
+                  <p className="mt-0.5 text-[0.78125rem] font-medium text-ink">
                     {m.list ? list(pendingDims[m.key]).join(", ") : str(pendingDims[m.key])}
                   </p>
                 </div>
@@ -235,8 +235,8 @@ export default function VoiceTab({
               <Megaphone size={16} />
             </span>
             <div>
-              <h2 className="text-[14px] font-semibold text-ink">Brand voice</h2>
-              <p className="text-[12px] text-muted">
+              <h2 className="text-[0.875rem] font-semibold text-ink">Brand voice</h2>
+              <p className="text-[0.75rem] text-muted">
                 {profile
                   ? `Derived from ${samples} sample${samples === 1 ? "" : "s"} · ${Math.round(profile.confidence * 100)}% confidence`
                   : "No voice profile yet — re-derive from your content or describe it below."}
@@ -277,8 +277,8 @@ export default function VoiceTab({
             const empty = m.list ? v.length === 0 : !v;
             return (
               <div key={m.key} className="rounded-md border border-line bg-canvas p-3">
-                <dt className="text-[11px] font-medium tracking-wide text-subtle">{m.label}</dt>
-                <dd className="mt-1 text-[13px] text-ink">
+                <dt className="text-[0.6875rem] font-medium tracking-wide text-subtle">{m.label}</dt>
+                <dd className="mt-1 text-[0.8125rem] text-ink">
                   {empty ? (
                     <span className="italic text-subtle">Not set</span>
                   ) : m.list ? (
@@ -296,7 +296,7 @@ export default function VoiceTab({
           })}
         </dl>
         {profile?.pinnedByUser && (
-          <p className="mt-3 flex items-center gap-1.5 text-[12px] text-muted">
+          <p className="mt-3 flex items-center gap-1.5 text-[0.75rem] text-muted">
             <Lock size={12} /> Locked by you — consolidation proposals arrive as reviewable diffs instead of applying directly.
           </p>
         )}
@@ -306,7 +306,7 @@ export default function VoiceTab({
         <Modal title="Edit brand voice" onClose={() => setEditing(false)}>
           {DIM_META.map((m) => (
             <div key={m.key} className="mb-3">
-              <label className="mb-1 block text-[12.5px] font-medium text-muted">
+              <label className="mb-1 block text-[0.78125rem] font-medium text-muted">
                 {m.label}{m.list && <span className="font-normal text-subtle"> — comma separated</span>}
               </label>
               {m.list || m.key === "rhythm" ? (

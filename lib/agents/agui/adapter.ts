@@ -51,6 +51,8 @@ import {
 } from "./events";
 import { createAguiLogger } from "./logger";
 import { mergeSharedState, type SharedAgentState } from "./shared-state";
+import { sseResponse, type SseOptions } from "@/lib/http/sse";
+import { hasRunProducer, subscribeRunEvents, type LiveRunEvent } from "@/lib/agents/runs/live-events";
 import type { AppliedStateChange } from "./shared-state-db";
 import type { WorkspaceRole } from "@prisma/client";
 import type { AgentTurnInput, AgentTurnOutput, ChatToolCall } from "@/lib/chat/agent";
@@ -74,6 +76,8 @@ export interface AguiTurnRequest {
    * is then re-emitted so the agent sees the applied result.
    */
   incomingState?: SharedAgentState;
+  /** Phase 22 (chat): decisions from the approval block (POST …/decisions) — the turn settles them and carries on. */
+  decisions?: AgentTurnInput["decisions"];
 }
 
 /** Context passed to the shared-state loaders/applier. */
@@ -107,9 +111,32 @@ export interface AguiAdapterDeps {
   getRunStatus?: (workspaceId: string, runId: string) => Promise<string | null>;
   /** Phase 8: the latest assistant message of the thread (a queued turn's answer). */
   latestAssistantText?: (threadId: string) => Promise<string | null>;
-  /** Phase 8: tail interval (default 200 ms) and cap on one stream (default 30 min). */
+  /**
+   * Phase 8: tail interval (default 200 ms) and cap on one stream (default
+   * 30 min). Phase 17: the poll is the FALLBACK — while the run's loop runs in
+   * this process its events arrive on the in-process bus (lib/agents/runs/
+   * live-events.ts) the moment they are written, and the database is only
+   * read to fill a gap and once at the end.
+   */
   pollMs?: number;
   maxStreamMs?: number;
+  /** Phase 17: the bus (tests inject one); default lib/agents/runs/live-events. */
+  liveEvents?: {
+    subscribe: (runId: string, listener: (event: LiveRunEvent) => void) => () => void;
+    hasProducer: (runId: string) => boolean;
+  };
+  /**
+   * Deploy PR: told the run cursor (agent run id + timeline seq) before each
+   * run event is mapped — the SSE route stamps it as the event id, so a
+   * client can resume after that event (Last-Event-ID).
+   */
+  onCursor?: (agentRunId: string, seq: number) => void;
+  /**
+   * Deploy PR: true while this server drains. A tailing stream then ends at a
+   * clean boundary with CUSTOM marketr.reconnect { runId, after, aguiRunId }
+   * instead of waiting for the run (which the worker carries on).
+   */
+  shouldReconnect?: () => boolean;
   /** Injectable run-id factory (tests pin it). */
   newRunId?: () => string;
   /** Text chunker for TEXT_MESSAGE_CONTENT deltas. */
@@ -235,7 +262,9 @@ function* toolCallEvents(
       messageId: `${toolCallId}:result`,
       toolCallId,
       content: call.resultSummary ?? "",
-      metadata: { marketr: { ...statusMeta, runId: meta.runId } },
+      // Phase 22 (chat): the typed renderer, its payload and the call's ids
+      // ride on the result so the transcript renders it inline.
+      metadata: { marketr: { ...statusMeta, runId: meta.runId, ...resultMeta(call) } },
     },
     meta,
   );
@@ -245,11 +274,46 @@ function* toolCallEvents(
       {
         type: EventType.CUSTOM,
         name: MARKETR_CUSTOM_NAMES.toolProposal,
-        value: { tool: call.tool, args: call.args, toolCallId },
+        value: proposalValue(call, toolCallId),
       },
       meta,
     );
   }
+}
+
+/** Phase 22 (chat): what a TOOL_CALL_RESULT carries besides its status (see lib/chat/blocks.ts). */
+function resultMeta(call: Partial<ChatToolCall> & Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof call.toolUseId === "string") out.toolUseId = call.toolUseId;
+  if (typeof call.ui === "string") out.ui = call.ui;
+  if (call.payload !== undefined) out.payload = call.payload;
+  if (typeof call.agentKey === "string") out.agentKey = call.agentKey;
+  if (typeof call.autoApproved === "string") out.autoApproved = call.autoApproved;
+  if (call.cached === true) out.cached = true;
+  if (call.edited === true) out.edited = true;
+  if (call.delegation && typeof call.delegation === "object") out.delegation = call.delegation;
+  if (typeof call.tier === "number") out.tier = call.tier;
+  if (typeof call.toolKind === "string") out.toolKind = call.toolKind;
+  return out;
+}
+
+/** Phase 22 (chat): the approval block's item (lib/chat/blocks.ts ApprovalItem). */
+function proposalValue(call: Partial<ChatToolCall> & Record<string, unknown>, toolCallId: string, agentRunId?: string | null): Record<string, unknown> {
+  const tier = typeof call.tier === "number" ? call.tier : undefined;
+  const toolKind = typeof call.toolKind === "string" ? call.toolKind : undefined;
+  return {
+    tool: call.tool,
+    args: call.args ?? {},
+    toolCallId,
+    ...(typeof call.toolUseId === "string" ? { toolUseId: call.toolUseId } : {}),
+    ...(toolKind ? { toolKind } : {}),
+    ...(tier !== undefined ? { tier } : {}),
+    ...(typeof call.autoAction === "string" ? { autoAction: call.autoAction } : {}),
+    ...(typeof call.agentKey === "string" ? { agentKey: call.agentKey } : {}),
+    ...(agentRunId ?? (typeof call.runId === "string" ? call.runId : null) ? { runId: agentRunId ?? call.runId } : {}),
+    needsClick: call.needsClick === true || toolKind === "destructive" || tier === 3,
+    ...(typeof call.resultSummary === "string" ? { summary: call.resultSummary } : {}),
+  };
 }
 
 /**
@@ -295,26 +359,42 @@ export async function* streamChatTurnAgui(
     workspaceId: request.workspaceId,
     projectId: request.projectId,
   };
-  try {
-    const baseline = await loadSharedState(stateCtx);
-    let current = baseline;
-    if (request.incomingState && Object.keys(request.incomingState).length > 0) {
-      const { applied } = await applySharedStateUpdates(stateCtx, baseline, request.incomingState);
-      if (applied.some((a) => !a.skipped)) {
-        current = await loadSharedState(stateCtx);
-      } else {
-        // Nothing was writable — still honor the client's view for
-        // domains the baseline didn't cover (offline-first optimism).
-        current = mergeSharedState(baseline, request.incomingState);
+  const hasIncoming = !!request.incomingState && Object.keys(request.incomingState).length > 0;
+  // Phase 17 (latency): the snapshot is loaded CONCURRENTLY with the turn's
+  // own pre-model work (prompt assembly, recall, connector listing — they
+  // never depend on it); the snapshot is still yielded before any run event
+  // (streamLiveTurn awaits it before it starts tailing). Only when the client
+  // carried state changes in is the apply awaited first, so the agent's tool
+  // calls see the canonical post-apply state.
+  const snapshot = (async (): Promise<AguiEvent | null> => {
+    try {
+      const baseline = await loadSharedState(stateCtx);
+      let current = baseline;
+      if (hasIncoming) {
+        const { applied } = await applySharedStateUpdates(stateCtx, baseline, request.incomingState!);
+        if (applied.some((a) => !a.skipped)) {
+          current = await loadSharedState(stateCtx);
+        } else {
+          // Nothing was writable — still honor the client's view for
+          // domains the baseline didn't cover (offline-first optimism).
+          current = mergeSharedState(baseline, request.incomingState!);
+        }
       }
+      return stamp({ type: EventType.STATE_SNAPSHOT, snapshot: current }, meta);
+    } catch {
+      // No snapshot this turn; the chat itself still streams.
+      return null;
     }
-    yield* emit(stamp({ type: EventType.STATE_SNAPSHOT, snapshot: current }, meta));
-  } catch {
-    // No snapshot this turn; the chat itself still streams.
-  }
+  })();
 
+  if (!deps.runTurn && !hasIncoming) {
+    yield* streamLiveTurn(request, deps, meta, emit, snapshot);
+    return;
+  }
+  const snapshotEvent = await snapshot;
+  if (snapshotEvent) yield* emit(snapshotEvent);
   if (!deps.runTurn) {
-    yield* streamLiveTurn(request, deps, meta, emit);
+    yield* streamLiveTurn(request, deps, meta, emit, null);
     return;
   }
 
@@ -386,20 +466,273 @@ const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
  */
 const TAIL_ENDS = new Set([...TERMINAL, "awaiting_confirmation"]);
 
-function sleepOrSettle(ms: number, settled: Promise<unknown>): Promise<void> {
-  return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    settled.then(
-      () => {
+
+/**
+ * The run-timeline tail shared by a live turn (POST /api/agents/chat) and a
+ * resumed one (GET /api/agents/chat/stream, deploy PR): maps run events to
+ * AG-UI as they land, remembering the open message and seen tool calls.
+ * Message ids derive from the AG-UI run id + agent run id + model step, so a
+ * resumed stream continues the SAME messages the client already shows.
+ */
+function createRunTail(
+  request: { workspaceId: string },
+  deps: AguiAdapterDeps,
+  meta: AguiRunMeta,
+  emitOut: (event: AguiEvent) => Generator<AguiEvent>,
+  afterSeq = -1,
+) {
+  const listEvents = deps.listRunEvents ?? defaultListRunEvents;
+  const bus = deps.liveEvents ?? { subscribe: subscribeRunEvents, hasProducer: hasRunProducer };
+  // While priming a resumed stream (prime() below) the state is rebuilt from
+  // events the client already has, so nothing is emitted.
+  let silent = false;
+  const emit = function* (event: AguiEvent): Generator<AguiEvent> {
+    if (!silent) yield* emitOut(event);
+  };
+  const runIdAgui = meta.runId;
+  const st = {
+    agentRunId: null as string | null,
+    lastSeq: afterSeq,
+    openMsg: null as string | null,
+    openText: "",
+    seenTools: new Set<string>(),
+  };
+  // Phase 17: the in-process bus. Events queue here as the loop writes them;
+  // flushLive() maps them in seq order, drain() (the database) fills a gap.
+  const live = {
+    queue: [] as LiveRunEvent[],
+    wake: null as (() => void) | null,
+    unsubscribe: null as (() => void) | null,
+  };
+  const attach = (agentRunId: string) => {
+    if (live.unsubscribe) return;
+    live.unsubscribe = bus.subscribe(agentRunId, (ev) => {
+      live.queue.push(ev);
+      live.wake?.();
+    });
+  };
+  const detach = () => {
+    live.unsubscribe?.();
+    live.unsubscribe = null;
+    live.queue.length = 0;
+  };
+  /** Does the run's loop run in this process (its events come on the bus)? */
+  const producerHere = () => !!st.agentRunId && bus.hasProducer(st.agentRunId);
+  /** Resolve on the next bus event (at once when one is queued), when `settled` settles, or after `ms`. */
+  const wait = (ms: number, settled?: Promise<unknown>) =>
+    new Promise<void>((resolve) => {
+      if (live.queue.length > 0) return resolve();
+      const t = setTimeout(done, ms);
+      live.wake = done;
+      settled?.then(done, done);
+      function done() {
         clearTimeout(t);
+        if (live.wake === done) live.wake = null;
         resolve();
-      },
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
+      }
+    });
+
+  const closeMsg = function* (): Generator<AguiEvent> {
+    if (!st.openMsg) return;
+    yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId: st.openMsg }, meta));
+    st.openMsg = null;
+  };
+  const mapEvent = function* (ev: TailedRunEvent): Generator<AguiEvent> {
+    const p = (ev.payload ?? {}) as Record<string, unknown>;
+    if (ev.type === "text" && p.kind === "text_delta" && typeof p.text === "string") {
+      const id = `${runIdAgui}:msg:${st.agentRunId}:${String(p.step ?? 0)}`;
+      if (st.openMsg !== id) {
+        yield* closeMsg();
+        st.openMsg = id;
+        st.openText = "";
+        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId: id, role: "assistant" }, meta));
+      }
+      st.openText += p.text;
+      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: id, delta: p.text } as TextMessageContentEvent, meta));
+      return;
+    }
+    // Phase 17: the model's thinking state (never its text) — a muted status
+    // line in the chat while the model reasons before writing.
+    if (ev.type === "text" && p.kind === "thinking") {
+      yield* emit(
+        stamp(
+          {
+            type: EventType.CUSTOM,
+            name: MARKETR_CUSTOM_NAMES.thinking,
+            value: { step: Number(p.step ?? 0), state: p.state === "ended" ? "ended" : "started", ...(typeof p.text === "string" ? { text: p.text } : {}) },
+          },
+          meta,
+        ),
+      );
+      return;
+    }
+    const toolUseId = typeof p.toolUseId === "string" ? p.toolUseId : null;
+    const tool = typeof p.tool === "string" ? p.tool : null;
+    if (!toolUseId || !tool) return;
+    const toolCallId = `${runIdAgui}:tool:${toolUseId}`;
+    const start = function* (args: unknown): Generator<AguiEvent> {
+      if (st.seenTools.has(toolCallId)) return;
+      st.seenTools.add(toolCallId);
+      yield* closeMsg();
+      // Phase 22 (chat): the model's tool_use id rides on every event of the
+      // call, so a client keys the block by it across streams.
+      const callMeta = { marketr: { runId: runIdAgui, toolUseId } };
+      yield* emit(stamp({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: tool, parentMessageId: `${runIdAgui}:msg:assistant`, metadata: callMeta }, meta));
+      yield* emit(stamp({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(args ?? {}), metadata: callMeta } as ToolCallArgsEvent, meta));
+      yield* emit(stamp({ type: EventType.TOOL_CALL_END, toolCallId, metadata: callMeta }, meta));
+    };
+    if (p.kind === "tool_start") {
+      yield* start(p.args);
+    } else if (p.kind === "tool_result") {
+      // A held call's args are on the gate event too (no tool_start precedes a
+      // refused / interrupted call).
+      yield* start(p.args ?? {});
+      const status = typeof p.status === "string" ? p.status : "executed";
+      const call = { ...p, tool, toolUseId, status } as Partial<ChatToolCall> & Record<string, unknown>;
+      yield* emit(
+        stamp(
+          {
+            type: EventType.TOOL_CALL_RESULT,
+            messageId: `${toolCallId}:result`,
+            toolCallId,
+            content: typeof p.summary === "string" ? p.summary : ev.summary,
+            metadata: { marketr: { status, runId: runIdAgui, tool, ...resultMeta(call) } },
+          },
+          meta,
+        ),
+      );
+      if (status === "pending_confirmation") {
+        yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.toolProposal, value: proposalValue(call, toolCallId, st.agentRunId) }, meta));
+      }
+    }
+  };
+  const drain = async function* (): AsyncGenerator<AguiEvent> {
+    if (!st.agentRunId) return;
+    for (;;) {
+      const batch = await listEvents(request.workspaceId, st.agentRunId, st.lastSeq).catch(() => [] as TailedRunEvent[]);
+      for (const ev of batch) {
+        if (ev.seq <= st.lastSeq) continue;
+        st.lastSeq = ev.seq;
+        // Every AG-UI event derived from run event N carries cursor N.
+        deps.onCursor?.(st.agentRunId, st.lastSeq);
+        yield* mapEvent(ev);
+      }
+      if (batch.length < 500) return;
+    }
+  };
+  /**
+   * Phase 17: map the bus events queued since the last flush, in seq order.
+   * One already applied (≤ lastSeq) is skipped; a gap (an event this process
+   * did not see, e.g. written before the subscription) is filled from the
+   * database first, so the client never gets events out of order.
+   */
+  const flushLive = async function* (): AsyncGenerator<AguiEvent> {
+    while (live.queue.length > 0) {
+      const ev = live.queue.shift()!;
+      if (!st.agentRunId || ev.seq <= st.lastSeq) continue;
+      if (ev.seq > st.lastSeq + 1) {
+        yield* drain();
+        if (ev.seq <= st.lastSeq) continue;
+      }
+      st.lastSeq = ev.seq;
+      deps.onCursor?.(st.agentRunId, st.lastSeq);
+      yield* mapEvent(ev);
+    }
+  };
+  /**
+   * Deploy PR: a stream resumed on another replica must continue where the
+   * client is, not where this process is. Replay the run's events up to
+   * `upToSeq` silently, so the open message (same id, no second
+   * TEXT_MESSAGE_START), the text already shown in it, and the tool calls
+   * already announced are known. Without this the final reconcile saw only
+   * the post-resume text and sent the whole answer again as a new message.
+   */
+  const prime = async (upToSeq: number): Promise<void> => {
+    if (!st.agentRunId || upToSeq < 0) return;
+    silent = true;
+    try {
+      let after = -1;
+      for (;;) {
+        const batch = await listEvents(request.workspaceId, st.agentRunId, after).catch(() => [] as TailedRunEvent[]);
+        for (const ev of batch) {
+          if (ev.seq > upToSeq) return;
+          after = Math.max(after, ev.seq);
+          for (const _ of mapEvent(ev)) void _;
+        }
+        if (batch.length < 500) return;
+      }
+    } finally {
+      silent = false;
+      st.lastSeq = Math.max(st.lastSeq, upToSeq);
+    }
+  };
+  /** Draining: end at this clean boundary and tell the client where to resume. */
+  const reconnect = function* (): Generator<AguiEvent> {
+    yield* emit(
+      stamp(
+        {
+          type: EventType.CUSTOM,
+          name: MARKETR_CUSTOM_NAMES.reconnect,
+          value: { runId: st.agentRunId, after: st.lastSeq, aguiRunId: runIdAgui },
+        },
+        meta,
+      ),
     );
-  });
+  };
+  /** Reconcile the final (delivered) text with what streamed, then finish. */
+  const finish = function* (finalText: string, threadId: string): Generator<AguiEvent> {
+    const final = finalText.trim();
+    if (final) {
+      if (st.openMsg && final.startsWith(st.openText.trim()) && st.openText.trim()) {
+        // What the client lacks after the text the open message already
+        // holds. Compare exactly when possible: the trimmed comparison used
+        // to re-send whitespace the stream had already delivered (the smoke
+        // saw a lone " " after a resume). A whitespace-only tail adds nothing.
+        const rest = finalText.startsWith(st.openText)
+          ? finalText.slice(st.openText.length)
+          : finalText.slice(finalText.indexOf(st.openText.trim()) + st.openText.trim().length);
+        if (rest.trim()) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: st.openMsg, delta: rest } as TextMessageContentEvent, meta));
+        yield* closeMsg();
+      } else if (!st.openMsg || final !== st.openText.trim()) {
+        yield* closeMsg();
+        const messageId = `${runIdAgui}:msg:assistant`;
+        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" }, meta));
+        for (const delta of (deps.chunkText ?? chunkTextFixed)(finalText)) {
+          yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta } as TextMessageContentEvent, meta));
+        }
+        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId }, meta));
+      } else {
+        yield* closeMsg();
+      }
+    } else {
+      yield* closeMsg();
+    }
+    yield* emit(stamp({ type: EventType.RUN_FINISHED, threadId, runId: runIdAgui, outcome: { type: "success" } }, meta));
+  };
+  /**
+   * Tail a run the worker carries until it ends (or waits for the user), or
+   * until this server drains. Returns "stopped" when it ended for the drain.
+   */
+  const tailUntilEnd = async function* (deadline: number): AsyncGenerator<AguiEvent, "ended" | "stopped"> {
+    const getStatus = deps.getRunStatus ?? defaultGetRunStatus;
+    const pollMs = deps.pollMs ?? 200;
+    for (;;) {
+      yield* flushLive();
+      // Phase 17: with the run's loop in this process (the in-app worker on
+      // this replica) the bus carries its events; the database is polled
+      // only when the run works elsewhere.
+      const here = producerHere();
+      if (!here) yield* drain();
+      if (deps.shouldReconnect?.()) return "stopped";
+      const status = st.agentRunId ? await getStatus(request.workspaceId, st.agentRunId).catch(() => null) : null;
+      if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
+      await wait(here ? Math.max(pollMs, 2_000) : Math.max(pollMs, 500));
+    }
+    yield* flushLive();
+    yield* drain();
+    return "ended";
+  };
+  return { st, attach, detach, producerHere, wait, closeMsg, drain, flushLive, prime, reconnect, finish, tailUntilEnd };
 }
 
 /**
@@ -411,16 +744,14 @@ async function* streamLiveTurn(
   deps: AguiAdapterDeps,
   meta: AguiRunMeta,
   emit: (event: AguiEvent) => Generator<AguiEvent>,
+  /** Phase 17: the STATE_SNAPSHOT being loaded alongside the turn (yielded before any run event). */
+  snapshot: Promise<AguiEvent | null> | null,
 ): AsyncGenerator<AguiEvent> {
   const runTracked = deps.runTrackedTurn ?? defaultRunTrackedTurn;
-  const listEvents = deps.listRunEvents ?? defaultListRunEvents;
-  const getStatus = deps.getRunStatus ?? defaultGetRunStatus;
-  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
   const pollMs = deps.pollMs ?? 200;
   const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
-  const runIdAgui = meta.runId;
+  const tail = createRunTail(request, deps, meta, emit);
 
-  let agentRunId: string | null = null;
   let output: (AgentTurnOutput & { runId: string }) | null = null;
   let failure: unknown = null;
   let settled = false;
@@ -433,12 +764,20 @@ async function* streamLiveTurn(
       threadId: request.threadId,
       userContent: request.userContent,
       attachmentIds: request.attachmentIds,
+      ...(request.decisions?.length ? { decisions: request.decisions } : {}),
     },
-    { onRunCreated: (id) => (agentRunId = id) },
+    {
+      onRunCreated: (id) => {
+        tail.st.agentRunId = id;
+        // Phase 17: subscribe before the loop writes its first event.
+        tail.attach(id);
+      },
+    },
   ).then(
     (o) => {
       output = o;
-      agentRunId = o.runId;
+      tail.st.agentRunId = o.runId;
+      tail.attach(o.runId);
     },
     (e: unknown) => {
       failure = e;
@@ -446,89 +785,47 @@ async function* streamLiveTurn(
   );
   void turn.finally(() => (settled = true));
 
-  let lastSeq = -1;
-  let openMsg: string | null = null;
-  let openText = "";
-  const openTools = new Set<string>();
-  const seenTools = new Set<string>();
-
-  const closeMsg = function* (): Generator<AguiEvent> {
-    if (!openMsg) return;
-    yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId: openMsg }, meta));
-    openMsg = null;
-  };
-  const mapEvent = function* (ev: TailedRunEvent): Generator<AguiEvent> {
-    const p = (ev.payload ?? {}) as Record<string, unknown>;
-    if (ev.type === "text" && p.kind === "text_delta" && typeof p.text === "string") {
-      const id = `${runIdAgui}:msg:${agentRunId}:${String(p.step ?? 0)}`;
-      if (openMsg !== id) {
-        yield* closeMsg();
-        openMsg = id;
-        openText = "";
-        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId: id, role: "assistant" }, meta));
-      }
-      openText += p.text;
-      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: id, delta: p.text } as TextMessageContentEvent, meta));
-      return;
+  try {
+    // The shared-state snapshot first (it loaded while the turn started).
+    if (snapshot) {
+      const ev = await snapshot;
+      if (ev) yield* emit(ev);
     }
-    const toolUseId = typeof p.toolUseId === "string" ? p.toolUseId : null;
-    const tool = typeof p.tool === "string" ? p.tool : null;
-    if (!toolUseId || !tool) return;
-    const toolCallId = `${runIdAgui}:tool:${toolUseId}`;
-    const start = function* (args: unknown): Generator<AguiEvent> {
-      if (seenTools.has(toolCallId)) return;
-      seenTools.add(toolCallId);
-      yield* closeMsg();
-      openTools.add(toolCallId);
-      yield* emit(stamp({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: tool, parentMessageId: `${runIdAgui}:msg:assistant` }, meta));
-      yield* emit(stamp({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(args ?? {}) } as ToolCallArgsEvent, meta));
-      yield* emit(stamp({ type: EventType.TOOL_CALL_END, toolCallId }, meta));
-      openTools.delete(toolCallId);
-    };
-    if (p.kind === "tool_start") {
-      yield* start(p.args);
-    } else if (p.kind === "tool_result") {
-      yield* start({});
-      const status = typeof p.status === "string" ? p.status : "executed";
-      yield* emit(
-        stamp(
-          {
-            type: EventType.TOOL_CALL_RESULT,
-            messageId: `${toolCallId}:result`,
-            toolCallId,
-            content: typeof p.summary === "string" ? p.summary : ev.summary,
-            metadata: { marketr: { status, runId: runIdAgui } },
-          },
-          meta,
-        ),
-      );
-      if (status === "pending_confirmation") {
-        yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.toolProposal, value: { tool, toolCallId } }, meta));
-      }
+    // While the request runs the turn: tail the run. Phase 17: events the loop
+    // writes in this process arrive on the bus at once; the database is
+    // polled only while no producer for the run lives here (the run id is
+    // not known yet, or the work runs elsewhere). (When the server drains,
+    // an inline turn hands off to the worker at its next step boundary — see
+    // lib/agents/loop.ts — so it settles as `queued` and we reconnect below.)
+    while (!settled && Date.now() < deadline) {
+      yield* tail.flushLive();
+      if (!tail.producerHere()) yield* tail.drain();
+      await tail.wait(pollMs, turn);
     }
-  };
-  const drain = async function* (): AsyncGenerator<AguiEvent> {
-    if (!agentRunId) return;
-    for (;;) {
-      const batch = await listEvents(request.workspaceId, agentRunId, lastSeq).catch(() => [] as TailedRunEvent[]);
-      for (const ev of batch) {
-        lastSeq = Math.max(lastSeq, ev.seq);
-        yield* mapEvent(ev);
-      }
-      if (batch.length < 500) return;
-    }
-  };
-
-  // While the request runs the turn: tail the run.
-  while (!settled && Date.now() < deadline) {
-    yield* drain();
-    await sleepOrSettle(pollMs, turn);
+    await turn;
+    yield* tail.flushLive();
+    yield* tail.drain();
+    yield* finishLiveTurn(request, deps, meta, emit, tail, deadline, output, failure);
+  } finally {
+    tail.detach();
   }
-  await turn;
-  yield* drain();
+}
 
+/** The end of a live turn: the error, the hand-off tail, or the final reconcile. */
+async function* finishLiveTurn(
+  request: AguiTurnRequest,
+  deps: AguiAdapterDeps,
+  meta: AguiRunMeta,
+  emit: (event: AguiEvent) => Generator<AguiEvent>,
+  tail: ReturnType<typeof createRunTail>,
+  deadline: number,
+  output: (AgentTurnOutput & { runId: string }) | null,
+  failure: unknown,
+): AsyncGenerator<AguiEvent> {
+  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
+  const runIdAgui = meta.runId;
   if (failure) {
-    yield* closeMsg();
+    yield* tail.closeMsg();
     yield* emit(
       stamp(
         {
@@ -543,42 +840,67 @@ async function* streamLiveTurn(
     return;
   }
 
-  let finalText = (output as (AgentTurnOutput & { runId: string }) | null)?.assistantText ?? "";
-  if ((output as AgentTurnOutput | null)?.queued && agentRunId) {
+  let finalText = output?.assistantText ?? "";
+  if (output?.queued && tail.st.agentRunId) {
     // Handed to the worker: keep tailing until the run ends.
-    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.queued, value: { runId: agentRunId } }, meta));
-    for (;;) {
-      yield* drain();
-      const status = await getStatus(request.workspaceId, agentRunId).catch(() => null);
-      if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
-      await new Promise((r) => setTimeout(r, Math.max(pollMs, 500)));
+    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.queued, value: { runId: tail.st.agentRunId } }, meta));
+    if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
+      yield* tail.reconnect();
+      return;
     }
-    yield* drain();
     finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
   }
-
-  // Reconcile the final (delivered) text with what streamed.
-  const final = finalText.trim();
-  if (final) {
-    if (openMsg && final.startsWith(openText.trim()) && openText.trim()) {
-      const rest = finalText.slice(finalText.indexOf(openText.trim()) + openText.trim().length);
-      if (rest) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: openMsg, delta: rest } as TextMessageContentEvent, meta));
-      yield* closeMsg();
-    } else if (!openMsg || final !== openText.trim()) {
-      yield* closeMsg();
-      const messageId = `${runIdAgui}:msg:assistant`;
-      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" }, meta));
-      for (const delta of (deps.chunkText ?? chunkTextFixed)(finalText)) {
-        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta } as TextMessageContentEvent, meta));
-      }
-      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId }, meta));
-    } else {
-      yield* closeMsg();
-    }
-  } else {
-    yield* closeMsg();
+  // Phase 17: an answer reused from the answer cache is labelled so.
+  if (output?.cached) {
+    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.cached, value: { question: request.userContent.slice(0, 200) } }, meta));
   }
-  yield* emit(stamp({ type: EventType.RUN_FINISHED, threadId: request.threadId, runId: runIdAgui, outcome: { type: "success" } }, meta));
+  yield* tail.finish(finalText, request.threadId);
+}
+
+/** What a resumed chat stream needs (GET /api/agents/chat/stream). */
+export interface AguiResumeRequest {
+  workspaceId: string;
+  threadId: string;
+  /** The agent run behind the turn (the reconnect event's runId). */
+  agentRunId: string;
+  /** The original AG-UI run id, so message ids continue unchanged. */
+  aguiRunId: string;
+  /** Resume after this run-timeline seq (-1 = from the start). */
+  afterSeq: number;
+}
+
+/**
+ * Deploy PR: continue a chat turn's stream after a reconnect (this or
+ * another replica): tail the run from `afterSeq` until it ends, then the
+ * final text and RUN_FINISHED — the same tail as the live stream. Ends with
+ * marketr.reconnect again if this server starts draining meanwhile.
+ */
+export async function* resumeChatTurnAgui(request: AguiResumeRequest, deps: AguiAdapterDeps = {}): AsyncGenerator<AguiEvent> {
+  const meta: AguiRunMeta = { runId: request.aguiRunId, threadId: request.threadId, workspaceId: request.workspaceId };
+  const log = createAguiLogger(meta, deps.logSink);
+  const emit = function* (event: AguiEvent): Generator<AguiEvent> {
+    log(event);
+    yield event;
+  };
+  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
+  const tail = createRunTail(request, deps, meta, emit, request.afterSeq);
+  tail.st.agentRunId = request.agentRunId;
+  // Phase 17: subscribe first, so nothing written while priming is missed
+  // (a bus event past the cursor is applied after the prime; one at or
+  // before it is skipped).
+  tail.attach(request.agentRunId);
+  try {
+    await tail.prime(request.afterSeq);
+    const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
+    if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
+      yield* tail.reconnect();
+      return;
+    }
+    const finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
+    yield* tail.finish(finalText, request.threadId);
+  } finally {
+    tail.detach();
+  }
 }
 
 /**
@@ -625,28 +947,51 @@ export function newAguiRunMeta(init: {
   return { runId: init.runId ?? randomUUID(), threadId: init.threadId, workspaceId: init.workspaceId };
 }
 
+/** Deploy PR: what the SSE layer hands the adapter (cursor + drain state). */
+export interface AguiStreamHooks {
+  onCursor: (agentRunId: string, seq: number) => void;
+  shouldReconnect: () => boolean;
+}
+
 /**
- * Serialize an AG-UI event generator as a text/event-stream Response.
- * One `data: <json>` frame per event; stream ends when the generator ends.
+ * Serialize an AG-UI event generator as a text/event-stream Response
+ * (lib/http/sse.ts: heartbeats, ids, drain). One `data: <json>` frame per
+ * event; the stream ends when the generator ends.
+ *
+ * Deploy PR: pass a factory to get the hooks — every frame then carries
+ * `id: <agentRunId>:<seq>` (the run-timeline cursor), and when the server
+ * drains the adapter stops at a clean boundary and the frame
+ * `event: reconnect` + data { runId, after, aguiRunId } tells the client to
+ * resume on GET /api/agents/chat/stream. The drain is cooperative: a turn
+ * still running inline gets its hand-off window first, and the helper
+ * forces the reconnect at its deadline.
  */
-export function aguiStreamResponse(events: AsyncGenerator<AguiEvent>): Response {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        for await (const event of events) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+export function aguiStreamResponse(
+  source: AsyncGenerator<AguiEvent> | ((hooks: AguiStreamHooks) => AsyncGenerator<AguiEvent>),
+  opts: { lastEventId?: string | null; sse?: SseOptions } = {},
+): Response {
+  let cursor: { runId: string; seq: number } | null = null;
+  let aguiRunId: string | null = null;
+  const resumePoint = () => ({ runId: cursor?.runId ?? null, after: cursor?.seq ?? -1, aguiRunId });
+  return sseResponse(
+    async (ch) => {
+      const hooks: AguiStreamHooks = {
+        onCursor: (runId, seq) => (cursor = { runId, seq }),
+        shouldReconnect: () => ch.draining,
+      };
+      const events = typeof source === "function" ? source(hooks) : source;
+      // for-await's break hands the generator back (its finally blocks run).
+      for await (const event of events) {
+        if (ch.closed) break;
+        const meta = (event.metadata as { marketr?: { runId?: unknown } } | undefined)?.marketr;
+        if (!aguiRunId && typeof meta?.runId === "string") aguiRunId = meta.runId;
+        if (event.type === EventType.CUSTOM && (event as { name?: unknown }).name === MARKETR_CUSTOM_NAMES.reconnect) {
+          ch.reconnect((event as { value?: unknown }).value ?? resumePoint());
+          break;
         }
-      } finally {
-        controller.close();
+        ch.send(null, event, { id: cursor ? `${cursor.runId}:${cursor.seq}` : null });
       }
     },
-  });
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    { drain: "cooperative", lastEventId: opts.lastEventId ?? null, reconnectData: resumePoint, ...(opts.sse ?? {}) },
+  );
 }

@@ -17,100 +17,82 @@
 
 import { TWIN_LIVE_MAX_MS, TWIN_LIVE_POLL_MS, type TwinSnapshot } from "./types";
 import { diffSnapshots } from "./derive";
+import { SSE_HEADERS, SSE_HEARTBEAT_MS, sseSleep, sseStream, type SseOptions } from "@/lib/http/sse";
 
-export const TWIN_LIVE_HEARTBEAT_MS = 15_000;
+export const TWIN_LIVE_HEARTBEAT_MS = SSE_HEARTBEAT_MS;
 
 export interface TwinLiveOptions {
   /** Loads the current snapshot (throws TwinNotFoundError when the site is gone). */
   snapshot: () => Promise<TwinSnapshot>;
   /** Re-checked every loop: false ends the stream. */
   stillAllowed: () => Promise<boolean>;
+  /**
+   * Phase 17 (latency): the change signal (lib/twin/signal.ts). While it does
+   * not move the snapshot is not rebuilt (nothing it reads changed); absent,
+   * every loop rebuilds as before.
+   */
+  signal?: () => Promise<string>;
   pollMs?: number;
   maxMs?: number;
   heartbeatMs?: number;
+  /** Deploy PR: SSE helper options (tests inject a clock / registry). */
+  sse?: SseOptions;
 }
 
 const sameObjectSet = (a: TwinSnapshot, b: TwinSnapshot) =>
   a.objects.length === b.objects.length && a.objects.every((o, i) => o.id === b.objects[i]!.id);
 
-/** The SSE body. The first snapshot is taken by the caller (so a 404 can be a normal response) and passed in. */
+/**
+ * The SSE body. The first snapshot is taken by the caller (so a 404 can be a
+ * normal response) and passed in. Deploy PR: built on lib/http/sse.ts — the
+ * `: ping` heartbeat, `retry:` and the graceful drain come from there. On a
+ * drain the stream says `event: reconnect` and closes; the client reconnects
+ * (to another replica) and gets a fresh `snapshot` — the snapshot IS the
+ * resume point, so no event id is needed.
+ */
 export function twinLiveStream(first: TwinSnapshot, opts: TwinLiveOptions): ReadableStream<Uint8Array> {
   const pollMs = opts.pollMs ?? TWIN_LIVE_POLL_MS;
   const maxMs = opts.maxMs ?? TWIN_LIVE_MAX_MS;
-  const encoder = new TextEncoder();
-  let closed = false;
-  let wake: (() => void) | null = null;
-  const sleep = (ms: number) =>
-    new Promise<void>((resolve) => {
-      const t = setTimeout(() => {
-        wake = null;
-        resolve();
-      }, ms);
-      wake = () => {
-        clearTimeout(t);
-        wake = null;
-        resolve();
-      };
-    });
-
-  return new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: string, data: unknown) => {
-        if (closed) return;
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-      };
-      const heartbeat = setInterval(() => {
-        if (!closed) controller.enqueue(encoder.encode(": ping\n\n"));
-      }, opts.heartbeatMs ?? TWIN_LIVE_HEARTBEAT_MS);
+  return sseStream(
+    async (ch) => {
       const deadline = Date.now() + maxMs;
       let last = first;
       let reason = "max-duration";
-      send("snapshot", first);
-      try {
-        while (!closed) {
-          await sleep(Math.max(0, Math.min(pollMs, deadline - Date.now())));
-          if (closed) break;
-          if (Date.now() >= deadline) break;
-          if (!(await opts.stillAllowed().catch(() => false))) {
-            reason = "access-revoked";
-            break;
-          }
-          let next: TwinSnapshot;
-          try {
-            next = await opts.snapshot();
-          } catch (e) {
-            reason = (e as { status?: number })?.status === 404 ? "site-gone" : "error";
-            break;
-          }
-          if (!sameObjectSet(last, next) || last.site.id !== next.site.id) {
-            send("snapshot", next);
-          } else {
-            const ops = diffSnapshots(last, next);
-            if (ops.length) send("patch", ops);
-          }
-          last = next;
+      let lastSignal = opts.signal ? await opts.signal().catch(() => null) : null;
+      ch.send("snapshot", first);
+      while (!ch.closed) {
+        await sseSleep(ch, Math.max(0, Math.min(pollMs, deadline - Date.now())));
+        if (ch.closed) return;
+        if (Date.now() >= deadline) break;
+        if (!(await opts.stillAllowed().catch(() => false))) {
+          reason = "access-revoked";
+          break;
         }
-        if (!closed) send("end", { reason });
-      } finally {
-        clearInterval(heartbeat);
-        closed = true;
+        if (opts.signal) {
+          const sig = await opts.signal().catch(() => null);
+          if (sig !== null && sig === lastSignal) continue; // nothing the snapshot reads changed
+          lastSignal = sig;
+        }
+        let next: TwinSnapshot;
         try {
-          controller.close();
-        } catch {
-          // Client already gone.
+          next = await opts.snapshot();
+        } catch (e) {
+          reason = (e as { status?: number })?.status === 404 ? "site-gone" : "error";
+          break;
         }
+        if (ch.closed) return;
+        if (!sameObjectSet(last, next) || last.site.id !== next.site.id) {
+          ch.send("snapshot", next);
+        } else {
+          const ops = diffSnapshots(last, next);
+          if (ops.length) ch.send("patch", ops);
+        }
+        last = next;
       }
+      if (!ch.closed) ch.send("end", { reason });
     },
-    cancel() {
-      closed = true;
-      (wake as (() => void) | null)?.();
-    },
-  });
+    { heartbeatMs: opts.heartbeatMs, ...(opts.sse ?? {}) },
+  );
 }
 
-export const TWIN_SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache, no-transform",
-  Connection: "keep-alive",
-  "X-Accel-Buffering": "no",
-} as const;
+export const TWIN_SSE_HEADERS = SSE_HEADERS;

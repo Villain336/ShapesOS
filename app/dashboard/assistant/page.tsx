@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function AssistantPage({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string; tab?: string }>;
+  searchParams: Promise<{ project?: string; tab?: string; thread?: string }>;
 }) {
   const user = await requireUser();
   if (!user) return null;
@@ -38,6 +38,9 @@ export default async function AssistantPage({
   });
   const mockMode = !llmStatus().isLive;
   const initialTab = sp.tab === "team" ? ("team" as const) : ("ai" as const);
+  // Phase 18.1 (Spotlight): a chat hit opens its thread (the thread API
+  // re-checks it is this person's own).
+  const initialThreadId = typeof sp.thread === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(sp.thread) ? sp.thread : null;
 
   return (
     <div className="h-full bg-canvas">
@@ -49,6 +52,7 @@ export default async function AssistantPage({
         memberCount={memberCount}
         currentUserId={user.id}
         initialTab={initialTab}
+        initialThreadId={initialThreadId}
         workspaceId={workspace.id}
       />
     </div>

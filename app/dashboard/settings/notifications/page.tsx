@@ -20,7 +20,7 @@ export default async function NotificationsSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Notifications</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — workspace-wide notification defaults.
         </p>
       </div>

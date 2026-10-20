@@ -177,3 +177,33 @@ export async function slackPostMessage(
   );
   return { channel: String(r.channel ?? channel), ts: String(r.ts ?? "") };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 18.3 (WS=trust): Slack direct messages for notifications
+// (lib/notifications/slack.ts). The bot finds the person by the email their
+// ShapesOS membership uses (users.lookupByEmail, scope users:read.email) and
+// opens a DM with them (conversations.open, scope im:write).
+// ---------------------------------------------------------------------------
+
+const SLACK_USER_RE = /^[UW][A-Z0-9]{6,20}$/;
+
+/** The Slack user with this email in the bot's team, or null when there is none. */
+export async function slackLookupUserByEmail(auth: TokenSource, email: string, deps: LiveDeps = {}): Promise<string | null> {
+  const e = email.trim().toLowerCase();
+  if (!e || !e.includes("@")) return null;
+  try {
+    const r = await slackCall<SlackEnvelope & { user?: { id?: string; deleted?: boolean; is_bot?: boolean } }>("users.lookupByEmail", auth, { query: { email: e } }, deps);
+    const id = r.user?.id;
+    return id && SLACK_USER_RE.test(id) && !r.user?.deleted && !r.user?.is_bot ? id : null;
+  } catch (err) {
+    if (err instanceof ConnectorApiError && /users_not_found/.test(err.message)) return null;
+    throw err;
+  }
+}
+
+/** Open (or find) the bot's DM with one Slack user; returns the D… channel id. */
+export async function slackOpenDm(auth: TokenSource, slackUserId: string, deps: LiveDeps = {}): Promise<string> {
+  if (!SLACK_USER_RE.test(slackUserId)) throw new Error("Not a Slack user id.");
+  const r = await slackCall<SlackEnvelope & { channel?: { id?: string } }>("conversations.open", auth, { json: { users: slackUserId } }, deps);
+  return channelIdOf(r.channel?.id);
+}

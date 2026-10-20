@@ -132,28 +132,28 @@ export function InvoiceFinancePanel({ invoice, onChanged }: { invoice: InvoiceMo
   return (
     <section className="mt-5 flex flex-col gap-3" aria-label="Payments">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-[13px] font-bold text-ink">Payments</h4>
+        <h4 className="text-[0.8125rem] font-bold text-ink">Payments</h4>
         <a href={`/api/ops/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" className={aosButton({ variant: "quiet", size: "xs" })}>
           <Download size={14} aria-hidden /> PDF
         </a>
       </div>
-      {invoice.deliveryStatus ? <p className="text-[13px] text-muted">{DELIVERY[invoice.deliveryStatus] ?? invoice.deliveryStatus}</p> : null}
-      <dl className="grid grid-cols-3 gap-2 text-[13px]">
+      {invoice.deliveryStatus ? <p className="text-[0.8125rem] text-muted">{DELIVERY[invoice.deliveryStatus] ?? invoice.deliveryStatus}</p> : null}
+      <dl className="grid grid-cols-3 gap-2 text-[0.8125rem]">
         <div className="rounded-md bg-canvas px-3 py-2">
-          <dt className="text-[11px] text-subtle">Paid</dt>
+          <dt className="text-[0.6875rem] text-subtle">Paid</dt>
           <dd className="font-medium tabular-nums">{money(invoice.paidCents ?? 0)}</dd>
         </div>
         <div className="rounded-md bg-canvas px-3 py-2">
-          <dt className="text-[11px] text-subtle">Credited</dt>
+          <dt className="text-[0.6875rem] text-subtle">Credited</dt>
           <dd className="font-medium tabular-nums">{money(invoice.creditedCents ?? 0)}</dd>
         </div>
         <div className="rounded-md bg-canvas px-3 py-2">
-          <dt className="text-[11px] text-subtle">Balance due</dt>
+          <dt className="text-[0.6875rem] text-subtle">Balance due</dt>
           <dd className="font-semibold tabular-nums">{money(balance)}</dd>
         </div>
       </dl>
       {acct && (acct.payments.length > 0 || acct.creditNotes.length > 0) ? (
-        <ul className="flex flex-col gap-1 text-[13px]">
+        <ul className="flex flex-col gap-1 text-[0.8125rem]">
           {acct.payments.map((p) => (
             <li key={p.id} className="flex justify-between">
               <span>
@@ -230,7 +230,7 @@ export function InvoiceFinancePanel({ invoice, onChanged }: { invoice: InvoiceMo
         </div>
       ) : null}
       {link ? (
-        <p className="text-[13px]">
+        <p className="text-[0.8125rem]">
           Pay online:{" "}
           <a className="font-semibold break-all underline" href={link} target="_blank" rel="noreferrer">
             {link}

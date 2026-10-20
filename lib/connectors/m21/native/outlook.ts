@@ -5,6 +5,7 @@
 // Microsoft Graph v1.0 (lib/connectors/m21/live/graph.ts):
 //   list_messages     GET  /me/messages
 //   get_message       GET  /me/messages/{id} (body as plain text)
+//   list_conversation GET  /me/messages?$filter=conversationId eq … (Phase 18.2: Mail app thread view)
 //   send_email        POST /me/sendMail                 [mutating]
 //   reply_to_message  POST /me/messages/{id}/reply(All) [mutating]
 // Mutating tools pass the chat confirmation gate first (connectorAction →
@@ -24,7 +25,7 @@ import type {
 } from "../types";
 import { boolProp, fail, liveOk, mockOk, numProp, strProp } from "../types";
 import { liveFailure, tokenSourceFrom, type LiveDeps } from "../live/http";
-import { graphGetMessage, graphListMessages, graphMe, graphReply, graphSendMail } from "../live/graph";
+import { graphGetMessage, graphListConversation, graphListMessages, graphMe, graphReply, graphSendMail } from "../live/graph";
 import { MimeInputError } from "../live/mime";
 
 /** Input-validation errors become bad_request (never a provider error). */
@@ -63,6 +64,13 @@ export class OutlookAdapter implements ConnectorAdapter {
         description: "Read one Outlook message (headers and plain-text body) by id.",
         mutating: false,
         argsSchema: { type: "object", properties: { messageId: strProp("Outlook message id.") }, required: ["messageId"] },
+      },
+      // Phase 18.2 (WS=comms): a conversation's messages (the Mail app's thread view).
+      {
+        name: "list_conversation",
+        description: "Read one Outlook conversation: every message (headers and plain-text body), oldest first.",
+        mutating: false,
+        argsSchema: { type: "object", properties: { conversationId: strProp("Outlook conversation id (from list_messages).") }, required: ["conversationId"] },
       },
       {
         name: "send_email",
@@ -117,6 +125,8 @@ export class OutlookAdapter implements ConnectorAdapter {
           );
         case "get_message":
           return liveOk(await graphGetMessage(auth, String(args.messageId ?? ""), this.deps));
+        case "list_conversation":
+          return liveOk(await graphListConversation(auth, String(args.conversationId ?? ""), this.deps));
         case "send_email":
           return liveOk(await graphSendMail(auth, { to: args.to, cc: args.cc, bcc: args.bcc, subject: args.subject, body: args.body, html: args.html }, this.deps));
         case "reply_to_message":
@@ -148,6 +158,10 @@ export class OutlookAdapter implements ConnectorAdapter {
         ]);
       case "get_message":
         return mockOk({ id: String(args.messageId ?? "mock-msg-1"), subject: "Quote request (MOCK)", from: "ada@example.com", to: ["you@example.com"], bodyText: "Could you send pricing for next month? (MOCK)", mock: true });
+      case "list_conversation":
+        return mockOk([
+          { id: "mock-msg-1", subject: "Quote request (MOCK)", from: "ada@example.com", receivedAt: "2026-10-01T09:00:00Z", preview: "Could you send pricing… (MOCK)", conversationId: String(args.conversationId ?? "mock-conv-1"), isRead: false, to: ["you@example.com"], cc: [], bodyText: "Hi,\n\nCould you send pricing for next month? We need 40 seats.\n\nAda (MOCK)", mock: true },
+        ]);
       case "send_email":
         return mockOk({ sent: false, mock: true, info: "MOCK — Outlook is not connected; nothing was sent." });
       case "reply_to_message":

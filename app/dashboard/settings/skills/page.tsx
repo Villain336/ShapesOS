@@ -21,7 +21,7 @@ export default async function SkillsSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="aos-heading">Skills</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — install skills that teach ShapesOS how your team
           does marketing. Enable them per project in project settings.
         </p>

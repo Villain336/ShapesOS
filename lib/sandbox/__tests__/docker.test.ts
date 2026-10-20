@@ -255,6 +255,18 @@ describe("DockerSandboxProvider.available", () => {
     const tcp = await new DockerSandboxProvider({ config: sandboxConfig({ DOCKER_HOST: "tcp://10.0.0.1:2375" }) }).available();
     assert.match((tcp as { reason: string }).reason, /unix socket/);
   });
+  it("is refused on a hosted install (single-host containers and checkpoints)", async () => {
+    const saved = process.env.DEPLOYMENT_MODE;
+    process.env.DEPLOYMENT_MODE = "hosted";
+    try {
+      const a = await provider().available();
+      assert.equal(a.ok, false);
+      assert.match((a as { reason: string }).reason, /SANDBOX_PROVIDER=e2b or daytona/);
+    } finally {
+      if (saved === undefined) delete process.env.DEPLOYMENT_MODE;
+      else process.env.DEPLOYMENT_MODE = saved;
+    }
+  });
 });
 
 describe("DockerSandboxProvider.create — request shapes and security options", () => {

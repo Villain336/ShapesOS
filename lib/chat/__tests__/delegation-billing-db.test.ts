@@ -8,12 +8,14 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { settleBackgroundWork } from "@/lib/runtime/shutdown";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { AgentWorker } from "@/lib/agents/queue/worker";
 import { creditsFor, llmTokenCredits } from "@/lib/metering/credits";
 import { runTrackedAgentTurn } from "../agent";
 import { allText, startFakeModel, toolOutputs, type FakeModel, type ResponsesBody } from "./fake-responses";
+import { flushUsageRecording } from "@/lib/llm/usage";
 
 const RUN = `p15db-${Date.now().toString(36)}`;
 const WS = `${RUN}-ws`;
@@ -32,6 +34,7 @@ before(async () => {
 });
 
 after(async () => {
+  await settleBackgroundWork(); // usage records and run events land in the background
   await model.close();
   await prisma.workspace.deleteMany({ where: { id: WS } });
   await prisma.$disconnect();
@@ -89,6 +92,7 @@ describe("delegated model calls are billed once, through the token path", () => 
 
     const served = model.requests.filter((r) => !r.aborted).length;
     assert.ok(served >= 4, `lead + 2 children + merge (saw ${served})`);
+    await flushUsageRecording(); // Phase 17: usage is recorded asynchronously (lib/llm/usage.ts)
     const tokens = await prisma.usageEvent.findMany({ where: { workspaceId: WS, action: "llm_tokens" } });
     assert.equal(tokens.length, served, "one llm_tokens row per model call — none missed, none doubled");
     assert.equal(new Set(tokens.map((e) => e.idempotencyKey)).size, tokens.length);

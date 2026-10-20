@@ -127,7 +127,7 @@ export default function InternalLinksList({
               <button
                 onClick={() => act([s.id], "apply")}
                 disabled={busy !== null}
-                className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white hover:bg-ink-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {busy === "apply" ? "…" : "Apply → inbox"}
               </button>

@@ -33,6 +33,7 @@ import { prisma } from "@/lib/prisma";
 import { BadRequestError, ConflictError } from "@/lib/api/errors";
 import { LIVE_SUBSCRIPTION, purgeWorkspace, readSubscription } from "@/lib/workspace/lifecycle";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
+import { USER_GUC } from "@/lib/desktop/scope";
 import { isUserRefColumn, loadCatalog, q, type Catalog } from "./catalog";
 import { emailFromUserId } from "@/lib/auth/email/tokens";
 
@@ -134,6 +135,10 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   // Phase 6: the email + password account (its single-use links are keyed by
   // address and deleted just before; see EMAIL_TOKEN_TABLE).
   { table: "email_accounts", column: "user_id" },
+  // Phase 18.1 (WS=desk): focus / do not disturb state (per person).
+  { table: "user_desk_state", column: "user_id" },
+  // Phase 18.1 (WS=find): theme, language, time zone, shortcuts… (lib/preferences).
+  { table: "user_preferences", column: "user_id" },
   { table: "user_security", column: "user_id" },
 ];
 
@@ -151,6 +156,22 @@ export const EMAIL_TOKEN_TABLE = "email_auth_tokens";
 export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] = [
   { table: "push_devices", column: "user_id" },
   { table: "conversation_reads", column: "user_id" },
+  // Phase 18.1 (WS=desk): owner-only (workspace + app.user_id) — the delete
+  // pass sets the person GUC to the subject too.
+  { table: "user_desktop_layouts", column: "user_id" },
+  { table: "user_recent_items", column: "user_id" },
+  { table: "desktop_briefings", column: "user_id" },
+];
+
+/**
+ * Phase 18.3: per-person rows in FORCE-RLS tables keyed on the person GUC
+ * alone (no workspace): deleted once the subject is the GUC.
+ */
+export const PERSONAL_USER_RLS_TABLES: readonly { table: string; column: string }[] = [
+  // WS=trust — the session registry (lib/auth/sessions.ts): every sign-in of the person.
+  { table: "user_sessions", column: "user_id" },
+  // WS=flow — Web Push subscriptions (lib/push/web.ts).
+  { table: "push_subscriptions", column: "user_id" },
 ];
 
 /**
@@ -165,7 +186,12 @@ export const KEEP_REFERENCES: readonly string[] = ["workspaces", "workspace_memb
 
 /** Columns pseudonymized on account deletion (catalog-driven; pure). */
 export function pseudonymizeTargets(catalog: Catalog): { table: string; columns: string[]; rls: boolean }[] {
-  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
+  const skip = new Set([
+    ...PERSONAL_TABLES.map((p) => p.table),
+    ...PERSONAL_RLS_TABLES.map((p) => p.table),
+    ...PERSONAL_USER_RLS_TABLES.map((p) => p.table),
+    ...KEEP_REFERENCES,
+  ]);
   const out: { table: string; columns: string[]; rls: boolean }[] = [];
   for (const name of [...catalog.keys()].sort()) {
     if (skip.has(name)) continue;
@@ -290,6 +316,14 @@ export async function deleteAccount(opts: {
         referencesPseudonymized += await tx.$executeRaw`
           UPDATE "file_change_log" SET "summary" = replace("summary", ${email}, '[deleted user]')
            WHERE "summary" ILIKE ${`%${email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`;
+      }
+      // Phase 18.1: owner-only tables answer only to their member (app.user_id).
+      await tx.$queryRaw`SELECT set_config(${USER_GUC}, ${userId}, true)`;
+      // Phase 18.3: person-only FORCE-RLS tables (no workspace): the session
+      // registry and Web Push subscriptions, deleted once with the person GUC set.
+      for (const p of PERSONAL_USER_RLS_TABLES) {
+        if (!catalog.has(p.table)) continue;
+        personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
       }
       for (const p of PERSONAL_RLS_TABLES) {
         if (!catalog.has(p.table)) continue;

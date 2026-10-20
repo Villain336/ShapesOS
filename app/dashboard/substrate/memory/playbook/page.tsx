@@ -13,9 +13,9 @@ import PlaybookReviewButtons from "./playbook-review-buttons";
 // Review states: pending_review is a workflow state awaiting human decision ->
 // needs fill; approved -> done. (Approval workflow => status colors.)
 const chipNeeds =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-1.5 py-0.5 text-[10px] font-medium leading-tight text-ink";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-ink";
 const chipDone =
-  "inline-flex items-center whitespace-nowrap rounded-full bg-done px-1.5 py-0.5 text-[10px] font-medium leading-tight text-white";
+  "inline-flex items-center whitespace-nowrap rounded-full bg-done px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-white";
 
 export const dynamic = "force-dynamic";
 

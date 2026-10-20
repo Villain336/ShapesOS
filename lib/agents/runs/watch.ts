@@ -11,9 +11,14 @@
 // and it re-checks workspace ownership via getAgentRun (RLS fail-closed)
 // before attaching a subscriber.
 //
-// In-process registry: the recorder and the SSE route run in the same
-// Next server process, exactly like the slice-5 recording semaphore.
-// Cross-process fan-out is out of scope (slice 8 territory).
+// In-process registry: subscribers in the producer's own process read the
+// frames straight from memory. Deploy PR (WS=state): the recording runs on
+// the worker and the SSE route on any web replica, so a stream started with
+// its workspace id is ALSO relayed through Postgres (./watch-relay.ts:
+// latest frame only, uploaded only while someone watches, deleted at the
+// end). A subscriber in another process reads the relay instead. The
+// one-stream-per-run claim stays in-process: a run is recorded by exactly
+// one process (the one that owns its lease).
 //
 // Guardrails (spec §7 task): one live stream (producer) per run —
 // startWatchStream() fails fast with WatchBusyError when a stream is
@@ -25,6 +30,13 @@
 import type { RecorderPage } from "./recorder";
 import { getAgentRun } from "./service";
 import type { AgentRunStatus } from "./types";
+import {
+  postgresWatchRelay,
+  WATCH_RELAY_FLUSH_MS,
+  WATCH_RELAY_HEARTBEAT_MS,
+  WATCH_RELAY_POLL_MS,
+  type WatchRelay,
+} from "./watch-relay";
 
 export class WatchBusyError extends Error {
   constructor(runId: string) {
@@ -54,14 +66,120 @@ interface WatchStreamState {
 
 const streams = new Map<string, WatchStreamState>();
 
+// ---- cross-process relay (Deploy PR) ----
+
+let relayOverride: WatchRelay | null | undefined;
+let defaultRelay: WatchRelay | null = null;
+
+/** The relay to use: Postgres whenever a database is configured. */
+function relay(): WatchRelay | null {
+  if (relayOverride !== undefined) return relayOverride;
+  if (!process.env.DATABASE_URL?.trim()) return null;
+  return (defaultRelay ??= postgresWatchRelay());
+}
+
+/** Test seam: force a relay (null = none); undefined restores the default. */
+export function _setWatchRelayForTests(r: WatchRelay | null | undefined): void {
+  relayOverride = r;
+}
+
+const relayWarned = new Set<string>();
+function relayWarn(op: string, err: unknown): void {
+  if (relayWarned.has(op)) return;
+  relayWarned.add(op);
+  console.warn(`[watch-relay] ${op} failed (live watch from other instances may lag): ${err instanceof Error ? err.message : String(err)}`);
+}
+
+/** Producer side of the relay for one run: throttled, only while watched. */
+class RelayProducer {
+  private latest: Buffer | null = null;
+  private latestN = 0;
+  private flushedN = 0;
+  private watched = false;
+  private lastFlushAt = 0;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private stopped = false;
+  private opened: Promise<void>;
+
+  constructor(
+    private readonly r: WatchRelay,
+    private readonly workspaceId: string,
+    private readonly runId: string,
+  ) {
+    this.opened = r.open(workspaceId, runId).catch((err) => relayWarn("open", err));
+    this.heartbeatTimer = setInterval(() => void this.beat(), WATCH_RELAY_HEARTBEAT_MS);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private async beat(): Promise<void> {
+    if (this.stopped) return;
+    await this.opened;
+    try {
+      const hb = await this.r.heartbeat(this.workspaceId, this.runId);
+      this.watched = hb.watched;
+      if (this.watched && this.latestN > this.flushedN) this.schedule();
+    } catch (err) {
+      relayWarn("heartbeat", err);
+    }
+  }
+
+  frame(jpeg: Buffer): void {
+    if (this.stopped) return;
+    this.latest = jpeg;
+    this.latestN += 1;
+    if (this.watched) this.schedule();
+  }
+
+  private schedule(): void {
+    if (this.flushTimer || this.stopped) return;
+    const wait = Math.max(0, this.lastFlushAt + WATCH_RELAY_FLUSH_MS - Date.now());
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      void this.flush();
+    }, wait);
+    this.flushTimer.unref?.();
+  }
+
+  private async flush(): Promise<void> {
+    if (this.stopped || !this.latest || this.latestN <= this.flushedN) return;
+    const n = this.latestN;
+    const jpeg = this.latest;
+    this.lastFlushAt = Date.now();
+    await this.opened;
+    try {
+      const res = await this.r.publish(this.workspaceId, this.runId, jpeg);
+      this.flushedN = n;
+      this.watched = res?.watched ?? false;
+    } catch (err) {
+      relayWarn("publish", err);
+    }
+    if (this.watched && this.latestN > this.flushedN) this.schedule();
+  }
+
+  async stop(): Promise<void> {
+    if (this.stopped) return;
+    this.stopped = true;
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    await this.opened;
+    await this.r.end(this.workspaceId, this.runId).catch((err) => relayWarn("end", err));
+  }
+}
+
+const producers = new Map<string, RelayProducer>();
+
 /**
  * Claim the single live-stream slot for a run. Fail-fast when a stream is
- * already active (same posture as the slice-5 recording semaphore).
+ * already active (same posture as the slice-5 recording semaphore). With
+ * `workspaceId` the frames are also relayed to other processes.
  */
-export function startWatchStream(runId: string): void {
+export function startWatchStream(runId: string, opts: { workspaceId?: string } = {}): void {
   const existing = streams.get(runId);
   if (existing?.active) throw new WatchBusyError(runId);
   streams.set(runId, { active: true, seq: 0, latest: null, ended: false, waiters: new Set() });
+  const r = opts.workspaceId ? relay() : null;
+  if (r && opts.workspaceId) producers.set(runId, new RelayProducer(r, opts.workspaceId, runId));
 }
 
 /** Publish one JPEG frame; no-op when no stream is active for the run. */
@@ -75,28 +193,44 @@ export function publishWatchFrame(runId: string, jpeg: Buffer): void {
     s.waiters.delete(w);
     w(frame);
   }
+  producers.get(runId)?.frame(jpeg);
 }
 
 /**
  * End the stream: all waiting subscribers resolve `ended`, late
  * subscribers get `ended` immediately, and the slot is freed so a
- * (never-reused) run id cannot leak the entry.
+ * (never-reused) run id cannot leak the entry. The relay row is deleted.
  */
-export function endWatchStream(runId: string): void {
+export function endWatchStream(runId: string): Promise<void> {
+  const producer = producers.get(runId);
+  producers.delete(runId);
   const s = streams.get(runId);
-  if (!s) return;
-  s.active = false;
-  s.ended = true;
-  for (const w of [...s.waiters]) {
-    s.waiters.delete(w);
-    w(null);
+  if (s) {
+    s.active = false;
+    s.ended = true;
+    for (const w of [...s.waiters]) {
+      s.waiters.delete(w);
+      w(null);
+    }
+    streams.delete(runId);
   }
-  streams.delete(runId);
+  return producer ? producer.stop() : Promise.resolve();
 }
 
-/** True while a live stream is producing frames for the run. */
+/** True while a live stream is producing frames for the run IN THIS PROCESS. */
 export function isWatchStreamActive(runId: string): boolean {
   return streams.get(runId)?.active === true;
+}
+
+/** True while a live stream produces frames for the run in ANY process. */
+export async function isWatchStreamLive(workspaceId: string, runId: string): Promise<boolean> {
+  if (isWatchStreamActive(runId)) return true;
+  const r = relay();
+  if (!r) return false;
+  return r.isLive(workspaceId, runId).catch((err) => {
+    relayWarn("isLive", err);
+    return false;
+  });
 }
 
 export interface WatchSubscription {
@@ -110,8 +244,56 @@ export interface WatchSubscription {
   close(): void;
 }
 
-/** Attach a subscriber to a run's live stream (route-checked, not auth). */
-export function subscribeWatchStream(runId: string): WatchSubscription {
+/**
+ * Attach a subscriber to a run's live stream (route-checked, not auth).
+ * The producer's own process reads frames from memory; any other process
+ * (given the workspace id) reads them from the relay.
+ */
+export function subscribeWatchStream(runId: string, opts: { workspaceId?: string } = {}): WatchSubscription {
+  const r = opts.workspaceId ? relay() : null;
+  if (!streams.has(runId) && r && opts.workspaceId) return relaySubscription(r, opts.workspaceId, runId);
+  return memorySubscription(runId);
+}
+
+/** Test seam: subscribe exactly as another process would (through the relay). */
+export function _relaySubscriptionForTests(workspaceId: string, runId: string, r: WatchRelay | null = relay()): WatchSubscription {
+  if (!r) throw new Error("no watch relay configured");
+  return relaySubscription(r, workspaceId, runId);
+}
+
+/** Cross-process subscriber: polls the relay (latest-wins, like memory). */
+function relaySubscription(r: WatchRelay, workspaceId: string, runId: string): WatchSubscription {
+  let lastSeen = 0;
+  let closed = false;
+  return {
+    async nextFrame(timeoutMs: number) {
+      const deadline = Date.now() + Math.max(0, timeoutMs);
+      for (;;) {
+        if (closed) return { ended: true };
+        let polled;
+        try {
+          polled = await r.poll(workspaceId, runId, lastSeen);
+        } catch (err) {
+          relayWarn("poll", err);
+          polled = null;
+        }
+        if (polled?.state === "ended") return { ended: true };
+        if (polled?.state === "live" && polled.frame && polled.frame.seq > lastSeen) {
+          lastSeen = polled.frame.seq;
+          return polled.frame;
+        }
+        const left = deadline - Date.now();
+        if (left <= 0) return null;
+        await new Promise((res) => setTimeout(res, Math.min(WATCH_RELAY_POLL_MS, left)));
+      }
+    },
+    close() {
+      closed = true;
+    },
+  };
+}
+
+function memorySubscription(runId: string): WatchSubscription {
   let lastSeen = 0;
   let closed = false;
   return {
@@ -167,7 +349,7 @@ export async function getWatchStreamAccess(
   workspaceId: string,
   runId: string,
 ): Promise<{ status: AgentRunStatus } | null> {
-  if (!isWatchStreamActive(runId)) return null;
+  if (!(await isWatchStreamLive(workspaceId, runId))) return null;
   const run = await getAgentRun(workspaceId, runId);
   if (!run) return null;
   return { status: run.status as AgentRunStatus };
@@ -186,13 +368,14 @@ export async function getWatchStreamAccess(
 export async function attachWatch(
   page: RecorderPage,
   runId: string,
+  workspaceId?: string,
 ): Promise<(() => Promise<void>) | null> {
   if (!page.startScreencast) return null;
   const stopScreencast = await page.startScreencast(WATCH_CAPTURE_OPTS, (jpeg) =>
     publishWatchFrame(runId, jpeg),
   );
   try {
-    startWatchStream(runId);
+    startWatchStream(runId, { workspaceId });
   } catch (err) {
     await stopScreencast().catch(() => undefined);
     throw err;
@@ -204,7 +387,7 @@ export async function attachWatch(
     try {
       await stopScreencast();
     } finally {
-      endWatchStream(runId);
+      await endWatchStream(runId);
     }
   };
 }
@@ -212,4 +395,5 @@ export async function attachWatch(
 /** Test seam: drop all stream state (production code never calls this). */
 export function _resetWatchRegistryForTests(): void {
   streams.clear();
+  producers.clear();
 }

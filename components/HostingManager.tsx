@@ -54,7 +54,7 @@ const TARGET_LABEL: Record<string, string> = {
 const INPUT =
   "mt-1 h-control w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const PILL_SECONDARY =
-  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40";
 
 const STATUS_COLOR: Record<string, string> = {
   // Deployment states read as text; only an error takes the failed color.
@@ -431,7 +431,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             <button onClick={() => void testVercel()} disabled={vTestBusy} className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40">
               {vTestBusy ? "Testing…" : "Test"}
             </button>
-            <button onClick={() => void saveVercel()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40">
+            <button onClick={() => void saveVercel()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40">
               {busy ? "Saving…" : "Connect"}
             </button>
           </div>
@@ -469,7 +469,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             <button onClick={() => void testCloudflare()} disabled={cTestBusy} className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40">
               {cTestBusy ? "Testing…" : "Test"}
             </button>
-            <button onClick={() => void saveCloudflare()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40">
+            <button onClick={() => void saveCloudflare()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40">
               {busy ? "Saving…" : "Connect"}
             </button>
           </div>
@@ -504,7 +504,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             <button onClick={() => void testNetlify()} disabled={nTestBusy} className="inline-flex h-control-sm items-center whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40">
               {nTestBusy ? "Testing…" : "Test"}
             </button>
-            <button onClick={() => void saveNetlify()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40">
+            <button onClick={() => void saveNetlify()} disabled={busy} className="inline-flex h-control-sm items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40">
               {busy ? "Saving…" : "Connect"}
             </button>
           </div>
@@ -528,14 +528,14 @@ export default function HostingManager({ projectId }: { projectId: string }) {
                 <button
                   onClick={() => void connectForAgents(c)}
                   disabled={agentBusy === c.id}
-                  className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {agentBusy === c.id ? "Connecting…" : "Use for agents"}
                 </button>
               )}
               <button
                 onClick={() => void deleteConn(c.id, c.name)}
-                className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
+                className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-paper px-3 text-[0.8125rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
               >
                 Remove
               </button>
@@ -565,7 +565,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
               <button
                 onClick={() => void runDeploy()}
                 disabled={depBusy || !depSite || !depConn}
-                className="inline-flex h-control w-full items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-control w-full items-center justify-center whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {depBusy ? "Deploying…" : "Deploy to hosting"}
               </button>

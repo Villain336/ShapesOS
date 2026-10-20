@@ -83,6 +83,44 @@ export async function loadActiveStyleRules(workspaceId: string): Promise<StyleRu
   );
 }
 
+// ── Phase 17 (latency): the per-workspace memo the chat turn reads ─────────
+//
+// A chat turn used to load the active rules three times (the prompt's hard
+// constraints, the stream guard, the final enforcement). The turn now reads
+// them once through loadActiveStyleRulesMemo(): one load per workspace per
+// process, kept STYLE_RULES_MEMO_MS, and dropped at once by
+// invalidateStyleRules() on every write path in this process (the style-rule
+// routes, the learning pass). Another replica sees an edit within the TTL.
+// The direct loader above stays uncached: the enforcement entry points other
+// surfaces call (checkOutput / enforceStyleRules) and the evals read fresh.
+
+export const STYLE_RULES_MEMO_MS = 10_000;
+const styleRulesMemo = new Map<string, { at: number; rules: Promise<StyleRule[]> }>();
+
+export async function loadActiveStyleRulesMemo(workspaceId: string, now: () => number = Date.now): Promise<StyleRule[]> {
+  const hit = styleRulesMemo.get(workspaceId);
+  if (hit && now() - hit.at < STYLE_RULES_MEMO_MS) return hit.rules;
+  const rules = loadActiveStyleRules(workspaceId);
+  styleRulesMemo.set(workspaceId, { at: now(), rules });
+  rules.catch(() => styleRulesMemo.delete(workspaceId));
+  // Bounded: forget the oldest entries past 1,000 workspaces in this process.
+  if (styleRulesMemo.size > 1_000) {
+    const oldest = styleRulesMemo.keys().next().value;
+    if (oldest !== undefined) styleRulesMemo.delete(oldest);
+  }
+  return rules;
+}
+
+/** A style rule changed in this workspace: the next turn reloads. */
+export function invalidateStyleRules(workspaceId: string): void {
+  styleRulesMemo.delete(workspaceId);
+}
+
+/** Test seam. */
+export function _resetStyleRulesMemoForTests(): void {
+  styleRulesMemo.clear();
+}
+
 /** Check text against all active rules for the workspace. */
 export async function checkOutput(
   text: string,

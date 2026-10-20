@@ -19,8 +19,10 @@ import type {
   AgentRunEventInput,
 } from "./types";
 import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
-import { notifyAgentRunFailed } from "@/lib/notifications/producers";
+import { notifyAgentRunFailed, notifyRunFinished } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
+import { publishRunEvent } from "./live-events";
+import { HttpError } from "@/lib/api/errors";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -30,17 +32,34 @@ export interface CreateAgentRunInput extends AgentRunLinkage {
 }
 
 export interface AttachRecordingInput {
+  /** Blob refs (deploy PR) or, on rows written before it, filesystem paths. */
   videoPath: string | null;
-  tracePath: string;
+  tracePath: string | null;
   stepCount: number;
   sizeBytes: number;
   retentionUntil: Date;
+}
+
+/**
+ * Phase 18.1 (WS=desk): "Pause all agents" (Control Center) freezes the
+ * workspace through the kill switch (lib/orchestrator/killswitch.ts). Every
+ * agent run — chat turns, scheduled skills, missions, browser runs, sub-agents
+ * — is created here, so a frozen workspace starts nothing new until an admin
+ * resumes it. 409 with code "agents_paused" for request handlers.
+ */
+export class AgentsPausedError extends HttpError {
+  constructor() {
+    super(409, "Agents are paused in this workspace. An admin can resume them from Control Center.", { code: "agents_paused" });
+    this.name = "AgentsPausedError";
+  }
 }
 
 /** Create a run in `queued` status; links back to the chat thread/mission. */
 export async function createAgentRun(input: CreateAgentRunInput) {
   if (!input.workspaceId) throw new Error("createAgentRun: workspaceId is required");
   if (!input.startedBy) throw new Error("createAgentRun: startedBy is required");
+  const ws = await prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { frozenAt: true } });
+  if (ws?.frozenAt) throw new AgentsPausedError();
   return withWorkspaceScope(input.workspaceId, (tx) =>
     tx.agentRun.create({
       data: {
@@ -79,7 +98,7 @@ export async function appendAgentRunEvent(
   event: AgentRunEventInput,
 ) {
   if (!event.summary?.trim()) throw new Error("appendAgentRunEvent: summary is required");
-  return withWorkspaceScope(workspaceId, async (tx) => {
+  const row = await withWorkspaceScope(workspaceId, async (tx) => {
     // Same outer transaction (withWorkspaceScope's) — no nested
     // $transaction: the seq increment and the event insert are atomic.
     const run = await tx.agentRun.update({
@@ -98,6 +117,41 @@ export async function appendAgentRunEvent(
       },
     });
   });
+  // Phase 17 (latency): the row is durable — hand it to the tails in this
+  // process at once (the AG-UI chat stream), instead of their next poll.
+  publishRunEvent(runId, { seq: row.seq, type: row.type, summary: row.summary, payload: row.payload });
+  return row;
+}
+
+/**
+ * Deploy PR: the last page a task's browser tools opened, from the run
+ * timeline (the `browser` events the tools link onto the calling run carry
+ * { tool, url }). The tools keep an in-process copy as a cache; this is the
+ * answer on any other instance (a turn handed to the worker, another web
+ * replica). Thread-scoped when the task has a thread, else run-scoped.
+ */
+export async function lastBrowserPageForTask(
+  workspaceId: string,
+  task: { threadId?: string | null; runId?: string | null },
+): Promise<string | null> {
+  if (!task.threadId && !task.runId) return null;
+  const rows = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: {
+        workspaceId,
+        type: "browser",
+        run: task.threadId ? { threadId: task.threadId } : { id: task.runId! },
+      },
+      orderBy: [{ createdAt: "desc" }, { seq: "desc" }],
+      take: 25,
+      select: { payload: true },
+    }),
+  );
+  for (const r of rows) {
+    const p = (r.payload ?? {}) as Record<string, unknown>;
+    if (typeof p.tool === "string" && p.tool.startsWith("browser_") && typeof p.url === "string" && p.url) return p.url;
+  }
+  return null;
 }
 
 /** Convenience: append an `agui` protocol event to the timeline. */
@@ -176,6 +230,18 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
       kind: run.kind,
       startedBy: run.startedBy,
     });
+  } else if (status === "succeeded") {
+    // Phase 18.3 (WS=trust): "run finished" → the member who started it
+    // (top-level runs; a quick chat turn the person watched doesn't count).
+    await notifyRunFinished({
+      workspaceId,
+      runId: run.id,
+      kind: run.kind,
+      startedBy: run.startedBy,
+      parentRunId: run.parentRunId,
+      createdAt: run.createdAt,
+      endedAt: run.endedAt,
+    });
   }
   return run;
 }
@@ -196,6 +262,64 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
     tx.agentRunEvent.findMany({
       where: { runId, workspaceId },
       orderBy: { seq: "asc" },
+    }),
+  );
+}
+
+/**
+ * Phase 17 (latency): one page of a run's TIMELINE events (streamed text and
+ * usage bookkeeping excluded), NEWEST first, before a seq cursor. The run
+ * page shows the newest page and loads older ones on demand ("Load earlier
+ * steps") instead of reading every event of a long run. `before` = the
+ * cursor for the next (older) page, null when this was the oldest.
+ */
+export const RUN_EVENTS_PAGE = 100;
+const NOT_TIMELINE: AgentRunEventType[] = ["text", "usage"];
+
+export async function listAgentRunEventsPage(
+  workspaceId: string,
+  runId: string,
+  opts: { beforeSeq?: number | null; limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(Math.floor(opts.limit ?? RUN_EVENTS_PAGE), 1), 500);
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const [rows, total] = await Promise.all([
+      tx.agentRunEvent.findMany({
+        where: {
+          runId,
+          workspaceId,
+          type: { notIn: NOT_TIMELINE },
+          ...(typeof opts.beforeSeq === "number" ? { seq: { lt: opts.beforeSeq } } : {}),
+        },
+        orderBy: { seq: "desc" },
+        take: limit + 1,
+      }),
+      typeof opts.beforeSeq === "number"
+        ? Promise.resolve(null)
+        : tx.agentRunEvent.count({ where: { runId, workspaceId, type: { notIn: NOT_TIMELINE } } }),
+    ]);
+    const more = rows.length > limit;
+    const events = more ? rows.slice(0, limit) : rows;
+    return { events, before: more ? events[events.length - 1]!.seq : null, total };
+  });
+}
+
+/** Phase 17: only the run's events of these types (usage totals) or payload kinds (the sandbox console). */
+export async function listAgentRunEventsWhere(
+  workspaceId: string,
+  runId: string,
+  filter: { types?: AgentRunEventType[]; payloadKindPrefix?: string },
+) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: {
+        runId,
+        workspaceId,
+        ...(filter.types ? { type: { in: filter.types } } : {}),
+        ...(filter.payloadKindPrefix ? { payload: { path: ["kind"], string_starts_with: filter.payloadKindPrefix } } : {}),
+      },
+      orderBy: { seq: "asc" },
+      take: 5_000,
     }),
   );
 }

@@ -215,6 +215,8 @@ export const TWIN_LIVE_MAX_MS = 30 * 60 * 1000;
 /** API paths (data side implements; scene/pages side consumes). */
 export const TWIN_API = {
   state: (siteId: string) => `/api/twin/sites/${encodeURIComponent(siteId)}/state`,
+  /** Phase 17: the change signal — { version } only. */
+  signal: (siteId: string) => `/api/twin/sites/${encodeURIComponent(siteId)}/state?signal=1`,
   live: (siteId: string) => `/api/twin/sites/${encodeURIComponent(siteId)}/live`,
   sample: "/api/twin/sites/sample",
   /** generic ops CRUD (lib/ops/twin/entities.ts) */

@@ -169,7 +169,7 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
         </div>
         {approval && (
           <span
-            className={`inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold ${STATUS_BADGE[approval.status] ?? STATUS_BADGE.pending}`}
+            className={`inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-[0.8125rem] font-semibold ${STATUS_BADGE[approval.status] ?? STATUS_BADGE.pending}`}
           >
             {badgeShape && (
               <span className={`aos-shape aos-shape--${badgeShape}`} style={{ color: "inherit" }} aria-hidden />
@@ -216,15 +216,15 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
       {(phase.kind === "ready" || phase.kind === "editing") && approval && (
         <>
           {approval.reviewNote && (
-            <div className="mt-3 flex items-start gap-2 rounded-md border border-needs bg-needs-tint p-3 text-[13px] text-ink">
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-needs bg-needs-tint p-3 text-[0.8125rem] text-ink">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{approval.reviewNote}</span>
             </div>
           )}
 
-          <table className="mt-3 w-full text-[13px]">
+          <table className="mt-3 w-full text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] text-muted">
+              <tr className="border-b border-line text-left text-[0.6875rem] text-muted">
                 <th className="py-1.5 pr-2 font-medium">Figure</th>
                 <th className="py-1.5 pr-2 font-medium">Value</th>
                 <th className="py-1.5 font-medium">Source</th>
@@ -252,7 +252,7 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
                           {f.source!.provider} · {f.source!.ref}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-needs bg-needs-tint px-2 py-0.5 text-[11px] font-medium text-ink">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-needs bg-needs-tint px-2 py-0.5 text-[0.6875rem] font-medium text-ink">
                           <AlertTriangle className="h-3 w-3" /> no source — flagged
                         </span>
                       )}
@@ -275,21 +275,21 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
               <button
                 type="button"
                 onClick={() => void postDecision("approve", {}, "Approving and rendering")}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold aos-press disabled:opacity-50 bg-done text-white"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold aos-press disabled:opacity-50 bg-done text-white"
               >
                 <Check className="h-3.5 w-3.5" /> Approve &amp; render
               </button>
               <button
                 type="button"
                 onClick={() => setShowDeny((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold aos-press disabled:opacity-50 bg-paper text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold aos-press disabled:opacity-50 bg-paper text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint"
               >
                 <X className="h-3.5 w-3.5" /> Deny
               </button>
               <button
                 type="button"
                 onClick={() => setPhase({ kind: "editing" })}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold aos-press disabled:opacity-50 bg-paper text-ink shadow-outline hover:bg-hover-paper"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold aos-press disabled:opacity-50 bg-paper text-ink shadow-outline hover:bg-hover-paper"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
@@ -302,12 +302,12 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
                 value={denyNote}
                 onChange={(e) => setDenyNote(e.target.value)}
                 placeholder="Denial note (optional)"
-                className="flex-1 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px]"
+                className="flex-1 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem]"
               />
               <button
                 type="button"
                 onClick={() => void postDecision("deny", { note: denyNote }, "Denying")}
-                className="rounded-full bg-paper px-3 py-1.5 text-[13px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint"
+                className="rounded-full bg-paper px-3 py-1.5 text-[0.8125rem] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint"
               >
                 Confirm deny
               </button>
@@ -320,20 +320,20 @@ export function ReportPreview({ approvalId, onResolved }: ReportPreviewProps) {
               <input
                 value={editPeriod}
                 onChange={(e) => setEditPeriod(e.target.value)}
-                className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px]"
+                className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[0.8125rem]"
               />
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => void postDecision("edit", { period: editPeriod }, "Saving edit")}
-                  className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover"
+                  className="rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-semibold text-white aos-press hover:bg-ink-hover"
                 >
                   Save — requeue for approval
                 </button>
                 <button
                   type="button"
                   onClick={() => setPhase({ kind: "ready" })}
-                  className="rounded-full bg-paper px-3 py-1.5 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+                  className="rounded-full bg-paper px-3 py-1.5 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
                 >
                   Cancel
                 </button>

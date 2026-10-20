@@ -7,6 +7,7 @@
 // the payload hash, never the secret or the raw body.
 
 import { createHmac, timingSafeEqual, createHash } from "node:crypto";
+import { sharedWindowHit } from "@/lib/api/rate-limit-store";
 
 export interface VerifyResult {
   ok: boolean;
@@ -79,14 +80,23 @@ export function verifyWooCommerceSignature(
 }
 
 // ---------------------------------------------------------------------------
-// Replay protection: timestamp window + seen-nonce LRU. v1 is an in-process
-// cache (single-instance assumption, documented); a Redis/DB-backed store
-// slots in behind the same interface for multi-instance deploys.
+// Replay protection: timestamp window + seen-nonce store. Deploy PR: the
+// default store is SHARED by every replica (sharedReplayStore: the Postgres
+// counter store, rate_limit_buckets) and claims a nonce atomically — one
+// statement both checks and records it, so a delivery replayed against
+// another replica, or two concurrent copies, are refused. memoryReplayStore
+// (the v1 in-process LRU) stays for tests and callers that inject it.
 // ---------------------------------------------------------------------------
 
 export interface ReplayStore {
   seen(nonce: string): Promise<boolean>;
   remember(nonce: string, ttlSec: number): Promise<void>;
+  /**
+   * Atomic check-and-record: true when this is the first sighting of the
+   * nonce inside ttlSec. Stores that have it are used instead of
+   * seen() + remember() (which race across concurrent deliveries).
+   */
+  claim?(nonce: string, ttlSec: number): Promise<boolean>;
 }
 
 const seenNonces = new Map<string, number>(); // nonce -> expiry epoch ms
@@ -110,6 +120,22 @@ export const memoryReplayStore: ReplayStore = {
   },
 };
 
+/** The shared, atomic replay store (any replica sees every claimed nonce). */
+export const sharedReplayStore: ReplayStore = {
+  async seen(nonce: string) {
+    // Only used by callers that skip claim(); a read-only probe is not
+    // offered by the counter store, so report "unseen" and let claim decide.
+    void nonce;
+    return false;
+  },
+  async remember(nonce: string, ttlSec: number) {
+    await sharedWindowHit(`replay:${nonce}`, { limit: 1, windowMs: ttlSec * 1000 });
+  },
+  async claim(nonce: string, ttlSec: number) {
+    return (await sharedWindowHit(`replay:${nonce}`, { limit: 1, windowMs: ttlSec * 1000 })).allowed;
+  },
+};
+
 /**
  * Reject replays: the (platform, delivery-id/timestamp) tuple must be fresh
  * and unseen. deliveryId falls back to a hash of the raw body — identical
@@ -121,7 +147,7 @@ export async function checkReplay(
   rawBody: string,
   deliveryId: string | null,
   timestampMs: number | null,
-  store: ReplayStore = memoryReplayStore,
+  store: ReplayStore = sharedReplayStore,
   windowSec = 600,
 ): Promise<VerifyResult> {
   const now = Date.now();
@@ -131,6 +157,12 @@ export async function checkReplay(
   const nonce =
     deliveryId ??
     `${platform}:${createHash("sha256").update(rawBody).digest("hex").slice(0, 32)}`;
+  if (store.claim) {
+    if (!(await store.claim(nonce, windowSec))) {
+      return { ok: false, reason: "replay: delivery already processed" };
+    }
+    return { ok: true };
+  }
   if (await store.seen(nonce)) {
     return { ok: false, reason: "replay: delivery already processed" };
   }

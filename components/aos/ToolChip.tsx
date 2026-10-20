@@ -42,8 +42,11 @@ export function ToolChip({
   disabled,
   title,
   className,
+  label,
 }: {
   name: string;
+  /** Phase 18.1: the displayed name in the person's language (the icon still keys on `name`). */
+  label?: string;
   variant?: "toggle" | "tag";
   /** Toggle chips only: aria-pressed state (black when true). */
   pressed?: boolean;
@@ -63,7 +66,7 @@ export function ToolChip({
         )}
       >
         <Icon className="size-3.5" aria-hidden />
-        {name}
+        {label ?? name}
       </span>
     );
   }
@@ -77,7 +80,7 @@ export function ToolChip({
     return (
       <span className={cls}>
         <Icon className="size-4" aria-hidden />
-        {name}
+        {label ?? name}
       </span>
     );
   }
@@ -91,7 +94,7 @@ export function ToolChip({
       className={cls}
     >
       <Icon className="size-4" aria-hidden />
-      {name}
+      {label ?? name}
     </button>
   );
 }

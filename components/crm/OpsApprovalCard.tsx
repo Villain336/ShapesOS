@@ -33,12 +33,12 @@ export function OpsApprovalCard({
 }) {
   return (
     <div className={`${needsBoxCls} mb-4`}>
-      <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+      <div className="flex items-center gap-2 text-[0.8125rem] font-bold text-ink">
         <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs review" />
         Approval needed — {pending.actionLabel}
       </div>
-      <p className="mt-1 text-[13px] text-ink">{pending.summary}</p>
-      <p className="mt-1 text-[12px] text-ink">
+      <p className="mt-1 text-[0.8125rem] text-ink">{pending.summary}</p>
+      <p className="mt-1 text-[0.75rem] text-ink">
         Risk tier: {pending.tier}. Nothing executes until you approve — approve here or in the
         Actions queue.
       </p>
@@ -62,14 +62,14 @@ export function OpsApprovalCard({
           </button>
           <a
             href="/dashboard/actions"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
+            className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink hover:underline"
           >
             Open Actions queue <ExternalLink size={12} />
           </a>
         </div>
       ) : (
         <div className="mt-3 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
+          <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-ink">
             <Check size={14} /> Approved
           </span>
           <button

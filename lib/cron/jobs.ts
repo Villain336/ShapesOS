@@ -61,8 +61,26 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "Scheduled skills fire on the next tick after nextRunAt; every minute keeps them on time (the tick catches up missed slots once).",
     timeoutMs: SHORT,
   },
+  {
+    // Phase 18.2 (WS=comms): reminders that came due → one notification per occurrence.
+    key: "comms-reminders",
+    path: "/api/cron/comms-reminders",
+    cron: "* * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. A reminder set for 09:00 should arrive at 09:00, so the sweep runs every minute; each occurrence notifies once (dedup key + reminder_notified_at).",
+    timeoutMs: SHORT,
+  },
 
   // --- Every 5–15 minutes -------------------------------------------------
+  {
+    // Phase 18.3 (WS=trust): meetings starting, the email digest, the agent-written summary.
+    key: "notifications",
+    path: "/api/cron/notifications",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "New in Phase 18.3. Meeting reminders look 10 minutes ahead, so a 5-minute sweep reaches every meeting at least once before it starts (each occurrence notifies once by dedup key); the digest and summary are once-a-day per person and skip until the person's morning.",
+    timeoutMs: SHORT,
+  },
   { key: "newsletter", path: "/api/cron/newsletter", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "social", path: "/api/cron/social", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "ads", path: "/api/cron/ads", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
@@ -100,6 +118,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     secretEnv: "REMINDERS_CRON_SECRET",
   },
   {
+    // Phase 18.1 (WS=desk): focus ends → queued notifications delivered; the morning "Today" briefings.
+    key: "desk",
+    path: "/api/cron/desk",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. Releases what focus / do not disturb queued once focus ends (within 15 minutes even with the app closed) and writes each opted-in member's briefing once their local morning (06:00) has come; idempotent per member per day.",
+    timeoutMs: SHORT,
+  },
+  {
     // Phase 9 (repos): webhook fallback for agent PR feedback; a no-op unless GITHUB_PR_POLL=on.
     key: "github-prs",
     path: "/api/cron/github-prs",
@@ -127,6 +154,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 6. The shortest monitor cadence is hourly; a 15-minute sweep checks each due monitor within 15 minutes of its slot. Each check is budget-gated before the vendor is hit.",
     timeoutMs: LONG,
   },
+  // Phase 18.1 (find): Spotlight's text index — files/docs the write hook missed, and chunk embeddings.
+  {
+    key: "search-index",
+    path: "/api/cron/search-index",
+    cron: "*/15 * * * *",
+    source: "picked",
+    note: "New in Phase 18.1. The write hook indexes text at once and embeds only when the model is already loaded; a 15-minute sweep makes a new upload meaning-searchable within 15 minutes. Idempotent by content hash, batch-capped (SEARCH_INDEX_BATCH).",
+    timeoutMs: LONG,
+  },
 
   // --- Hourly -------------------------------------------------------------
   { key: "gsc-pull", path: "/api/cron/gsc-pull", cron: "5 * * * *", source: "deploy", timeoutMs: LONG },
@@ -139,6 +175,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
     timeoutMs: SHORT,
   },
+  // Phase 18.2 (WS=comms): Contacts — link new people records, refresh merge suggestions.
+  {
+    key: "comms-contacts",
+    path: "/api/cron/comms-contacts",
+    cron: "10,40 * * * *",
+    source: "picked",
+    note: "New in Phase 18.2. Opening Contacts syncs on demand, so the sweep only keeps the address book and Spotlight current for workspaces nobody opened; twice an hour, off the busy :00 and :30 minutes. Suggestions only — nothing merges without a person.",
+    timeoutMs: SHORT,
+  },
   // Phase 13 (twincore): digital twin conditions → alerts + editor notifications.
   {
     key: "twin-alerts",
@@ -146,6 +191,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     cron: "*/5 * * * *",
     source: "picked",
     note: "New in Phase 13. The tightest twin threshold is a truck 30 minutes past its ETA; a 5-minute sweep flags it within 5 minutes, and each condition alerts once (dedup keys), so the cadence never repeats an alert.",
+    timeoutMs: SHORT,
+  },
+  // Phase 17 (observability): the prompt cache's 24 h read share → admin notification when below 60%.
+  {
+    key: "ai-cache-health",
+    path: "/api/cron/ai-cache-health",
+    cron: "35 * * * *",
+    source: "picked",
+    note: "New in Phase 17. A rolling 24 h window and one notification per workspace per day (dedup key), so hourly catches a cache breaker within the hour of it crossing the threshold without ever repeating the alert.",
     timeoutMs: SHORT,
   },
   // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
@@ -240,6 +294,15 @@ export const CRON_JOBS: readonly CronJob[] = [
   { key: "zernio-accounts", path: "/api/cron/zernio-accounts", cron: "30 2 1 * *", source: "deploy", timeoutMs: LONG },
   // Phase 15.4 (zernio): daily ad-report pull (last 7 days) into ad_reports.
   { key: "zernio-ads-reports", path: "/api/cron/zernio-ads-reports", cron: "40 5 * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 18.3 (WS=flow): Time Machine — scheduled workspace snapshots.
+  {
+    key: "snapshots",
+    path: "/api/cron/snapshots",
+    cron: "17 * * * *",
+    source: "picked",
+    note: "Hourly: a workspace's daily / weekly snapshot is taken within the hour it falls due (lib/timemachine/snapshots.ts snapshotDue). Off the :00 rush.",
+    timeoutMs: LONG,
+  },
 ];
 
 const parsed = new Map<string, CronSchedule>();

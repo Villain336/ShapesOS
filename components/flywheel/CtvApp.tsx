@@ -63,7 +63,7 @@ async function api(path: string, init?: RequestInit) {
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -73,7 +73,7 @@ function chip(text: React.ReactNode, cls?: string) {
 // live/human_placed = done, pending/reconciling = needs, cancelled = failed.
 function statusChip(s: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   const shape = (extra: string) => (
     <span className={`aos-shape ${extra} [--aos-shape-size:9px]`} style={{ color: "inherit" }} aria-hidden />
   );
@@ -86,9 +86,9 @@ function statusChip(s: string) {
   return <span className={`${base} bg-paper text-muted shadow-control`}>{s}</span>;
 }
 
-const HI = "border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]";
-const HSELECT = "rounded-md border border-line bg-white px-3 py-2 text-[13px] text-ink focus-visible:border-ink focus-visible:outline-none";
-const HLABEL = "text-[13px] font-medium text-muted";
+const HI = "border-line bg-white text-[0.8125rem] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]";
+const HSELECT = "rounded-md border border-line bg-white px-3 py-2 text-[0.8125rem] text-ink focus-visible:border-ink focus-visible:outline-none";
+const HLABEL = "text-[0.8125rem] font-medium text-muted";
 
 function Panel({ title, description, action, children }: {
   title: string; description?: string; action?: React.ReactNode; children: React.ReactNode;
@@ -118,7 +118,7 @@ export function CtvApp() {
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -211,7 +211,7 @@ function CampaignsTab() {
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[0.8125rem] text-failed-text">
           <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
         </div>
@@ -236,7 +236,7 @@ function CampaignsTab() {
           <div className="grid gap-1.5"><Label htmlFor="ctv-approval" className={HLABEL}>Approval object id (required for API buys)</Label><Input id="ctv-approval" className={HI} value={form.approvalObjectId} onChange={(e) => setForm({ ...form, approvalObjectId: e.target.value })} placeholder="appr_…" /></div>
           <div className="grid gap-1.5"><Label htmlFor="ctv-advertiser" className={HLABEL}>Vibe advertiser id (API mode)</Label><Input id="ctv-advertiser" className={HI} value={form.vibeAdvertiserId} onChange={(e) => setForm({ ...form, vibeAdvertiserId: e.target.value })} placeholder="adv_…" /></div>
           <div className="flex items-end">
-            <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" onClick={create} disabled={!form.name}>Create (draft)</Button>
+            <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" onClick={create} disabled={!form.name}>Create (draft)</Button>
           </div>
         </div>
       </Panel>
@@ -246,14 +246,14 @@ function CampaignsTab() {
         action={<Button size="sm" className="bg-paper text-ink shadow-outline hover:bg-hover-paper" onClick={refresh} disabled={loading}>Refresh</Button>}
       >
         {pauseNote && (
-          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{pauseNote}</span></div>
+          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[0.8125rem] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{pauseNote}</span></div>
         )}
         {!loading && campaigns.length === 0 && (
-          <p className="py-2 text-[13px] text-muted">No campaigns yet — create one above.</p>
+          <p className="py-2 text-[0.8125rem] text-muted">No campaigns yet — create one above.</p>
         )}
         {campaigns.length > 0 && (
           <div className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Campaign</th>
@@ -268,8 +268,8 @@ function CampaignsTab() {
                   <tr key={c.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
                     <td className="px-3 py-2">{statusChip(c.status)}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{PLATFORM_LABELS[c.platform] ?? c.platform}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{PLATFORM_LABELS[c.platform] ?? c.platform}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">
                       {c.mode}
                       {c.vibeTestMode && c.mode === "api" && (
                         <> {chip("test mode", "border-line bg-hover text-muted")}</>
@@ -326,7 +326,7 @@ function ValidatorTab() {
           </div>
         </div>
         <div>
-          <Button className="bg-ink text-white hover:bg-night-hover" disabled={busy} onClick={async () => {
+          <Button className="bg-ink text-white hover:bg-ink-hover" disabled={busy} onClick={async () => {
             setBusy(true); setError(""); setResult(null);
             try {
               const fileId = (document.getElementById("ctv-file-id") as HTMLInputElement | null)?.value?.trim();
@@ -342,15 +342,15 @@ function ValidatorTab() {
             {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />} Validate
           </Button>
         </div>
-        {error && <p className="text-[13px] text-failed-text">{error}</p>}
+        {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
         {result && (
           <div>
-            <div className={`mb-2 flex items-center gap-2 text-[13px] font-semibold ${result.pass ? "text-ink" : "text-failed-text"}`}>
+            <div className={`mb-2 flex items-center gap-2 text-[0.8125rem] font-semibold ${result.pass ? "text-ink" : "text-failed-text"}`}>
               {result.pass ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {result.pass ? "COMPLIANT — may be attached to a buy" : "BLOCKED — fix the failing checks before submission"}
             </div>
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Check</th>
@@ -361,15 +361,15 @@ function ValidatorTab() {
                 <tbody>
                   {result.checks.map((c) => (
                     <tr key={c.name} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                      <td className="px-3 py-2 font-mono text-[12px] text-ink">{c.name}</td>
+                      <td className="px-3 py-2 font-mono text-[0.75rem] text-ink">{c.name}</td>
                       <td className="px-3 py-2">
-                        <span className="flex items-center gap-1.5 text-[12px]">
+                        <span className="flex items-center gap-1.5 text-[0.75rem]">
                           {c.passed ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-ink" /> : <XCircle className="h-3.5 w-3.5 shrink-0 text-failed-text" />}
                           {c.passed ? "Pass" : "Fail"}
                           {c.heuristic && chip("heuristic", "border-line bg-hover text-muted")}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{c.detail}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{c.detail}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -428,7 +428,7 @@ function SpotsTab() {
             <div className="grid gap-1.5"><Label htmlFor="spot-dest" className={HLABEL}>Destination URL</Label><Input id="spot-dest" className={HI} value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://shop.example.com/tv" /></div>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Placement label</th>
@@ -451,17 +451,17 @@ function SpotsTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setRows([...rows, { placementLabel: "", showGenre: "", daypart: "", demo: "" }])}>+ placement</Button>
-            <Button className="bg-ink text-white hover:bg-night-hover" onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
+            <Button className="bg-ink text-white hover:bg-ink-hover" onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
               {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <QrCode className="mr-1 h-4 w-4" />} Mint kit
             </Button>
           </div>
-          {error && <p className="text-[13px] text-failed-text">{error}</p>}
-          {landing && <p className="text-[13px] text-muted">{landing}</p>}
+          {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
+          {landing && <p className="text-[0.8125rem] text-muted">{landing}</p>}
         </div>
       </Panel>
       {result && (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">QR code</th>
@@ -475,8 +475,8 @@ function SpotsTab() {
                 <tr key={s.publicUrl} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2"><div className="max-w-[120px]" dangerouslySetInnerHTML={{ __html: s.qrSvg }} /></td>
                   <td className="px-3 py-2 font-medium text-ink">{s.placementLabel}</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted">{s.publicUrl}</td>
-                  <td className="px-3 py-2 text-[12px] text-muted">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</td>
+                  <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">{s.publicUrl}</td>
+                  <td className="px-3 py-2 text-[0.75rem] text-muted">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</td>
                 </tr>
               ))}
             </tbody>
@@ -545,7 +545,7 @@ function IoTab() {
     <div className="flex flex-col gap-4">
       <Panel title="Concierge IO generator">
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{ALERT_ONLY_COPY} ShapesOS generates the IO + creative brief; you place the buy in the vendor UI.</span></div>
+          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[0.8125rem] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{ALERT_ONLY_COPY} ShapesOS generates the IO + creative brief; you place the buy in the vendor UI.</span></div>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="grid gap-1.5"><Label className={HLABEL}>Campaign id</Label><Input className={HI} value={form.campaignId} onChange={set("campaignId")} /></div>
             <div className="grid gap-1.5"><Label className={HLABEL}>Vendor</Label>
@@ -563,18 +563,18 @@ function IoTab() {
             <div className="grid gap-1.5"><Label className={HLABEL}>Approval object id</Label><Input className={HI} value={form.approvalObjectId} onChange={set("approvalObjectId")} /></div>
           </div>
           <div>
-            <Button className="bg-ink text-white hover:bg-night-hover" onClick={createIo} disabled={busy}>
+            <Button className="bg-ink text-white hover:bg-ink-hover" onClick={createIo} disabled={busy}>
               {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <FileText className="mr-1 h-4 w-4" />} Generate IO + brief
             </Button>
           </div>
-          {error && <p className="text-[13px] text-failed-text">{error}</p>}
+          {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
         </div>
       </Panel>
 
       {honesty.length > 0 && (
         <div className="rounded-xl bg-needs p-4">
-          <h3 className="mb-2 text-[13px] font-semibold text-ink">Vendor honesty notes (surfaced in-product)</h3>
-          <ul className="list-disc space-y-1 pl-5 text-[13px] text-ink">
+          <h3 className="mb-2 text-[0.8125rem] font-semibold text-ink">Vendor honesty notes (surfaced in-product)</h3>
+          <ul className="list-disc space-y-1 pl-5 text-[0.8125rem] text-ink">
             {honesty.map((h, i) => <li key={i}>{h}</li>)}
           </ul>
         </div>
@@ -639,15 +639,15 @@ function AttributionTab() {
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
           <Input className={HI} value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="Campaign id" />
-          <Button className="bg-ink text-white hover:bg-night-hover" onClick={load} disabled={busy || !campaignId}>
+          <Button className="bg-ink text-white hover:bg-ink-hover" onClick={load} disabled={busy || !campaignId}>
             {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <BarChart3 className="mr-1 h-4 w-4" />} Load
           </Button>
         </div>
-        {error && <p className="text-[13px] text-failed-text">{error}</p>}
+        {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
         {view && layers && (
           <div className="flex flex-col gap-3">
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
                   <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Layer</th>
@@ -660,7 +660,7 @@ function AttributionTab() {
                     <tr key={l.title} className={`border-b border-line last:border-0 ${l.deterministic ? "bg-hover-paper" : "hover:bg-hover-paper"}`}>
                       <td className="px-3 py-2 font-medium text-ink">{l.title}</td>
                       <td className="px-3 py-2 font-semibold text-ink">{l.value}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{l.note}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{l.note}</td>
                     </tr>
                   ))}
                 </tbody>

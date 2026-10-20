@@ -134,7 +134,7 @@ export function AnalyticsPanel() {
               key={p}
               type="button"
               onClick={() => setDays(p)}
-              className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
+              className={`rounded-md px-3 py-1.5 text-[0.8125rem] font-medium ${
                 days === p
                   ? "bg-ink text-white"
                   : "text-muted hover:bg-hover"
@@ -167,7 +167,7 @@ export function AnalyticsPanel() {
               <BarChart3 className="h-5 w-5 text-ink" />
               <h2 className="text-sm font-semibold">Umami is not connected</h2>
             </div>
-            <p className="mt-2 text-[13px] text-muted">
+            <p className="mt-2 text-[0.8125rem] text-muted">
               {state.message}{" "}
               Analytics for public pages (share links, campaign pages) come from a
               self-hosted Umami sidecar — MIT, cookieless, ~100MB idle.
@@ -176,7 +176,7 @@ export function AnalyticsPanel() {
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted">
                 <TerminalSquare className="h-4 w-4" /> Quick start
               </p>
-              <pre className="mt-2 overflow-x-auto rounded bg-ink p-3 font-mono text-[11px] leading-relaxed text-white">
+              <pre className="mt-2 overflow-x-auto rounded bg-ink p-3 font-mono text-[0.6875rem] leading-relaxed text-white">
 {`docker compose -f docker-compose.yml \\
   -f docker/profiles/umami.yml \\
   --profile umami up -d`}
@@ -193,7 +193,7 @@ export function AnalyticsPanel() {
         )}
 
       {state.kind === "error" && (
-        <div className="rounded-xl border border-failed bg-failed-tint p-4 text-[13px] text-failed-text" role="alert">
+        <div className="rounded-xl border border-failed bg-failed-tint p-4 text-[0.8125rem] text-failed-text" role="alert">
           Couldn&apos;t load analytics: {state.message}
         </div>
       )}
@@ -226,7 +226,7 @@ export function AnalyticsPanel() {
               {state.series.length > 0 ? (
                 <Sparkline series={state.series} />
               ) : (
-                <p className="py-8 text-center text-[13px] text-muted">
+                <p className="py-8 text-center text-[0.8125rem] text-muted">
                   No pageviews recorded in this period yet.
                 </p>
               )}

@@ -96,9 +96,12 @@ export function twinLiveAccess(input: {
   siteId: string;
   isMember: () => Promise<boolean>;
   isEditor: () => Promise<boolean>;
-}): { snapshot: () => Promise<TwinSnapshot>; stillAllowed: () => Promise<boolean> } {
+}): { snapshot: () => Promise<TwinSnapshot>; stillAllowed: () => Promise<boolean>; signal: () => Promise<string> } {
   const { workspaceId, siteId } = input;
   return {
+    // Phase 17 (latency): the change signal — the stream skips the snapshot
+    // while it does not move (lib/twin/signal.ts).
+    signal: async () => (await import("./signal")).siteSignal(workspaceId, siteId).then((s) => s.version),
     snapshot: async () => siteSnapshotFor(workspaceId, siteId, await input.isEditor()),
     stillAllowed: async () => {
       if (!(await input.isMember())) return false;

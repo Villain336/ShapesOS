@@ -15,7 +15,7 @@ export const rowCls = "hover:bg-hover-paper";
 export const chipCls = "inline-flex h-badge items-center whitespace-nowrap rounded-full bg-canvas px-2.5 text-xs font-semibold text-ink";
 export const linkCls = "font-semibold text-ink underline-offset-2 hover:underline";
 export const btnPrimarySm =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-fg";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-fg";
 export const btnSecondarySm =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-fg disabled:shadow-none";
 export const btnQuietSm =

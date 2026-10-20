@@ -93,13 +93,13 @@ export function RegisterForm({
   }
 
   if (onSale.length === 0) {
-    return <p className="text-[15px] text-muted">{tickets.some((t) => !t.free) && !paymentsReady ? "Online payment isn't set up for this event yet." : "Registration is closed."}</p>;
+    return <p className="text-[0.9375rem] text-muted">{tickets.some((t) => !t.free) && !paymentsReady ? "Online payment isn't set up for this event yet." : "Registration is closed."}</p>;
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-[13px] font-semibold text-muted">Ticket</span>
+        <span className="text-[0.8125rem] font-semibold text-muted">Ticket</span>
         <select className={shopSelect} value={ticketId} onChange={(e) => { setTicketId(e.target.value); setQty(1); }}>
           {onSale.map((t) => (
             <option key={t.id} value={t.id}>
@@ -110,22 +110,22 @@ export function RegisterForm({
         </select>
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-[13px] font-semibold text-muted">How many</span>
+        <span className="text-[0.8125rem] font-semibold text-muted">How many</span>
         <input className={`${shopInput} w-28`} type="number" min={1} max={max} value={quantity} onChange={(e) => setQty(Number(e.target.value) || 1)} />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold text-muted">Your name</span>
+          <span className="text-[0.8125rem] font-semibold text-muted">Your name</span>
           <input className={shopInput} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold text-muted">Email</span>
+          <span className="text-[0.8125rem] font-semibold text-muted">Email</span>
           <input className={shopInput} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
         </label>
       </div>
       {guests.map((g, i) => (
         <label key={i} className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold text-muted">Guest {i + 2} name (optional)</span>
+          <span className="text-[0.8125rem] font-semibold text-muted">Guest {i + 2} name (optional)</span>
           <input className={shopInput} value={g} onChange={(e) => setGuests(guests.map((x, j) => (j === i ? e.target.value : x)))} />
         </label>
       ))}
@@ -141,7 +141,7 @@ export function RegisterForm({
           {busy ? "One moment" : ticket?.free ? "Register" : "Continue to payment"}
         </button>
       </div>
-      {!ticket?.free ? <p className="text-[13px] text-muted">Your seats are held while you pay. Payment is processed securely by Stripe.</p> : null}
+      {!ticket?.free ? <p className="text-[0.8125rem] text-muted">Your seats are held while you pay. Payment is processed securely by Stripe.</p> : null}
     </form>
   );
 }

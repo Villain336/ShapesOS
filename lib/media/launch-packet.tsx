@@ -17,8 +17,7 @@
 // destination_url, utm_json, qr_png_url) — the attribution track owns the
 // links themselves; the packet embeds the assignments it receives.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { blobGetFirst, blobPath, blobPut, encodeBlobSegment, localBlobDir, workspaceBlobPath } from "@/lib/filesystem/storage";
 import { createHash } from "node:crypto";
 import type { ReactElement } from "react";
 import { Document, Page, View, Text as SpanText, Image as PdfImage } from "@/lib/pdf-primitives";
@@ -110,10 +109,19 @@ export interface CompiledPacket {
   version: number;
 }
 
+/**
+ * Local directory of the "launch-packets" blob namespace (MARKETR_STORAGE=local;
+ * LAUNCH_PACKET_STORAGE_DIR, default .data/launch-packets). Deploy PR: packets
+ * are stored through the shared blob layer as <workspaceId>/<planId>-v<n>.pdf.
+ */
 export function launchPacketStorageDir(): string {
-  const override = (process.env.LAUNCH_PACKET_STORAGE_DIR ?? "").trim();
-  if (override) return override;
-  return path.join(process.cwd(), ".data", "launch-packets");
+  return localBlobDir("launch-packets");
+}
+
+/** The stored launch packet PDF (new workspace-scoped key, then the legacy one). */
+export async function readLaunchPacketPdf(workspaceId: string, planId: string, version: number): Promise<Buffer | null> {
+  const file = `${encodeBlobSegment(planId)}-v${Math.floor(version)}.pdf`;
+  return blobGetFirst("launch-packets", [workspaceBlobPath(workspaceId, file), blobPath(file)]);
 }
 
 // ---------------------------------------------------------------------------
@@ -502,11 +510,13 @@ export async function compileLaunchPacket(input: LaunchPacketInput): Promise<Com
   const pdf = await renderPdf(element);
   const packetSha256 = createHash("sha256").update(pdf).digest("hex");
 
-  const dir = launchPacketStorageDir();
-  await fs.mkdir(dir, { recursive: true });
   const version = input.version ?? 1;
-  const pdfPath = path.join(dir, `${plan.id}-v${version}.pdf`);
-  await fs.writeFile(pdfPath, pdf);
+  const pdfPath = await blobPut(
+    "launch-packets",
+    workspaceBlobPath(plan.workspaceId, `${encodeBlobSegment(plan.id)}-v${Math.floor(version)}.pdf`),
+    Buffer.from(pdf),
+    "application/pdf",
+  );
 
   return { pdfBytes: Buffer.from(pdf), packetSha256, pdfPath, version };
 }

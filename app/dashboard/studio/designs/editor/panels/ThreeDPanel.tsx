@@ -132,7 +132,7 @@ export function ThreeDPanel() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 rounded px-2 py-1 text-[12px] font-medium ${
+              className={`flex-1 rounded px-2 py-1 text-[0.75rem] font-medium ${
                 tab === t ? "bg-paper text-ink shadow-outline" : "text-muted hover:text-ink"
               }`}
             >
@@ -144,13 +144,13 @@ export function ThreeDPanel() {
         {tab === "curated" ? (
           <>
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold text-muted">Angle</p>
+              <p className="mb-1.5 text-[0.6875rem] font-semibold text-muted">Angle</p>
               <div className="flex gap-1">
                 {THREE_D_ANGLES.map((a) => (
                   <button
                     key={a}
                     onClick={() => setAngle(a)}
-                    className={`flex-1 rounded-md border px-2 py-1 text-[12px] font-medium ${
+                    className={`flex-1 rounded-md border px-2 py-1 text-[0.75rem] font-medium ${
                       angle === a
                         ? "border-ink bg-ink text-white"
                         : "border-line bg-paper text-muted hover:bg-hover-paper hover:text-ink"
@@ -163,7 +163,7 @@ export function ThreeDPanel() {
             </div>
             {categories.map((cat) => (
               <div key={cat}>
-                <p className="mb-1.5 text-[11px] font-semibold text-muted">{cat}</p>
+                <p className="mb-1.5 text-[0.6875rem] font-semibold text-muted">{cat}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {CURATED_3D_ASSETS.filter((m) => m.category === cat).map((model) => (
                     <button
@@ -179,7 +179,7 @@ export function ThreeDPanel() {
                         loading="lazy"
                         className="h-20 w-full bg-canvas object-contain transition-transform group-hover:scale-105"
                       />
-                      <div className="px-1 py-1 text-[10px] font-medium leading-tight text-muted">
+                      <div className="px-1 py-1 text-[0.625rem] font-medium leading-tight text-muted">
                         {model.name}
                       </div>
                     </button>
@@ -187,7 +187,7 @@ export function ThreeDPanel() {
                 </div>
               </div>
             ))}
-            <p className="text-[11px] leading-snug text-subtle">
+            <p className="text-[0.6875rem] leading-snug text-subtle">
               Starter props from Kenney (CC0, no attribution needed), rendered
               as transparent stickers. Click to place the {ANGLE_LABELS[angle].toLowerCase()} render.
             </p>
@@ -214,7 +214,7 @@ export function ThreeDPanel() {
               </button>
             </div>
             {error && (
-              <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
+              <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[0.75rem] leading-snug text-failed-text">
                 {error}
               </p>
             )}
@@ -238,7 +238,7 @@ export function ThreeDPanel() {
                         className="h-24 w-full object-cover"
                       />
                     </button>
-                    <div className="px-1.5 py-1 text-[10px] leading-snug text-muted">
+                    <div className="px-1.5 py-1 text-[0.625rem] leading-snug text-muted">
                       <span className="font-medium text-ink">{asset.name}</span>
                       <span className="text-subtle"> · CC0</span>
                     </div>
@@ -246,12 +246,12 @@ export function ThreeDPanel() {
                 ))}
               </div>
             ) : searched !== null && !busy ? (
-              <p className="flex items-start gap-1.5 text-[12px] text-muted">
+              <p className="flex items-start gap-1.5 text-[0.75rem] text-muted">
                 <ImageOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>No 3D models found for “{searched}”. Try another search.</span>
               </p>
             ) : (
-              <p className="text-[12px] leading-snug text-muted">
+              <p className="text-[0.75rem] leading-snug text-muted">
                 Search Poly Haven’s library of photorealistic 3D models (CC0).
                 Click a result to place its preview render — curated
                 transparent stickers live in the Curated tab.
@@ -265,7 +265,7 @@ export function ThreeDPanel() {
             </button>
           </>
         )}
-        <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
+        <p className="border-t border-line pt-2 text-[0.6875rem] leading-snug text-subtle">
           <a href={POLY_HAVEN_URL} target="_blank" rel="noreferrer noopener" className="hover:text-ink">
             {POLY_HAVEN_CREDIT}
           </a>

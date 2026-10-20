@@ -41,3 +41,6 @@ scripts/e2e/.e2e-ids.json
 screenshots
 *.log
 logs
+
+# infra-as-code (render.yaml, the AWS CDK app): never part of an app image
+infra

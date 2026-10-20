@@ -28,13 +28,23 @@ import {
   toolGroup,
   type ToolContext,
   type ToolDef,
+  type ToolKind,
   type ToolResult,
 } from "./tools";
-import { TOOL_GROUP_LABELS, agentDisplayName, isAgentKey } from "@/lib/agents/grants";
+import { TOOL_GROUP_LABELS, agentDisplayName, isAgentKey, isGroupBlocked, type ToolGroup } from "@/lib/agents/grants";
+// Phase 18.3 (WS=trust): agent app permissions (the workspace's blocked apps).
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { autoApprovalFor } from "@/lib/automation/policy";
 import { appendAgentRunEvent, isAgentRunCancelRequested } from "@/lib/agents/runs/service";
 import { abortRun, isRunStopped } from "@/lib/agents/runs/abort";
 import { resolveConnectorTool } from "./connector-tools";
+// Phase 17 (latency, A8): the short-lived cache for pure read tools, and the
+// answer cache it also drops on a write (lib/chat/answer-cache.ts).
+import { isCacheableTool, toolCacheKey, toolResultCache } from "./tool-cache";
+import { answerCache } from "./answer-cache";
+// Phase 22 (chat): the typed renderer + structured payload a result carries to the transcript.
+import { uiHintFor, uiPayloadFor } from "./tool-ui";
+import type { ToolUiHint } from "./ui-hints";
 
 export const DELEGATE_TOOL = "delegate_to_subagent";
 /** Phase 16: hand a whole plan to sub-agents that run in parallel (lib/chat/delegation.ts). */
@@ -77,6 +87,21 @@ export interface ChatToolCall {
    * started (the chat's "Working with N sub-agents" card reads it live).
    */
   delegation?: { parentRunId: string; planId: string; tasks: number; goal: string };
+  /**
+   * Phase 22 (chat): how the transcript draws the result (ToolDef.ui or
+   * inferred) and the structured, capped payload the renderer reads
+   * (lib/chat/tool-ui.ts). On a held call: the tool's safety kind and its
+   * Phase 14 tier (3 = money / irreversible: the approval needs a click; a
+   * typed or spoken "yes" is refused).
+   */
+  ui?: ToolUiHint;
+  payload?: unknown;
+  toolKind?: ToolKind;
+  tier?: 0 | 1 | 2 | 3;
+  /** Phase 22 (genui): form / $variable state the person left on a render_ui block. */
+  uiState?: Record<string, unknown>;
+  /** Phase 22 (chat): the person edited the arguments before approving. */
+  edited?: boolean;
 }
 
 /** ToolContext plus the thread a delegated sub-agent writes its tool rows to. */
@@ -206,6 +231,17 @@ export async function executeTool(
       .join(", ")}`;
     return null;
   }
+  // Phase 18.3 (WS=trust): an app the workspace blocked for agents is refused
+  // whatever the task's grant says (the grant already leaves it out; this is
+  // the backstop, and it also covers calls with no task grant at all).
+  if (await blockedForAgents(ctx, toolGroup(tool.name))) {
+    const group = toolGroup(tool.name);
+    call.status = "denied";
+    call.resultSummary = blockedSummary(group, tool.name);
+    await auditToolExecution(ctx, tool, `DENIED (agents may not use ${TOOL_GROUP_LABELS[group]} in this workspace)`);
+    await runEvent(ctx, `Refused ${tool.name}: ${TOOL_GROUP_LABELS[group]} is blocked for agents`, { kind: "tool_result", tool: tool.name, group, status: "denied", reason: "app_blocked", ...ids }, "gate");
+    return null;
+  }
   // Phase 5: the task's tool grant, checked before anything runs. The model
   // only ever sees granted tools, so this is the backstop for a model that
   // names a tool anyway.
@@ -241,25 +277,68 @@ export async function executeTool(
       if (ctx.grant) call.grant = [...ctx.grant];
       // Phase 14: offered on every Tier 0–2 call (never Tier 3 / destructive).
       if (decision?.offerAuto) call.autoAction = toolAction(tool.name);
-      await runEvent(ctx, `Waiting for your OK: ${tool.name}`, { kind: "tool_result", tool: tool.name, status: "pending_confirmation", toolKind: tool.kind, ...ids }, "gate");
+      // Phase 22 (chat): the approval block needs the kind and tier (a Tier 3
+      // or destructive call is decided by a click, never a typed "yes").
+      call.toolKind = tool.kind;
+      if (decision) call.tier = decision.tier;
+      await runEvent(
+        ctx,
+        `Waiting for your OK: ${tool.name}`,
+        {
+          kind: "tool_result",
+          tool: tool.name,
+          status: "pending_confirmation",
+          toolKind: tool.kind,
+          args,
+          ...(decision ? { tier: decision.tier } : {}),
+          ...(call.autoAction ? { autoAction: call.autoAction } : {}),
+          ...(call.agentKey ? { agentKey: call.agentKey } : {}),
+          needsClick: needsClick(tool.kind, decision?.tier),
+          ...ids,
+        },
+        "gate",
+      );
       return null;
     }
     autoReason = decision.reason;
     call.autoApproved = decision.reason;
   }
   try {
-    const result = await tool.execute(ctx, args);
+    // Phase 17 (A8): a pure read repeated within TOOL_CACHE_TTL_MS is served
+    // from the cache (same workspace, project, tool and arguments); a write
+    // through this gate drops the workspace's cached reads and answers.
+    const cacheKey = tool.kind === "safe" && isCacheableTool(tool.name) ? toolCacheKey({ workspaceId: ctx.workspaceId, projectId: ctx.projectId, tool: tool.name, args }) : null;
+    const hit = cacheKey ? toolResultCache.get(cacheKey) : null;
+    const result = hit ?? (await tool.execute(ctx, args));
+    if (cacheKey && !hit) toolResultCache.set(cacheKey, result);
+    if (tool.kind !== "safe") {
+      toolResultCache.invalidateWorkspace(ctx.workspaceId);
+      answerCache.invalidateWorkspace(ctx.workspaceId);
+    }
     call.status = "executed";
     call.resultSummary = result.summary;
     collectDelegated(call, result);
+    // Phase 22 (chat): the typed renderer and its (capped) payload travel with
+    // the call (persisted rows) and the run event (the live stream).
+    call.ui = uiHintFor(tool, result);
+    call.payload = uiPayloadFor(call.ui, result, call.toolUseId);
     await auditToolExecution(ctx, tool, result.summary, autoReason);
     await runEvent(ctx, `${tool.name}: ${result.summary}`, {
       kind: "tool_result",
       tool: tool.name,
       status: "executed",
       ...ids,
+      ui: call.ui,
+      payload: call.payload,
+      ...(call.agentKey ? { agentKey: call.agentKey } : {}),
+      ...(call.confirmed ? { confirmed: true } : {}),
+      ...(call.edited ? { edited: true } : {}),
+      ...(call.delegation ? { delegation: call.delegation } : {}),
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
+      // Phase 18.3 (WS=flow): what it wrote, for "Undo this agent run".
+      ...(result.touched?.length ? { touched: result.touched.slice(0, 20) } : {}),
+      ...(hit ? { cached: true } : {}),
       // Phase 8: the tool recorded its own timeline event (ship / browser
       // tools); this one only feeds the live stream (isStreamEvent hides it).
       ...(recordedOwnEvent(result) ? { recorded: true } : {}),
@@ -277,6 +356,26 @@ export async function executeTool(
     await runEvent(ctx, `${tool.name} failed: ${call.resultSummary}`, { kind: "tool_result", tool: tool.name, status: "error", ...ids });
     return null;
   }
+}
+
+/**
+ * Phase 22 (chat): does deciding this held call need a click in the approval
+ * block? Money and irreversible actions (Tier 3) and destructive tools: a
+ * typed or spoken "yes" is refused (owner rule, 2026-10-05).
+ */
+export function needsClick(kind: ToolKind | string | undefined, tier: number | undefined): boolean {
+  return kind === "destructive" || tier === 3;
+}
+
+/** Phase 18.3: is this group blocked for agents in the call's workspace? */
+export async function blockedForAgents(ctx: Pick<ToolContext, "workspaceId">, group: ToolGroup): Promise<boolean> {
+  if (!ctx.workspaceId) return false;
+  return isGroupBlocked(await getAgentBlockedGroups(ctx.workspaceId), group);
+}
+
+/** Phase 18.3: what the model (and the person) is told when an app is blocked. */
+export function blockedSummary(group: ToolGroup, toolName: string): string {
+  return `Agents may not use ${TOOL_GROUP_LABELS[group]} in this workspace (${toolName}). An admin can allow it in Settings → Privacy and security → Agent app access.`;
 }
 
 /** The chat text that asks the user to OK a proposed call. */

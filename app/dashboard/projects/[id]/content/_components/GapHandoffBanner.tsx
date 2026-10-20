@@ -44,12 +44,12 @@ export default function GapHandoffBanner({ handoff }: { handoff: GapHandoff }) {
             <Link2 className="h-4 w-4" />
             Citation-gap handoff from AI visibility
           </h2>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[0.8125rem] text-muted">
             Engines cite competitors for this buyer question but never your domain. Save{" "}
             <strong>“{handoff.keyword}”</strong> as a keyword, then build the brief from it —
             feed it the sources so the page carries the structured facts engines quote.
           </p>
-          <dl className="mt-2 space-y-1 text-[13px]">
+          <dl className="mt-2 space-y-1 text-[0.8125rem]">
             <div className="flex gap-2">
               <dt className="w-28 shrink-0 font-medium text-ink">Engines</dt>
               <dd className="text-muted">{handoff.engines || "—"}</dd>
@@ -66,7 +66,7 @@ export default function GapHandoffBanner({ handoff }: { handoff: GapHandoff }) {
         </div>
         <button
           onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-medium text-white aos-press hover:bg-ink-hover"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy brief inputs"}

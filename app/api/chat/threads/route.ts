@@ -5,6 +5,8 @@
 //   tools narrows it to those tool groups. The grant is computed here, on
 //   the server (lib/agents/grants.ts) — what comes back is what applies.
 
+// Phase 18.3 (WS=trust): agent app permissions.
+import { getAgentBlockedGroups } from "@/lib/agents/app-permissions";
 import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
   if (!v.ok) return v.error;
   const project = await prisma.project.findFirst({
     where: { id: v.data.projectId, workspace: accessibleWorkspaceWhere(user.id) },
-    select: { id: true },
+    select: { id: true, workspaceId: true },
   });
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
   if (!(await requireProjectRole(user.id, project.id, "viewer"))) return forbidden();
@@ -76,7 +78,8 @@ export async function POST(req: Request) {
   // agent keeps its defaults (stored as an empty list).
   const agentKey = v.data.agentKey && isAgentKey(v.data.agentKey) ? v.data.agentKey : "lead";
   const requested = v.data.tools ?? [];
-  const grant = computeGrant({ agentKey, requested });
+  // Phase 18.3 (WS=trust): apps blocked for agents in this workspace are dropped.
+  const grant = computeGrant({ agentKey, requested, blockedGroups: await getAgentBlockedGroups(project.workspaceId) });
   const thread = await prisma.aiChatThread.create({
     data: {
       projectId: project.id,

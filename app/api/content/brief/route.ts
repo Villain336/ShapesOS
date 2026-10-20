@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
   // this item. Fail-soft: capture never breaks brief generation.
   void captureEpisode({
     workspaceId: keyword.project.workspaceId,
+    userId: user.id, // Phase 18.3: what agents remember from this person's work
     agentId: "content-brief",
     promptSummary: `Brief for keyword "${keyword.phrase}" (${keyword.intent ?? "unknown intent"})`,
     outputSummary: `Brief created: ${brief.h1 ?? brief.keyword} (${brief.h2s?.length ?? 0} H2s).`,

@@ -25,7 +25,9 @@ import { agentWorkerConfig } from "./config";
 
 // Phase 16 (deleg): subagent_run (one delegated child), delegation_tick (start
 // held-back tasks / arm a plan), delegation_join (the parent's continuation).
-export type AgentJobKind = "chat_turn" | "mission" | "subagent_run" | "delegation_tick" | "delegation_join" | (string & {});
+// Phase 17 (latency): llm_usage (one model call's metering, written by the
+// call as an outbox row — lib/llm/usage.ts).
+export type AgentJobKind = "chat_turn" | "mission" | "subagent_run" | "delegation_tick" | "delegation_join" | "llm_usage" | (string & {});
 
 export interface EnqueueAgentJobInput {
   workspaceId: string;
@@ -109,6 +111,26 @@ export async function claimAgentJobs(
   });
 }
 
+/**
+ * Phase 17: claim ONE specific queued job (the usage outbox row the writer
+ * processes at once). Atomic like claimAgentJobs — a worker that claimed it
+ * first wins and this returns null.
+ */
+export async function claimAgentJobById(workspaceId: string, jobId: string, workerId: string, leaseMs: number): Promise<ClaimedAgentJob | null> {
+  const rows = await claimRows<ClaimedAgentJob>({
+    workspaceId,
+    table: "agent_jobs",
+    where: Prisma.sql`"id" = ${jobId} AND "status" = 'queued' AND "run_after" <= ${SQL_NOW_UTC}`,
+    orderBy: Prisma.sql`"created_at" ASC`,
+    set: Prisma.sql`"status" = 'running', "attempts" = "attempts" + 1, "locked_by" = ${workerId},
+      "heartbeat_at" = ${SQL_NOW_UTC}, "lease_until" = ${SQL_NOW_UTC} + ${ms(leaseMs)}, "updated_at" = ${SQL_NOW_UTC}`,
+    returning: Prisma.sql`"id", "workspace_id" AS "workspaceId", "kind", "payload", "attempts",
+      "max_attempts" AS "maxAttempts", "run_id" AS "runId"`,
+    limit: 1,
+  });
+  return rows[0] ?? null;
+}
+
 /** Extend the lease. False = this worker no longer owns the job (stop working on it). */
 export async function heartbeatAgentJob(workspaceId: string, jobId: string, workerId: string, leaseMs: number): Promise<boolean> {
   const n = await withWorkspaceScope(workspaceId, (tx) =>
@@ -133,6 +155,18 @@ export async function completeAgentJob(workspaceId: string, jobId: string, worke
         ...(result === undefined ? {} : { result: result as Prisma.InputJsonValue }),
       },
     }),
+  );
+  return res.count > 0;
+}
+
+/**
+ * Phase 17: drop a finished transient row this worker owns (the usage
+ * outbox: once the ledger row exists the outbox row is noise — one per model
+ * call would otherwise pile up). False when this worker no longer owned it.
+ */
+export async function deleteOwnedAgentJob(workspaceId: string, jobId: string, workerId: string): Promise<boolean> {
+  const res = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentJob.deleteMany({ where: { id: jobId, workspaceId, status: "running", lockedBy: workerId } }),
   );
   return res.count > 0;
 }
@@ -164,6 +198,25 @@ export async function failAgentJob(
     });
     return retry ? "queued" : "dead";
   });
+}
+
+/**
+ * Deploy PR: hand a running job back on shutdown — queued again at once, and
+ * the attempt is NOT charged (the work did not fail; this process is going
+ * away). The run's transcript was saved at its last step, so whichever worker
+ * claims it next continues from there. False when this worker no longer
+ * owned the job.
+ */
+export async function releaseAgentJob(workspaceId: string, jobId: string, workerId: string): Promise<boolean> {
+  const n = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.$executeRaw`
+      UPDATE "agent_jobs"
+         SET "status" = 'queued', "locked_by" = NULL, "lease_until" = NULL,
+             "attempts" = GREATEST("attempts" - 1, 0), "run_after" = ${SQL_NOW_UTC}, "updated_at" = ${SQL_NOW_UTC}
+       WHERE "id" = ${jobId} AND "workspace_id" = ${workspaceId}
+         AND "status" = 'running' AND "locked_by" = ${workerId}`,
+  );
+  return n > 0;
 }
 
 /**

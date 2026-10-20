@@ -11,8 +11,26 @@ import { isExpoPushToken } from "./expo";
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
-/** Notification kinds that go out as push (Phase 3 producer kinds). */
-export const PUSH_KINDS = ["approval_needed", "approval_decided", "run_failed"] as const;
+/**
+ * Notification kinds that can go out as push (Phase 3 producer kinds).
+ * Phase 18.3 (WS=trust): every kind can — the person's channel matrix
+ * (lib/notifications/channels.ts, Settings → You → Notifications) decides
+ * which actually do. A device can still mute any of them.
+ */
+export const PUSH_KINDS = [
+  "approval_needed",
+  "approval_decided",
+  "run_failed",
+  // Phase 18.3 (WS=trust): the 18.2 and 18.3 kinds. Alerts and accepted
+  // invites stay off the phone (team news, not something to act on now).
+  "mention",
+  "direct_message",
+  "reminder_due",
+  "run_finished",
+  "invoice_paid",
+  "ticket_assigned",
+  "meeting_starting",
+] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 export function isPushKind(v: unknown): v is PushKind {

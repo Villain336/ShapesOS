@@ -18,7 +18,7 @@ export const metadata = {
 const quietNav =
   "inline-flex h-control-sm items-center rounded-full px-4 text-base font-semibold text-muted transition-colors hover:bg-hover hover:text-ink";
 const primaryCta =
-  "aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover";
+  "aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-ink-hover";
 
 export default function PricingPage() {
   const data = pricingPageData();

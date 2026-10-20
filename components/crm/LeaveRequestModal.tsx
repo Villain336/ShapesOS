@@ -73,7 +73,7 @@ export function LeaveRequestModal({
             </div>
           )}
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-ink">Team member *</span>
+            <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Team member *</span>
             <select
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
@@ -90,7 +90,7 @@ export function LeaveRequestModal({
           </label>
           <div className="grid grid-cols-3 gap-3">
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Type</span>
+              <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Type</span>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as typeof type)}
@@ -102,7 +102,7 @@ export function LeaveRequestModal({
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">Start *</span>
+              <span className="mb-1 block text-[0.75rem] font-semibold text-ink">Start *</span>
               <input
                 type="date"
                 value={startDate}
@@ -111,7 +111,7 @@ export function LeaveRequestModal({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-ink">End *</span>
+              <span className="mb-1 block text-[0.75rem] font-semibold text-ink">End *</span>
               <input
                 type="date"
                 value={endDate}
@@ -120,7 +120,7 @@ export function LeaveRequestModal({
               />
             </label>
           </div>
-          <p className="text-[12px] text-muted">
+          <p className="text-[0.75rem] text-muted">
             Goes out as a request. A manager approves it — that approval is gated and recorded.
           </p>
           <div className="flex justify-end gap-2 pt-1">

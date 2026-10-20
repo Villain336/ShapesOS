@@ -21,7 +21,7 @@ export default async function RecyclingPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <header>
         <h1 className="aos-heading">Creative recycling</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           Winners from attribution, QR scans, AEO, and direct mail become cross-channel briefs.
           Recycling proposes — a human approves every variant before it enters the studio flows.
         </p>

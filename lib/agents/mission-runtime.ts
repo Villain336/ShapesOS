@@ -154,7 +154,9 @@ export interface SubAgentDispatchOptions {
 export function subAgentDispatch(opts: SubAgentDispatchOptions) {
   return async (executor: ExecutorName, task: MissionTask): Promise<DispatchResult> => {
     const stepId = String((task.payload as { stepId?: unknown } | undefined)?.stepId ?? task.label);
-    const grant = executorGrant(executor);
+    // Phase 18.3 (WS=trust): apps blocked for agents in this workspace are dropped.
+    const { getAgentBlockedGroups } = await import("@/lib/agents/app-permissions");
+    const grant = executorGrant(executor, await getAgentBlockedGroups(opts.workspaceId));
     const name = agentDisplayName(executor);
 
     let runId: string;

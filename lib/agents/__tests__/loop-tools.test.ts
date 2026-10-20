@@ -67,9 +67,12 @@ describe("tool schema conversion", () => {
     assert.match(String(validateToolInput(s, {})), /a/);
   });
 
-  it("non-safe tools say they wait for the user's OK", () => {
-    const def = toolDefToChat(TOOLS.find((t) => t.kind === "spend")!);
-    assert.match(def.description, /waits for the user's OK/);
+  it("Phase 17 (A2): no per-tool KIND_NOTE suffix — the chat description is the ToolDef's own (the legend lives once in the system prompt)", () => {
+    for (const t of TOOLS) {
+      const def = toolDefToChat(t);
+      assert.equal(def.description, t.description.slice(0, 4000), t.name);
+      assert.doesNotMatch(def.description, /\[(costs money|publishes or sends|destructive)/, t.name);
+    }
   });
 });
 

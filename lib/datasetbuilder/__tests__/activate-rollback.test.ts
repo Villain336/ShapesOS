@@ -82,6 +82,8 @@ describe("rollback / roll-forward (in-memory store mirrors Postgres)", () => {
     assert.equal(briefNowAdaptersRoot(env({})), null);
     assert.equal(briefNowAdaptersRoot(env({ BRIEFNOW_ADAPTERS_ROOT: "  " })), null);
     assert.ok(briefNowAdaptersRoot(env({ BRIEFNOW_ADAPTERS_ROOT: "/srv/briefnow" }))!.endsWith("briefnow"));
+    // Deploy PR: the local file drop is self-host only; hosted pulls over MCP.
+    assert.equal(briefNowAdaptersRoot(env({ BRIEFNOW_ADAPTERS_ROOT: "/srv/briefnow", DEPLOYMENT_MODE: "hosted" })), null);
     assert.equal(staleAfterDaysFromEnv(env({})), 90);
     assert.equal(staleAfterDaysFromEnv(env({ DATASET_STALE_AFTER_DAYS: "30" })), 30);
     assert.equal(staleAfterDaysFromEnv(env({ DATASET_STALE_AFTER_DAYS: "-1" })), 90);

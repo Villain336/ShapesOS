@@ -12,6 +12,7 @@
 // Cron/service routes keep using CRON_SECRET bearer auth (shared service
 // secret, not a user role) — see app/api/cron/fix-agent/route.ts.
 
+import { cache } from "react";
 import { prisma } from "./prisma";
 import { randomBytes } from "node:crypto";
 import type { WorkspaceMember, WorkspaceRole } from "@prisma/client";
@@ -40,8 +41,15 @@ export function accessibleWorkspaceWhere(userId: string) {
 /**
  * Load the user's membership for a workspace, lazily backfilling an `owner`
  * row for legacy workspaces whose ownerUserId matches (pre-m11 data).
+ *
+ * Phase 17 (latency): request-scoped React cache() — one read per request
+ * however many guards ask (requireWorkspaceRole, requireProjectRole,
+ * hasPermission all call it). Outside a request scope it calls straight
+ * through; nothing is shared across requests (see lib/session.ts).
  */
-export async function getMembership(
+export const getMembership = cache(getMembershipUncached);
+
+async function getMembershipUncached(
   userId: string,
   workspaceId: string,
 ): Promise<WorkspaceMember | null> {

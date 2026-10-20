@@ -109,7 +109,7 @@ function TierPill({ tier }: { tier: ExpiryTier | null }) {
   const meta = TIER_META[key];
   const Icon = meta.icon;
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+    <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
       <Icon size={13} />
       {meta.label}
     </span>
@@ -180,7 +180,7 @@ function UploadForm({
           <select
             value={docType}
             onChange={(e) => setDocType(e.target.value as LegalDocumentType)}
-            className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+            className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
             aria-label="Document type"
           >
             {DOCUMENT_TYPES.map((t) => (
@@ -194,12 +194,12 @@ function UploadForm({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Document title"
-            className="h-10 min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+            className="h-10 min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
           />
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex h-10 cursor-pointer items-center gap-1.5 rounded-full bg-paper px-4 text-[14px] font-semibold shadow-hairline">
+        <label className="flex h-10 cursor-pointer items-center gap-1.5 rounded-full bg-paper px-4 text-[0.875rem] font-semibold shadow-hairline">
           <Upload size={14} />
           {file ? file.name : "Choose file"}
           <input
@@ -209,11 +209,11 @@ function UploadForm({
           />
         </label>
         {file && (
-          <span className="text-[13px] text-muted">{formatBytes(file.size)} · 25 MB max</span>
+          <span className="text-[0.8125rem] text-muted">{formatBytes(file.size)} · 25 MB max</span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-[14px]">
+        <label className="flex items-center gap-2 text-[0.875rem]">
           <input
             type="checkbox"
             checked={useExpiry}
@@ -228,13 +228,13 @@ function UploadForm({
               type="date"
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
-              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
               aria-label="Expiry date"
             />
             <select
               value={expirySource}
               onChange={(e) => setExpirySource(e.target.value as LegalExpirySource)}
-              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
               aria-label="Expiry date source"
             >
               {(Object.keys(EXPIRY_SOURCE_LABELS) as LegalExpirySource[]).map((s) => (
@@ -247,7 +247,7 @@ function UploadForm({
         )}
       </div>
       {!useExpiry && (
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Leaving this unchecked keeps it as "no expiry recorded" — expiry dates are never guessed.
         </p>
       )}
@@ -256,14 +256,14 @@ function UploadForm({
         value={issuer}
         onChange={(e) => setIssuer(e.target.value)}
         placeholder="Issuer (optional)"
-        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
       />
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={busy || !canSubmit}
           onClick={submit}
-          className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={14} className="animate-spin" />}
           {submitLabel}
@@ -271,7 +271,7 @@ function UploadForm({
         <button
           type="button"
           onClick={onCancel}
-          className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted"
+          className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[0.875rem] font-semibold text-muted"
         >
           <X size={14} />
           Cancel
@@ -327,7 +327,7 @@ function EditForm({
         <select
           value={docType}
           onChange={(e) => setDocType(e.target.value as LegalDocumentType)}
-          className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+          className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
           aria-label="Document type"
         >
           {DOCUMENT_TYPES.map((t) => (
@@ -341,7 +341,7 @@ function EditForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Document title"
-          className="h-10 min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+          className="h-10 min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
         />
       </div>
       <textarea
@@ -349,10 +349,10 @@ function EditForm({
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Notes (optional)"
         rows={2}
-        className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[14px]"
+        className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.875rem]"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-[14px]">
+        <label className="flex items-center gap-2 text-[0.875rem]">
           <input
             type="checkbox"
             checked={useExpiry}
@@ -367,13 +367,13 @@ function EditForm({
               type="date"
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
-              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
               aria-label="Expiry date"
             />
             <select
               value={expirySource}
               onChange={(e) => setExpirySource(e.target.value as LegalExpirySource)}
-              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+              className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
               aria-label="Expiry date source"
             >
               {(Object.keys(EXPIRY_SOURCE_LABELS) as LegalExpirySource[]).map((s) => (
@@ -390,14 +390,14 @@ function EditForm({
         value={issuer}
         onChange={(e) => setIssuer(e.target.value)}
         placeholder="Issuer (optional)"
-        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[14px]"
+        className="h-10 rounded-md border-[1.5px] border-control bg-paper px-3 text-[0.875rem]"
       />
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={busy || title.trim().length === 0}
           onClick={save}
-          className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={14} className="animate-spin" />}
           Save changes
@@ -405,7 +405,7 @@ function EditForm({
         <button
           type="button"
           onClick={onCancel}
-          className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold text-muted"
+          className="aos-press flex h-10 items-center gap-1.5 rounded-full px-4 text-[0.875rem] font-semibold text-muted"
         >
           <X size={14} />
           Cancel
@@ -426,26 +426,26 @@ function VersionRow({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md bg-canvas px-3 py-2">
-      <span className="flex items-center gap-1.5 text-[14px] font-semibold">
+      <span className="flex items-center gap-1.5 text-[0.875rem] font-semibold">
         <FileText size={14} />
         v{v.versionNumber}
         {isCurrent && (
-          <span className="rounded-full bg-black px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="rounded-full bg-black px-2 py-0.5 text-[0.6875rem] font-semibold text-white">
             Current
           </span>
         )}
       </span>
-      <span className="text-[13px] text-muted">{v.filename}</span>
-      <span className="text-[13px] text-muted">{formatBytes(v.sizeBytes)}</span>
-      <span className="text-[13px] text-muted">{formatDate(v.uploadedAt)}</span>
+      <span className="text-[0.8125rem] text-muted">{v.filename}</span>
+      <span className="text-[0.8125rem] text-muted">{formatBytes(v.sizeBytes)}</span>
+      <span className="text-[0.8125rem] text-muted">{formatDate(v.uploadedAt)}</span>
       {v.supersedesVersionNumber !== null && (
-        <span className="text-[13px] text-muted">
+        <span className="text-[0.8125rem] text-muted">
           Supersedes v{v.supersedesVersionNumber}
         </span>
       )}
       <a
         href={`/api/files/${encodeURIComponent(v.workspaceFileId)}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`}
-        className="aos-press ml-auto flex h-9 items-center gap-1.5 rounded-full bg-paper px-4 text-[13px] font-semibold shadow-hairline"
+        className="aos-press ml-auto flex h-9 items-center gap-1.5 rounded-full bg-paper px-4 text-[0.8125rem] font-semibold shadow-hairline"
       >
         Download
       </a>
@@ -549,10 +549,10 @@ export function DocumentsView({
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3 rounded-lg bg-paper p-4 shadow-hairline">
         <Info size={16} className="mt-0.5 shrink-0" />
-        <p className="text-[14px]">{disclaimer}</p>
+        <p className="text-[0.875rem]">{disclaimer}</p>
       </div>
 
-      <p className="text-[13px] text-muted">
+      <p className="text-[0.8125rem] text-muted">
         {documents.length} {documents.length === 1 ? "document" : "documents"} in the vault
         {attentionCount > 0 && ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention`}
         {noExpiryCount > 0 && ` · ${noExpiryCount} with no expiry recorded`}
@@ -561,7 +561,7 @@ export function DocumentsView({
       {documents.length === 0 && !adding ? (
         <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
           <Archive size={28} className="mx-auto text-muted" />
-          <p className="mt-2 text-[15px] font-semibold">No documents yet</p>
+          <p className="mt-2 text-[0.9375rem] font-semibold">No documents yet</p>
           <p className="mt-1 text-sm text-muted">
             Store formation docs, contracts, licenses, and EIN letters here.
             Every upload is versioned — nothing is ever overwritten.
@@ -569,7 +569,7 @@ export function DocumentsView({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="aos-press mx-auto mt-4 flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white"
+            className="aos-press mx-auto mt-4 flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white"
           >
             <Plus size={14} />
             Add a document
@@ -581,7 +581,7 @@ export function DocumentsView({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white"
+              className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white"
             >
               <Plus size={14} />
               Add a document
@@ -592,7 +592,7 @@ export function DocumentsView({
 
       {adding && (
         <div className="rounded-lg bg-paper p-4 shadow-hairline">
-          <h3 className="text-[15px] font-semibold">Add a document</h3>
+          <h3 className="text-[0.9375rem] font-semibold">Add a document</h3>
           <UploadForm
             initial={{
               docType: "formation",
@@ -620,10 +620,10 @@ export function DocumentsView({
           return (
             <article key={d.id} className="rounded-lg bg-paper p-4 shadow-hairline">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="min-w-0 flex-1 text-[15px] font-semibold">{d.title}</h3>
+                <h3 className="min-w-0 flex-1 text-[0.9375rem] font-semibold">{d.title}</h3>
                 <TierPill tier={d.tier} />
               </div>
-              <p className="mt-1.5 text-[14px] text-muted">
+              <p className="mt-1.5 text-[0.875rem] text-muted">
                 {cv?.expiryDate ? (
                   <>
                     Expires {formatDate(cv.expiryDate)}
@@ -638,24 +638,24 @@ export function DocumentsView({
                 )}
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                <span className="rounded-full bg-canvas px-3 py-1 text-[0.8125rem] font-semibold">
                   {DOCUMENT_TYPE_LABELS[d.docType]}
                 </span>
                 {cv && (
-                  <span className="text-[13px] text-muted">
+                  <span className="text-[0.8125rem] text-muted">
                     v{cv.versionNumber} · {cv.filename} · {formatBytes(cv.sizeBytes)}
                   </span>
                 )}
-                <span className="text-[13px] text-muted">
+                <span className="text-[0.8125rem] text-muted">
                   {d.versionCount} {d.versionCount === 1 ? "version" : "versions"}
                 </span>
               </div>
-              {d.notes && <p className="mt-1.5 text-[14px] text-muted">{d.notes}</p>}
+              {d.notes && <p className="mt-1.5 text-[0.875rem] text-muted">{d.notes}</p>}
               {cv?.issuer && (
-                <p className="mt-1 text-[13px] text-muted">Issuer: {cv.issuer}</p>
+                <p className="mt-1 text-[0.8125rem] text-muted">Issuer: {cv.issuer}</p>
               )}
               {cv?.expirySource && cv.expiryDate && (
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-1 text-[0.8125rem] text-muted">
                   Expiry {cv.expirySource === "read_from_document" ? "read from the document" : "set by you"}
                 </p>
               )}
@@ -696,7 +696,7 @@ export function DocumentsView({
                     type="button"
                     disabled={busy}
                     onClick={() => setVersioningId(d.id)}
-                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-black px-5 text-[0.875rem] font-semibold text-white disabled:opacity-50"
                   >
                     <Upload size={14} />
                     New version
@@ -705,7 +705,7 @@ export function DocumentsView({
                     type="button"
                     disabled={busy}
                     onClick={() => setEditingId(d.id)}
-                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline disabled:opacity-50"
+                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline disabled:opacity-50"
                   >
                     <Pencil size={14} />
                     Edit details
@@ -714,7 +714,7 @@ export function DocumentsView({
                     type="button"
                     disabled={busy}
                     onClick={() => void toggleHistory(d.id)}
-                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline disabled:opacity-50"
+                    className="aos-press flex h-10 items-center gap-1.5 rounded-full bg-paper px-5 text-[0.875rem] font-semibold shadow-hairline disabled:opacity-50"
                   >
                     {busyKey === `history:${d.id}` ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -730,7 +730,7 @@ export function DocumentsView({
                     type="button"
                     disabled={busy}
                     onClick={() => void remove(d.id)}
-                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-failed-text disabled:opacity-50"
+                    className="aos-press flex h-9 items-center gap-1.5 rounded-full px-4 text-[0.8125rem] font-semibold text-failed-text disabled:opacity-50"
                   >
                     <Trash2 size={13} />
                     Delete

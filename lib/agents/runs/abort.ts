@@ -50,6 +50,28 @@ export function isLeaseLost(signal: AbortSignal | undefined): boolean {
   return !!signal?.aborted && (signal.reason as { name?: unknown } | undefined)?.name === "LeaseLostError";
 }
 
+/**
+ * Deploy PR: abort every run live in this process with `reason` (the drain
+ * hands inline turns and worker jobs off with a LeaseLostError). Returns the
+ * run ids it aborted.
+ */
+export function abortAllRunsWith(reason: () => Error, except: ReadonlySet<string> = new Set()): string[] {
+  const ids: string[] = [];
+  for (const [id, c] of controllers) {
+    if (c.signal.aborted || except.has(id)) continue;
+    c.abort(reason());
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** How many runs are live in this process (minus `except`). */
+export function liveRunCount(except: ReadonlySet<string> = new Set()): number {
+  let n = 0;
+  for (const [id, c] of controllers) if (!c.signal.aborted && !except.has(id)) n++;
+  return n;
+}
+
 /** Forget a finished run's controller. */
 export function releaseRunAbort(runId: string): void {
   controllers.delete(runId);

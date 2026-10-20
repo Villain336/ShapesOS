@@ -54,7 +54,7 @@ export function BrainSourcesTable({
     <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
       <div className="border-b border-line px-3 py-2">
         <div className="text-sm font-semibold text-ink">Sources</div>
-        <div className="text-[11px] text-subtle">
+        <div className="text-[0.6875rem] text-subtle">
           The full corpus register — click any row to fly to its bead.
         </div>
       </div>
@@ -109,7 +109,7 @@ export function BrainSourcesTable({
                       />
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-ink">{n.title}</span>
-                        <span className="block truncate text-[11px] text-subtle">{n.author}</span>
+                        <span className="block truncate text-[0.6875rem] text-subtle">{n.author}</span>
                       </span>
                     </div>
                     <span className="mt-1 flex gap-1">

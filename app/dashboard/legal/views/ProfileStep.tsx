@@ -84,7 +84,7 @@ export function ProfileStep({
   }
 
   const pill = (active: boolean) =>
-    `aos-press flex h-11 items-center rounded-full px-5 text-[14px] font-semibold ${
+    `aos-press flex h-11 items-center rounded-full px-5 text-[0.875rem] font-semibold ${
       active ? "bg-black text-white" : "bg-paper text-ink shadow-hairline"
     }`;
 
@@ -105,7 +105,7 @@ export function ProfileStep({
       </div>
 
       <div>
-        <p className="mb-2 text-[13px] font-semibold">Industry</p>
+        <p className="mb-2 text-[0.8125rem] font-semibold">Industry</p>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Industry">
           {INDUSTRY_OPTIONS.map((o) => (
             <button
@@ -123,7 +123,7 @@ export function ProfileStep({
       </div>
 
       <div>
-        <p className="mb-2 text-[13px] font-semibold">Business model</p>
+        <p className="mb-2 text-[0.8125rem] font-semibold">Business model</p>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Business model">
           {BUSINESS_MODEL_OPTIONS.map((o) => (
             <button
@@ -141,7 +141,7 @@ export function ProfileStep({
       </div>
 
       <div>
-        <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold">
+        <p className="mb-2 flex items-center gap-1.5 text-[0.8125rem] font-semibold">
           <MapPinned size={14} />
           Jurisdictions
         </p>
@@ -161,13 +161,13 @@ export function ProfileStep({
             );
           })}
         </div>
-        <p className="mt-1.5 text-[13px] text-muted">
+        <p className="mt-1.5 text-[0.8125rem] text-muted">
           The national baseline always applies on top of your jurisdictions.
         </p>
       </div>
 
       {error && (
-        <p role="alert" className="flex items-start gap-2 text-[14px] text-failed-text">
+        <p role="alert" className="flex items-start gap-2 text-[0.875rem] text-failed-text">
           <TriangleAlert size={15} className="mt-0.5 shrink-0" />
           {error}
         </p>
@@ -177,7 +177,7 @@ export function ProfileStep({
         <button
           type="submit"
           disabled={busy}
-          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-50"
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[0.9375rem] font-semibold text-white disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy

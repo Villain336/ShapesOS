@@ -30,6 +30,12 @@ const ALLOW = new Map<string, string>([
   // Phase 10 (portal): the sign-in request names no workspace — the address may be a client of several; clients is not a tenant (RLS) table. Ids + workspace name only; every link write that follows is tenant-scoped.
   // Phase 12 (people): public event routing — /events/<slug> → workspace, the one cross-workspace read, through the SELECT-only app.event_route policy (published events only); everything after it is tenant-scoped.
   ["lib/ops/events/catalog.ts:opsEvent.findFirst", "resolvePublishedEvent: maps a public /events/<slug> to its workspace via the SELECT-only app.event_route policy (published rows only)"],
+  // Phase 18.2 (comms): the project team chat now runs under withWorkspaceScope; its project lookup comes first and resolves the workspace from the caller's own memberships.
+  ["app/api/team/chat/route.ts:project.findFirst", "projectAccess: resolves the project through accessibleWorkspaceWhere(userId) (the caller's memberships) before any workspace is known; every chat query after it is workspace-scoped"],
+  // Phase 18.2 (content): public file share links — token hash → link, the one cross-workspace read, through the SELECT-only app.file_share_route policy (live links only); everything after it runs under the link's workspace scope.
+  ["lib/files/shares.ts:workspaceFileShare.findFirst", "resolveShareToken: maps a public /r/file/<token> to its link via the SELECT-only app.file_share_route policy (unrevoked rows only)"],
+  // Phase 18.3 (WS=flow): the hourly Time Machine sweep lists which workspaces asked for scheduled snapshots (workspace_settings is not a tenant RLS table; ids + schedule only); every snapshot read / write after it runs under that workspace's scope.
+  ["lib/timemachine/snapshots.ts:workspaceSettings.findMany", "runDueSnapshots: cron-only fan-out over workspaces with a snapshot schedule (ids only); each snapshot is taken under its own workspace scope"],
   ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 

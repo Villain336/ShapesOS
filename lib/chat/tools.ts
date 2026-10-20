@@ -44,6 +44,17 @@ import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
 import { generate_image } from "@/lib/images/tool";
 // Phase 5: tool groups (per-task tool grants).
 import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
+// Phase 18.1 (WS=find): Spotlight for agents — the same search people run in ⌘K.
+import { search_workspace } from "@/lib/search/tool";
+// Phase 18.2 (WS=comms): Mail, Calendar, Contacts, Messages, Meet, Reminders.
+import { COMMS_TOOLS, COMMS_TOOL_ACTION, COMMS_TOOL_GROUP } from "@/lib/comms/tools";
+// Phase 18.2 (WS=content): the core apps' agent tools (Notes, Files, Activity Monitor, Store).
+import { NOTE_TOOLS } from "@/lib/notes/tools";
+import { FILE_TOOLS } from "@/lib/files/tools";
+import { PROCESS_TOOLS } from "@/lib/aos/tools";
+import { STORE_TOOLS } from "@/lib/store/tools";
+// Phase 22 (chat): how the transcript draws a tool's result (lib/chat/ui-hints.ts).
+import type { ToolUiHint } from "./ui-hints";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -76,6 +87,25 @@ export interface ToolContext {
 export interface ToolResult {
   summary: string;
   details?: unknown;
+  /**
+   * Phase 18.3 (WS=flow): the records this call wrote, recorded on the run's
+   * timeline (AgentRunEvent payload) so "Undo this agent run" knows exactly
+   * what to revert (lib/timemachine/undo.ts). `before` = the changed fields'
+   * prior values for an update.
+   */
+  touched?: TouchedRecord[];
+}
+
+/** Phase 18.3 (WS=flow): one record a tool call wrote. */
+export interface TouchedRecord {
+  kind: string;
+  id: string;
+  op: "create" | "update" | "share";
+  /** Ops entity slug ("deals") for kind "ops". */
+  entity?: string;
+  /** The file a share link belongs to. */
+  fileId?: string;
+  before?: Record<string, unknown>;
 }
 
 /**
@@ -103,6 +133,13 @@ export interface ToolDef {
     required?: string[];
   };
   execute: (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>;
+  /**
+   * Phase 22 (chat): the typed renderer for this tool's result in the
+   * transcript (records table, file card, image, diff, chart, text, an OpenUI
+   * program, a plan). Absent = inferred from the result's shape
+   * (lib/chat/tool-ui.ts).
+   */
+  ui?: ToolUiHint;
 }
 
 function str(v: unknown): string | undefined {
@@ -133,6 +170,7 @@ async function keywordOverview(projectId: string) {
 
 const get_keywords: ToolDef = {
   name: "get_keywords",
+  ui: "records",
   description:
     "List the project's saved keywords: phrase, volume, difficulty, intent, list name, tracked flag, and latest rank position.",
   kind: "safe",
@@ -169,6 +207,7 @@ const get_keywords: ToolDef = {
 
 const get_rankings: ToolDef = {
   name: "get_rankings",
+  ui: "records",
   description:
     "Rankings summary for the project: tracked keywords with latest position, movement vs previous check, the visibility score, and any rank-drop/gain alerts.",
   kind: "safe",
@@ -223,6 +262,7 @@ const get_rankings: ToolDef = {
 
 const get_competitors: ToolDef = {
   name: "get_competitors",
+  ui: "records",
   description:
     "List the project's tracked competitors (domains) plus the latest competitor-radar events (new keywords, gains, new pages, lost rankings).",
   kind: "safe",
@@ -265,6 +305,7 @@ const get_competitors: ToolDef = {
 
 const get_content: ToolDef = {
   name: "get_content",
+  ui: "records",
   description:
     "Content library overview: counts by status (brief/draft/editing/published) and the most recent content items with their keyword, status and SEO score.",
   kind: "safe",
@@ -308,6 +349,7 @@ const get_content: ToolDef = {
 
 const get_alerts: ToolDef = {
   name: "get_alerts",
+  ui: "records",
   description:
     "Open alert picture: recent alert events (rule, trigger, title, status) plus open site issues by severity.",
   kind: "safe",
@@ -391,6 +433,7 @@ const get_visibility_score: ToolDef = {
 
 const get_workflows: ToolDef = {
   name: "get_workflows",
+  ui: "records",
   description:
     "Automation workflows for the project: name, status, enabled, schedule, last run, node counts — plus the latest workflow runs.",
   kind: "safe",
@@ -448,7 +491,7 @@ const get_workflows: ToolDef = {
 const load_skill: ToolDef = {
   name: "load_skill",
   description:
-    "Load an enabled project's skill by slug: returns the full SKILL.md playbook (name, description, steps, tools it may invoke). Call this BEFORE acting whenever a task matches a skill in the AVAILABLE SKILLS section.",
+    "Load an enabled skill's full SKILL.md playbook by slug. Call it BEFORE acting whenever a task matches a skill listed under AVAILABLE SKILLS.",
   kind: "safe",
   minRole: "viewer",
   argsSchema: {
@@ -598,7 +641,7 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
+    "Run an SEO audit of a project site (heavy job): findings go to the audit inbox, site files are never edited. live=true crawls the live URLs instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
@@ -803,7 +846,7 @@ const approve_autopilot_item: ToolDef = {
 const design_qr_code: ToolDef = {
   name: "design_qr_code",
   description:
-    "Design a brand-styled QR code from a natural-language style request (e.g. 'round QR, modules as little snakes, brand colors, logo in the center'). Renders the styled code on the real QR matrix, runs automated validation (glyph fill, contrast, finder integrity, quiet zone, error correction H) and a real decoder scan test. Failures come back with the named reason plus a bolder auto-regenerated variant. A verified design is print-locked and its sha256 hash is returned for the media-buy approval binding. The AI only ever styles the artwork — never the encoded data.",
+    "Design a brand-styled QR code from a style request (e.g. 'round, snake modules, brand colors, logo in the center') on the real QR matrix, then validate it (contrast, finders, quiet zone, error correction H) and scan-test it; a failure returns the reason plus a bolder variant. A verified design is print-locked and its sha256 returned for the media-buy approval. Only the artwork is styled, never the encoded data.",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
@@ -1005,7 +1048,7 @@ const automation_flow_status: ToolDef = {
 const ask_business_data: ToolDef = {
   name: "ask_business_data",
   description:
-    "Answer a question about the business (FAQs, products, policies, SOPs, company facts, pricing) strictly from the datasets this workspace published to RAG + Feed. Returns the best-matching passage plus Source → Document → Chunk citations; says so when nothing matches. Use it before answering factual questions about the tenant's own business.",
+    "Answer a question about the business (FAQs, products, policies, SOPs, facts, pricing) only from the datasets the workspace published, with citations; says so when nothing matches. Use it before answering factual questions about the business.",
   kind: "safe",
   minRole: "viewer",
   argsSchema: {
@@ -1053,11 +1096,22 @@ export const TOOLS: ToolDef[] = [
   research_question,
   // Phase 4b: grounded answers from published datasets.
   ask_business_data,
+  // Phase 18.1: one index for people and agents (lib/search/records.ts).
+  search_workspace,
   // Phase 7: images from OpenAI's image model, saved as workspace files.
   generate_image,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOLS,
+  // Phase 18.2 (WS=content): read_note (Tier 0) / create_note (Tier 1);
+  // list_file_versions (Tier 0) / share_file_link (Tier 2); list_processes (Tier 0);
+  // list_store_items (Tier 0).
+  ...NOTE_TOOLS,
+  ...FILE_TOOLS,
+  ...PROCESS_TOOLS,
+  ...STORE_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {
@@ -1084,6 +1138,7 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   get_workflows: "workspace",
   load_skill: "workspace",
   ask_business_data: "workspace",
+  search_workspace: "workspace",
   automation_flow_status: "workspace",
   research_keywords: "web",
   research_question: "web",
@@ -1211,6 +1266,17 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
   web_scrape: "web",
   web_crawl: "web",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_GROUP,
+  // Phase 18.2 (WS=content): the core apps' agent tools (lib/notes/tools.ts,
+  // lib/files/tools.ts, lib/aos/tools.ts, lib/store/tools.ts). Reads are
+  // workspace; writing a note is content; sharing a file link is content.
+  read_note: "workspace",
+  create_note: "content",
+  list_file_versions: "workspace",
+  share_file_link: "content",
+  list_processes: "workspace",
+  list_store_items: "workspace",
 };
 
 /**
@@ -1220,6 +1286,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
  * asks, whatever a rule says.
  */
 export const TOOL_ACTION: Readonly<Record<string, string>> = {
+  // Phase 18.1: read-only search over the workspace — a Tier-0 "search_" kind.
+  search_workspace: "search_workspace",
   research_keywords: "search_keywords",
   research_question: "search_web",
   create_content_draft: "draft_content",
@@ -1315,6 +1383,19 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
   web_scrape: "fetch_web_pages",
   web_crawl: "fetch_web_pages",
+  // Phase 18.2 (WS=comms): the communication apps (lib/comms/tools.ts).
+  ...COMMS_TOOL_ACTION,
+  // Phase 18.2 (WS=content): a note is internal and reversible — Tier 1
+  // (TIER1_KINDS: asks unless an automation rule lets it run). A share link
+  // hands a file to people outside the workspace — Tier 2, always asks
+  // unless a rule says Auto-run.
+  create_note: "write_internal_note",
+  share_file_link: "share_file_externally",
+  // Read-only tools of the core apps: observation kinds (Tier 0 by evaluateTier, like search_workspace).
+  read_note: "read_note",
+  list_file_versions: "list_file_versions",
+  list_processes: "list_processes",
+  list_store_items: "list_store_items",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

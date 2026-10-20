@@ -8,6 +8,14 @@
 // selling twice. PURE apart from the injected storage, so it is unit-tested.
 //
 // Card sales are never queued: a card payment needs the reader online.
+//
+// Phase 18.3 (WS=flow): the queue mechanics now live in lib/offline/queue.ts
+// (the app-wide offline queue); this file keeps the till's API, storage key
+// and item shape so sales already queued in a browser survive the upgrade.
+
+import { classifySend as classifyWrite, genericQueue, type KeyValueStore } from "@/lib/offline/queue";
+
+export type { KeyValueStore };
 
 export interface QueuedSale {
   clientOrderId: string;
@@ -17,11 +25,6 @@ export interface QueuedSale {
   queuedAt: string;
   attempts: number;
   lastError?: string;
-}
-
-export interface KeyValueStore {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
 }
 
 export type SendResult =
@@ -35,27 +38,15 @@ export function queueKey(sessionId: string): string {
   return `shapes_pos_queue_${sessionId.replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
-export function readQueue(store: KeyValueStore, sessionId: string): QueuedSale[] {
-  try {
-    const raw = store.getItem(queueKey(sessionId));
-    const v = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(v) ? (v as QueuedSale[]) : [];
-  } catch {
-    return [];
-  }
-}
+const saleQueue = (sessionId: string) => genericQueue<QueuedSale>(queueKey(sessionId), (s) => s.clientOrderId);
 
-function writeQueue(store: KeyValueStore, sessionId: string, q: QueuedSale[]): void {
-  store.setItem(queueKey(sessionId), JSON.stringify(q));
+export function readQueue(store: KeyValueStore, sessionId: string): QueuedSale[] {
+  return saleQueue(sessionId).read(store);
 }
 
 /** Add a sale (a second enqueue of the same client order id is ignored). */
 export function enqueue(store: KeyValueStore, sale: Omit<QueuedSale, "queuedAt" | "attempts">, now: Date = new Date()): QueuedSale[] {
-  const q = readQueue(store, sale.sessionId);
-  if (q.some((s) => s.clientOrderId === sale.clientOrderId)) return q;
-  const next = [...q, { ...sale, queuedAt: now.toISOString(), attempts: 0 }];
-  writeQueue(store, sale.sessionId, next);
-  return next;
+  return saleQueue(sale.sessionId).enqueue(store, { ...sale, queuedAt: now.toISOString(), attempts: 0 });
 }
 
 export interface ReplayReport {
@@ -74,34 +65,23 @@ export async function replayQueue(
   sessionId: string,
   send: (sale: QueuedSale) => Promise<SendResult>,
 ): Promise<ReplayReport> {
-  const report: ReplayReport = { sent: [], failed: [], remaining: 0 };
-  let q = readQueue(store, sessionId);
-  while (q.length > 0) {
-    const head = q[0]!;
-    const r = await send(head);
-    if (r.ok) {
-      report.sent.push({ clientOrderId: head.clientOrderId, orderId: r.orderId, replayed: r.replayed });
-      q = q.slice(1);
-    } else if (r.permanent) {
-      report.failed.push({ clientOrderId: head.clientOrderId, error: r.error });
-      q = q.slice(1);
-    } else {
-      q = [{ ...head, attempts: head.attempts + 1, lastError: r.error }, ...q.slice(1)];
-      break;
-    }
-    writeQueue(store, sessionId, q);
-  }
-  writeQueue(store, sessionId, q);
-  report.remaining = q.length;
-  return report;
+  const r = await saleQueue(sessionId).replay(
+    store,
+    async (sale) => {
+      const res = await send(sale);
+      return res.ok ? { ok: true, replayed: res.replayed, id: res.orderId } : res;
+    },
+    (sale, error) => ({ ...sale, attempts: sale.attempts + 1, lastError: error }),
+  );
+  return {
+    sent: r.sent.map((s) => ({ clientOrderId: s.clientId, orderId: s.id, replayed: s.replayed })),
+    failed: r.failed.map((f) => ({ clientOrderId: f.clientId, error: f.error })),
+    remaining: r.remaining,
+  };
 }
 
 /** Classify a fetch outcome for the queue. */
 export function classifySend(status: number | null, data: Record<string, unknown> | null): SendResult {
-  if (status !== null && status >= 200 && status < 300 && data && typeof data.orderId === "string") {
-    return { ok: true, replayed: data.replayed === true, orderId: data.orderId };
-  }
-  const error = (data && typeof data.error === "string" ? data.error : null) ?? (status === null ? "No connection" : `Server error ${status}`);
-  if (status !== null && status >= 400 && status < 500 && status !== 408 && status !== 429) return { ok: false, permanent: true, error };
-  return { ok: false, permanent: false, error };
+  const r = classifyWrite(status, data, "orderId");
+  return r.ok ? { ok: true, replayed: r.replayed, orderId: r.id } : r;
 }

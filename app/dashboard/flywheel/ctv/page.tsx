@@ -27,7 +27,7 @@ export default async function CtvPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="aos-heading">CTV buying path</h1>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Validator → per-spot QR/pURL kit → concierge IO → Vibe API → probabilistic attribution.
             Every spend action sits behind a Phase 5 per-buy approval object.
           </p>

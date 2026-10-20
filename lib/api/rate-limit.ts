@@ -5,7 +5,7 @@
 //
 // Tiers (per spec):
 //   auth  — /api/auth/* (except read-only session/csrf/providers): 10 req/min, keyed by IP
-//   read  — GET/HEAD/OPTIONS: 120 req/min, keyed by user (IP fallback)
+//   read  — GET/HEAD/OPTIONS: 120 req/min (RATE_LIMIT_READ_PER_MIN), keyed by user (IP fallback)
 //   write — POST/PUT/PATCH/DELETE: 60 req/min, keyed by user (IP fallback)
 //   ai    — LLM / skill-execution routes (see AI_ROUTE_PATTERNS): 20 req/min, keyed by user
 //
@@ -13,7 +13,20 @@
 // handlers call — uses the shared Postgres table (lib/api/rate-limit-store.ts,
 // RATE_LIMIT_STORE, default postgres when DATABASE_URL is set) so the limits
 // hold across replicas, and FAILS OPEN to the in-memory limiter below when
-// the database errors or is slow. checkRateLimit() is that in-memory fixed
+// the database errors or is slow.
+//
+// Phase 17 (latency): which tier lives where, and why —
+//   auth   SHARED (Postgres): credential abuse must be counted across
+//          replicas, or N replicas give an attacker N × the attempts.
+//   write  SHARED (Postgres): mutations and their side effects.
+//   ai     SHARED (Postgres): every request here can spend model money.
+//   read   PER PROCESS (memory): a throttle against scraping and runaway
+//          polling, not a correctness or money boundary. Every GET used to
+//          pay a Postgres round trip in the proxy before the route ran;
+//          per-process it costs nothing. Behind N replicas a client gets at
+//          most N × 120/min of reads — still bounded.
+// LOCAL_TIERS is the single list; a tier moves to memory only with a
+// reason written above. checkRateLimit() is that in-memory fixed
 // window: per process, kept for the fallback, scripts and tests. The login
 // brute-force limiter (lib/auth/rate-limit.ts) is complementary: lockouts for
 // credential abuse, this for API abuse.
@@ -25,9 +38,25 @@ import { maybeCleanup, sharedCounterStore, storeWarn, withStoreTimeout } from ".
 
 export type RateLimitTier = "auth" | "read" | "write" | "ai";
 
+export const DEFAULT_READ_LIMIT = 120;
+
+/**
+ * RATE_LIMIT_READ_PER_MIN (optional) raises or lowers the READ tier only —
+ * e.g. many people behind one office IP before they sign in, or the e2e suite
+ * (one user, machine speed). Clamped to 30–6000; anything else keeps the
+ * default. The auth, write and ai tiers are never configurable here: they
+ * guard credentials, side effects and spend.
+ */
+export function readLimitFromEnv(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.RATE_LIMIT_READ_PER_MIN;
+  if (!raw) return DEFAULT_READ_LIMIT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 30 && n <= 6000 ? n : DEFAULT_READ_LIMIT;
+}
+
 export const TIER_LIMITS: Record<RateLimitTier, { limit: number; windowMs: number }> = {
   auth: { limit: 10, windowMs: 60_000 },
-  read: { limit: 120, windowMs: 60_000 },
+  read: { limit: readLimitFromEnv(), windowMs: 60_000 },
   write: { limit: 60, windowMs: 60_000 },
   ai: { limit: 20, windowMs: 60_000 },
 };
@@ -55,6 +84,7 @@ const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/programmatic\/generate$/, // AI page generation
   /^\/api\/autopilot\//, // scheduled fix-agent
   /^\/api\/workflows\/[^/]+\/run$/, // automation / skill execution
+  /^\/api\/automations\/draft$/, // Phase 18.3: "Describe it" (the lead model drafts an automation)
   /^\/api\/(sites|websites)\/[^/]+\/assist$/, // IDE assist (LLM)
   /^\/api\/websites\/generate$/, // site generation (LLM)
   /^\/api\/ads\/creatives\/[^/]+\/regenerate$/, // AI creative regen
@@ -121,12 +151,15 @@ export function checkRateLimit(
  * in-memory checkRateLimit() — fail open to per-process limiting, never to
  * no limiting at all.
  */
+/** Phase 17: tiers counted per process (see the header for why only these). */
+export const LOCAL_TIERS: ReadonlySet<RateLimitTier> = new Set<RateLimitTier>(["read"]);
+
 export async function checkRateLimitAsync(
   key: string,
   tier: RateLimitTier,
   now: number = Date.now(),
 ): Promise<RateLimitResult> {
-  const store = sharedCounterStore();
+  const store = LOCAL_TIERS.has(tier) ? null : sharedCounterStore();
   if (!store) return checkRateLimit(key, tier, now);
   const { limit, windowMs } = TIER_LIMITS[tier];
   try {

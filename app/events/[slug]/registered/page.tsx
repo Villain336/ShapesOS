@@ -27,7 +27,7 @@ export default async function RegisteredPage({ params, searchParams }: PageProps
     return (
       <div className={`${shopCard} flex flex-col gap-3 p-8`}>
         <h1 className="aos-heading">We couldn't find that registration</h1>
-        <p className="text-[15px] text-muted">If you just paid, your receipt from Stripe is the record of your purchase.</p>
+        <p className="text-[0.9375rem] text-muted">If you just paid, your receipt from Stripe is the record of your purchase.</p>
       </div>
     );
   }
@@ -38,11 +38,11 @@ export default async function RegisteredPage({ params, searchParams }: PageProps
         <h1 className="aos-heading">
           {confirmed ? "You're registered" : view.status === "pending" ? "We're confirming your payment" : "This registration isn't active"}
         </h1>
-        <p className="text-[15px]">
+        <p className="text-[0.9375rem]">
           {view.event.title} · {view.quantity} × {view.ticketName}
           {view.amountCents > 0 ? ` · ${fmtPrice(view.amountCents, view.currency)}` : ""}
         </p>
-        <p className="text-[15px] text-muted">
+        <p className="text-[0.9375rem] text-muted">
           {confirmed
             ? "Show the QR code at the door. Each ticket checks in once."
             : view.status === "pending"
@@ -50,7 +50,7 @@ export default async function RegisteredPage({ params, searchParams }: PageProps
               : `This registration is ${view.status}. No tickets are valid for it.`}
         </p>
         {confirmed && view.event.webinarUrl ? (
-          <p className="text-[15px]">
+          <p className="text-[0.9375rem]">
             Join online:{" "}
             <a className="font-semibold underline" href={view.event.webinarUrl} target="_blank" rel="noreferrer">
               {view.event.webinarUrl}
@@ -69,7 +69,7 @@ export default async function RegisteredPage({ params, searchParams }: PageProps
               ) : null}
               {t.checkedInAt ? <span className={shopChip}>Checked in</span> : null}
               {t.url ? (
-                <Link className="text-[13px] font-semibold underline" href={t.url.replace(/^https?:\/\/[^/]+/, "")}>
+                <Link className="text-[0.8125rem] font-semibold underline" href={t.url.replace(/^https?:\/\/[^/]+/, "")}>
                   Open this ticket on its own
                 </Link>
               ) : null}

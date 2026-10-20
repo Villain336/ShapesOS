@@ -13,6 +13,8 @@ import {
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { compilePattern } from "@/lib/intelligence/company/style-check";
 import { StyleRuleSeverity } from "@prisma/client";
+// Phase 17 (latency): the chat turn memoizes active rules per workspace; a write drops the memo.
+import { invalidateStyleRules } from "@/lib/intelligence/company/style-check";
 
 const SEVERITIES = Object.values(StyleRuleSeverity) as string[];
 
@@ -77,6 +79,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       },
     }),
   );
+  invalidateStyleRules(access.workspaceId);
   return Response.json({ rule: updated });
 }
 
@@ -98,5 +101,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   await withWorkspaceScope(access.workspaceId, (tx) =>
     tx.styleRule.delete({ where: { id: existing.id, workspaceId: access.workspaceId } }),
   );
+  invalidateStyleRules(access.workspaceId);
   return Response.json({ deleted: true });
 }

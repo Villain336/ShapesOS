@@ -212,7 +212,7 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
           </button>
         )}
       </div>
-      <h4 className="mb-2 text-[13px] font-bold text-ink">Line items</h4>
+      <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">Line items</h4>
       <div className={tableWrapCls}>
         <table className={tableCls}>
           <thead>
@@ -228,7 +228,7 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
               <tr key={i}>
                 <td className={tdCls}>
                   {l.name}
-                  {l.sku && <span className="ml-1 font-mono text-[12px] text-muted">{l.sku}</span>}
+                  {l.sku && <span className="ml-1 font-mono text-[0.75rem] text-muted">{l.sku}</span>}
                 </td>
                 <td className={`${tdCls} text-right tabular-nums`}>{l.qty}</td>
                 <td className={`${tdCls} text-right tabular-nums`}>{fmtCents(l.priceCents)}</td>
@@ -238,7 +238,7 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
           </tbody>
         </table>
       </div>
-      <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-[13px]">
+      <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-[0.8125rem]">
         <dt className="text-muted">Subtotal</dt>
         <dd className="text-right tabular-nums">{fmtCents(order.subtotalCents)}</dd>
         {(order.discountCents ?? 0) > 0 && (
@@ -254,11 +254,11 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
         <dt className="text-muted">Net payments recorded</dt>
         <dd className="text-right tabular-nums">{fmtCents(paid)}</dd>
       </dl>
-      <h4 className="mb-2 mt-5 text-[13px] font-bold text-ink">Payments</h4>
+      <h4 className="mb-2 mt-5 text-[0.8125rem] font-bold text-ink">Payments</h4>
       {mine.length === 0 ? (
-        <p className="text-[13px] text-muted">No payment records for this order.</p>
+        <p className="text-[0.8125rem] text-muted">No payment records for this order.</p>
       ) : (
-        <ul className="flex flex-col gap-1 text-[13px]">
+        <ul className="flex flex-col gap-1 text-[0.8125rem]">
           {mine.map((p) => (
             <li key={p.id} className="flex justify-between">
               <span>
@@ -312,7 +312,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           <span className={labelCls}>Tax ($)</span>
           <input className={inputCls} value={tax} onChange={(e) => setTax(e.target.value)} inputMode="decimal" />
         </label>
-        <p className="text-[13px] text-muted">
+        <p className="text-[0.8125rem] text-muted">
           Total <span className="font-bold tabular-nums text-ink">{fmtCents(linesSubtotal(lines) + (taxCents ?? 0))}</span>
         </p>
         {error && <div className={errorBoxCls}>{error}</div>}

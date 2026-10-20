@@ -96,9 +96,15 @@ interface MissionListItem {
 
 // ── Template picker (modal) ──────────────────────────────────────────────────
 
-function TemplatePicker({ onClose }: { onClose: () => void }) {
+function TemplatePicker({ onClose, hiddenTemplateIds = [] }: { onClose: () => void; hiddenTemplateIds?: string[] }) {
   const router = useRouter();
-  const grouped = useMemo(() => templatesByBusinessType(), []);
+  // Phase 18.2 (WS=content): templates the workspace removed in the Store are not offered.
+  const grouped = useMemo(() => {
+    const all = templatesByBusinessType();
+    if (hiddenTemplateIds.length === 0) return all;
+    const hidden = new Set(hiddenTemplateIds);
+    return Object.fromEntries(Object.entries(all).map(([k, list]) => [k, list.filter((t) => !hidden.has(t.id))])) as typeof all;
+  }, [hiddenTemplateIds]);
   const [bt, setBt] = useState<BusinessType>("home-services");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [goalIdx, setGoalIdx] = useState(0);
@@ -164,7 +170,7 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
@@ -323,7 +329,7 @@ function cardMeta(m: MissionListItem, v: MissionView): string {
   return m.nextCheckpoint ? `Next: ${m.nextCheckpoint}` : `${Math.round(m.progress * 100)}% of goal`;
 }
 
-export function MissionsApp() {
+export function MissionsApp({ hiddenTemplateIds = [] }: { hiddenTemplateIds?: string[] } = {}) {
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [fType, setFType] = useState("");
   const [fStatus, setFStatus] = useState<StatusFilter>("all");
@@ -484,7 +490,7 @@ export function MissionsApp() {
         freshness and goal assumptions before anything continues.
       </p>
 
-      {pickerOpen && <TemplatePicker onClose={() => { setPickerOpen(false); void load(); }} />}
+      {pickerOpen && <TemplatePicker hiddenTemplateIds={hiddenTemplateIds} onClose={() => { setPickerOpen(false); void load(); }} />}
     </div>
   );
 }

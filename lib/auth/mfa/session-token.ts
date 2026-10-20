@@ -44,6 +44,8 @@ export interface MfaTokenFields {
   mfaAt?: number;
   /** Unix seconds of the sign-in that produced this session (account-deletion cutoff). */
   authAt?: number;
+  /** Phase 18.3 (WS=trust): this session's user_sessions row (lib/auth/sessions.ts). */
+  sid?: string;
   [key: string]: unknown;
 }
 

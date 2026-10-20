@@ -85,7 +85,7 @@ function VitalsSummary({ vitals }: { vitals: Vitals }) {
       {vitals.errors.map((e) => (
         <p key={e.strategy} className="text-xs text-muted">{e.strategy}: {e.reason}</p>
       ))}
-      <p className="text-[11px] text-muted">
+      <p className="text-[0.6875rem] text-muted">
         PageSpeed Insights · {new Date(vitals.measuredAt).toLocaleString()}{vitals.keyed ? "" : " · keyless quota"}
       </p>
     </div>
@@ -519,7 +519,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={runAudit} disabled={busy}
-                className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50">
+                className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-50">
                 {busy ? "Working…" : "Run audit"}
               </button>
               <button onClick={runFixes} disabled={busy || !settings.enabled}
@@ -639,8 +639,8 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                           <p className="text-sm font-medium text-ink">{issue.detail}</p>
                           <p className="mt-0.5 font-mono text-xs text-muted">
                             {issue.filePath}{issue.line ? `:${issue.line}` : ""} · {issue.category}
-                            {!issue.autoFixable && <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-muted">manual only</span>}
-                            {issue.destructive && <span className="ml-2 rounded-full bg-failed-tint px-1.5 py-0.5 text-[10px] font-semibold text-failed-text">destructive</span>}
+                            {!issue.autoFixable && <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted">manual only</span>}
+                            {issue.destructive && <span className="ml-2 rounded-full bg-failed-tint px-1.5 py-0.5 text-[0.625rem] font-semibold text-failed-text">destructive</span>}
                           </p>
                           {issue.fixHint && <p className="mt-1 text-xs text-muted">{issue.fixHint}</p>}
                         </div>
@@ -667,7 +667,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                         </div>
                       </div>
                       {showPreview === issue.id && issue.proposedDiff && (
-                        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-canvas p-2 font-mono text-[11px] text-muted">
+                        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-canvas p-2 font-mono text-[0.6875rem] text-muted">
                           {issue.proposedDiff}
                         </pre>
                       )}

@@ -8,8 +8,8 @@
 import { TrendingUp } from "lucide-react";
 import PromptBar from "@/components/vault/primitives/PromptBar";
 import { StreamText } from "@/components/vault/atoms/StreamText";
-import ThinkingState from "@/components/vault/primitives/ThinkingState";
 import ToolChips, { type ToolStep } from "@/components/vault/primitives/ToolChips";
+import { LiveStatusLine } from "./chat/LiveStatusLine";
 import {
   MessageScrollerProvider,
   MessageScroller,
@@ -39,9 +39,12 @@ function stepIcon(tool: string): ToolStep["icon"] {
   return "think";
 }
 
+/** Phase 17: the marker a cached answer carries (lib/chat/answer-cache.ts) — a label, not a tool chip. */
+const CACHED_ANSWER_TOOL = "cached_answer";
+
 /** Map the agent's tool-call records onto vault ToolChips steps. */
 function toolSteps(calls: ChatToolCall[]): ToolStep[] {
-  return calls.map((c) => ({
+  return calls.filter((c) => c.tool !== CACHED_ANSWER_TOOL).map((c) => ({
     icon: stepIcon(c.tool),
     label: c.tool,
     chip: c.status.replace(/_/g, " "),
@@ -59,7 +62,7 @@ function toolLabels(count: number) {
 }
 
 export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
-  const { messages, sending, sendMessage, session, threadTask } = useChat();
+  const { messages, sending, sendMessage, session, threadTask, liveStatus } = useChat();
   const canEdit = session?.canEdit ?? false;
   const mockMode = session?.mockMode ?? false;
   // Phase 5: the last assistant message's pending proposal, when a per-agent
@@ -92,11 +95,11 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                       approvals — grounded in this project’s data.
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-                      <span className="text-[12px] text-muted">Try:</span>
+                      <span className="text-[0.75rem] text-muted">Try:</span>
                       {["/rankings", "/keywords", "/alerts", "/help"].map((c) => (
                         <code
                           key={c}
-                          className="rounded-key bg-paper px-1.5 py-0.5 font-mono text-[12px] text-ink shadow-hairline"
+                          className="rounded-key bg-paper px-1.5 py-0.5 font-mono text-[0.75rem] text-ink shadow-hairline"
                         >
                           {c}
                         </code>
@@ -147,12 +150,15 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                                   <StreamText text={m.content} caret={false} />
                                 </div>
                               </BubbleContent>
-                              {m.toolCalls && m.toolCalls.length > 0 && (
+                              {m.toolCalls?.some((c) => c.tool === CACHED_ANSWER_TOOL) ? (
+                                <p className="mt-1 text-[0.75rem] text-muted">Cached answer — reused from a recent identical question</p>
+                              ) : null}
+                              {m.toolCalls && toolSteps(m.toolCalls).length > 0 && (
                                 <div className="mt-2">
                                   <ToolChips
                                     steps={toolSteps(m.toolCalls)}
                                     diffs={[]}
-                                    labels={toolLabels(m.toolCalls.length)}
+                                    labels={toolLabels(toolSteps(m.toolCalls).length)}
                                   />
                                 </div>
                               )}
@@ -185,24 +191,17 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                     );
                   })
                 )}
-                {sending && (
-                  <MessageScrollerItem messageId="thinking" className="msg-enter">
+                {/* Phase 17: the real state of the turn (Sending → Working →
+                    Thinking → Running <tool>), not a canned animation. */}
+                {sending && liveStatus ? (
+                  <MessageScrollerItem messageId="live-status" className="msg-enter">
                     <Message align="start">
                       <MessageContent>
-                        <ThinkingState
-                          variant="Steps"
-                          active="Working"
-                          done="Done"
-                          rows={[
-                            { primary: "Reading project data" },
-                            { primary: "Running tools" },
-                            { primary: "Drafting reply" },
-                          ]}
-                        />
+                        <LiveStatusLine status={liveStatus} />
                       </MessageContent>
                     </Message>
                   </MessageScrollerItem>
-                )}
+                ) : null}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton size="icon" variant="secondary" style={{ bottom: "7rem" }} />
@@ -224,12 +223,12 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                   />
                 </div>
               ) : (
-                <div className="rounded-xl bg-paper px-4 py-3 text-center text-[13px] text-muted shadow-raised">
+                <div className="rounded-xl bg-paper px-4 py-3 text-center text-[0.8125rem] text-muted shadow-raised">
                   You need the editor role to chat with ShapesOS.
                 </div>
               )}
               {mockMode && canEdit && (
-                <p className="mt-2 text-center text-[12px] text-muted">
+                <p className="mt-2 text-center text-[0.75rem] text-muted">
                   Mock mode — the assistant runs a rule-based demo. Type{" "}
                   <code className="rounded-key bg-paper px-1 font-mono shadow-hairline">/help</code>{" "}
                   to see commands.

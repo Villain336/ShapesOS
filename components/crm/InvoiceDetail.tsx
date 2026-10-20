@@ -17,6 +17,7 @@ import {
 // Phase 10 (finance): number, PDF, delivery, partial payments, credit notes,
 // payment link and recurring schedules.
 import { InvoiceFinancePanel, invoiceLabel } from "@/components/ops-finance/InvoiceFinancePanel";
+import { ShareMenu } from "@/components/share/ShareMenu";
 import { backdropCls, btnApprove, btnDeny, btnExecute, btnGhost, btnPrimary, btnReview, chipCls, errorBoxCls, inputCls, needsBoxCls, noteBoxCls, sectionTitleCls, slideoverCls, tableCls } from "./ui";
 
 interface PendingGate {
@@ -211,13 +212,17 @@ export function InvoiceDetail({
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <p className="mt-0.5 text-[0.8125rem] text-muted">
                 {who} · {formatMoney(invoice.totalCents)} · due {fmtDate(invoice.dueAt)}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
-              <X size={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {/* Phase 18.3 (WS=flow): the share sheet (Send to… / Open with). */}
+              <ShareMenu record={{ kind: "invoice", id: invoice.id, title: invoiceLabel(invoice), href: `/dashboard/ops/invoices?invoice=${encodeURIComponent(invoice.id)}` }} role="editor" />
+              <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -235,11 +240,11 @@ export function InvoiceDetail({
             {/* Approval card for the gated write */}
             {pending && (
               <div className={`${needsBoxCls} mb-4`}>
-                <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+                <div className="flex items-center gap-2 text-[0.8125rem] font-bold text-ink">
                   <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs review" /> Approval needed — {pending.actionLabel}
                 </div>
-                <p className="mt-1 text-[13px] text-ink">{pending.summary}</p>
-                <p className="mt-1 text-[12px] text-ink">
+                <p className="mt-1 text-[0.8125rem] text-ink">{pending.summary}</p>
+                <p className="mt-1 text-[0.75rem] text-ink">
                   Risk tier: {pending.tier}. Nothing executes until you approve — approve here or in the Actions queue.
                 </p>
                 {!pending.approved ? (
@@ -262,14 +267,14 @@ export function InvoiceDetail({
                     </button>
                     <a
                       href="/dashboard/actions"
-                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
+                      className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink hover:underline"
                     >
                       Open Actions queue <ExternalLink size={12} />
                     </a>
                   </div>
                 ) : (
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
+                    <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-ink">
                       <Check size={14} /> Approved — ready to execute
                     </span>
                     <button
@@ -310,7 +315,7 @@ export function InvoiceDetail({
                 </tbody>
               </table>
             </div>
-            <div className="mt-2 space-y-1 text-[13px]">
+            <div className="mt-2 space-y-1 text-[0.8125rem]">
               <div className="flex justify-between text-muted">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{formatMoney(subtotal)}</span>
@@ -319,26 +324,26 @@ export function InvoiceDetail({
                 <span>Tax</span>
                 <span className="tabular-nums">{formatMoney(invoice.taxCents)}</span>
               </div>
-              <div className="flex justify-between border-t border-line pt-1 text-[15px] font-bold text-ink">
+              <div className="flex justify-between border-t border-line pt-1 text-[0.9375rem] font-bold text-ink">
                 <span>Total</span>
                 <span className="tabular-nums">{formatMoney(invoice.totalCents)}</span>
               </div>
-              <p className="text-[12px] text-subtle">Totals are computed on the server from line items.</p>
+              <p className="text-[0.75rem] text-subtle">Totals are computed on the server from line items.</p>
             </div>
 
             {/* Dates */}
             <h4 className={`${sectionTitleCls} mt-5!`}>Dates</h4>
-            <dl className="mt-1 grid grid-cols-3 gap-2 text-[13px]">
+            <dl className="mt-1 grid grid-cols-3 gap-2 text-[0.8125rem]">
               <div className="rounded-md bg-canvas px-3 py-2">
-                <dt className="text-[11px] text-subtle">Created</dt>
+                <dt className="text-[0.6875rem] text-subtle">Created</dt>
                 <dd className="font-medium text-ink">{fmtDate(invoice.createdAt)}</dd>
               </div>
               <div className="rounded-md bg-canvas px-3 py-2">
-                <dt className="text-[11px] text-subtle">Sent</dt>
+                <dt className="text-[0.6875rem] text-subtle">Sent</dt>
                 <dd className="font-medium text-ink">{fmtDate(invoice.sentAt)}</dd>
               </div>
               <div className="rounded-md bg-canvas px-3 py-2">
-                <dt className="text-[11px] text-subtle">Due</dt>
+                <dt className="text-[0.6875rem] text-subtle">Due</dt>
                 <dd className="font-medium text-ink">
                   {fmtDate(invoice.dueAt)}
                 </dd>
@@ -350,8 +355,8 @@ export function InvoiceDetail({
             {/* Reminder composer */}
             {showRemind && (
               <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-3">
-                <h4 className="text-[13px] font-semibold text-ink">Payment reminder</h4>
-                <p className="mt-0.5 text-[12px] text-muted">
+                <h4 className="text-[0.8125rem] font-semibold text-ink">Payment reminder</h4>
+                <p className="mt-0.5 text-[0.75rem] text-muted">
                   Draft the reminder — it goes through approval before anything is sent.
                 </p>
                 <textarea
@@ -431,15 +436,15 @@ export function InvoiceDetail({
                 </button>
               )}
               {invoice.status === "paid" && (
-                <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
                   <Check size={14} /> Paid in full — nothing left to do.
                 </span>
               )}
               {invoice.status === "cancelled" && (
-                <span className="text-[13px] text-subtle">This invoice was voided.</span>
+                <span className="text-[0.8125rem] text-subtle">This invoice was voided.</span>
               )}
             </div>
-            <p className="mt-2 text-[12px] text-subtle">
+            <p className="mt-2 text-[0.75rem] text-subtle">
               Sending (emailed with the PDF), payments, credit notes, voiding and reminders all need your approval first.
             </p>
           </div>

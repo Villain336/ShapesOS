@@ -58,7 +58,7 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1 text-[12px] text-ink shadow-outline hover:bg-hover-paper"
+        className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1 text-[0.75rem] text-ink shadow-outline hover:bg-hover-paper"
         title="Edit chart data and colors"
       >
         <BarChart3 className="h-3.5 w-3.5 text-ink" />
@@ -71,7 +71,7 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
               <button
                 key={t.key}
                 onClick={() => set({ chartType: t.key })}
-                className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1.5 text-[12px] font-medium ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1.5 text-[0.75rem] font-medium ${
                   el.chartType === t.key
                     ? "bg-ink text-white"
                     : "text-muted hover:bg-hover-paper"
@@ -95,14 +95,14 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
                 <input
                   value={label}
                   onChange={(e) => updateRow(i, e.target.value, el.values[i] ?? 0)}
-                  className="min-w-0 flex-1 rounded border border-control bg-paper px-1.5 py-1 text-[12px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+                  className="min-w-0 flex-1 rounded border border-control bg-paper px-1.5 py-1 text-[0.75rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   aria-label={`Label ${i + 1}`}
                 />
                 <input
                   type="number"
                   value={el.values[i] ?? 0}
                   onChange={(e) => updateRow(i, label, parseFloat(e.target.value) || 0)}
-                  className="w-16 shrink-0 rounded border border-control bg-paper px-1.5 py-1 text-[12px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
+                  className="w-16 shrink-0 rounded border border-control bg-paper px-1.5 py-1 text-[0.75rem] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   aria-label={`Value ${i + 1}`}
                 />
                 <button
@@ -119,12 +119,12 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
           <div className="flex items-center justify-between border-t border-line p-2">
             <button
               onClick={addRow}
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium text-ink hover:bg-hover-paper"
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-[0.75rem] font-medium text-ink hover:bg-hover-paper"
             >
               <Plus className="h-3.5 w-3.5" />
               Add series
             </button>
-            <label className="flex items-center gap-1.5 text-[12px] text-muted">
+            <label className="flex items-center gap-1.5 text-[0.75rem] text-muted">
               <input
                 type="checkbox"
                 checked={el.showValues}

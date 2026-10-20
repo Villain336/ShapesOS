@@ -43,6 +43,7 @@ export function AgentCard({
   action,
   badgeLabel,
   eyebrow,
+  toolLabels,
   className,
   children,
 }: {
@@ -56,6 +57,8 @@ export function AgentCard({
   badgeLabel?: string;
   /** Small line above the title, e.g. the agent that owns the work. */
   eyebrow?: ReactNode;
+  /** Phase 18.1: tool chip names in the person's language ({ [English name]: label }). */
+  toolLabels?: Readonly<Record<string, string>>;
   className?: string;
   children?: ReactNode;
 }) {
@@ -72,7 +75,7 @@ export function AgentCard({
         {tools.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {tools.map((t) => (
-              <ToolChip key={t} name={t} variant="tag" />
+              <ToolChip key={t} name={t} label={toolLabels?.[t]} variant="tag" />
             ))}
           </div>
         ) : null}

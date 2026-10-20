@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const me = await requireSelfService();
     if (me instanceof Response) return me;
     const slot = `user:${me.id}`;
-    if (!claimExportSlot(slot)) {
+    if (!(await claimExportSlot(slot))) {
       return Response.json({ error: "Your export is already running. Try again when it finishes." }, { status: 429 });
     }
     const now = new Date();

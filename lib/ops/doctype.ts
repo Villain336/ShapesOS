@@ -70,7 +70,14 @@ export interface OpsListQuery {
 
 export type OpsWriteResult =
   /** Phase 14: autoApproved = a rule approved the gated write (names the rule). */
-  | { outcome: "done"; row: Record<string, unknown>; action: string; autoApproved?: string }
+  | {
+      outcome: "done";
+      row: Record<string, unknown>;
+      action: string;
+      autoApproved?: string;
+      /** Phase 18.3 (WS=flow): a free update's changed fields, as they were (for undo). */
+      before?: Record<string, unknown>;
+    }
   | {
       outcome: "approval_required";
       approval: OpsGateProposal;
@@ -189,7 +196,7 @@ export async function opsList(
     throw new OpsError(400, `Invalid limit: must be an integer between 1 and ${OPS_LIST_MAX}`);
   }
   const limit = Math.min(rawLimit, OPS_LIST_MAX);
-  const where: Record<string, unknown> = { workspaceId: actor.workspaceId };
+  const where: Record<string, unknown> = { ...(def.scopeWhere ?? {}), workspaceId: actor.workspaceId };
   for (const f of def.filterable) {
     const v = query.filters?.[f];
     if (typeof v === "string" && v) where[f] = v;
@@ -280,7 +287,7 @@ export async function opsCreate(
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
       // Phase 11 (conncore): outbound webhook events, in this transaction.
-      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
+      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row, actor.userId);
     }
     return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
@@ -302,7 +309,7 @@ export async function opsCreate(
   for (const row of rows) {
     await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
     // Phase 11 (conncore): outbound webhook events, in this transaction.
-    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row, actor.userId);
   }
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
@@ -570,7 +577,7 @@ export async function opsPatch(
   const d = delegateFor(tx, def);
 
   // 404 for "not your workspace's row" (RLS + explicit scope).
-  const existing = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
+  const existing = await d.findFirst({ where: { ...(def.scopeWhere ?? {}), id, workspaceId: actor.workspaceId } });
   if (!existing) throw new OpsNotFoundError(def.slug, id);
   // Illegal moves fail before anything is proposed or written.
   assertOpsPatchAllowed(def, existing, patch);
@@ -611,16 +618,20 @@ export async function opsPatch(
     });
     const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
-    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row, actor.userId);
     return { outcome: "done", row, action: "gate_executed", ...(autoApproved ? { autoApproved } : {}) };
   }
 
-  const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
+  const prepared = await preparePatch(tx, def, actor, patch, existing);
+  const row = await applyPatch(tx, def, actor, id, prepared, existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   // Phase 11 (conncore): outbound webhook events (invoice sent/paid, deal
   // moved/won/lost, ticket solved…) in this transaction.
-  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
-  return { outcome: "done", row, action: "update" };
+  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row, actor.userId);
+  // Phase 18.3 (WS=flow): the prior values of exactly the fields this update changed.
+  const before: Record<string, unknown> = {};
+  for (const k of Object.keys(patch)) if (k !== "id") before[k] = existing[k] instanceof Date ? (existing[k] as Date).toISOString() : (existing[k] ?? null);
+  return { outcome: "done", row, action: "update", before };
 }
 
 /** Phase 10 (finance): run the entity's prepare hook on a validated patch. */

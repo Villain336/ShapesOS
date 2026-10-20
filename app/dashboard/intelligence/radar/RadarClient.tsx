@@ -35,7 +35,7 @@ function Chip({
   void tone;
   return (
     <span
-      className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}
+      className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control"}
     >
       {children}
     </span>
@@ -45,7 +45,7 @@ function Chip({
 const inputCls =
   "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
@@ -212,7 +212,7 @@ function EventsTab() {
 
       {/* Dense events table */}
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Date</th>
@@ -254,14 +254,14 @@ function EventsTab() {
             ))}
             {events.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No platform events yet — run the sweep above, or wait for the daily cron.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
@@ -274,7 +274,7 @@ function EventsTab() {
       {selected && (
         <div className="mt-4 rounded-lg border border-line bg-white p-4">
           {detailLoading || !detail || detail.event.id !== selected.id ? (
-            <div className="flex items-center gap-2 text-[13px] text-subtle">
+            <div className="flex items-center gap-2 text-[0.8125rem] text-subtle">
               <Loader2 size={15} className="aos-spin" /> Loading event detail…
             </div>
           ) : (
@@ -283,7 +283,7 @@ function EventsTab() {
         </div>
       )}
 
-      <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted">
+      <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Official sources only. </span>
         Rollouts come from Google's Search Status Dashboard, documentation changes from the Search
         Central changelog RSS, and Bing items from the Bing Webmaster blog RSS. The radar never
@@ -305,13 +305,13 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
             <Chip>{TYPE_LABELS[event.eventType]}</Chip>
             <Chip tone="blue">{SOURCE_LABELS[event.source] ?? event.source}</Chip>
             {event.classificationConfidence !== null && (
-              <span className="text-[11px] text-muted">
+              <span className="text-[0.6875rem] text-muted">
                 classifier confidence {event.classificationConfidence.toFixed(2)}
               </span>
             )}
           </div>
-          <h3 className="mt-1.5 text-[15px] font-bold tracking-tight text-ink">{event.title}</h3>
-          <p className="mt-0.5 text-[12.5px] text-muted">
+          <h3 className="mt-1.5 text-[0.9375rem] font-bold tracking-tight text-ink">{event.title}</h3>
+          <p className="mt-0.5 text-[0.78125rem] text-muted">
             {fmtDate(event.startedAt)}
             {event.endedAt ? ` → ${fmtDate(event.endedAt)}` : " (rolling out)"}
             {event.url && (
@@ -332,7 +332,7 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
       </div>
 
       {!isRollout && (
-        <div className="mt-3 flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-[12.5px] text-muted">
+        <div className="mt-3 flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-[0.78125rem] text-muted">
           <Info size={14} className="mt-0.5 shrink-0 text-subtle" />
           {event.eventType === "docs_change" ? (
             <span>
@@ -351,14 +351,14 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
 
       {isRollout && (
         <>
-          <h4 className="mb-2 mt-4 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+          <h4 className="mb-2 mt-4 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
             <Zap size={14} className="text-ink" /> Page impacts
             <span className="font-normal text-muted">
               — only deltas above the baseline noise band are claimed
             </span>
           </h4>
           <div className="overflow-hidden rounded-lg border border-line">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Page</th>
@@ -372,7 +372,7 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
               <tbody>
                 {impacts.map((i, idx) => (
                   <tr key={idx} className="border-b border-line last:border-0 hover:bg-hover-paper">
-                    <td className="max-w-[280px] truncate px-3 py-2 font-mono text-[11.5px] text-ink" title={i.page}>
+                    <td className="max-w-[280px] truncate px-3 py-2 font-mono text-[0.71875rem] text-ink" title={i.page}>
                       {i.page}
                     </td>
                     <td className="max-w-[200px] truncate px-3 py-2 text-muted" title={i.query ?? ""}>
@@ -387,7 +387,7 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
                       <span className="font-medium text-ink">
                         {i.impactScore !== null ? i.impactScore.toFixed(2) : "—"}
                       </span>{" "}
-                      <span className="text-[11.5px] text-muted">
+                      <span className="text-[0.71875rem] text-muted">
                         {i.confidenceBand ? `[${i.confidenceBand[0].toFixed(2)}, ${i.confidenceBand[1].toFixed(2)}]` : ""}
                       </span>
                     </td>
@@ -395,7 +395,7 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
                 ))}
                 {impacts.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-[13px] text-subtle">
+                    <td colSpan={6} className="px-3 py-6 text-center text-[0.8125rem] text-subtle">
                       No pages moved beyond the noise band for this rollout yet — either the
                       correlation hasn't run, or your properties genuinely didn't move.
                     </td>
@@ -405,12 +405,12 @@ function EventDetailView({ detail }: { detail: EventDetail }) {
             </table>
           </div>
 
-          <h4 className="mb-2 mt-4 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+          <h4 className="mb-2 mt-4 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink">
             <ListChecks size={14} className="text-ink" /> Verification checklist
           </h4>
           <ul className="space-y-1.5">
             {VERIFICATION_CHECKLIST.map((c) => (
-              <li key={c} className="flex items-start gap-2 text-[12.5px] text-muted">
+              <li key={c} className="flex items-start gap-2 text-[0.78125rem] text-muted">
                 <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-subtle" />
                 {c}
               </li>
@@ -436,13 +436,13 @@ function VolatilityPanel({ volatility }: { volatility: VolatilityReading[] }) {
   if (!volatility || volatility.length === 0) return null;
   return (
     <div className="mt-4 rounded-lg border border-line bg-canvas p-3">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[0.78125rem] font-medium text-ink">
         <Activity size={13} /> SERP-flux context
         <span className="font-normal text-muted">— corroboration only, never the impact source</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {volatility.map((v) => (
-          <span key={v.provider} className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+          <span key={v.provider} className="inline-flex items-center gap-1.5 text-[0.75rem] text-muted">
             <Chip tone={v.available ? "amber" : "slate"}>{v.label}</Chip>
             {v.available ? (
               <>
@@ -476,7 +476,7 @@ function VolatilityTab() {
   return (
     <div>
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-[0.8125rem]">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Tracker</th>
@@ -511,7 +511,7 @@ function VolatilityTab() {
             ))}
             {readings.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                <td colSpan={5} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                   No tracker readings available.
                 </td>
               </tr>
@@ -519,7 +519,7 @@ function VolatilityTab() {
           </tbody>
         </table>
       </div>
-      <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted">
+      <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-[0.78125rem] text-muted">
         <span className="font-medium text-ink">Read-only corroboration. </span>
         These public tracker values confirm whether the SERPs were fluxy around a confirmed
         rollout — they never determine whether your pages were impacted. That claim comes only
@@ -546,7 +546,7 @@ export function RadarClient() {
           <Zap size={10} /> Phase 10 · M2
         </Chip>
       </div>
-      <p className="mb-4 text-[13px] text-muted">
+      <p className="mb-4 text-[0.8125rem] text-muted">
         Confirmed Google rollouts joined to your own GSC deltas: which updates hit which pages,
         with honest confidence bands. Official sources only.
       </p>
@@ -556,7 +556,7 @@ export function RadarClient() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"

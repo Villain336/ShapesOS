@@ -197,7 +197,7 @@ export function ProjectDetail({
                 )}
               </div>
               {summary?.customer && (
-                <p className="mt-0.5 text-[13px] text-muted">
+                <p className="mt-0.5 text-[0.8125rem] text-muted">
                   {summary.customer.name}
                   {summary.customer.company ? ` · ${summary.customer.company}` : ""}
                 </p>
@@ -220,13 +220,13 @@ export function ProjectDetail({
               </div>
             )}
             {loading || !summary ? (
-              <div className="flex items-center gap-2 text-[13px] text-muted">
+              <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
                 <Loader2 size={16} className="animate-spin" /> Loading…
               </div>
             ) : (
               <div className="flex flex-col gap-6">
                 {/* Progress + time header */}
-                <div className="flex flex-wrap gap-4 text-[13px] text-muted">
+                <div className="flex flex-wrap gap-4 text-[0.8125rem] text-muted">
                   <span>
                     Milestones{" "}
                     <span className="font-bold text-ink tabular-nums">
@@ -252,9 +252,9 @@ export function ProjectDetail({
 
                 {/* Milestones */}
                 <section>
-                  <h4 className="mb-2 text-[13px] font-bold text-ink">Milestones</h4>
+                  <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">Milestones</h4>
                   {summary.project.milestones.length === 0 ? (
-                    <p className="text-[13px] text-muted">No milestones yet — add the first one below.</p>
+                    <p className="text-[0.8125rem] text-muted">No milestones yet — add the first one below.</p>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
                       {summary.project.milestones.map((m, i) => (
@@ -275,13 +275,13 @@ export function ProjectDetail({
                             {m.status === "done" ? <Check size={13} /> : <RotateCcw size={11} />}
                           </button>
                           <span
-                            className={`flex-1 text-[13px] ${
+                            className={`flex-1 text-[0.8125rem] ${
                               m.status === "done" ? "text-subtle line-through" : "text-ink"
                             }`}
                           >
                             {m.title}
                           </span>
-                          <span className="text-[12px] text-subtle">{fmtDate(m.dueAt)}</span>
+                          <span className="text-[0.75rem] text-subtle">{fmtDate(m.dueAt)}</span>
                         </li>
                       ))}
                     </ul>
@@ -315,7 +315,7 @@ export function ProjectDetail({
 
                 {/* Time ledger */}
                 <section>
-                  <h4 className="mb-2 text-[13px] font-bold text-ink">Time</h4>
+                  <h4 className="mb-2 text-[0.8125rem] font-bold text-ink">Time</h4>
                   {!terminal && (
                     <div className="mb-2 flex gap-2">
                       <input
@@ -335,7 +335,7 @@ export function ProjectDetail({
                       <button
                         onClick={logTime}
                         disabled={busy !== null}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-[7px] text-[13px] font-semibold text-ink hover:bg-canvas disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-[7px] text-[0.8125rem] font-semibold text-ink hover:bg-canvas disabled:opacity-50"
                       >
                         {busy === "log-time" ? <Loader2 size={15} className="animate-spin" /> : <Clock3 size={15} />}
                         Log
@@ -343,7 +343,7 @@ export function ProjectDetail({
                     </div>
                   )}
                   {entries.length === 0 ? (
-                    <p className="text-[13px] text-muted">No time logged yet.</p>
+                    <p className="text-[0.8125rem] text-muted">No time logged yet.</p>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
                       {entries.map((e) => (
@@ -351,20 +351,20 @@ export function ProjectDetail({
                           key={e.id}
                           className="flex items-center gap-2.5 rounded-md border border-line bg-paper px-3 py-2"
                         >
-                          <span className="w-16 shrink-0 text-[13px] font-semibold text-ink tabular-nums">
+                          <span className="w-16 shrink-0 text-[0.8125rem] font-semibold text-ink tabular-nums">
                             {fmtMinutes(e.minutes)}
                           </span>
-                          <span className="flex-1 text-[13px] text-ink">{e.description ?? "—"}</span>
-                          <span className="text-[12px] text-subtle">{fmtDate(e.occurredAt)}</span>
+                          <span className="flex-1 text-[0.8125rem] text-ink">{e.description ?? "—"}</span>
+                          <span className="text-[0.75rem] text-subtle">{fmtDate(e.occurredAt)}</span>
                           {e.billed ? (
-                            <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-ink">
+                            <span className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-ink">
                               Billed
                             </span>
                           ) : (
                             <button
                               onClick={() => markBilled(e.id)}
                               disabled={busy !== null}
-                              className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-ink hover:bg-hover-paper"
+                              className="rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-semibold text-ink hover:bg-hover-paper"
                             >
                               Mark billed
                             </button>
@@ -383,7 +383,7 @@ export function ProjectDetail({
                         <button
                           onClick={() => holdOrResume("on_hold")}
                           disabled={busy !== null}
-                          className="rounded-md border border-line bg-paper px-3 py-[7px] text-[13px] font-semibold text-ink hover:bg-canvas"
+                          className="rounded-md border border-line bg-paper px-3 py-[7px] text-[0.8125rem] font-semibold text-ink hover:bg-canvas"
                         >
                           Put on hold
                         </button>

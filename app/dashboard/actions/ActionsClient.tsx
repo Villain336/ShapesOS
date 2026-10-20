@@ -122,14 +122,14 @@ const badgeBase =
 
 // Neutral chip for categories and provider states (12a ClipsApp idiom).
 const chipNeutral =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control";
 
 // Action button idioms (Agentic OS): primary black pill, secondary white
 // with shadow-outline, approve = done fill, deny = white + failed-text with
 // 1.5px failed inset ring, review = needs fill with black text, execute =
 // failed fill.
 const BTN_PRIMARY =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const BTN_SECONDARY =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const BTN_APPROVE =
@@ -184,7 +184,7 @@ function tierBreakdownBadges(bd: ToolkitEntry["tierBreakdown"]) {
           title={`${it.n} ${it.label} tools`}
           className={
             it.label === "unclassified"
-              ? "inline-block rounded-full border border-dashed border-line bg-paper px-1.5 py-0.5 text-[11px] font-medium text-muted"
+              ? "inline-block rounded-full border border-dashed border-line bg-paper px-1.5 py-0.5 text-[0.6875rem] font-medium text-muted"
               : chipNeutral
           }
         >
@@ -217,24 +217,24 @@ function BudgetPanel({
   return (
     <div className="mb-3 rounded-lg border border-line bg-paper px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="text-[12px] font-semibold text-muted">Call budget</span>
+        <span className="text-[0.75rem] font-semibold text-muted">Call budget</span>
         {budget.budget == null ? (
-          <span className="text-[12px] text-muted">
+          <span className="text-[0.75rem] text-muted">
             No monthly budget set — usage is metered through the credit ledger.
           </span>
         ) : (
           <>
-            <span className="text-[12px] text-muted">
+            <span className="text-[0.75rem] text-muted">
               {budget.usage.toLocaleString()} / {budget.budget.toLocaleString()} calls this month (
               {budget.pct}%)
             </span>
             <span
-              className={budget.hardCap ? "inline-flex items-center rounded-full bg-failed-tint px-2 py-0.5 text-[11px] font-medium text-failed-text" : chipNeutral}
+              className={budget.hardCap ? "inline-flex items-center rounded-full bg-failed-tint px-2 py-0.5 text-[0.6875rem] font-medium text-failed-text" : chipNeutral}
             >
               {budget.hardCap ? "Hard cap" : "Soft cap"}
             </span>
             {budget.blocked && (
-              <span className="flex items-center gap-1 text-[12px] font-medium text-failed-text">
+              <span className="flex items-center gap-1 text-[0.75rem] font-medium text-failed-text">
                 <AlertTriangle className="h-3.5 w-3.5" /> Budget exhausted — new executions are
                 refused.
               </span>
@@ -251,14 +251,14 @@ function BudgetPanel({
         </div>
       )}
       {budget.warning && (
-        <div className="mt-2 flex items-start gap-2 rounded-md border border-line bg-needs-tint px-3 py-2 text-[12px] text-ink">
+        <div className="mt-2 flex items-start gap-2 rounded-md border border-line bg-needs-tint px-3 py-2 text-[0.75rem] text-ink">
           <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" />
           <span>{budget.warning}</span>
         </div>
       )}
       {top.length > 0 && (
         <div className="mt-3 border-t border-line pt-2">
-          <div className="mb-1.5 text-[11px] font-semibold text-muted">
+          <div className="mb-1.5 text-[0.6875rem] font-semibold text-muted">
             Cost attribution — this month
           </div>
           <div className="grid gap-1.5 sm:grid-cols-2">
@@ -267,7 +267,7 @@ function BudgetPanel({
                 attribution.total > 0 ? Math.round((count / attribution.total) * 100) : 0;
               return (
                 <div key={slug} className="flex items-center gap-2">
-                  <span className="w-28 shrink-0 truncate text-[12px] font-medium text-muted">
+                  <span className="w-28 shrink-0 truncate text-[0.75rem] font-medium text-muted">
                     {slug === "unknown" ? "Unattributed" : slug}
                   </span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
@@ -276,7 +276,7 @@ function BudgetPanel({
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="w-24 shrink-0 text-right text-[11px] text-muted">
+                  <span className="w-24 shrink-0 text-right text-[0.6875rem] text-muted">
                     {pct}% · {count.toLocaleString()}
                   </span>
                 </div>
@@ -284,7 +284,7 @@ function BudgetPanel({
             })}
           </div>
           {entries.length > top.length && (
-            <div className="mt-1 text-[11px] text-subtle">
+            <div className="mt-1 text-[0.6875rem] text-subtle">
               + {entries.length - top.length} more toolkits
             </div>
           )}
@@ -338,13 +338,13 @@ function DriftPanel({
   return (
     <div className="mb-3 rounded-lg border border-line bg-paper px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="text-[12px] font-semibold text-muted">Catalog drift</span>
+        <span className="text-[0.75rem] font-semibold text-muted">Catalog drift</span>
         {unack.length === 0 ? (
-          <span className="text-[12px] text-muted">
+          <span className="text-[0.75rem] text-muted">
             Live catalog matches the cached tool list — no drift detected.
           </span>
         ) : (
-          <span className="flex items-center gap-1.5 rounded-md border border-line bg-needs-tint px-2 py-1 text-[12px] font-medium text-ink">
+          <span className="flex items-center gap-1.5 rounded-md border border-line bg-needs-tint px-2 py-1 text-[0.75rem] font-medium text-ink">
             <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Warning" />
             {unack.length} unacknowledged change{unack.length === 1 ? "" : "s"}
           </span>
@@ -352,9 +352,9 @@ function DriftPanel({
       </div>
       {unack.length > 0 && (
         <div className="mt-2 overflow-hidden rounded-lg border border-line bg-paper">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-[0.75rem]">
             <thead>
-              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">Detected</th>
                 <th className="px-3 py-2 font-medium">Change</th>
                 <th className="px-3 py-2 font-medium">Tool</th>
@@ -369,7 +369,7 @@ function DriftPanel({
                     {new Date(r.detectedAt).toLocaleString()}
                   </td>
                   <td className="px-3 py-2">{driftBadge(r.changeType)}</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted">{r.toolSlug}</td>
+                  <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">{r.toolSlug}</td>
                   <td className="max-w-[320px] px-3 py-2 text-muted">{driftDetail(r)}</td>
                   <td className="px-3 py-2">
                     <button
@@ -387,7 +387,7 @@ function DriftPanel({
       )}
       {data.staleOverrides.length > 0 && (
         <div className="mt-2 border-t border-line pt-2">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-ink">
             <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Needs re-approval" />
             Stale tier overrides — needs re-approval
           </div>
@@ -400,10 +400,10 @@ function DriftPanel({
               );
               return (
                 <div key={s.toolSlug} className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-[11px] font-medium text-muted">
+                  <span className="font-mono text-[0.6875rem] font-medium text-muted">
                     {s.toolSlug}
                   </span>
-                  <span className="flex-1 text-[12px] text-muted">{s.reason}</span>
+                  <span className="flex-1 text-[0.75rem] text-muted">{s.reason}</span>
                   {row && (
                     <button
                       onClick={() => onAcknowledge(row.id)}
@@ -648,7 +648,7 @@ export function ActionsClient({
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.8125rem] font-medium ${
                 active
                   ? "border-ink text-ink"
                   : "border-transparent text-muted hover:text-ink"
@@ -657,7 +657,7 @@ export function ActionsClient({
               <Icon className="h-4 w-4" />
               {t.label}
               {t.id === "approvals" && pendingCount > 0 && (
-                <span className="rounded-full bg-ink px-1.5 text-[11px] font-semibold text-white">
+                <span className="rounded-full bg-ink px-1.5 text-[0.6875rem] font-semibold text-white">
                   {pendingCount}
                 </span>
               )}
@@ -667,7 +667,7 @@ export function ActionsClient({
       </div>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[0.8125rem] text-failed-text">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -676,9 +676,9 @@ export function ActionsClient({
       {/* ── Connections ─────────────────────────────────────────── */}
       {tab === "connections" && (
         <div className="overflow-hidden rounded-lg border border-line bg-paper">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">App</th>
                 <th className="px-3 py-2 font-medium">What agents can do</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -727,7 +727,7 @@ export function ActionsClient({
               })}
             </tbody>
           </table>
-          <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
+          <div className="border-t border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
             OAuth runs on Composio&apos;s hosted flow — ShapesOS stores only the connection
             reference, never your app tokens.
           </div>
@@ -762,7 +762,7 @@ export function ActionsClient({
                 </option>
               ))}
             </select>
-            <span className="text-[12px] text-muted">
+            <span className="text-[0.75rem] text-muted">
               {enabledToolkitCount} of {toolkits.length} enabled — agents can only
               propose tools from enabled toolkits; anything else is refused by
               the gate.
@@ -770,9 +770,9 @@ export function ActionsClient({
           </div>
 
           <div className="overflow-hidden rounded-lg border border-line bg-paper">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                   <th className="px-3 py-2 font-medium">Toolkit</th>
                   <th className="px-3 py-2 font-medium">Category</th>
                   <th className="px-3 py-2 font-medium">Tools</th>
@@ -787,7 +787,7 @@ export function ActionsClient({
                   <tr key={t.toolkitSlug} className="border-b border-line hover:bg-hover-paper">
                     <td className="max-w-xs px-3 py-2.5">
                       <div className="font-medium text-ink">{t.label}</div>
-                      <div className="text-[12px] text-muted">{t.description}</div>
+                      <div className="text-[0.75rem] text-muted">{t.description}</div>
                     </td>
                     <td className="px-3 py-2.5">{categoryBadge(t.category)}</td>
                     <td className="px-3 py-2.5 text-muted">{t.toolCount}</td>
@@ -818,21 +818,21 @@ export function ActionsClient({
                           Connect
                         </button>
                       ) : (
-                        <span className="text-[12px] text-subtle">—</span>
+                        <span className="text-[0.75rem] text-subtle">—</span>
                       )}
                     </td>
                   </tr>
                 ))}
                 {visibleToolkits.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+                    <td colSpan={7} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                       No toolkits match — try a different search or category.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
+            <div className="border-t border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
               Every toolkit is browsable from day one (full firehose, no packs).
               Enablement is à la carte; unclassified tools always land
               high-gated and need your approval plus second confirmation.
@@ -867,15 +867,15 @@ export function ActionsClient({
                 Approve {selected.size} selected
               </button>
             )}
-            <span className="text-[12px] text-muted">
+            <span className="text-[0.75rem] text-muted">
               Approvals expire automatically — stale proposals can never execute.
             </span>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-line bg-paper">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+                <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                   <th className="w-8 px-3 py-2" />
                   <th className="px-3 py-2 font-medium">What will happen</th>
                   <th className="px-3 py-2 font-medium">Tool</th>
@@ -904,7 +904,7 @@ export function ActionsClient({
                         )}
                       </td>
                       <td className="max-w-md px-3 py-2.5 text-ink">{a.plainSummary}</td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{a.toolName}</td>
+                      <td className="px-3 py-2.5 font-mono text-[0.6875rem] text-muted">{a.toolName}</td>
                       <td className="px-3 py-2.5">{tierBadge(a.riskTier)}</td>
                       <td className="px-3 py-2.5">{statusBadge(a.status)}</td>
                       <td className="px-3 py-2.5">
@@ -969,17 +969,17 @@ export function ActionsClient({
                             const bulk = bulkFor(a);
                             return (
                               <div className="rounded-md border border-failed bg-paper p-3">
-                                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-failed-text">
+                                <div className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-failed-text">
                                   <AlertTriangle className="h-4 w-4" />
                                   Destructive action — explicit confirmation required
                                 </div>
-                                <div className="mt-1 text-[12px] text-muted">{a.plainSummary}</div>
+                                <div className="mt-1 text-[0.75rem] text-muted">{a.plainSummary}</div>
                                 {bulk ? (
-                                  <div className="mt-1 text-[12px] font-medium text-failed-text">
+                                  <div className="mt-1 text-[0.75rem] font-medium text-failed-text">
                                     Bulk review: {describeBulk(bulk)}
                                   </div>
                                 ) : (
-                                  <div className="mt-1 text-[12px] text-muted">
+                                  <div className="mt-1 text-[0.75rem] text-muted">
                                     {expanded === a.id ? "Single target." : "Loading target details…"}
                                   </div>
                                 )}
@@ -1020,10 +1020,10 @@ export function ActionsClient({
                         <td colSpan={5} className="px-3 py-3">
                           <div className="grid gap-3 md:grid-cols-2">
                             <div>
-                              <div className="mb-1 text-[11px] font-medium text-muted">
+                              <div className="mb-1 text-[0.6875rem] font-medium text-muted">
                                 Proposed arguments (redacted)
                               </div>
-                              <pre className="max-h-48 overflow-auto rounded-md border border-line bg-paper p-2 font-mono text-[11px] text-muted">
+                              <pre className="max-h-48 overflow-auto rounded-md border border-line bg-paper p-2 font-mono text-[0.6875rem] text-muted">
                                 {JSON.stringify((detail as { proposedArgs?: unknown }).proposedArgs ?? {}, null, 2)}
                               </pre>
                               {editing === a.id ? (
@@ -1032,7 +1032,7 @@ export function ActionsClient({
                                     value={editText}
                                     onChange={(e) => setEditText(e.target.value)}
                                     rows={6}
-                                    className={`${INPUT_CLS} h-auto py-2 font-mono text-[11px]`}
+                                    className={`${INPUT_CLS} h-auto py-2 font-mono text-[0.6875rem]`}
                                   />
                                   <div className="mt-1 flex gap-1.5">
                                     <button
@@ -1065,7 +1065,7 @@ export function ActionsClient({
                                       );
                                       setEditing(a.id);
                                     }}
-                                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-muted hover:bg-paper"
+                                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.75rem] text-muted hover:bg-paper"
                                   >
                                     <Pencil className="h-3.5 w-3.5" /> Edit args before approving
                                   </button>
@@ -1073,10 +1073,10 @@ export function ActionsClient({
                               )}
                             </div>
                             <div>
-                              <div className="mb-1 text-[11px] font-medium text-muted">
+                              <div className="mb-1 text-[0.6875rem] font-medium text-muted">
                                 Audit trail
                               </div>
-                              <ul className="space-y-1 text-[12px] text-muted">
+                              <ul className="space-y-1 text-[0.75rem] text-muted">
                                 {((detail as { auditTrail?: Array<{ at: string; actor: string; event: string; detail?: string }> }).auditTrail ?? []).map(
                                   (ev, i) => (
                                     <li key={i} className="rounded border border-line bg-paper px-2 py-1">
@@ -1088,7 +1088,7 @@ export function ActionsClient({
                                 )}
                               </ul>
                               {a.decisionReason && (
-                                <div className="mt-2 text-[12px] text-muted">
+                                <div className="mt-2 text-[0.75rem] text-muted">
                                   <span className="font-medium">Decision reason:</span> {a.decisionReason}
                                 </div>
                               )}
@@ -1096,7 +1096,7 @@ export function ActionsClient({
                           </div>
                           {denyFor === a.id && (
                             <div className="mt-3 rounded-md border border-failed bg-failed-tint/50 p-2">
-                              <div className="mb-1 text-[12px] font-medium text-failed-text">
+                              <div className="mb-1 text-[0.75rem] font-medium text-failed-text">
                                 Deny with reason (the action is killed):
                               </div>
                               <div className="flex gap-1.5">
@@ -1104,7 +1104,7 @@ export function ActionsClient({
                                   value={denyReason}
                                   onChange={(e) => setDenyReason(e.target.value)}
                                   placeholder="Why is this denied?"
-                                  className={`${INPUT_CLS} flex-1 text-[12px]`}
+                                  className={`${INPUT_CLS} flex-1 text-[0.75rem]`}
                                 />
                                 <button
                                   onClick={() => decide(a.id, "denied", denyReason || "Denied without reason")}
@@ -1128,7 +1128,7 @@ export function ActionsClient({
                 ))}
                 {visibleApprovals.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                    <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                       No approvals here yet — proposed agent actions will appear for review.
                     </td>
                   </tr>
@@ -1145,9 +1145,9 @@ export function ActionsClient({
           <DriftPanel data={drift} onAcknowledge={acknowledgeDrift} />
           <BudgetPanel budget={initialBudget} attribution={initialAttribution} />
           <div className="overflow-hidden rounded-lg border border-line bg-paper">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[0.8125rem]">
             <thead>
-              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
+              <tr className="border-b border-line bg-paper text-left text-[0.6875rem] text-muted">
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Tool</th>
                 <th className="px-3 py-2 font-medium">App</th>
@@ -1162,7 +1162,7 @@ export function ActionsClient({
                   <td className="whitespace-nowrap px-3 py-2.5 text-muted">
                     {new Date(l.createdAt).toLocaleString()}
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{l.toolName}</td>
+                  <td className="px-3 py-2.5 font-mono text-[0.6875rem] text-muted">{l.toolName}</td>
                   <td className="px-3 py-2.5 text-muted">{l.appKey}</td>
                   <td className="px-3 py-2.5">{tierBadge(l.riskTier)}</td>
                   <td className="px-3 py-2.5">{statusBadge(l.status)}</td>
@@ -1171,14 +1171,14 @@ export function ActionsClient({
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
+                  <td colSpan={6} className="px-3 py-8 text-center text-[0.8125rem] text-subtle">
                     No actions executed yet — every execution is logged here.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-          <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
+          <div className="border-t border-line bg-paper px-3 py-2 text-[0.75rem] text-muted">
             Reads and draft-creators execute automatically and appear here; writes and
             destructive actions only after your approval.
           </div>

@@ -20,23 +20,28 @@ import { cn } from "@/lib/utils";
 import { Banner, FilterPill, ToastView, aosButton } from "@/components/aos";
 import {
   NOTIFICATION_KIND_ICONS,
-  NOTIFICATION_KIND_LABELS,
   NotificationIcon,
   timeAgo,
   type NotificationItem,
 } from "@/components/notifications/NotificationIcon";
 import { notificationAction, notificationBanners, notificationStatus } from "@/lib/aos/notifications";
 import { toast, toastError } from "@/lib/ui/feedback";
+// Phase 18.1 (WS=find): the list chrome in the person's language (titles and
+// bodies are generated per notification and stay as written).
+import { useI18n } from "@/components/i18n/I18nProvider";
+import type { Translator } from "@/lib/i18n";
+import { sendSafeWrite } from "@/lib/offline/client";
 
 const PAGE = 30;
 
-function when(iso: string): string {
-  const t = timeAgo(iso);
-  return t === "now" ? "Just now" : `${t} ago`;
+function when(iso: string, t: Translator): string {
+  const age = timeAgo(iso);
+  return age === "now" ? t("notifications.justNow") : t("notifications.ago", { age });
 }
 
 export default function NotificationsList() {
   const router = useRouter();
+  const { t } = useI18n();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -61,10 +66,10 @@ export default function NotificationsList() {
       if (before) qs.set("before", before);
       const res = await fetch(`/api/notifications?${qs}`, { cache: "no-store" });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't load notifications.");
+      if (!res.ok) throw new Error(body.error ?? t("notifications.loadError"));
       return body as { notifications: NotificationItem[]; unread: number };
     },
-    [unreadOnly],
+    [unreadOnly, t],
   );
 
   const load = useCallback(async () => {
@@ -76,11 +81,11 @@ export default function NotificationsList() {
       setUnread(body.unread);
       setMore(body.notifications.length === PAGE);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Couldn't load notifications.");
+      setLoadError(e instanceof Error ? e.message : t("notifications.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [fetchPage]);
+  }, [fetchPage, t]);
 
   useEffect(() => {
     void load();
@@ -95,21 +100,19 @@ export default function NotificationsList() {
       setItems((prev) => [...prev, ...body.notifications.filter((n) => !prev.some((p) => p.id === n.id))]);
       setMore(body.notifications.length === PAGE);
     } catch (e) {
-      toastError("Couldn't load more", e instanceof Error ? e.message : undefined);
+      toastError(t("notifications.couldNotLoadMore"), e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(false);
     }
   }
 
   async function markRead(payload: { ids: string[] } | { all: true }) {
-    const res = await fetch("/api/notifications/read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? "Couldn't update notifications.");
-    setUnread(body.unread);
+    // Phase 18.3 (WS=flow): offline, "mark read" is queued (idempotent) and
+    // sent when the connection returns (lib/offline/queue.ts).
+    const out = await sendSafeWrite("notifications_read", payload);
+    if (out.status === "error") throw new Error(out.error || t("notifications.updateError"));
+    if (out.status === "sent") setUnread(Number(out.data.unread) || 0);
+    else setUnread((u) => ("all" in payload ? 0 : Math.max(0, u - payload.ids.length)));
     const now = new Date().toISOString();
     setItems((prev) =>
       unreadOnly && "all" in payload
@@ -123,9 +126,9 @@ export default function NotificationsList() {
     try {
       const count = unread;
       await markRead({ all: true });
-      toast({ title: "Marked read", description: `${count} ${count === 1 ? "notification" : "notifications"}.`, status: "done" });
+      toast({ title: t("notifications.markedRead"), description: t("notifications.markedReadCount", { count }), status: "done" });
     } catch (e) {
-      toastError("Couldn't mark all read", e instanceof Error ? e.message : undefined);
+      toastError(t("notifications.couldNotMarkAll"), e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(false);
     }
@@ -133,7 +136,7 @@ export default function NotificationsList() {
 
   function dismiss(n: NotificationItem) {
     void markRead({ ids: [n.id] }).catch((e: unknown) =>
-      toastError("Couldn't mark it read", e instanceof Error ? e.message : undefined),
+      toastError(t("notifications.couldNotMarkOne"), e instanceof Error ? e.message : undefined),
     );
   }
 
@@ -149,7 +152,7 @@ export default function NotificationsList() {
   return (
     <div className="flex flex-col gap-5">
       {banners.length ? (
-        <div className="flex flex-col gap-2.5" aria-label="Needs your attention">
+        <div className="flex flex-col gap-2.5" aria-label={t("notifications.needsAttention")}>
           {banners.map((b) => (
             <Banner key={b.key} status={b.status} title={b.title} description={b.description} action={b.action} />
           ))}
@@ -158,9 +161,9 @@ export default function NotificationsList() {
 
       <div className="flex flex-wrap items-center gap-2">
         <FilterPill selected={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>
-          Unread only
+          {t("notifications.unreadOnly")}
         </FilterPill>
-        <span className="text-md text-muted tabular-nums">{unread} unread</span>
+        <span className="text-md text-muted tabular-nums">{t("notifications.unreadCount", { count: unread })}</span>
         <button
           type="button"
           onClick={() => void markAll()}
@@ -168,7 +171,7 @@ export default function NotificationsList() {
           className={aosButton({ variant: "primary", size: "sm", className: "ml-auto" })}
         >
           <CheckCheck size={15} aria-hidden />
-          Mark all read
+          {t("notifications.markAllRead")}
         </button>
       </div>
 
@@ -182,14 +185,14 @@ export default function NotificationsList() {
       {loading ? (
         <div className="flex items-center gap-2 text-md text-muted">
           <Loader2 size={16} className="aos-spin" aria-hidden />
-          Loading notifications…
+          {t("notifications.loadingList")}
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg bg-paper px-6 py-14 text-center shadow-hairline">
           <Bell size={28} className="text-subtle" aria-hidden />
-          <h2 className="aos-subheading">{unreadOnly ? "You're all caught up" : "No notifications yet"}</h2>
+          <h2 className="aos-subheading">{unreadOnly ? t("notifications.caughtUp") : t("notifications.noneYet")}</h2>
           <p className="max-w-[44ch] text-md text-muted">
-            Approvals waiting on you, decisions on your requests, alerts and failed agent runs show up here.
+            {t("notifications.emptyBody")}
           </p>
         </div>
       ) : (
@@ -197,7 +200,7 @@ export default function NotificationsList() {
           {fresh.length ? (
             <section aria-labelledby="new-h" className="flex flex-col gap-3">
               <h2 id="new-h" className="aos-subheading">
-                New
+                {t("notifications.new")}
               </h2>
               <ul className="grid items-start gap-3 lg:grid-cols-2">
                 {fresh.map((n) => {
@@ -209,7 +212,7 @@ export default function NotificationsList() {
                         icon={NOTIFICATION_KIND_ICONS[n.kind]}
                         title={n.title}
                         description={n.body ?? undefined}
-                        meta={`${NOTIFICATION_KIND_LABELS[n.kind]} · ${when(n.createdAt)}`}
+                        meta={`${t(`notifications.kinds.${n.kind}`)} · ${when(n.createdAt, t)}`}
                         action={action ? { label: action.label, onClick: () => open(n) } : null}
                         onDismiss={() => dismiss(n)}
                         className="animate-none"
@@ -224,7 +227,7 @@ export default function NotificationsList() {
           {earlier.length ? (
             <section aria-labelledby="earlier-h" className="flex flex-col gap-3">
               <h2 id="earlier-h" className="aos-subheading">
-                Earlier
+                {t("notifications.earlier")}
               </h2>
               <ul className="overflow-hidden rounded-lg bg-paper shadow-hairline">
                 {earlier.map((n) => {
@@ -245,7 +248,7 @@ export default function NotificationsList() {
                           <span className="block text-base leading-5 font-semibold text-ink">{n.title}</span>
                           {n.body ? <span className="mt-0.5 block text-md text-muted">{n.body}</span> : null}
                           <span className="mt-1 block text-xs text-subtle">
-                            {NOTIFICATION_KIND_LABELS[n.kind]} · {when(n.createdAt)}
+                            {t(`notifications.kinds.${n.kind}`)} · {when(n.createdAt, t)}
                           </span>
                         </span>
                         {action ? (
@@ -272,7 +275,7 @@ export default function NotificationsList() {
           className={aosButton({ variant: "secondary", size: "sm", className: "self-center" })}
         >
           {busy ? <Loader2 size={14} className="aos-spin" aria-hidden /> : null}
-          {busy ? "Loading" : "Load more"}
+          {busy ? t("common.loading") : t("notifications.loadMore")}
         </button>
       ) : null}
     </div>

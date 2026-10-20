@@ -781,7 +781,7 @@ export function KnowledgeClient({
                         <>
                           {s.brandKit.name}
                           {s.brandKit.isDefault && (
-                            <span className="ml-1 text-[11px] text-subtle">(default)</span>
+                            <span className="ml-1 text-[0.6875rem] text-subtle">(default)</span>
                           )}
                         </>
                       ) : (
@@ -880,7 +880,7 @@ export function KnowledgeClient({
                             ))}
                           </tbody>
                         </table>
-                        <p className="mt-1 text-[11px] text-subtle">
+                        <p className="mt-1 text-[0.6875rem] text-subtle">
                           Approving applies name, colors, and fonts to the kit and downloads the
                           logo; the dashboard theme refreshes on the next render.
                         </p>

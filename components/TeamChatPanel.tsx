@@ -127,12 +127,12 @@ export default function TeamChatPanel({
     <div className="relative flex h-full min-h-0 flex-col bg-canvas">
       {/* Slim channel strip — chat chrome, not a page header */}
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-paper px-4">
-        <span className="text-[13px] font-medium text-ink">Project channel</span>
+        <span className="text-[0.8125rem] font-medium text-ink">Project channel</span>
         <ValuePill tone="neutral">
           <Users className="mr-1 size-3" />
           {memberCount} member{memberCount === 1 ? "" : "s"}
         </ValuePill>
-        <span className="ml-auto text-[12px] text-muted">Refreshes every 5 seconds</span>
+        <span className="ml-auto text-[0.75rem] text-muted">Refreshes every 5 seconds</span>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -148,7 +148,7 @@ export default function TeamChatPanel({
                     <h2 className="aos-heading mt-4 text-ink">
                       No messages yet
                     </h2>
-                    <p className="mt-2 max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
+                    <p className="mt-2 max-w-[46ch] text-[0.84375rem] leading-relaxed text-muted">
                       Kick off the conversation — the whole project team sees it here.
                     </p>
                   </div>

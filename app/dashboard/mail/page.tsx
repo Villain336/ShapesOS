@@ -1,29 +1,43 @@
-// Marketr — Direct Mail workspace (Phase 4 R3-integration).
+// ShapesOS — Phase 18.2 (WS=comms): Mail — one inbox over your own Gmail /
+// Outlook, the CRM lead conversations and social DMs (lib/comms/mail), with
+// the inbox agent (summaries, suggested labels, drafted replies; triage as an
+// agent run). Viewer+; replying to lead and social conversations is editor+.
+// (Direct mail — postcards — moved to /dashboard/direct-mail.)
+
 import { redirect } from "next/navigation";
-import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { MailApp } from "./MailApp";
+import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { getMembership, roleAtLeast } from "@/lib/authz";
+import { getI18n } from "@/lib/i18n/server";
+import { MailApp } from "@/components/comms/MailApp";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Direct Mail — ShapesOS",
-  description: "Direct mail campaigns and nurture mail pieces: builder, approvals, verification, tracking.",
-};
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: `${t("comms.mail.title")} — ShapesOS`, description: t("comms.mail.metaDescription") };
+}
 
-export default async function MailPage() {
+export default async function MailPage({ searchParams }: { searchParams: Promise<{ thread?: string; compose?: string; to?: string; subject?: string; body?: string }> }) {
   const user = await requireUser();
   if (!user) redirect("/login");
-  await getOrCreateWorkspace(user.id, user.email);
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const me = await getMembership(user.id, workspace.id);
+  if (!me) redirect("/dashboard");
+  const sp = await searchParams;
   return (
-    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
-      <div>
-        <h1 className="aos-heading">Direct Mail</h1>
-        <p className="mt-1 text-sm text-muted">
-          Postcard and letter campaigns — a first-class nurture channel. Test mode by default; every
-          piece needs a human approval binding creative, count, and max spend.
-        </p>
-      </div>
-      <MailApp />
-    </div>
+    <MailApp
+      canEdit={roleAtLeast(me.role, "editor")}
+      initialThread={typeof sp.thread === "string" ? sp.thread.slice(0, 900) : null}
+      initialCompose={
+        sp.compose === "1"
+          ? {
+              to: typeof sp.to === "string" ? sp.to.slice(0, 300) : null,
+              // Phase 18.3 (WS=flow): the share sheet's "Send to → Mail" prefills a new message.
+              subject: typeof sp.subject === "string" ? sp.subject.slice(0, 200) : null,
+              body: typeof sp.body === "string" ? sp.body.slice(0, 4000) : null,
+            }
+          : null
+      }
+    />
   );
 }

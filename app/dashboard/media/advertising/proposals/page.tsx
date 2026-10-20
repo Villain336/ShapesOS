@@ -190,7 +190,7 @@ const EMPTY_COPY: Record<string, { title: string; body: string }> = {
 };
 
 const btnPrimarySm =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover";
 const btnExecute =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running-pressed";
 const btnApprove =

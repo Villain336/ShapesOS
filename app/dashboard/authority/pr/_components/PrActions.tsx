@@ -13,7 +13,7 @@ import { confirmAction } from "@/lib/ui/feedback";
 
 // Agentic OS pressables: running = agent-run verbs, done = approve.
 const btnP =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnS =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const btnD =
@@ -113,7 +113,7 @@ export function CreateDraftForm({ opportunityId }: { opportunityId: string }) {
         onChange={(e) => setSubject(e.target.value)}
         required
       />
-      <p className="text-[11px] text-muted">{subject.length}/49 chars</p>
+      <p className="text-[0.6875rem] text-muted">{subject.length}/49 chars</p>
       <Textarea
         placeholder="Draft body (optional — runs the de-AI pass)"
         value={body}
@@ -160,8 +160,8 @@ export function ApproveButton({ draftId, disabled, reason }: { draftId: string; 
         {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Approve draft
       </button>
-      {disabled && reason && <span className="text-[11px] text-ink">{reason}</span>}
-      {error && <span className="text-[11px] text-failed-text">{error}</span>}
+      {disabled && reason && <span className="text-[0.6875rem] text-ink">{reason}</span>}
+      {error && <span className="text-[0.6875rem] text-failed-text">{error}</span>}
     </span>
   );
 }
@@ -193,7 +193,7 @@ export function MarkSentButton({ draftId, journalist, outlet }: { draftId: strin
         {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Record sent
       </button>
-      {error && <span className="text-[11px] text-failed-text">{error}</span>}
+      {error && <span className="text-[0.6875rem] text-failed-text">{error}</span>}
     </span>
   );
 }

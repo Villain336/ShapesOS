@@ -35,9 +35,9 @@ export function KanbanBoard({
           <>
             <div className="flex items-center gap-2">
               <StageBadge label={s.label} color={s.color} />
-              <span className="text-[12px] font-semibold text-muted tabular-nums">{col.length}</span>
+              <span className="text-[0.75rem] font-semibold text-muted tabular-nums">{col.length}</span>
             </div>
-            <span className="text-[12px] font-semibold text-muted tabular-nums">
+            <span className="text-[0.75rem] font-semibold text-muted tabular-nums">
               {formatMoney(col.reduce((a, l) => a + (l.valueCents ?? 0), 0))}
             </span>
           </>
@@ -48,13 +48,13 @@ export function KanbanBoard({
           <div className="flex items-center gap-2">
             <Avatar name={l.name} size={24} />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-semibold text-ink">{l.name}</div>
-              {l.company && <div className="truncate text-[12px] text-muted">{l.company}</div>}
+              <div className="truncate text-[0.8125rem] font-semibold text-ink">{l.name}</div>
+              {l.company && <div className="truncate text-[0.75rem] text-muted">{l.company}</div>}
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between">
             <ScoreBar score={l.score} showNumber />
-            <span className="text-[12.5px] font-semibold text-ink tabular-nums">{formatMoney(l.valueCents)}</span>
+            <span className="text-[0.78125rem] font-semibold text-ink tabular-nums">{formatMoney(l.valueCents)}</span>
           </div>
         </>
       )}

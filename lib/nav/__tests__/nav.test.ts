@@ -10,7 +10,10 @@ import {
   allNavItems,
   NAV_GROUPS,
   NAV_HOTKEYS,
+  NAV_SYSTEM_ACTIONS,
   navCommands,
+  navItemVisible,
+  visibleNavGroups,
   pathMatches,
 } from "../config";
 import { capIdleSection, rankCommands, type CommandItem } from "../../../components/command-bar/lib";
@@ -107,9 +110,10 @@ describe("activeNavHref", () => {
 });
 
 describe("⌘K Go section", () => {
-  it("covers every nav destination exactly once", () => {
+  it("covers every nav destination exactly once, then the system actions", () => {
     const goHrefs = navCommands().map((c) => c.href);
-    assert.deepEqual(goHrefs, allNavItems().map((i) => i.href));
+    // Phase 18.1: Switch app + Split view follow the sidebar destinations.
+    assert.deepEqual(goHrefs, [...allNavItems().map((i) => i.href), ...NAV_SYSTEM_ACTIONS.map((a) => a.href)]);
     for (const c of navCommands()) {
       assert.equal(c.section, "go");
       assert.equal(c.id, `go:${c.href}`);
@@ -118,7 +122,39 @@ describe("⌘K Go section", () => {
 
   it("CommandBar builds its Go list from the nav config", () => {
     const src = readFileSync(path.join(ROOT, "components/command-bar/CommandBar.tsx"), "utf8");
-    assert.match(src, /const GO_ITEMS: UICommand\[\] = navCommands\(\);/);
+    // Phase 18.1: the same nav config, in the person's language (lib/nav/i18n.ts).
+    assert.match(src, /navCommands\(localizeNavGroups\(NAV_GROUPS, messages\), NAV_SYSTEM_ACTIONS\.map\(\(a\) => localizeNavItem\(a, messages\)\)\)/);
+  });
+
+  it("the desk's system actions are localized too (Switch app, Split view)", async () => {
+    const { localizeNavItem } = await import("../i18n");
+    const { en } = await import("@/lib/i18n/messages/en");
+    const { es } = await import("@/lib/i18n/messages/es");
+    const { mergeCatalogues } = await import("@/lib/i18n");
+    const ES = mergeCatalogues(en, es);
+    const cmds = navCommands(NAV_GROUPS, NAV_SYSTEM_ACTIONS.map((a) => localizeNavItem(a, ES)));
+    const sw = cmds.find((c) => c.href === "/dashboard/switch")!;
+    assert.equal(sw.title, "Cambiar de app");
+    assert.match(sw.keywords, /Switch app/, "English words stay searchable");
+    assert.equal(cmds.find((c) => c.href === "/dashboard/split")!.title, "Vista dividida");
+    // English catalogue = the config's own words.
+    for (const a of NAV_SYSTEM_ACTIONS) assert.equal(localizeNavItem(a, en).label, a.label);
+  });
+
+  it("the localized nav keeps every destination and English search words (Phase 18.1)", async () => {
+    const { localizeNavGroups } = await import("../i18n");
+    const { en } = await import("@/lib/i18n/messages/en");
+    const { es } = await import("@/lib/i18n/messages/es");
+    const { mergeCatalogues } = await import("@/lib/i18n");
+    const localized = localizeNavGroups(NAV_GROUPS, mergeCatalogues(en, es));
+    const before = navCommands();
+    const after = navCommands(localized);
+    assert.deepEqual(after.map((c) => c.href), before.map((c) => c.href), "same destinations, same order");
+    const files = after.find((c) => c.href === "/dashboard/files")!;
+    assert.equal(files.title, "Archivos");
+    assert.match(files.keywords, /Files/, "English label stays searchable");
+    assert.match(files.subtitle, /^Operar · /);
+    assert.deepEqual(navCommands(localizeNavGroups(NAV_GROUPS, en)).map((c) => c.title), before.map((c) => c.title), "English unchanged");
   });
 
   it("keeps the original ⌥1–⌥6 hotkeys on real destinations", () => {
@@ -147,5 +183,38 @@ describe("⌘K Go section", () => {
     assert.equal(idle.length, 8);
     const searched = capIdleSection(rankCommands(items, "a", {}, 0), "a", "go", 8);
     assert.ok(searched.length > 8);
+  });
+});
+
+describe("Phase 18.1: system actions and role gating", () => {
+  it("system actions are real pages and not sidebar rows", () => {
+    const sidebar = new Set(allNavItems().map((i) => i.href));
+    for (const a of NAV_SYSTEM_ACTIONS) {
+      assert.ok(existsSync(pageFileFor(a.href)), `${a.label} → ${a.href} has no page`);
+      assert.ok(!sidebar.has(a.href), `${a.href} must not be a second nav row`);
+    }
+    const titles = navCommands().map((c) => c.title);
+    assert.ok(titles.includes("Switch app"));
+    assert.ok(titles.includes("Split view"));
+  });
+
+  it("Billing is admin+ like its page; everything else is for every member", () => {
+    const billing = allNavItems().find((i) => i.href === "/dashboard/billing")!;
+    assert.equal(billing.minRole, "admin");
+    assert.equal(navItemVisible(billing, "viewer"), false);
+    assert.equal(navItemVisible(billing, "editor"), false);
+    assert.equal(navItemVisible(billing, "admin"), true);
+    assert.equal(navItemVisible(billing, "owner"), true);
+    assert.equal(navItemVisible(billing, null), false);
+    const src = readFileSync(path.join(ROOT, "app/dashboard/billing/page.tsx"), "utf8");
+    assert.match(src, /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/);
+    const viewerHrefs = visibleNavGroups("viewer").flatMap((g) => g.items.map((i) => i.href));
+    assert.ok(!viewerHrefs.includes("/dashboard/billing"));
+    // Phase 18.2 (WS=content): the Terminal is editor+ like its routes (a shell on a workspace sandbox).
+    const terminal = allNavItems().find((i) => i.href === "/dashboard/terminal")!;
+    assert.equal(terminal.minRole, "editor");
+    assert.ok(!viewerHrefs.includes("/dashboard/terminal"));
+    assert.ok(visibleNavGroups("editor").some((g) => g.items.some((i) => i.href === "/dashboard/terminal")));
+    assert.equal(viewerHrefs.length, allNavItems().length - 2);
   });
 });

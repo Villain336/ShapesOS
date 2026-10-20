@@ -44,7 +44,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const { workspace } = await guardWorkspace({ editor: true });
+    const { workspace, user } = await guardWorkspace({ editor: true });
     const { id } = await ctx.params;
     const body = PatchSchema.parse(await readJson(req));
     let doc = await getUniverDoc(workspace.id, id);
@@ -55,6 +55,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (body.snapshot !== undefined) {
       try {
         doc = await saveUniverDocSnapshot(workspace.id, id, body.snapshot, {
+          // Phase 18.2: who saved (the idle snapshot it may keep is theirs).
+          userId: user.id,
           ...(body.expectedVersion !== undefined
             ? { expectedVersion: body.expectedVersion }
             : {}),

@@ -50,8 +50,22 @@ export async function runSchedulerTick(
     },
   });
 
+  // Phase 18.1 (WS=desk): a workspace paused from Control Center (kill
+  // switch, frozenAt) starts nothing — its schedules stay due and fire once
+  // (the catch-up policy) after it is resumed.
+  const wsIds = [...new Set(due.map((s) => s.workspaceId))];
+  const frozen = wsIds.length
+    ? new Set(
+        (await db.workspace.findMany({ where: { id: { in: wsIds }, frozenAt: { not: null } }, select: { id: true } })).map((w) => w.id),
+      )
+    : new Set<string>();
+
   for (const schedule of due) {
     if (!schedule.cronExpr) continue;
+    if (frozen.has(schedule.workspaceId)) {
+      result.blocked.push({ scheduleId: schedule.id, reason: "agents paused in this workspace" });
+      continue;
+    }
     // One bad schedule must never halt the sweep for every other workspace:
     // any failure is contained, the schedule is parked, and it is audited.
     try {

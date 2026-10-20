@@ -115,7 +115,8 @@ export async function* userExport(account: SessionAccount, now = new Date()): As
       : [{ predicate: userPredicate(ref.userColumns, 1), params: [userId], guc: null }];
     let n = 0;
     for (const pass of passes) {
-      for await (const row of scopedRows({ table: t, columns: include, predicate: pass.predicate, params: pass.params, gucWorkspaceId: pass.guc })) {
+      // Phase 18.1: the subject is also the person GUC, so owner-only tables (the desk) export too.
+      for await (const row of scopedRows({ table: t, columns: include, predicate: pass.predicate, params: pass.params, gucWorkspaceId: pass.guc, gucUserId: userId })) {
         if (n === 0) {
           yield `${firstTable ? "" : ","}${JSON.stringify(ref.table)}:[`;
           firstTable = false;

@@ -13,7 +13,7 @@
 
 import { createTwoFilesPatch } from "diff";
 import { prisma } from "@/lib/prisma";
-import type { LocalDirProvider } from "@/lib/connectors/local";
+import type { WorkingCopyProvider } from "@/lib/connectors/local";
 import { assertSnapshotSize, readSiteWorkingCopy, siteFingerprint, type SiteFile } from "@/lib/sites/files";
 import { createSiteRevision, type SiteRevisionSummary } from "@/lib/sites/revisions";
 import { capPatch } from "@/lib/ship/git";
@@ -65,7 +65,7 @@ export interface JsonLdDraftInput {
   createdBy?: string | null;
   runId?: string | null;
   /** Test seam: the working copy. */
-  provider?: LocalDirProvider;
+  provider?: WorkingCopyProvider;
 }
 
 const HTML = /\.html?$/i;

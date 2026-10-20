@@ -50,7 +50,7 @@ const workspaceId = ws.id;
 // ---------------------------------------------------------------------------
 {
   const { synthesizeWithKnownVoice, health } = await import("@/lib/voice/voicestudio");
-  const { LocalDiskAdapter } = await import("@/lib/filesystem/storage");
+  const { getStorageAdapter } = await import("@/lib/filesystem/storage");
   const { randomUUID } = await import("node:crypto");
 
   // 1. One voiceover agent (find-or-create; VoiceStudio is the default backend).
@@ -119,7 +119,8 @@ const workspaceId = ws.id;
   if (audio.length === 0) throw new Error("VoiceStudio returned empty audio — refusing to seed.");
   console.log(`[13d-b] synthesized ${audio.length} bytes of real VoiceStudio audio`);
 
-  const adapter = new LocalDiskAdapter();
+  // Same store the app reads voiceovers from (MARKETR_STORAGE).
+  const adapter = getStorageAdapter();
   const key = randomUUID();
   await adapter.put(key, audio, "audio/wav");
 

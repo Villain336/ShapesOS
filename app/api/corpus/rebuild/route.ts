@@ -17,6 +17,7 @@ import {
   readRebuildLogTail,
   rebuildLogPath,
 } from "@/lib/intelligence/corpus/proposals";
+import { corpusReadOnlyReason, ensureCorpusFresh } from "@/lib/intelligence/corpus/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,16 @@ async function authed(min: "viewer") {
 export async function GET() {
   const a = await authed("viewer");
   if (a.err) return a.err;
+  await ensureCorpusFresh();
   return Response.json({ status: readRebuildStatus(), logTail: readRebuildLogTail(60) });
 }
 
 export async function POST() {
   const op = await requirePlatformOperator();
   if (op instanceof Response) return op;
+  // Deploy PR (class c): no runtime corpus edits on a shared/hosted install.
+  const readOnly = corpusReadOnlyReason();
+  if (readOnly) return Response.json({ error: readOnly }, { status: 409 });
 
   const current = readRebuildStatus();
   if (current.state === "running") {

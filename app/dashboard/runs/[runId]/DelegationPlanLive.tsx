@@ -3,7 +3,9 @@
 // Server-rendered first (the view the page loaded), then kept current by the
 // watch SSE (GET /api/agent-runs/[runId]/watch?view=delegation): each
 // sub-agent's state, budget used and deliverable as it lands. The stream
-// ends when the run finishes or waits for the user.
+// ends when the run finishes or waits for the user. Deploy PR: through
+// openLiveStream (lib/ui/live-stream.ts) — a deploy's `reconnect` or a dropped
+// connection reconnects (with backoff) and the server resends the full view.
 
 "use client";
 
@@ -12,24 +14,26 @@ import { DelegationPlan } from "@/components/aos/DelegationPlan";
 import { StatusShape } from "@/components/aos/StatusShape";
 import { formatBudget, viewProgress, type DelegationView } from "@/lib/aos/delegation";
 import { progressLine } from "@/lib/agents/delegation/plan";
+import { openLiveStream } from "@/lib/ui/live-stream";
 
 export function DelegationPlanLive({ initial }: { initial: DelegationView }) {
   const [view, setView] = useState<DelegationView>(initial);
 
   useEffect(() => {
     if (!initial.live) return;
-    const es = new EventSource(`/api/agent-runs/${encodeURIComponent(initial.runId)}/watch?view=delegation`);
-    const onView = (e: Event) => {
-      try {
-        setView(JSON.parse((e as MessageEvent).data) as DelegationView);
-      } catch {
-        // Malformed frame: keep the last view.
-      }
-    };
-    es.addEventListener("delegation", onView);
-    es.addEventListener("end", () => es.close());
-    es.onerror = () => es.close();
-    return () => es.close();
+    const stream = openLiveStream(`/api/agent-runs/${encodeURIComponent(initial.runId)}/watch?view=delegation`, {
+      events: {
+        delegation: (data) => {
+          try {
+            setView(JSON.parse(data) as DelegationView);
+          } catch {
+            // Malformed frame: keep the last view.
+          }
+        },
+      },
+      onEnd: () => "stop",
+    });
+    return () => stream.close();
   }, [initial.live, initial.runId]);
 
   const total = viewProgress(view);

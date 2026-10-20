@@ -107,7 +107,8 @@ describe("push device routes", () => {
     const listed = (await (await route.GET()).json()) as { devices: Array<Record<string, unknown>>; kinds: string[] };
     assert.equal(listed.devices.length, 1);
     assert.ok(!JSON.stringify(listed).includes("ExponentPushToken"), "the raw token is never returned");
-    assert.deepEqual(listed.kinds, ["approval_needed", "approval_decided", "run_failed"]);
+    // Phase 18.3 (WS=trust): the 18.2 and 18.3 kinds became pushable (the person's channel matrix decides).
+    assert.deepEqual(listed.kinds, ["approval_needed", "approval_decided", "run_failed", "mention", "direct_message", "reminder_due", "run_finished", "invoice_paid", "ticket_assigned", "meeting_starting"]);
 
     const off = await route.PATCH(req("PATCH", { token: tok("alice1"), enabled: false, mutedKinds: ["run_failed"] }));
     assert.equal(off.status, 200);

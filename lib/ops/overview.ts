@@ -19,6 +19,11 @@ export interface OpsOverview extends OpsSummary {
 
 type Tx = Prisma.TransactionClient;
 
+/** Net payments: refunds subtract, every other kind adds (the same rule as before, on per-kind sums). PURE. */
+export function paymentsNetCents(sums: ReadonlyArray<{ kind: string; sumCents: number }>): number {
+  return sums.reduce((s, p) => s + (p.kind === "refund" ? -p.sumCents : p.sumCents), 0);
+}
+
 export async function getOpsOverview(tx: Tx, workspaceId: string): Promise<OpsOverview> {
   const since = new Date(Date.now() - 30 * 24 * 3600_000);
   const active = { in: ["new", "open", "pending"] as Array<"new" | "open" | "pending"> };
@@ -26,15 +31,19 @@ export async function getOpsOverview(tx: Tx, workspaceId: string): Promise<OpsOv
     getOpsSummary(tx as unknown as OpsSummaryTx, workspaceId),
     tx.opsOrder.count({ where: { workspaceId, status: { in: ["draft", "confirmed"] } } }),
     tx.opsProject.count({ where: { workspaceId, status: { in: ["planning", "active"] } } }),
-    tx.opsPayment.findMany({
+    // Phase 17 (latency): one SQL aggregate per payment kind instead of
+    // fetching the rows (the old read also stopped at 5,000 rows, so a busy
+    // month was under-counted).
+    tx.opsPayment.groupBy({
+      by: ["kind"],
       where: { workspaceId, status: "succeeded", createdAt: { gte: since } },
-      select: { kind: true, amountCents: true },
-      take: 5000,
+      _sum: { amountCents: true },
     }),
     tx.opsTicket.count({ where: { workspaceId, status: active } }),
     tx.opsTicket.count({ where: { workspaceId, status: active, slaBreachedAt: { not: null } } }),
-    tx.opsTask.count({ where: { workspaceId, stage: { notIn: ["done", "cancelled"] } } }),
+    // Phase 18.2: project tasks only (project-less tasks are personal reminders).
+    tx.opsTask.count({ where: { workspaceId, projectId: { not: null }, stage: { notIn: ["done", "cancelled"] } } }),
   ]);
-  const paymentsLast30dCents = payments.reduce((s, p) => s + (p.kind === "refund" ? -p.amountCents : p.amountCents), 0);
+  const paymentsLast30dCents = paymentsNetCents(payments.map((p) => ({ kind: p.kind, sumCents: p._sum.amountCents ?? 0 })));
   return { ...summary, openOrders, activeProjects, paymentsLast30dCents, openTickets, breachedTickets, openTasks };
 }

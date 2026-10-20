@@ -223,7 +223,7 @@ const STATUS_SHAPES: Record<string, string> = {
 function StatusPill({ status }: { status: string }) {
   const shape = STATUS_SHAPES[status];
   return (
-    <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-paper px-2.5 text-[13px] font-semibold capitalize text-ink shadow-control">
+    <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-paper px-2.5 text-[0.8125rem] font-semibold capitalize text-ink shadow-control">
       {shape && <span className={shape} aria-hidden />}
       {status.replace(/_/g, " ")}
     </span>
@@ -265,8 +265,8 @@ function WfNodeView({ data, selected }: NodeProps<WfNode>) {
           <Icon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-ink">{data.label}</div>
-          <div className="text-[11px] capitalize text-muted">{def?.label ?? data.type}</div>
+          <div className="truncate text-[0.8125rem] font-semibold text-ink">{data.label}</div>
+          <div className="text-[0.6875rem] capitalize text-muted">{def?.label ?? data.type}</div>
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-paper !bg-muted" />
@@ -388,7 +388,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
     <div className="flex flex-col gap-4">
       {NODE_KINDS.map((kind) => (
         <div key={kind}>
-          <div className="mb-1.5 text-[12.5px] font-medium text-muted">
+          <div className="mb-1.5 text-[0.78125rem] font-medium text-muted">
             {KIND_LABELS[kind]}
           </div>
           <GlideMenu highlightClassName="inset-x-0 rounded-sm bg-hover">
@@ -406,7 +406,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
                     }}
                     title={def.description}
                     className={cn(
-                      "flex items-center gap-2 rounded-sm border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink shadow-hairline",
+                      "flex items-center gap-2 rounded-sm border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink shadow-hairline",
                       canEdit ? "cursor-grab hover:border-line-strong active:cursor-grabbing" : "opacity-60",
                     )}
                   >
@@ -421,7 +421,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
           </GlideMenu>
         </div>
       ))}
-      <p className="text-[11px] leading-snug text-muted">
+      <p className="text-[0.6875rem] leading-snug text-muted">
         Drag a node onto the canvas, then drag from a handle to connect it. Click a node to edit its
         config; click an edge to label it true/false for condition branches.
       </p>
@@ -853,7 +853,7 @@ function CanvasInner({
 
       {/* Floating top-center toolbar: save + run */}
       <div className="bg-paper absolute left-1/2 top-4 z-20 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-full py-1.5 pl-4 pr-1.5 shadow-raised">
-        <span className="max-w-40 truncate text-[13px] font-semibold text-ink">
+        <span className="max-w-40 truncate text-[0.8125rem] font-semibold text-ink">
           {wf?.name ?? "No workflow"}
         </span>
         {wf && <StatusPill status={wf.status} />}
@@ -937,7 +937,7 @@ function CanvasInner({
           <div className="mb-2 flex items-center justify-between gap-2">
             <Link
               href={`/dashboard/projects/${projectId}`}
-              className="inline-flex min-w-0 items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-ink"
+              className="inline-flex min-w-0 items-center gap-1 text-[0.8125rem] font-medium text-muted transition-colors hover:text-ink"
             >
               <ArrowLeft className="size-3.5 shrink-0" />
               <span className="truncate">{projectDomain}</span>
@@ -948,7 +948,7 @@ function CanvasInner({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div>
-              <div className="mb-2 text-[12.5px] font-medium text-muted">Workflows</div>
+              <div className="mb-2 text-[0.78125rem] font-medium text-muted">Workflows</div>
               {workflows.length === 0 ? (
                 <p className="text-xs text-muted">No workflows yet — create one below.</p>
               ) : (
@@ -971,7 +971,7 @@ function CanvasInner({
                           <WorkflowIcon className={cn("size-4 shrink-0", active ? "text-ink" : "text-muted")} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate font-medium text-ink">{w.name}</span>
-                            <span className="block text-[11px] text-muted">
+                            <span className="block text-[0.6875rem] text-muted">
                               {w.status}
                               {lastRun ? ` · last run ${lastRun.status.replace(/_/g, " ")}` : ""}
                             </span>
@@ -990,7 +990,7 @@ function CanvasInner({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && createWorkflow()}
-                    className="h-7 text-[13px]"
+                    className="h-7 text-[0.8125rem]"
                   />
                   <Tooltip>
                     <TooltipTrigger
@@ -1014,7 +1014,7 @@ function CanvasInner({
               )}
             </div>
             <div className="mt-3 border-t border-line pt-3">
-              <div className="mb-2 text-[12.5px] font-medium text-muted">Node palette</div>
+              <div className="mb-2 text-[0.78125rem] font-medium text-muted">Node palette</div>
               <Palette canEdit={canEdit} />
             </div>
           </div>
@@ -1024,7 +1024,7 @@ function CanvasInner({
           type="button"
           onClick={() => setLeftOpen(true)}
           aria-label="Open workflows and palette"
-          className="bg-paper absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-muted shadow-raised transition-colors hover:text-ink"
+          className="bg-paper absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[0.8125rem] font-medium text-muted shadow-raised transition-colors hover:text-ink"
         >
           <WorkflowIcon className="size-4" />
           Workflows
@@ -1073,7 +1073,7 @@ function CanvasInner({
           type="button"
           onClick={() => setRightOpen(true)}
           aria-label="Open inspector"
-          className="bg-paper absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-muted shadow-raised transition-colors hover:text-ink"
+          className="bg-paper absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[0.8125rem] font-medium text-muted shadow-raised transition-colors hover:text-ink"
         >
           <Settings className="size-4" />
           Inspector
@@ -1162,13 +1162,13 @@ function NodeInspector({
         def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />
       )}
       {node.data.type === "condition" && (
-        <p className="rounded-sm bg-paper px-3 py-2 text-[11px] leading-snug text-muted">
+        <p className="rounded-sm bg-paper px-3 py-2 text-[0.6875rem] leading-snug text-muted">
           Branch tip: click an outgoing edge and set its label to <b>true</b> or <b>false</b>. Unlabeled
           edges are followed on the default path.
         </p>
       )}
       {node.data.type === "approval_gate" && (
-        <p className="rounded-sm bg-paper px-3 py-2 text-[11px] leading-snug text-muted">
+        <p className="rounded-sm bg-paper px-3 py-2 text-[0.6875rem] leading-snug text-muted">
           Pauses the run and pushes a pending item into the approval queue. Approve to resume, reject to
           cancel the run.
         </p>
@@ -1267,10 +1267,10 @@ function WebhookTriggerPanel({ workflowId, canEdit }: { workflowId: string; canE
     }
   }, [view?.configured, workflowId]);
 
-  if (error && !view) return <p className="text-[13px] text-failed-text">{error}</p>;
+  if (error && !view) return <p className="text-[0.8125rem] text-failed-text">{error}</p>;
   if (!view) {
     return (
-      <p className="flex items-center gap-2 text-[13px] text-muted">
+      <p className="flex items-center gap-2 text-[0.8125rem] text-muted">
         <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Loading webhook settings
       </p>
     );
@@ -1296,21 +1296,21 @@ function WebhookTriggerPanel({ workflowId, canEdit }: { workflowId: string; canE
               </code>
               <CopyButton value={secret} label="Copy signing secret" />
             </div>
-            <p className="text-[13px] text-muted">Copy it now. This is the only time it&apos;s shown.</p>
+            <p className="text-[0.8125rem] text-muted">Copy it now. This is the only time it&apos;s shown.</p>
           </div>
         ) : view.configured ? (
           <code className="block rounded-md bg-paper px-3 py-2 font-mono text-xs text-muted shadow-hairline">{view.secretHint}</code>
         ) : (
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             No secret yet. Calls to this URL are refused until you create one.
           </p>
         )}
       </Field>
 
       {!view.hasTrigger && (
-        <p className="text-[13px] text-muted">Save the workflow first, then create the secret.</p>
+        <p className="text-[0.8125rem] text-muted">Save the workflow first, then create the secret.</p>
       )}
-      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] text-failed-text">{error}</p>}
 
       {canEdit && (
         <div>
@@ -1322,10 +1322,10 @@ function WebhookTriggerPanel({ workflowId, canEdit }: { workflowId: string; canE
       )}
 
       {view.lastReceivedAt && (
-        <p className="text-[13px] text-muted">Last call received {new Date(view.lastReceivedAt).toLocaleString()}.</p>
+        <p className="text-[0.8125rem] text-muted">Last call received {new Date(view.lastReceivedAt).toLocaleString()}.</p>
       )}
 
-      <p className="rounded-sm bg-paper px-3 py-2 text-[13px] leading-snug text-muted">
+      <p className="rounded-sm bg-paper px-3 py-2 text-[0.8125rem] leading-snug text-muted">
         Sign each request with <span className="font-mono">{view.signatureHeader}: t=&lt;unix&gt;,v1=&lt;hex&gt;</span>,
         the HMAC-SHA256 of <span className="font-mono">&lt;t&gt;.&lt;raw body&gt;</span> with this secret. Requests older
         than 5 minutes, replays and bodies over 64 KB are refused. The workflow must be active.
@@ -1420,7 +1420,7 @@ function WorkflowSettings({
         <Input value={settings.schedule} disabled={!canEdit} placeholder="0 9 * * *" onChange={(e) => onChange({ schedule: e.target.value })} />
       </Field>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] text-muted">Enabled</span>
+        <span className="text-[0.8125rem] text-muted">Enabled</span>
         <Switch checked={settings.enabled} disabled={!canEdit} onCheckedChange={(checked) => onChange({ enabled: checked })} />
       </div>
       {canEdit && (
@@ -1441,7 +1441,7 @@ function WorkflowSettings({
           </Tooltip>
         </div>
       )}
-      <p className="text-[11px] leading-snug text-muted">
+      <p className="text-[0.6875rem] leading-snug text-muted">
         Only <b>active</b> + enabled workflows run. Manual runs need an active workflow; the kill switch
         in Content autopilot blocks all runs with a 423.
       </p>
@@ -1501,13 +1501,13 @@ function RunsPanel({
               >
                 <div className="flex items-center justify-between gap-2">
                   <StatusPill status={r.status} />
-                  <span className="text-[11px] text-muted">{new Date(r.startedAt).toLocaleString()}</span>
+                  <span className="text-[0.6875rem] text-muted">{new Date(r.startedAt).toLocaleString()}</span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] text-muted">
+                <div className="mt-1 flex items-center justify-between text-[0.6875rem] text-muted">
                   <span>{r.triggerKind} · {r._count?.steps ?? r.steps?.length ?? 0} steps</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </div>
-                {r.error && <div className="mt-1 truncate text-[11px] text-failed-text">{r.error}</div>}
+                {r.error && <div className="mt-1 truncate text-[0.6875rem] text-failed-text">{r.error}</div>}
               </button>
             );
           })}
@@ -1515,14 +1515,14 @@ function RunsPanel({
       </GlideMenu>
       {selectedRun?.steps && selectedRun.steps.length > 0 && (
         <div className="mt-2 border-t border-line pt-2">
-          <div className="mb-1.5 text-[12.5px] font-medium text-muted">
+          <div className="mb-1.5 text-[0.78125rem] font-medium text-muted">
             Steps · {new Date(selectedRun.startedAt).toLocaleString()}
           </div>
           <TaskRows variant="List" rows={selectedRun.steps.map(stepTaskRow)} />
           {selectedRun.status === "waiting_approval" && (
             <a
               href={`/dashboard/projects/${projectId}/autopilot`}
-              className="mt-2 flex items-center gap-1.5 rounded-sm bg-needs px-2.5 py-2 text-[12px] font-semibold text-ink"
+              className="mt-2 flex items-center gap-1.5 rounded-sm bg-needs px-2.5 py-2 text-[0.75rem] font-semibold text-ink"
             >
               <span className="aos-shape aos-shape--needs" style={{ color: "inherit" }} aria-hidden />
               Waiting on approval — review in the approval queue →

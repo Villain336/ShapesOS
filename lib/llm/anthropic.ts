@@ -19,10 +19,23 @@
 //     {type: "between_tools"} at effort high or below; Haiku 4.5 has neither
 //     adaptive thinking nor effort. What could not be applied is reported in
 //     meta.notes, never sent as a request that 400s.
-//   - prompt caching: one breakpoint on the last system block (it caches the
-//     tools + system prefix together), or on the last tool when there is no
-//     system prompt; optional automatic caching of the conversation tail.
-//     Tools are sorted by name so the cached prefix is byte-stable.
+//   - prompt caching (Phase 17 A1): a breakpoint on the last LOADED tool and
+//     one on the last system block, both with the request's TTL (1h for
+//     chat, 5m otherwise — cache_control.ttl, SDK CacheControlEphemeral);
+//     optional automatic caching of the conversation tail (top-level
+//     cache_control, 5m — a 1h marker before a 5m tail is the documented
+//     order). Tools are sorted by name so the cached prefix is byte-stable;
+//     deferred tools sort after loaded ones (they are not rendered into the
+//     prefix and may not carry cache_control).
+//   - tool search (Phase 17 A2): ChatToolDef.deferLoading → `defer_loading`
+//     plus the server-side tool_search_tool_bm25_20251119 tool (SDK
+//     ToolSearchToolBm25_20251119, non-beta), on the models the docs list.
+//   - context editing (Phase 17 A3): clear_tool_uses_20250919 under beta
+//     context-management-2025-06-27 (SDK BetaClearToolUses20250919Edit).
+//   - service_tier (Phase 17 A4): "auto" | "standard_only" (SDK
+//     MessageCreateParams.service_tier); the response's usage.service_tier is
+//     reported back.
+//   - timing (Phase 17 A1): ttftMs (first content delta) and durationMs.
 //   - server tools web_search_20260209 / web_fetch_20260209 on models that
 //     support them.
 //   - forced tool_choice is NEVER sent to Claude Opus 5.5 / Sonnet 5.5 /
@@ -44,10 +57,12 @@ import { estimateCostMicroUsd, priceFor } from "./pricing";
 import { checkToolUse } from "./tool-input";
 import { assertModelSpendAllowed, recordChatUsage } from "./usage";
 import type {
+  ChatCacheTtl,
   ChatContentBlock,
   ChatEffort,
   ChatRequest,
   ChatResponse,
+  ChatResponseMeta,
   ChatServerTool,
   ChatStopReason,
   ChatStreamEvent,
@@ -58,6 +73,9 @@ import type {
 } from "./types";
 
 export const ANTHROPIC_TIMEOUT_MS = 120_000;
+
+/** Phase 17 (A4): workloads no person waits on (never priority capacity). */
+export const NON_INTERACTIVE_WORKLOADS: ReadonlySet<string> = new Set(["bulk", "background", "subagent"]);
 export const ANTHROPIC_MAX_RETRIES = 1;
 
 /** Map an SDK error to a classified, key-free LlmProviderError. */
@@ -110,6 +128,17 @@ export interface AnthropicModelCaps {
   serverTools: boolean;
   /** Phase 8: server-side compaction (beta compact-2026-01-12 / compact_20260112). */
   compaction?: boolean;
+  /**
+   * Phase 17 (A2): tool_search_tool_bm25_20251119 / defer_loading. Per the
+   * tool-search-tool docs (model compatibility table, read 2026-10-06): every
+   * current model from Haiku 4.5 up; Opus 4.1 and earlier do not.
+   */
+  toolSearch: boolean;
+  /**
+   * Phase 17 (A3): clear_tool_uses_20250919 under context-management-2025-06-27.
+   * Per the context-editing docs (read 2026-10-06): all supported models.
+   */
+  contextEditing: boolean;
 }
 
 /** Per-model API surface, from the Claude API docs (models.md, error-codes.md,
@@ -119,34 +148,41 @@ export function anthropicModelCaps(model: string): AnthropicModelCaps {
     case "claude-opus-5-5":
       // Thinking always on; effort is the only depth control; forced tool_choice 400s.
       // Compaction beta: listed for Opus 5.5 (typescript/claude-api/README.md → Compaction).
-      return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true, compaction: true };
+      return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true, compaction: true, toolSearch: true, contextEditing: true };
     case "claude-fable-5-1":
       // As Opus 5.5. The compaction beta is documented for "Fable 5", not
       // named for 5.1 — not assumed (the loop compacts client-side instead).
-      return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true };
+      return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true, toolSearch: true, contextEditing: true };
     case "claude-sonnet-5-5":
       // disabled 400s; between_tools at effort <= high turns it off; forced 400s.
-      return { adaptiveThinking: true, thinkingOff: "between_tools", effort: true, forcedToolChoice: false, serverTools: true };
+      return { adaptiveThinking: true, thinkingOff: "between_tools", effort: true, forcedToolChoice: false, serverTools: true, toolSearch: true, contextEditing: true };
     case "claude-opus-5":
       // Adaptive by default; disabled only at effort high or lower. Compaction beta listed.
-      return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true, compaction: true };
+      return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true, compaction: true, toolSearch: true, contextEditing: true };
     case "claude-sonnet-5":
       // Adaptive by default; disabled only at effort high or lower.
-      return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true };
+      return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true, toolSearch: true, contextEditing: true };
     case "claude-haiku-4-5":
       // No adaptive thinking, no effort (thinking is off unless budgeted).
-      return { adaptiveThinking: false, thinkingOff: "omit", effort: false, forcedToolChoice: true, serverTools: false };
+      return { adaptiveThinking: false, thinkingOff: "omit", effort: false, forcedToolChoice: true, serverTools: false, toolSearch: true, contextEditing: true };
     default:
-      return { adaptiveThinking: false, thinkingOff: "omit", effort: false, forcedToolChoice: false, serverTools: false };
+      return { adaptiveThinking: false, thinkingOff: "omit", effort: false, forcedToolChoice: false, serverTools: false, toolSearch: false, contextEditing: false };
   }
 }
 
 const EPHEMERAL = { type: "ephemeral" } as const;
+/** SDK CacheControlEphemeral: { type: "ephemeral", ttl?: "5m" | "1h" } (resources/messages/messages.d.ts). */
+function cacheControl(ttl: ChatCacheTtl | undefined): Anthropic.Messages.CacheControlEphemeral {
+  return ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : EPHEMERAL;
+}
 const MAX_CACHE_BREAKPOINTS = 4;
 const SERVER_TOOL_TYPES: Record<ChatServerTool, string> = {
   web_search: "web_search_20260209",
   web_fetch: "web_fetch_20260209",
 };
+
+/** Phase 17 (A2): the server-side tool search tool (SDK ToolSearchToolBm25_20251119). */
+export const TOOL_SEARCH_TOOL = { type: "tool_search_tool_bm25_20251119", name: "tool_search_tool_bm25" } as const;
 
 export interface BuiltAnthropicRequest {
   params: Anthropic.Messages.MessageCreateParamsNonStreaming;
@@ -154,11 +190,24 @@ export interface BuiltAnthropicRequest {
   serverToolsSent: ChatServerTool[];
   /** Phase 8: the request uses the compaction beta (send via client.beta.messages). */
   compaction: boolean;
+  /** Phase 17: the request carries any `betas` (send via client.beta.messages). */
+  beta: boolean;
+  /** Phase 17 (A2): deferred tools were offered through server-side tool search. */
+  toolSearch: boolean;
+  /** Phase 17 (A3): context editing was sent. */
+  contextEditing: boolean;
+  /** Phase 17: the effort actually sent (null = the model's default). */
+  effort: ChatEffort | null;
 }
 
 /** Phase 8: the documented compaction beta (typescript/claude-api/README.md). */
 export const COMPACTION_BETA = "compact-2026-01-12";
 export const COMPACTION_EDIT = "compact_20260112";
+/** Phase 17 (A3): the documented context-editing beta (SDK AnthropicBeta union, resources/beta/beta.d.ts). */
+export const CONTEXT_EDITING_BETA = "context-management-2025-06-27";
+export const CLEAR_TOOL_USES_EDIT = "clear_tool_uses_20250919";
+/** Defaults of clear_tool_uses_20250919 per the context-editing docs (trigger 100k input tokens, keep 3). */
+export const CONTEXT_EDITING_DEFAULTS = { triggerInputTokens: 100_000, keepToolUses: 3 } as const;
 
 function toAnthropicContent(
   blocks: ChatContentBlock[],
@@ -212,18 +261,36 @@ export function buildAnthropicParams(
   const notes: string[] = [];
   const count = { breakpoints: 0 };
 
+  const ttl = req.cacheTtl;
+
   // System prompt → text blocks.
   const sysIn = typeof req.system === "string" ? (req.system ? [{ text: req.system }] : []) : (req.system ?? []);
   const system: Anthropic.Messages.TextBlockParam[] = sysIn.map((b) => {
     const cache = "cache" in b && b.cache === true;
     if (cache) count.breakpoints++;
-    return { type: "text", text: b.text, ...(cache ? { cache_control: EPHEMERAL } : {}) };
+    return { type: "text", text: b.text, ...(cache ? { cache_control: cacheControl(ttl) } : {}) };
   });
 
-  // Tools: server tools first, then client tools sorted by name, so the last
-  // tool (the breakpoint when there is no system prompt) is stable.
+  // Tools: server tools first, then LOADED client tools sorted by name, then
+  // deferred client tools sorted by name — so the last rendered tool block
+  // (the tool breakpoint) is stable, and deferred tools (which the API keeps
+  // out of the prefix and which may not carry cache_control) come after it.
   const serverToolsSent: ChatServerTool[] = [];
   const tools: Array<Record<string, unknown>> = [];
+  const byName = (a: { name: string }, b: { name: string }) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  const sortedClient = [...(req.tools ?? [])].sort(byName);
+  const wantsToolSearch = req.toolSearch === true && sortedClient.some((t) => t.deferLoading);
+  let toolSearch = false;
+  if (wantsToolSearch) {
+    if (caps.toolSearch) {
+      // Must stay non-deferred itself; at least one other tool must be loaded
+      // too (the API 400s when everything is deferred) — enforced below.
+      tools.push({ ...TOOL_SEARCH_TOOL });
+      toolSearch = true;
+    } else {
+      notes.push(`Tool search is not available on ${model}; deferred tools were sent as loaded tools.`);
+    }
+  }
   for (const s of [...new Set(req.serverTools ?? [])]) {
     if (caps.serverTools) {
       tools.push({ type: SERVER_TOOL_TYPES[s], name: s });
@@ -232,32 +299,44 @@ export function buildAnthropicParams(
       notes.push(`Server tool ${s} is not available on ${model}; not sent.`);
     }
   }
-  const clientTools = [...(req.tools ?? [])].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  for (const t of clientTools) {
-    tools.push({
-      name: t.name,
-      description: t.description,
-      input_schema: t.inputSchema,
-      ...(t.strict ? { strict: true } : {}),
-      // Streamed tool input arrives as generated; we validate it ourselves.
-      ...(opts.stream ? { eager_input_streaming: true } : {}),
-    });
+  const loadedClient = toolSearch ? sortedClient.filter((t) => !t.deferLoading) : sortedClient;
+  const deferredClient = toolSearch ? sortedClient.filter((t) => t.deferLoading) : [];
+  if (toolSearch && loadedClient.length === 0 && deferredClient.length > 0) {
+    // Never send an all-deferred set: load the first one (byte-stable choice).
+    loadedClient.push(deferredClient.shift()!);
+    notes.push(`Every tool was deferred; ${loadedClient[0].name} was loaded so the request is valid.`);
   }
+  const clientToolParam = (t: (typeof sortedClient)[number], deferred: boolean) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema,
+    ...(t.strict ? { strict: true } : {}),
+    // Streamed tool input arrives as generated; we validate it ourselves.
+    ...(opts.stream ? { eager_input_streaming: true } : {}),
+    ...(deferred ? { defer_loading: true } : {}),
+  });
+  for (const t of loadedClient) tools.push(clientToolParam(t, false));
+  const lastLoadedIndex = tools.length - 1;
+  for (const t of deferredClient) tools.push(clientToolParam(t, true));
 
-  // cache: one breakpoint caches tools + system together (render order is
-  // tools → system → messages).
+  // cache (Phase 17 A1): a breakpoint on the last LOADED tool and one on the
+  // last system block (render order is tools → system → messages, so the
+  // tool entry survives a system-prompt change and the system entry covers
+  // both). Both carry the request's TTL.
   if (req.cache) {
+    if (loadedClient.length > 0) {
+      tools[lastLoadedIndex].cache_control = cacheControl(ttl);
+      count.breakpoints++;
+    }
     if (system.length > 0) {
       const last = system[system.length - 1];
       if (!last.cache_control) {
-        last.cache_control = EPHEMERAL;
+        last.cache_control = cacheControl(ttl);
         count.breakpoints++;
       }
-    } else if (clientTools.length > 0) {
-      tools[tools.length - 1].cache_control = EPHEMERAL;
-      count.breakpoints++;
     }
   }
+  const clientTools = sortedClient;
 
   // Messages. Empty messages (everything dropped) are skipped; consecutive
   // same-role turns are merged by the API.
@@ -283,7 +362,12 @@ export function buildAnthropicParams(
   const params: Record<string, unknown> = { model, max_tokens: req.maxTokens, messages };
   if (system.length > 0) params.system = system;
   if (tools.length > 0) params.tools = tools;
+  // The conversation tail stays on the 5-minute TTL (steps are seconds
+  // apart); a 1h explicit marker before a 5m automatic tail is the
+  // documented order (prompt-caching.md § Automatic vs explicit).
   if (req.cacheConversation) params.cache_control = EPHEMERAL;
+  // Phase 17 (A4): SDK MessageCreateParams.service_tier: 'auto' | 'standard_only'.
+  if (req.serviceTier) params.service_tier = req.serviceTier;
 
   // tool_choice — never forced where the model rejects it.
   if (req.toolChoice && (clientTools.length > 0 || serverToolsSent.length > 0)) {
@@ -328,16 +412,44 @@ export function buildAnthropicParams(
     }
   }
 
-  // Compaction (Phase 8): server-side summarize-and-continue, beta.
+  // Context editing (Phase 17 A3) + compaction (Phase 8): both ride on
+  // context_management.edits over the beta endpoint. Shapes from the SDK:
+  // BetaClearToolUses20250919Edit { trigger: BetaInputTokensTrigger, keep:
+  // BetaToolUsesKeep, clear_at_least: BetaInputTokensClearAtLeast,
+  // exclude_tools } and BetaCompact20260112Edit.
+  const betas: string[] = [];
+  const edits: Array<Record<string, unknown>> = [];
+  let contextEditing = false;
+  if (req.contextEditing) {
+    if (caps.contextEditing && opts.betaAvailable !== false) {
+      const ce = req.contextEditing;
+      const edit: Record<string, unknown> = {
+        type: CLEAR_TOOL_USES_EDIT,
+        trigger: { type: "input_tokens", value: ce.triggerInputTokens ?? CONTEXT_EDITING_DEFAULTS.triggerInputTokens },
+        keep: { type: "tool_uses", value: ce.keepToolUses ?? CONTEXT_EDITING_DEFAULTS.keepToolUses },
+      };
+      if (ce.clearAtLeastTokens) edit.clear_at_least = { type: "input_tokens", value: ce.clearAtLeastTokens };
+      if (ce.excludeTools?.length) edit.exclude_tools = [...ce.excludeTools];
+      edits.push(edit);
+      betas.push(CONTEXT_EDITING_BETA);
+      contextEditing = true;
+    } else {
+      notes.push(`Server-side context editing is not available on ${model}; not sent.`);
+    }
+  }
   let compaction = false;
   if (req.compaction) {
     if (caps.compaction && opts.betaAvailable !== false) {
-      params.betas = [COMPACTION_BETA];
-      params.context_management = { edits: [{ type: COMPACTION_EDIT }] };
+      betas.push(COMPACTION_BETA);
+      edits.push({ type: COMPACTION_EDIT });
       compaction = true;
     } else {
       notes.push(`Server-side compaction is not available on ${model}; not sent.`);
     }
+  }
+  if (betas.length > 0) {
+    params.betas = betas;
+    params.context_management = { edits };
   }
 
   return {
@@ -345,6 +457,10 @@ export function buildAnthropicParams(
     notes,
     serverToolsSent,
     compaction,
+    beta: betas.length > 0,
+    toolSearch,
+    contextEditing,
+    effort: effort && caps.effort ? effort : null,
   };
 }
 
@@ -367,12 +483,31 @@ export function mapAnthropicStopReason(r: string | null | undefined): ChatStopRe
 }
 
 function mapUsage(u: Anthropic.Messages.Usage | null | undefined): ChatUsage {
+  // SDK Usage.cache_creation: { ephemeral_1h_input_tokens, ephemeral_5m_input_tokens }.
+  const oneHour = u?.cache_creation?.ephemeral_1h_input_tokens ?? 0;
   return {
     inputTokens: u?.input_tokens ?? 0,
     outputTokens: u?.output_tokens ?? 0,
     cacheReadTokens: u?.cache_read_input_tokens ?? 0,
     cacheWriteTokens: u?.cache_creation_input_tokens ?? 0,
+    ...(oneHour > 0 ? { cacheWrite1hTokens: oneHour } : {}),
   };
+}
+
+/** Phase 17 (A3): the response's context_management.applied_edits (beta), as plain data. */
+function mapContextEdits(msg: Anthropic.Messages.Message): ChatResponseMeta["contextEdits"] {
+  const cm = (msg as unknown as { context_management?: { applied_edits?: unknown } | null }).context_management;
+  if (!cm || !Array.isArray(cm.applied_edits)) return undefined;
+  const out: NonNullable<ChatResponseMeta["contextEdits"]> = [];
+  for (const e of cm.applied_edits as Array<Record<string, unknown>>) {
+    if (!e || typeof e.type !== "string") continue;
+    out.push({
+      type: e.type,
+      clearedInputTokens: typeof e.cleared_input_tokens === "number" ? e.cleared_input_tokens : 0,
+      ...(typeof e.cleared_tool_uses === "number" ? { clearedToolUses: e.cleared_tool_uses } : {}),
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 /** Shallow plain copy (drops the SDK's non-enumerable stream bookkeeping). */
@@ -393,6 +528,9 @@ export function mapAnthropicMessage(
     notes: string[];
     serverToolsSent: ChatServerTool[];
     toolJson?: Map<number, string>;
+    /** Phase 17: what the request carried / measured. */
+    built?: Pick<BuiltAnthropicRequest, "compaction" | "toolSearch" | "contextEditing" | "effort">;
+    timing?: { startedAt: number; firstDeltaAt: number | null; endedAt: number };
   },
 ): ChatResponse {
   const stopReason = mapAnthropicStopReason(msg.stop_reason);
@@ -425,6 +563,14 @@ export function mapAnthropicMessage(
   const usage = mapUsage(msg.usage);
   const pricedModel = priceFor(ctx.model) ? ctx.model : msg.model;
   const sd = msg.stop_details;
+  // SDK Usage.service_tier: 'standard' | 'priority' | 'batch' | null.
+  const serviceTier = (msg.usage as { service_tier?: string | null } | null | undefined)?.service_tier ?? null;
+  const meta: ChatResponseMeta = { serverToolsSent: ctx.serverToolsSent, notes: ctx.notes };
+  if (ctx.built?.compaction) meta.compaction = "server";
+  if (ctx.built?.toolSearch) meta.toolSearch = "server";
+  const edits = mapContextEdits(msg);
+  if (edits) meta.contextEdits = edits;
+  const t = ctx.timing;
   return {
     id: msg.id ?? null,
     content,
@@ -434,8 +580,11 @@ export function mapAnthropicMessage(
     usage,
     model: ctx.model,
     provider: "anthropic",
-    costMicroUsd: estimateCostMicroUsd(pricedModel, usage),
-    meta: { serverToolsSent: ctx.serverToolsSent, notes: ctx.notes },
+    costMicroUsd: estimateCostMicroUsd(pricedModel, usage, { serviceTier }),
+    meta,
+    ...(t ? { timing: { ttftMs: t.firstDeltaAt === null ? null : t.firstDeltaAt - t.startedAt, durationMs: t.endedAt - t.startedAt } } : {}),
+    effort: ctx.built?.effort ?? null,
+    serviceTier,
   };
 }
 
@@ -446,12 +595,28 @@ interface MessageStreamLike extends AsyncIterable<Anthropic.Messages.RawMessageS
   abort?(): void;
 }
 
+/**
+ * Phase 17 (A4): the slice of the SDK's Message Batches resource the batch
+ * path uses (client.messages.batches — SDK resources/messages/batches.d.ts:
+ * create({ requests: [{ custom_id, params }] }), retrieve(id) →
+ * processing_status 'in_progress' | 'canceling' | 'ended', results(id) →
+ * JSONL of { custom_id, result: { type: 'succeeded', message } | errored |
+ * canceled | expired }).
+ */
+export interface BatchesLike {
+  create(params: { requests: Array<{ custom_id: string; params: Anthropic.Messages.MessageCreateParamsNonStreaming }> }): PromiseLike<{ id: string; processing_status: string }>;
+  retrieve(id: string): PromiseLike<{ id: string; processing_status: string; request_counts?: Record<string, number> }>;
+  results(id: string): PromiseLike<AsyncIterable<{ custom_id: string; result: { type: string; message?: Anthropic.Messages.Message; error?: unknown } }>>;
+}
+
 interface MessagesLike {
   create(
     params: Anthropic.Messages.MessageCreateParamsNonStreaming,
     options?: { signal?: AbortSignal },
   ): PromiseLike<Anthropic.Messages.Message>;
   stream(params: Anthropic.Messages.MessageStreamParams, options?: { signal?: AbortSignal }): MessageStreamLike;
+  /** Phase 17 (A4): Message Batches (the real SDK client always has it). */
+  batches?: BatchesLike;
 }
 
 /** The slice of the SDK client this adapter uses (a test seam). */
@@ -511,17 +676,133 @@ export class AnthropicLlmProvider implements LlmProvider {
     return this.defaultEffort;
   }
 
+  /** Router workload (metering label). */
+  getWorkload(): string | null {
+    return this.workload;
+  }
+
+  // ── Phase 17 (A4): Message Batches ────────────────────────────────────────
+
+  /** True when this client can send Message Batches (50% of standard prices). */
+  supportsBatch(): boolean {
+    return Boolean(this.client.messages.batches);
+  }
+
+  /**
+   * Submit prompts as one Message Batch. Gated by the credit cap like any
+   * call (assertModelSpendAllowed); never sent for a capped workspace.
+   * The params are exactly generate()'s (no service_tier: a batch is its
+   * own tier).
+   */
+  async submitBatch(
+    requests: ReadonlyArray<{ customId: string; prompt: string; maxTokens: number }>,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<{ providerBatchId: string; status: string }> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    await assertModelSpendAllowed(usage, this.keySource, this.name);
+    try {
+      const b = await batches.create({
+        requests: requests.map((r) => ({
+          custom_id: r.customId,
+          params: { model: this.model, max_tokens: r.maxTokens, messages: [{ role: "user", content: r.prompt }] },
+        })),
+      });
+      return { providerBatchId: b.id, status: b.processing_status };
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+  }
+
+  /** Poll a batch: ended once processing_status is "ended". */
+  async batchStatus(providerBatchId: string): Promise<{ ended: boolean; status: string }> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    try {
+      const b = await batches.retrieve(providerBatchId);
+      return { ended: b.processing_status === "ended", status: b.processing_status };
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+  }
+
+  /**
+   * An ended batch's results, one per request (any order — keyed by
+   * customId). Each succeeded message's usage is recorded (llm_tokens, the
+   * batch tier at 50%), idempotent per response id: a re-read after a worker
+   * restart never charges twice.
+   */
+  async batchResults(
+    providerBatchId: string,
+    usage?: LlmGenerateOptions["usage"],
+  ): Promise<Record<string, { text: string } | { error: string }>> {
+    const batches = this.client.messages.batches;
+    if (!batches) throw new LlmProviderError({ provider: this.name, kind: "client", detail: "this client has no Message Batches resource" });
+    const out: Record<string, { text: string } | { error: string }> = {};
+    let decoder: AsyncIterable<{ custom_id: string; result: { type: string; message?: Anthropic.Messages.Message; error?: unknown } }>;
+    try {
+      decoder = await batches.results(providerBatchId);
+    } catch (err) {
+      throw classifyAnthropicError(err);
+    }
+    for await (const line of decoder) {
+      const r = line.result;
+      if (r.type === "succeeded" && r.message) {
+        const msg = r.message;
+        const u = mapUsage(msg.usage);
+        // Batch results report usage.service_tier "batch"; default to it.
+        const serviceTier = (msg.usage as { service_tier?: string | null } | null)?.service_tier ?? "batch";
+        if (usage) {
+          await recordChatUsage({
+            context: usage,
+            workload: this.workload,
+            provider: this.name,
+            model: this.model,
+            usage: u,
+            costMicroUsd: estimateCostMicroUsd(priceFor(this.model) ? this.model : msg.model, u, { serviceTier }),
+            responseId: msg.id ?? null,
+            keySource: this.keySource,
+            timing: null,
+            effort: null,
+            serviceTier,
+          });
+        }
+        const text = msg.content
+          .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+          .trim();
+        out[line.custom_id] = text ? { text } : { error: `empty response (stop_reason ${msg.stop_reason ?? "unknown"})` };
+      } else {
+        const detail = r.type === "errored" ? `errored: ${JSON.stringify(r.error ?? {}).slice(0, 300)}` : r.type;
+        out[line.custom_id] = { error: detail };
+      }
+    }
+    return out;
+  }
+
+  /** Phase 17 (A2): tool search is server-side on the models the docs list. */
+  supportsToolSearch(): boolean {
+    return anthropicModelCaps(this.model).toolSearch;
+  }
+
   async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     const maxTokens = opts?.maxTokens ?? 4096;
     // Phase 15.2: a capped workspace is refused before anything is sent.
     await assertModelSpendAllowed(opts?.usage, this.keySource, this.name);
     let res: Anthropic.Messages.Message;
+    const startedAt = Date.now();
     try {
       res = await this.client.messages.create(
         {
           model: this.model,
           max_tokens: maxTokens,
           messages: [{ role: "user", content: prompt }],
+          // Phase 17 (A4): bulk / background / sub-agent work nobody waits
+          // for never takes priority capacity (SDK service_tier: 'auto' |
+          // 'standard_only'); copy (a person may be waiting on a draft) keeps
+          // the API default.
+          ...(NON_INTERACTIVE_WORKLOADS.has(this.workload ?? "") ? { service_tier: "standard_only" as const } : {}),
         },
         opts?.signal ? { signal: opts.signal } : undefined,
       );
@@ -535,15 +816,19 @@ export class AnthropicLlmProvider implements LlmProvider {
     // when the text turns out empty, so record first).
     if (opts?.usage) {
       const usage = mapUsage(res.usage);
+      const serviceTier = (res.usage as { service_tier?: string | null } | null)?.service_tier ?? null;
       await recordChatUsage({
         context: opts.usage,
         workload: this.workload,
         provider: this.name,
         model: this.model,
         usage,
-        costMicroUsd: estimateCostMicroUsd(priceFor(this.model) ? this.model : res.model, usage),
+        costMicroUsd: estimateCostMicroUsd(priceFor(this.model) ? this.model : res.model, usage, { serviceTier }),
         responseId: res.id ?? null,
         keySource: this.keySource,
+        timing: { ttftMs: null, durationMs: Date.now() - startedAt },
+        effort: null,
+        serviceTier,
       });
     }
 
@@ -577,12 +862,15 @@ export class AnthropicLlmProvider implements LlmProvider {
       costMicroUsd: res.costMicroUsd,
       responseId: res.id,
       keySource: this.keySource,
+      timing: res.timing ?? null,
+      effort: res.effort ?? null,
+      serviceTier: res.serviceTier ?? null,
     });
   }
 
-  /** The endpoint a built request goes to (beta when it uses compaction). */
+  /** The endpoint a built request goes to (beta when it carries betas: compaction / context editing). */
   private endpoint(built: BuiltAnthropicRequest): MessagesLike {
-    return built.compaction && this.client.beta ? this.client.beta.messages : this.client.messages;
+    return built.beta && this.client.beta ? this.client.beta.messages : this.client.messages;
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
@@ -593,14 +881,21 @@ export class AnthropicLlmProvider implements LlmProvider {
       betaAvailable: Boolean(this.client.beta),
     });
     let msg: Anthropic.Messages.Message;
+    const startedAt = Date.now();
     try {
       msg = await this.endpoint(built).create(built.params, req.signal ? { signal: req.signal } : undefined);
     } catch (err) {
       if (req.signal?.aborted) throw req.signal.reason ?? err;
       throw classifyAnthropicError(err);
     }
-    const res = mapAnthropicMessage(msg, { model: this.model, req, notes: built.notes, serverToolsSent: built.serverToolsSent });
-    if (built.compaction) res.meta.compaction = "server";
+    const res = mapAnthropicMessage(msg, {
+      model: this.model,
+      req,
+      notes: built.notes,
+      serverToolsSent: built.serverToolsSent,
+      built,
+      timing: { startedAt, firstDeltaAt: null, endedAt: Date.now() },
+    });
     await this.record(req, res);
     return res;
   }
@@ -616,6 +911,8 @@ export class AnthropicLlmProvider implements LlmProvider {
     const toolMeta = new Map<number, { id: string; name: string }>();
     let stream: MessageStreamLike | null = null;
     let msg: Anthropic.Messages.Message | null = null;
+    const startedAt = Date.now();
+    let firstDeltaAt: number | null = null;
     try {
       try {
         stream = this.endpoint(built).stream(
@@ -623,6 +920,8 @@ export class AnthropicLlmProvider implements LlmProvider {
           req.signal ? { signal: req.signal } : undefined,
         );
         for await (const ev of stream) {
+          // Phase 17 (A1): time to the first content delta of any kind.
+          if (firstDeltaAt === null && ev.type === "content_block_delta") firstDeltaAt = Date.now();
           if (ev.type === "content_block_start") {
             if (ev.content_block.type === "tool_use") {
               toolMeta.set(ev.index, { id: ev.content_block.id, name: ev.content_block.name });
@@ -674,8 +973,9 @@ export class AnthropicLlmProvider implements LlmProvider {
       notes: built.notes,
       serverToolsSent: built.serverToolsSent,
       toolJson,
+      built,
+      timing: { startedAt, firstDeltaAt, endedAt: Date.now() },
     });
-    if (built.compaction) res.meta.compaction = "server";
     await this.record(req, res);
     yield { type: "message_stop", stopReason: res.stopReason, usage: res.usage };
     yield { type: "final", response: res };

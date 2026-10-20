@@ -18,7 +18,7 @@ interface EngineFlow {
 }
 
 const btnPrimary =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnGhost =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 const chipCls =
@@ -94,13 +94,13 @@ export default function ActivepiecesFlowBindings({
   return (
     <div className="mt-4 border-t border-line pt-4" data-testid="activepieces-flow-bindings">
       <h3 className="text-sm font-semibold text-ink">Flow bindings</h3>
-      <p className="mt-1 text-[13px] text-muted">
+      <p className="mt-1 text-[0.8125rem] text-muted">
         Platform operators only. A flow runs only from the workspace it is bound to; bind it to{" "}
         {workspaceName} to make it available to Missions, Playbooks and the Strategy Agent here.
       </p>
 
       {error && (
-        <p role="alert" className="mt-2 flex items-center gap-2 text-[13px] text-failed-text">
+        <p role="alert" className="mt-2 flex items-center gap-2 text-[0.8125rem] text-failed-text">
           <span className="h-2 w-2 shrink-0 bg-failed" aria-hidden="true" />
           {error}
         </p>

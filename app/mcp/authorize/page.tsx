@@ -93,9 +93,9 @@ export default async function McpAuthorizePage({
         <p className="mt-2 text-sm text-ink">
           <span className="font-semibold">{clientName}</span> wants access with these exact
           permissions. Approving sends you back to{" "}
-          <code className="rounded bg-canvas px-1 font-mono text-[13px]">{host}</code>.
+          <code className="rounded bg-canvas px-1 font-mono text-[0.8125rem]">{host}</code>.
         </p>
-        <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-ink">
+        <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-[0.8125rem] text-ink">
           <p>
             ShapesOS hasn&apos;t verified this app. Its name comes from the app itself. Only approve
             if you started this connection and you trust{" "}
@@ -109,7 +109,7 @@ export default async function McpAuthorizePage({
           {scopes.map(({ scope, label }) => (
             <li key={scope} className="p-4">
               <div className="text-sm font-semibold text-ink">{label!.title}</div>
-              <div className="mt-0.5 text-[13px] text-muted">{label!.description}</div>
+              <div className="mt-0.5 text-[0.8125rem] text-muted">{label!.description}</div>
               <code className="mt-1 inline-block rounded bg-canvas px-1.5 py-0.5 font-mono text-xs text-muted">
                 {scope}
               </code>
@@ -124,7 +124,7 @@ export default async function McpAuthorizePage({
         ) : (
           <ConsentForm grant={grant!} workspaces={eligible} defaultWorkspaceId={defaultWorkspaceId} />
         )}
-        <p className="mt-4 text-[13px] text-muted">
+        <p className="mt-4 text-[0.8125rem] text-muted">
           The token is bound to the workspace you choose, limited to what your role there allows,
           and expires after 1 hour. Revoke access any time in Settings → API / MCP.
         </p>

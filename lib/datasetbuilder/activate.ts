@@ -175,10 +175,26 @@ export function briefNowPullRef(type: DatasetType, version: number): string {
   return `mcp://get_dataset_adapter?type=${type}&version=${version}`;
 }
 
-/** File-drop root for co-located BriefNow runtimes; null = MCP pull only. */
+let warnedHostedDrop = false;
+
+/**
+ * File-drop root for co-located BriefNow runtimes; null = MCP pull only.
+ * Deploy PR (class c — self-host only): the drop writes to THIS server's
+ * disk for a connector on the same box. A hosted install (several instances,
+ * no shared disk) never writes it — the MCP pull (get_dataset_adapter, built
+ * from the database) is the live path everywhere.
+ */
 export function briefNowAdaptersRoot(env: NodeJS.ProcessEnv = process.env): string | null {
   const root = (env.BRIEFNOW_ADAPTERS_ROOT ?? "").trim();
-  return root ? path.resolve(root) : null;
+  if (!root) return null;
+  if ((env.DEPLOYMENT_MODE ?? "").trim().toLowerCase() === "hosted") {
+    if (!warnedHostedDrop) {
+      warnedHostedDrop = true;
+      console.warn("[datasetbuilder] BRIEFNOW_ADAPTERS_ROOT is ignored on DEPLOYMENT_MODE=hosted; BriefNow pulls adapters over MCP.");
+    }
+    return null;
+  }
+  return path.resolve(root);
 }
 
 export function ragSnapshotRef(

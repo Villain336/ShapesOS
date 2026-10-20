@@ -22,7 +22,7 @@ export default async function ExperimentsSettingsPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading">Experiments</h1>
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-[0.8125rem] text-muted">
           {workspace.name} — feature flags and experiments, powered by a
           self-hosted GrowthBook sidecar (open core, MIT bulk).
         </p>
@@ -30,7 +30,7 @@ export default async function ExperimentsSettingsPage() {
       <SettingsNav />
 
       <div className="flex items-center gap-1 border-b border-line">
-        <span className="inline-flex items-center gap-1.5 border-b-2 border-ink px-3 py-2 text-[13px] font-medium text-ink">
+        <span className="inline-flex items-center gap-1.5 border-b-2 border-ink px-3 py-2 text-[0.8125rem] font-medium text-ink">
           <FlaskConical className="h-4 w-4" />
           Flags
         </span>

@@ -6,6 +6,8 @@
 // fail-closed RLS pattern as the Composio tables.
 
 import { prisma } from "@/lib/prisma";
+// Phase 18.1 (WS=find): Spotlight indexes each doc's text on create / save.
+import { scheduleUniverDocTextIndex } from "@/lib/search/text-index-schedule";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   isUniverDocKind,
@@ -13,6 +15,10 @@ import {
   type UniverDocKind,
 } from "@/lib/univer/snapshots";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
+// Phase 18.2 (WS=content): version history (idle snapshots) + notes share
+// this table (kind "note"); the Office functions here only see Office kinds.
+import { snapshotBeforeSave } from "@/lib/univer/versions";
+import { UNIVER_DOC_KINDS } from "@/lib/univer/snapshots";
 
 export const UNIVER_SHARE_STATES = ["private", "workspace", "link"] as const;
 export type UniverShareState = (typeof UNIVER_SHARE_STATES)[number];
@@ -86,6 +92,7 @@ export async function createUniverDoc(
       },
     }),
   );
+  scheduleUniverDocTextIndex(workspaceId, row.id);
   return toRecord(row);
 }
 
@@ -95,7 +102,8 @@ export async function getUniverDoc(
   id: string,
 ): Promise<UniverDocRecord | null> {
   const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.findFirst({ where: { id, workspaceId } }),
+    // Phase 18.2: notes (kind "note") are not Office docs.
+    tx.univerDoc.findFirst({ where: { id, workspaceId, kind: { in: [...UNIVER_DOC_KINDS] } } }),
   );
   return row ? toRecord(row) : null;
 }
@@ -116,7 +124,8 @@ export async function listUniverDocs(
     tx.univerDoc.findMany({
       where: {
         workspaceId,
-        ...(opts.kind && isUniverDocKind(opts.kind) ? { kind: opts.kind } : {}),
+        // Phase 18.2: notes (kind "note") never list as Office docs.
+        ...(opts.kind && isUniverDocKind(opts.kind) ? { kind: opts.kind } : { kind: { in: [...UNIVER_DOC_KINDS] } }),
         ...(opts.sourceRef ? { sourceRef: opts.sourceRef } : {}),
       },
       orderBy: { updatedAt: "desc" },
@@ -134,7 +143,7 @@ export async function saveUniverDocSnapshot(
   workspaceId: string,
   id: string,
   snapshot: unknown,
-  opts: { expectedVersion?: number } = {},
+  opts: { expectedVersion?: number; userId?: string | null } = {},
 ): Promise<UniverDocRecord> {
   const existing = await getUniverDoc(workspaceId, id);
   if (!existing) throw new NotFoundError("doc not found");
@@ -147,12 +156,15 @@ export async function saveUniverDocSnapshot(
       `version conflict: expected ${opts.expectedVersion}, current ${existing.version}`,
     );
   }
-  const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.update({
+  const row = await withWorkspaceScope(workspaceId, async (tx) => {
+    // Phase 18.2: a doc that sat idle keeps the state it had (version history).
+    await snapshotBeforeSave(tx, existing, opts.userId ?? null);
+    return tx.univerDoc.update({
       where: { id, workspaceId },
       data: { snapshot: snapshot as object, version: { increment: 1 } },
-    }),
-  );
+    });
+  });
+  scheduleUniverDocTextIndex(workspaceId, row.id);
   return toRecord(row);
 }
 

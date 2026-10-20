@@ -99,21 +99,21 @@ const inputCls =
   "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 
 const btnPrimary =
-  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 const btnGhost =
   "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 const btnSmall =
-  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-1 text-[11px] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper focus-visible:outline-none disabled:opacity-40";
+  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-1 text-[0.6875rem] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper focus-visible:outline-none disabled:opacity-40";
 
 const btnSmallPrimary =
-  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-ink px-2 py-1 text-[11px] font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none disabled:opacity-40";
+  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-ink px-2 py-1 text-[0.6875rem] font-semibold text-white aos-press hover:bg-ink-hover focus-visible:outline-none disabled:opacity-40";
 
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
   void tone;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
@@ -122,7 +122,7 @@ function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: 
 /** Genuine agent state: an enrichment agent is mid-run on this prospect. */
 function RunningBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-running px-2 py-0.5 text-[10px] font-semibold leading-tight text-white">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-running px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-white">
       <span
         className="aos-shape aos-shape--running aos-is-live"
         style={{ color: "var(--aos-on-running)" }}
@@ -384,7 +384,7 @@ export function ProspectsApp() {
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-[13px] font-semibold text-ink">{l.name}</span>
+                <span className="truncate text-[0.8125rem] font-semibold text-ink">{l.name}</span>
                 <Chip>{l.status}</Chip>
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
@@ -396,7 +396,7 @@ export function ProspectsApp() {
                   <Chip key={t}>{t}</Chip>
                 ))}
               </div>
-              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
+              <div className="mt-1.5 flex items-center gap-2 text-[0.6875rem] text-muted">
                 <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" />{l.prospectCount}</span>
                 <span className="inline-flex items-center gap-1 text-muted"><BadgeCheck className="h-3 w-3" />{l.enrichedCount} enriched</span>
               </div>
@@ -495,7 +495,7 @@ export function ProspectsApp() {
 
             {/* Prospect table */}
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[12px] text-muted">{prospects.length} prospects</p>
+              <p className="text-[0.75rem] text-muted">{prospects.length} prospects</p>
               {prospects.length > 0 && (
                 <OpenInSheetsButton
                   title={`Prospect list — ${selected?.name ?? "all"}`}
@@ -512,7 +512,7 @@ export function ProspectsApp() {
                   ])}
                   sourceRef="prospects:list"
                   sheetName="Prospects"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[12px] font-semibold text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[0.75rem] font-semibold text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
                 />
               )}
             </div>
@@ -663,7 +663,7 @@ export function ProspectsApp() {
       )}
 
       {researchTarget && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" role="presentation" onClick={() => setResearchTarget(null)} onKeyDown={closeOnEscape(() => setResearchTarget(null))}>
+        <div className="fixed inset-0 z-40 flex justify-end bg-night/30" role="presentation" onClick={() => setResearchTarget(null)} onKeyDown={closeOnEscape(() => setResearchTarget(null))}>
           <div className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -677,13 +677,13 @@ export function ProspectsApp() {
             )}
             <section className="mb-4">
               <h4 className="mb-1 text-xs font-semibold text-muted">Summary</h4>
-              <p className="text-[13px] leading-relaxed text-muted">{researchTarget.research?.summary}</p>
+              <p className="text-[0.8125rem] leading-relaxed text-muted">{researchTarget.research?.summary}</p>
             </section>
             <section className="mb-4">
               <h4 className="mb-1 text-xs font-semibold text-muted">Icebreakers</h4>
               <ul className="space-y-1.5">
                 {(researchTarget.research?.icebreakers ?? []).map((s, i) => (
-                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[13px] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" />{s}</li>
+                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[0.8125rem] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" />{s}</li>
                 ))}
               </ul>
             </section>
@@ -691,13 +691,13 @@ export function ProspectsApp() {
               <h4 className="mb-1 text-xs font-semibold text-muted">First lines</h4>
               <ul className="space-y-1.5">
                 {(researchTarget.research?.firstLines ?? []).map((s, i) => (
-                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[13px] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />{s}</li>
+                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[0.8125rem] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />{s}</li>
                 ))}
               </ul>
             </section>
             <section>
               <h4 className="mb-1 text-xs font-semibold text-muted">Talking points</h4>
-              <ul className="list-disc space-y-1 pl-5 text-[13px] text-muted">
+              <ul className="list-disc space-y-1 pl-5 text-[0.8125rem] text-muted">
                 {(researchTarget.research?.talkingPoints ?? []).map((s, i) => <li key={i}>{s}</li>)}
               </ul>
             </section>
@@ -710,7 +710,7 @@ export function ProspectsApp() {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-night/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-lg rounded-lg border border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">{title}</h3>

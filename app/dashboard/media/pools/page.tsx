@@ -11,7 +11,7 @@ import { poolUtilization } from "@/lib/media/pools";
 
 // Pool status is not an agent state: neutral chips, told apart by label.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[0.75rem] font-semibold leading-tight";
 const chipSlate = `${chip} text-muted`;
 const chipGreen = `${chip} text-ink`;
 const chipRed = `${chip} text-ink`;
@@ -42,7 +42,7 @@ export default async function PoolsPage() {
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading text-ink">Budget pools</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+        <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
           Non-custodial caps with encumbrance ledgers. Dual enforcement: software encumbrance +
           a virtual card on the client&apos;s own Brex/Ramp account (limit = pool cap) — the
           money-layer backstop that kills the €7,937/day failure class.
@@ -56,7 +56,7 @@ export default async function PoolsPage() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-[0.8125rem]">
             <thead>
               <tr className="border-b border-line bg-canvas text-xs text-muted">
                 <th className="px-3 py-2 font-semibold">Pool</th>
@@ -81,7 +81,7 @@ export default async function PoolsPage() {
                     </td>
                     <td className="px-3 py-2"><span className={poolStatusTone(p.status)}>{p.status}</span></td>
                     <td className="px-3 py-2 text-muted">{p.period}</td>
-                    <td className="px-3 py-2 text-[12px] text-muted">{p.platformAllowlist.join(", ")}</td>
+                    <td className="px-3 py-2 text-[0.75rem] text-muted">{p.platformAllowlist.join(", ")}</td>
                     <td className="px-3 py-2 font-medium text-ink">{money(p.remainingCents, p.currency)}</td>
                     <td className="px-3 py-2 text-muted">{money(p.encumberedCents, p.currency)}</td>
                     <td className="px-3 py-2">
@@ -92,10 +92,10 @@ export default async function PoolsPage() {
                             style={{ width: `${Math.min(100, util).toFixed(1)}%` }}
                           />
                         </span>
-                        <span className="text-[11px] text-muted">{util.toFixed(0)}%</span>
+                        <span className="text-[0.6875rem] text-muted">{util.toFixed(0)}%</span>
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="px-3 py-2 font-mono text-[0.6875rem] text-muted">
                       {p.virtualCardRef ?? "none"} ({p.cardProvider})
                     </td>
                   </tr>

@@ -57,7 +57,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 function chip(text: React.ReactNode, cls: string) {
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight ${cls}`}>
       {text}
     </span>
   );
@@ -117,12 +117,12 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
                   <span className={`block h-full rounded-full ${scoreBar(audit.score)}`} style={{ width: audit.score == null ? "0%" : `${audit.score}%` }} />
                 </span>
               </td>
-              <td className="px-3 py-2 text-[12px] text-muted">{audit.dataSource}</td>
+              <td className="px-3 py-2 text-[0.75rem] text-muted">{audit.dataSource}</td>
             </tr>
             <tr key={`${audit.id}-findings`} className="border-b border-line bg-paper/40">
               <td colSpan={4} className="px-3 py-2">
                 {top.length === 0 ? (
-                  <p className="text-[12px] text-subtle">
+                  <p className="text-[0.75rem] text-subtle">
                     {audit.completeness === "unavailable"
                       ? "No data available — connect the contributing data sources to unlock this audit."
                       : "No findings recorded."}
@@ -135,8 +135,8 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
                         <li key={i} className="flex gap-2">
                           <SIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${SEVERITY_COLOR[f.severity]}`} />
                           <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-ink">{f.title}</p>
-                            <p className="line-clamp-1 text-[12px] text-muted">{f.detail}</p>
+                            <p className="text-[0.75rem] font-medium text-ink">{f.title}</p>
+                            <p className="line-clamp-1 text-[0.75rem] text-muted">{f.detail}</p>
                           </div>
                         </li>
                       );
@@ -144,7 +144,7 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
                   </ul>
                 )}
                 {audit.findings.length > 3 && (
-                  <p className="mt-1 text-[11px] text-subtle">+ {audit.findings.length - 3} more findings in the PDF.</p>
+                  <p className="mt-1 text-[0.6875rem] text-subtle">+ {audit.findings.length - 3} more findings in the PDF.</p>
                 )}
               </td>
             </tr>
@@ -218,9 +218,9 @@ export default async function IntelligencePage({
       {/* Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[13px] text-muted">Intelligence report</p>
+          <p className="text-[0.8125rem] text-muted">Intelligence report</p>
           <h1 className="mt-1 aos-heading">{brandName}</h1>
-          {domain && <p className="mt-0.5 text-[13px] text-muted">{domain}</p>}
+          {domain && <p className="mt-0.5 text-[0.8125rem] text-muted">{domain}</p>}
           {row && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
               {chip(`v${row.version}`, "border-line bg-paper text-muted")}
@@ -317,9 +317,9 @@ export default async function IntelligencePage({
               <p className="text-xs text-muted">Each audit cites the ShapesOS module that produced it.</p>
             </div>
             <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                  <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">Audit</th>
                     <th className="px-3 py-2 font-medium">Completeness</th>
                     <th className="px-3 py-2 font-medium">Score</th>
@@ -347,9 +347,9 @@ export default async function IntelligencePage({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full text-left text-[0.8125rem]">
                   <thead>
-                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                    <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                       <th className="px-3 py-2 font-medium">#</th>
                       <th className="px-3 py-2 font-medium">Opportunity</th>
                       <th className="px-3 py-2 font-medium">Impact</th>
@@ -363,13 +363,13 @@ export default async function IntelligencePage({
                     {bundle.opportunities.map((o, i) => (
                       <tr key={o.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className="px-3 py-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[0.6875rem] font-bold text-white">
                             {i + 1}
                           </span>
                         </td>
                         <td className="max-w-xs px-3 py-2">
                           <span className="font-medium text-ink">{o.title}</span>
-                          <span className="block text-[12px] text-muted line-clamp-2">{o.description}</span>
+                          <span className="block text-[0.75rem] text-muted line-clamp-2">{o.description}</span>
                         </td>
                         <td className="px-3 py-2">
                           <span className="flex items-center gap-1 font-bold text-ink">
@@ -391,8 +391,8 @@ export default async function IntelligencePage({
                           {chip(`${o.confidence} confidence`,
                             "border-line bg-paper text-muted shadow-control")}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-muted">{o.executesIn}</td>
-                        <td className="px-3 py-2 text-[12px] text-muted">{AUDIT_NAMES[o.auditId]}</td>
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">{o.executesIn}</td>
+                        <td className="px-3 py-2 text-[0.75rem] text-muted">{AUDIT_NAMES[o.auditId]}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -447,9 +447,9 @@ function PlanBoardReadOnly({ initiatives }: { initiatives: PlanInitiative[] }) {
           <section key={s.sprint} aria-label={s.label}>
             <h3 className="mb-2 text-sm font-semibold tracking-tight text-ink">{s.label}</h3>
             <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.8125rem]">
                 <thead>
-                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
+                  <tr className="border-b border-line bg-paper/60 text-[0.6875rem] text-muted">
                     <th className="px-3 py-2 font-medium">#</th>
                     <th className="px-3 py-2 font-medium">Initiative</th>
                     <th className="px-3 py-2 font-medium">Module</th>
@@ -461,7 +461,7 @@ function PlanBoardReadOnly({ initiatives }: { initiatives: PlanInitiative[] }) {
                   {items.map((i) => (
                     <tr key={i.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className="px-3 py-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[0.6875rem] font-bold text-white">
                           {i.priority}
                         </span>
                       </td>
@@ -470,11 +470,11 @@ function PlanBoardReadOnly({ initiatives }: { initiatives: PlanInitiative[] }) {
                           {i.title}
                           {i.adjustedByHuman && chip("human-adjusted", "border-line bg-paper text-muted shadow-control")}
                         </span>
-                        <span className="block text-[12px] text-muted line-clamp-2">{i.description}</span>
+                        <span className="block text-[0.75rem] text-muted line-clamp-2">{i.description}</span>
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{i.module}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{i.effort}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{i.expectedOutcome}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{i.module}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{i.effort}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{i.expectedOutcome}</td>
                     </tr>
                   ))}
                 </tbody>

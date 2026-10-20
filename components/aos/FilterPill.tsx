@@ -38,7 +38,7 @@ export function FilterPill({
       {status ? <StatusShape status={status} size={9} tone={selected ? "night" : "paper"} live={false} /> : null}
       {children}
       {typeof count === "number" ? (
-        <span className={cn("tabular-nums", selected ? "text-night-soft" : "text-muted")}>{count}</span>
+        <span className={cn("tabular-nums", selected ? "text-on-ink-muted" : "text-muted")}>{count}</span>
       ) : null}
     </>
   );

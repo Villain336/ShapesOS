@@ -90,11 +90,11 @@ export function InventoryTab() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-ink">Inventory</h2>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Stock moves only through inventory transactions — the ledger and the balance can never drift.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-muted">
+        <div className="flex items-center gap-4 text-[0.8125rem] text-muted">
           <span>
             Products{" "}
             <span className="font-bold text-ink tabular-nums">{products.length}</span>
@@ -108,11 +108,11 @@ export function InventoryTab() {
 
       {alerts.length > 0 && (
         <div className={needsBoxCls}>
-          <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+          <div className="flex items-center gap-2 text-[0.8125rem] font-bold text-ink">
             <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs attention" /> {alerts.length} product{alerts.length === 1 ? "" : "s"} at or
             below the low-stock threshold
           </div>
-          <p className="mt-1 text-[13px] text-ink">
+          <p className="mt-1 text-[0.8125rem] text-ink">
             {alerts
               .slice(0, 5)
               .map((p) => `${p.name} (${p.stockQty} left)`)
@@ -156,14 +156,14 @@ export function InventoryTab() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading inventory…
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
           <Boxes size={28} className="mx-auto text-subtle" />
-          <p className="mt-2 text-[13px] font-semibold text-ink">No products yet</p>
-          <p className="mt-0.5 text-[13px] text-muted">
+          <p className="mt-2 text-[0.8125rem] font-semibold text-ink">No products yet</p>
+          <p className="mt-0.5 text-[0.8125rem] text-muted">
             Add a product to start tracking stock.
           </p>
         </div>

@@ -224,7 +224,7 @@ export function DoohApp() {
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[0.84375rem] font-medium transition ${
               tab === id
                 ? "border-ink text-ink"
                 : "border-transparent text-muted hover:text-ink"
@@ -254,15 +254,15 @@ export function DoohApp() {
           <div className="rounded-lg border border-line bg-paper p-4">
             <h2 className="text-sm font-semibold text-ink">1 · Vendor & inventory</h2>
             <label className="mt-3 block text-xs font-medium text-muted">Vendor (locked order)</label>
-            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
+            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
               {VENDORS.map((v) => (
                 <option key={v.id} value={v.id}>{v.label}</option>
               ))}
             </select>
             <p className="mt-1 text-xs text-muted">{VENDORS.find((v) => v.id === vendor)?.hint}</p>
             <div className="mt-3 flex gap-2">
-              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
-              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
               <button onClick={lookupInventory} disabled={loading} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white aos-press disabled:opacity-40">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Lookup
               </button>
@@ -284,15 +284,15 @@ export function DoohApp() {
           <div className="rounded-lg border border-line bg-paper p-4">
             <h2 className="text-sm font-semibold text-ink">2 · Flight, dayparts & budget</h2>
             <label className="mt-3 block text-xs font-medium text-muted">Plan name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-muted">Flight start</label>
-                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted">Flight end</label>
-                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
               </div>
             </div>
             <label className="mt-3 block text-xs font-medium text-muted">Daypart mix</label>
@@ -304,7 +304,7 @@ export function DoohApp() {
               ))}
             </div>
             <label className="mt-3 block text-xs font-medium text-muted">Plays per board per day</label>
-            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
             <label className="mt-3 block text-xs font-medium text-muted">Creatives (Creative Studio — hash-bound)</label>
             <div className="mt-1 max-h-32 space-y-1 overflow-y-auto">
               {creatives.map((c) => (
@@ -335,9 +335,9 @@ export function DoohApp() {
           <p className="text-sm text-muted">No plans yet — build one in the Planner tab.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-[0.8125rem]">
               <thead>
-                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-canvas text-[0.6875rem] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Plan</th>
                   <th className="px-3 py-2 font-medium">Vendor</th>
                   <th className="px-3 py-2 font-medium">Boards</th>
@@ -354,10 +354,10 @@ export function DoohApp() {
                       <td className="px-3 py-2 font-medium text-ink">{plan.name}</td>
                       <td className="px-3 py-2 text-muted">{plan.vendor}</td>
                       <td className="px-3 py-2 text-muted">{(plan.placementsJson.placements ?? []).length}</td>
-                      <td className="px-3 py-2 text-[12px] text-muted">{plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd}</td>
+                      <td className="px-3 py-2 text-[0.75rem] text-muted">{plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd}</td>
                       <td className="px-3 py-2 font-medium text-ink">{money(plan.estimateCents)}</td>
                       <td className="px-3 py-2">
-                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted">{plan.status}</span>
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[0.625rem] font-medium leading-tight text-muted">{plan.status}</span>
                       </td>
                       <td className="px-3 py-2">
                         <button onClick={() => { const next = expandedPlan === plan.id ? null : plan.id; setExpandedPlan(next); if (next) loadPackets(plan.id); }} className="rounded-full border border-line bg-paper px-2 py-1 text-xs font-medium text-ink shadow-outline hover:bg-hover-paper">
@@ -386,13 +386,13 @@ export function DoohApp() {
                           ))}
                           <div className="mt-3 rounded-lg border border-line bg-paper p-3">
                             <h4 className="text-xs font-semibold text-muted">Compile launch packet (approved buy only)</h4>
-                            <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                            <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
                             <label className="mt-2 block text-xs text-muted">Per-placement tracking (JSON — from the attribution track)</label>
-                            <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 font-mono text-[12px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                            <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 font-mono text-[0.75rem] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
                             <button onClick={() => compilePacket(plan.id)} disabled={loading || !approvalId} className="mt-2 flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-white aos-press disabled:opacity-40">
                               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />} Compile packet
                             </button>
-                            <p className="mt-1 text-[11px] text-muted">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
+                            <p className="mt-1 text-[0.6875rem] text-muted">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
                           </div>
                         </td>
                       </tr>

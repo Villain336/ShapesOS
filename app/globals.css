@@ -13,9 +13,21 @@
 
 @import "../docs/design/tailwind.css";
 
-/* .dark class variant (kept: vault/shadcn components use dark: — the class is
- * never applied, so those styles stay inert, exactly as before). */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Phase 18.1: the `dark:` variant follows the person's theme. <html> carries
+ * .dark (explicit dark) or .theme-system (follow the OS), set server-side
+ * from their preferences (lib/preferences/shell.ts). The token sets live in
+ * docs/design/tokens.css; components should use tokens, not `dark:`, which
+ * remains only for the vendored vault/shadcn primitives. */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(.theme-system, .theme-system *) {
+      @slot;
+    }
+  }
+}
 
 :root {
   /* next/font variables, set on <html> in app/layout.tsx */
@@ -181,6 +193,20 @@ body {
   color: var(--aos-text);
 }
 
+/* Phase 18.1: the black sidebar needs an edge on a dark canvas. */
+:root:is(.dark, .theme-dark) aside.aos-night { box-shadow: inset -1px 0 0 var(--aos-night-line); }
+@media (prefers-color-scheme: dark) {
+  :root.theme-system aside.aos-night { box-shadow: inset -1px 0 0 var(--aos-night-line); }
+}
+
+/* Phase 18.1 (density): the shell's own rows follow --aos-row-h. The
+ * sidebar's nav is addressed by its data-shell-nav hook (its label is
+ * translated), the palette rows use min-h-row directly. */
+:root.density-compact nav[data-shell-nav] :is(a, button):not([class*="size-"]) {
+  height: var(--aos-row-h);
+  min-height: var(--aos-row-h);
+}
+
 h1, h2, h3, h4 { text-wrap: balance; }
 p { text-wrap: pretty; }
 
@@ -223,7 +249,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 [data-focus-ring="container"]:focus-visible { outline: none; }
 
 /* StreamingText / ContextCards — favicon source avatars */
-.source-avatar { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); }
+.source-avatar { box-shadow: 0 0 0 1px var(--aos-line-strong); }
 
 /* primitive spacing system */
 .primitive-card-pad { padding: 12px; }
@@ -306,4 +332,6 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
   }
   .msg-enter, .widget-enter { animation: none; }
 }
+:root.motion-reduce :is(.msg-enter, .widget-enter, .stream-caret) { animation: none; }
+:root.motion-reduce .stream-tail { filter: none; -webkit-mask-image: none; mask-image: none; }
 

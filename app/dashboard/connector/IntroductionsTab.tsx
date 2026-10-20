@@ -86,12 +86,12 @@ function IntroActions({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-paper p-5 shadow-hairline">
-      <p className="text-[12px] font-semibold text-muted">Next actions</p>
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      <p className="text-[0.75rem] font-semibold text-muted">Next actions</p>
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
 
       {intro.status === "proposed" && intro.tenantApproved && (
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             The ask is out to {intro.personA.name}. Record their human response —
             the agent can never accept on their behalf.
           </p>
@@ -153,7 +153,7 @@ function IntroActions({
 
       {intro.status === "side_a_accepted" && (
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             The offer is out to {intro.personB.name}. Record their human response.
           </p>
           <ActionRow>
@@ -204,11 +204,11 @@ function IntroActions({
 
       {intro.status === "side_b_accepted" && (
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-muted">
+          <p className="text-[0.8125rem] text-muted">
             Both sides accepted — the intro can go out now, and only now.
           </p>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Intro message</span>
+            <span className="text-[0.75rem] font-semibold text-muted">Intro message</span>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -218,7 +218,7 @@ function IntroActions({
             />
           </label>
           <ActionRow>
-            <label className="flex items-center gap-2 text-[13px] text-muted">
+            <label className="flex items-center gap-2 text-[0.8125rem] text-muted">
               Send via
               <input
                 value={sentVia}
@@ -243,12 +243,12 @@ function IntroActions({
       {(intro.status === "made" || intro.status === "followed_up") &&
         !intro.pendingFollowupDraft && (
           <div className="flex flex-col gap-2">
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               Post-intro nudge — drafts land in your approval inbox logic: you
               approve every followup before it sends.
             </p>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-semibold text-muted">Followup draft</span>
+              <span className="text-[0.75rem] font-semibold text-muted">Followup draft</span>
               <textarea
                 value={followupDraft}
                 onChange={(e) => setFollowupDraft(e.target.value)}
@@ -284,7 +284,7 @@ function IntroActions({
 
       {intro.pendingFollowupDraft && (
         <div className="flex flex-col gap-2 rounded-md border border-line bg-canvas p-3">
-          <p className="text-[12px] font-semibold text-muted">
+          <p className="text-[0.75rem] font-semibold text-muted">
             Pending followup draft — to{" "}
             {intro.pendingFollowupTo === "side_a"
               ? intro.personA.name
@@ -292,9 +292,9 @@ function IntroActions({
                 ? intro.personB.name
                 : "both"}
           </p>
-          <p className="text-[14px] leading-relaxed text-ink">{intro.pendingFollowupDraft}</p>
+          <p className="text-[0.875rem] leading-relaxed text-ink">{intro.pendingFollowupDraft}</p>
           <ActionRow>
-            <label className="flex items-center gap-2 text-[13px] text-muted">
+            <label className="flex items-center gap-2 text-[0.8125rem] text-muted">
               Send via
               <input
                 value={sentVia}
@@ -348,7 +348,7 @@ function IntroDetail({
 
       <div className="flex flex-col gap-4 rounded-lg bg-paper p-5 shadow-hairline">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-[18px] font-semibold text-ink">
+          <div className="text-[1.125rem] font-semibold text-ink">
             {intro.personA.name} <span className="font-normal text-muted">→</span>{" "}
             {intro.personB.name}
           </div>
@@ -358,7 +358,7 @@ function IntroDetail({
         <PathSnapshotView snapshot={intro.introPathSnapshot} />
         {/* Slice 5: funding plug-in lineage — linked investor + data-room offer. */}
         {(intro.fundingInvestor || intro.dataRoomShareLinkId) && (
-          <div className="grid gap-x-6 gap-y-1 text-[13px] text-muted md:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-1 text-[0.8125rem] text-muted md:grid-cols-2">
             {intro.fundingInvestor && (
               <span>
                 Linked investor:{" "}
@@ -378,7 +378,7 @@ function IntroDetail({
             )}
           </div>
         )}
-        <div className="grid gap-x-6 gap-y-1 text-[13px] text-muted md:grid-cols-2">
+        <div className="grid gap-x-6 gap-y-1 text-[0.8125rem] text-muted md:grid-cols-2">
           <span>
             Tenant approval:{" "}
             <span className="font-semibold text-ink">
@@ -500,9 +500,9 @@ export function IntroductionsTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-[13px] font-semibold text-failed-text">{error}</p>}
+      {error && <p className="text-[0.8125rem] font-semibold text-failed-text">{error}</p>}
       {intros.length === 0 ? (
-        <div className="rounded-lg bg-paper p-6 text-[14px] text-muted shadow-hairline">
+        <div className="rounded-lg bg-paper p-6 text-[0.875rem] text-muted shadow-hairline">
           No introductions yet. The connector agent proposes intros from the paths
           it finds — each one lands in your approval inbox first.
         </div>
@@ -515,10 +515,10 @@ export function IntroductionsTab() {
             className="aos-press flex items-center justify-between gap-3 rounded-sm bg-paper px-4 py-3 text-left shadow-hairline"
           >
             <span className="min-w-0">
-              <span className="block truncate text-[15px] font-semibold text-ink">
+              <span className="block truncate text-[0.9375rem] font-semibold text-ink">
                 {i.personA.name} <span className="font-normal text-muted">→</span> {i.personB.name}
               </span>
-              <span className="block truncate text-[13px] text-muted">
+              <span className="block truncate text-[0.8125rem] text-muted">
                 Proposed {new Date(i.createdAt).toLocaleDateString()}
                 {i.followupCount > 0 &&
                   ` · ${i.followupCount} followup${i.followupCount === 1 ? "" : "s"}`}

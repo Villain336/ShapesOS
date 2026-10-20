@@ -41,6 +41,7 @@ export default function AssistantClient({
   memberCount,
   currentUserId,
   initialTab,
+  initialThreadId = null,
   workspaceId,
 }: {
   project: AssistantProject;
@@ -50,9 +51,11 @@ export default function AssistantClient({
   memberCount: number;
   currentUserId: string;
   initialTab: ChatTab;
+  /** Phase 18.1: open this thread first (a Spotlight chat hit). */
+  initialThreadId?: string | null;
   workspaceId: string;
 }) {
-  const { setSession, tab, setTab } = useChat();
+  const { setSession, tab, setTab, openThread } = useChat();
   const router = useRouter();
   const [showThreads, setShowThreads] = useState(false);
 
@@ -72,6 +75,12 @@ export default function AssistantClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (initialThreadId) void openThread(initialThreadId).catch(() => {});
+    // Once per thread id (the session effect above has set the project).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialThreadId]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Top strip: project switcher, AI/Team tabs, live indicator */}
@@ -85,7 +94,7 @@ export default function AssistantClient({
               <span className="flex size-5 shrink-0 items-center justify-center rounded-control bg-ink text-page">
                 <TrendingUp className="size-3" />
               </span>
-              <span className="truncate text-[13px] font-medium">{project.domain}</span>
+              <span className="truncate text-[0.8125rem] font-medium">{project.domain}</span>
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
           </DropdownMenuTrigger>
@@ -126,7 +135,7 @@ export default function AssistantClient({
                 aria-selected={active}
                 onClick={() => setTab(value)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-150",
+                  "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[0.8125rem] transition-all duration-150",
                   active
                     ? "bg-surface font-medium text-ink shadow-hairline"
                     : "text-ink-2 hover:text-ink",
@@ -146,7 +155,7 @@ export default function AssistantClient({
           aria-expanded={showThreads}
           aria-label="Toggle chat threads"
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink md:hidden",
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.8125rem] text-ink-2 transition-colors hover:text-ink md:hidden",
             showThreads && "bg-accent-tint font-medium text-accent-ink",
           )}
         >
@@ -154,7 +163,7 @@ export default function AssistantClient({
           MessagesSquare
         </button>
 
-        <span className="hidden items-center gap-1.5 text-[12px] text-ink-3 sm:inline-flex">
+        <span className="hidden items-center gap-1.5 text-[0.75rem] text-ink-3 sm:inline-flex">
           <span className={cn("size-1.5 rounded-full", mockMode ? "bg-amber" : "bg-green")} />
           {mockMode ? "Mock mode" : "Live AI"}
         </span>

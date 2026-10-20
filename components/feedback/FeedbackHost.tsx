@@ -15,6 +15,8 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { cn } from "@/lib/utils";
 import { feedback, type FeedbackState, type ToastRecord } from "@/lib/ui/feedback";
 import { ToastView } from "@/components/aos/Toast";
+// Phase 18.1 (integration): the toast region's name in the person's language.
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 const EMPTY: FeedbackState = { toasts: [], confirm: null };
 
@@ -40,7 +42,7 @@ function ConfirmDialog({ state }: { state: FeedbackState }) {
       }}
     >
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-[90] bg-ink/30 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <AlertDialog.Backdrop className="fixed inset-0 z-[90] bg-night/30 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <AlertDialog.Popup
           initialFocus={view?.destructive ? cancelRef : confirmRef}
           className="fixed top-1/2 left-1/2 z-[91] flex w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-lg bg-paper p-6 text-ink shadow-overlay transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0"
@@ -116,6 +118,7 @@ function ToastItem({ t }: { t: ToastRecord }) {
 }
 
 export function FeedbackHost() {
+  const { t: tr } = useI18n();
   const state = useSyncExternalStore(
     (fn) => feedback.subscribe(fn),
     () => feedback.getState(),
@@ -127,7 +130,7 @@ export function FeedbackHost() {
     <>
       <ConfirmDialog state={state} />
       <section
-        aria-label="Notifications"
+        aria-label={tr("kit.toasts")}
         aria-live="polite"
         className="pointer-events-none fixed right-4 bottom-4 z-[95] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
       >

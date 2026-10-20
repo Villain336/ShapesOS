@@ -14,6 +14,8 @@
 // retried write or a second path never delivers the same event twice.
 // No new delivery system: the Phase 4a queue + cron deliver them.
 
+// Phase 18.3 (WS=trust): notifications at the same seam.
+import { opsNotices, queueOpsNotices } from "@/lib/notifications/ops";
 import type { WebhookEventData, WebhookEventType } from "./events";
 import { emitWebhookEventInTx } from "./emit";
 
@@ -199,8 +201,15 @@ export function opsWebhookEvents(slug: string, before: Row | null, after: Row): 
 type Tx = Parameters<typeof emitWebhookEventInTx>[0];
 
 /** Enqueue the events of one ops write in its own transaction. Never throws. */
-export async function emitOpsWriteEvents(tx: Tx, workspaceId: string, slug: string, before: Row | null, after: Row): Promise<number> {
+export async function emitOpsWriteEvents(tx: Tx, workspaceId: string, slug: string, before: Row | null, after: Row, actorUserId: string | null = null): Promise<number> {
   let n = 0;
+  // Phase 18.3 (WS=trust): invoice paid / ticket assigned notifications,
+  // produced right after this write's transaction (lib/notifications/ops.ts).
+  try {
+    queueOpsNotices(workspaceId, opsNotices(slug, before, after), actorUserId);
+  } catch {
+    /* pure mapper + setImmediate: nothing to do */
+  }
   try {
     for (const ev of opsWebhookEvents(slug, before, after)) {
       n += (await emitWebhookEventInTx(tx, { workspaceId, type: ev.type, data: ev.data as never, dedupKey: ev.dedupKey })).enqueued;
@@ -212,6 +221,11 @@ export async function emitOpsWriteEvents(tx: Tx, workspaceId: string, slug: stri
 }
 
 /** Same, for a ready-made event (payments / web-order paths). Never throws. */
-export async function emitOpsEvent(tx: Tx, workspaceId: string, ev: OpsEvent): Promise<number> {
+export async function emitOpsEvent(tx: Tx, workspaceId: string, ev: OpsEvent, actorUserId: string | null = null): Promise<number> {
+  // Phase 18.3 (WS=trust): a payment that settles an invoice notifies too.
+  if (ev.type === "invoice.paid") {
+    const d = ev.data as { id: string; totalCents?: number | null };
+    queueOpsNotices(workspaceId, [{ kind: "invoice_paid", invoiceId: d.id, number: null, totalCents: d.totalCents ?? null, currency: null }], actorUserId);
+  }
   return (await emitWebhookEventInTx(tx, { workspaceId, type: ev.type, data: ev.data as never, dedupKey: ev.dedupKey })).enqueued;
 }

@@ -31,7 +31,7 @@ interface SequenceOption {
 }
 
 const textareaCls =
-  "min-h-28 w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
+  "min-h-28 w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 
 export function LeadActions({
   lead,
@@ -280,7 +280,7 @@ export function LeadActions({
             void send(panel);
           }}
         >
-          <p className="text-[12px] text-muted">
+          <p className="text-[0.75rem] text-muted">
             To {panel === "email" ? lead.email : lead.phone}. Queued for approval; nothing sends until it&apos;s approved.
           </p>
           {panel === "email" ? (
@@ -316,7 +316,7 @@ export function LeadActions({
               aria-invalid={formError ? true : undefined}
             />
             {panel === "sms" ? (
-              <p className="mt-1 text-right text-[12px] text-muted tabular-nums">
+              <p className="mt-1 text-right text-[0.75rem] text-muted tabular-nums">
                 {body.trim().length} / {SMS_MAX}
               </p>
             ) : null}
@@ -344,11 +344,11 @@ export function LeadActions({
           }}
         >
           {sequences === null ? (
-            <p className="flex items-center gap-2 text-[13px] text-muted">
+            <p className="flex items-center gap-2 text-[0.8125rem] text-muted">
               <Loader2 size={13} className="animate-spin" aria-hidden /> Loading sequences
             </p>
           ) : sequences.length === 0 ? (
-            <p className="text-[13px] text-muted">
+            <p className="text-[0.8125rem] text-muted">
               No sequences yet.{" "}
               <a href="/dashboard/nurture" className="font-semibold text-ink underline underline-offset-2">
                 Create one in Nurture
@@ -407,7 +407,7 @@ export function LeadActions({
 
 function ActionError({ message }: { message: string }) {
   return (
-    <p id="lead-action-error" role="alert" className="flex items-center gap-1.5 text-[13px] text-failed-text">
+    <p id="lead-action-error" role="alert" className="flex items-center gap-1.5 text-[0.8125rem] text-failed-text">
       <span className="aos-shape aos-shape--failed" aria-hidden style={{ ["--aos-shape-size" as string]: "8px" }} />
       {message}
     </p>

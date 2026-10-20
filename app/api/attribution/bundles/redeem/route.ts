@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   }
 
   const ip = clientIp(req);
-  if (!checkRedeemRateLimit(d.code, ip)) {
+  if (!(await checkRedeemRateLimit(d.code, ip))) {
     return Response.json({ error: "Too many attempts, try again later" }, { status: 429 });
   }
 

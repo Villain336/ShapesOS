@@ -10,11 +10,8 @@
 // BEFORE the vendor (10 credits), the API key never leaks into errors, and
 // failed proposals are stored as failed rows for audit, never dropped.
 
-import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { pipeline } from "node:stream/promises";
 import type { Prisma } from "@prisma/client";
+import { storeLogo } from "@/lib/brand-logo";
 import { prisma } from "@/lib/prisma";
 import { createContextDevClient, ContextDevError, type BrandProfile } from "./client";
 import { contextDevCreditsFor } from "./costs";
@@ -192,7 +189,8 @@ export async function proposeBrandSync(
   });
 }
 
-const LOGO_DIR = join(process.cwd(), ".data", "reports", "logos");
+/** Largest logo the sync downloads (the upload route allows 2 MB). */
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 const LOGO_CONTENT_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -201,8 +199,13 @@ const LOGO_CONTENT_TYPES: Record<string, string> = {
   "image/avif": "avif",
 };
 
-/** Best-effort logo download into the kit's logoPath convention. Never throws. */
+/**
+ * Best-effort logo download into the shared blob store (namespace "logos",
+ * <workspaceId>/<kitId>.<ext> — the same place uploaded logos live, so every
+ * replica serves it). Returns the blob ref for BrandKit.logoPath. Never throws.
+ */
 async function downloadLogo(
+  workspaceId: string,
   kitId: string,
   logoUrl: string,
   fetchImpl: typeof fetch,
@@ -222,12 +225,11 @@ async function downloadLogo(
       LOGO_CONTENT_TYPES[contentType] ??
       logoUrl.split("?")[0].split(".").pop()?.toLowerCase().match(/^(png|jpe?g|svg|webp|avif)$/)?.[0] ??
       "png";
-    await mkdir(LOGO_DIR, { recursive: true });
-    const fileName = `${kitId}.${ext}`;
-    const dest = join(LOGO_DIR, fileName);
-    const nodeStream = res.body as unknown as NodeJS.ReadableStream;
-    await pipeline(nodeStream, createWriteStream(dest));
-    return join(".data", "reports", "logos", fileName);
+    const declared = Number(res.headers.get("content-length") ?? 0);
+    if (declared > LOGO_MAX_BYTES) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > LOGO_MAX_BYTES) return null;
+    return await storeLogo(workspaceId, `${kitId}.${ext === "jpeg" ? "jpg" : ext}`, bytes);
   } catch {
     return null;
   }
@@ -301,7 +303,7 @@ export async function approveBrandSync(
 
   let logoPath: string | undefined;
   if (logoUrl) {
-    const downloaded = await downloadLogo(kit.id, logoUrl, fetchImpl);
+    const downloaded = await downloadLogo(workspaceId, kit.id, logoUrl, fetchImpl);
     if (downloaded) logoPath = downloaded;
   }
 

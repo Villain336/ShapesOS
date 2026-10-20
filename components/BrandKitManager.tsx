@@ -148,7 +148,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
         </p>
         <button
           onClick={startCreate}
-          className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover"
+          className="rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-semibold text-white aos-press hover:bg-ink-hover"
         >
           New brand kit
         </button>
@@ -195,7 +195,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[12px] text-muted">
+          <p className="mt-2 text-[0.75rem] text-muted">
             Primary drives this workspace&apos;s UI accent too — the whole app re-tints live
             as you pick. Save to apply.
           </p>
@@ -203,14 +203,14 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
               previews the kit's color via the preview broadcast. Brand-kit
               machinery stays (Tico 2026-10-01); everything else is Agentic OS. */}
           <div className="mt-3 flex items-center gap-3 rounded-lg border border-line bg-canvas p-3">
-            <span className="text-[12px] font-medium text-muted">Live preview</span>
-            <span className="inline-flex items-center rounded-full bg-[var(--brand-600)] px-2.5 py-1.5 text-[13px] font-semibold text-white">
+            <span className="text-[0.75rem] font-medium text-muted">Live preview</span>
+            <span className="inline-flex items-center rounded-full bg-[var(--brand-600)] px-2.5 py-1.5 text-[0.8125rem] font-semibold text-white">
               Primary button
             </span>
-            <span className="inline-flex items-center rounded-full border border-[var(--brand-600)]/30 bg-[var(--brand-50)] px-2 py-0.5 text-[11px] font-semibold text-[var(--brand-700)]">
+            <span className="inline-flex items-center rounded-full border border-[var(--brand-600)]/30 bg-[var(--brand-50)] px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--brand-700)]">
               Soft tint chip
             </span>
-            <span className="font-mono text-[12px] text-muted">
+            <span className="font-mono text-[0.75rem] text-muted">
               {/* Shown value only: with no tenant brand the base primary is ink. */}
               {primaryPreview ?? "#000000"}
             </span>
@@ -237,13 +237,13 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
             <button
               onClick={save}
               disabled={saving}
-              className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
+              className="rounded-full bg-ink px-3 py-1.5 text-[0.8125rem] font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>
             <button
               onClick={() => setEditingId(null)}
-              className="rounded-full bg-paper px-4 py-1.5 text-[13px] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
+              className="rounded-full bg-paper px-4 py-1.5 text-[0.8125rem] font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
             >
               Cancel
             </button>

@@ -192,7 +192,7 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
             type="button"
             onClick={handleSave}
             disabled={phase !== "ready" || saving}
-            className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
+            className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {saving ? "Saving…" : "Save to ShapesOS"}

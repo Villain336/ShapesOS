@@ -22,7 +22,7 @@ import { notFound } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { getMembership, roleAtLeast } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { getAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
+import { getAgentRun, listAgentRunEventsPage, listAgentRunEventsWhere } from "@/lib/agents/runs/service";
 import { prisma } from "@/lib/prisma";
 import { Banner, aosButton } from "@/components/aos";
 import { missionDisplayName } from "@/lib/aos/missions";
@@ -36,6 +36,8 @@ import { LiveWatch } from "./LiveWatch";
 import { ChangesReview } from "./ChangesReview";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 import { RestoreCheckpointButton } from "./RestoreCheckpointButton";
+// Phase 18.3 (WS=flow): "Undo this agent run" (lib/timemachine/undo.ts).
+import { UndoRunPanel } from "@/components/timemachine/UndoRunPanel";
 import { DelegationPlanLive } from "./DelegationPlanLive";
 import { loadDelegationView } from "@/lib/agents/delegation/store";
 import { StatusShape } from "@/components/aos/StatusShape";
@@ -123,15 +125,22 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const run = await getAgentRun(workspace.id, runId);
   if (!run) notFound();
 
-  const [allEvents, membership] = await Promise.all([listAgentRunEvents(workspace.id, runId), getMembership(user.id, workspace.id)]);
+  // Phase 17 (latency): the newest page of timeline steps (older ones load
+  // on demand), the usage events for the cost facts and the sandbox events
+  // for its console — three bounded reads instead of every event of the run.
+  const [page, usageEvents, membership, sandboxRow] = await Promise.all([
+    listAgentRunEventsPage(workspace.id, runId),
+    listAgentRunEventsWhere(workspace.id, runId, { types: ["usage"] }),
+    getMembership(user.id, workspace.id),
+    sandboxRowForRun(workspace.id, runId).catch(() => null),
+  ]);
   // Phase 7: model-call usage events are bookkeeping (cost per run), not
   // steps — they are summed into the facts below and kept off the timeline.
-  const usage = runUsageTotals(allEvents);
+  const usage = runUsageTotals(usageEvents);
   // Phase 8: streamed text and sandbox output are shown live / as a console
   // below, not as timeline steps.
-  const events = allEvents.filter((e) => !isUsageEvent(e) && !isStreamEvent(e) && !isSandboxOutputEvent(e));
-  const sandboxRow = await sandboxRowForRun(workspace.id, runId).catch(() => null);
-  const sandboxView = sandboxRow ? sandboxRunView(allEvents) : null;
+  const events = [...page.events].reverse().filter((e) => !isUsageEvent(e) && !isStreamEvent(e) && !isSandboxOutputEvent(e));
+  const sandboxView = sandboxRow ? sandboxRunView(await listAgentRunEventsWhere(workspace.id, runId, { payloadKindPrefix: "sandbox." })) : null;
 
   // The run's mission: its name, state, plan (steps still to come) and the
   // approvals waiting on a person. Read-only here; decisions happen in the inbox.
@@ -237,7 +246,7 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
     ["Ended", run.endedAt ? fmtTime(run.endedAt) : "Still going"],
     ["Duration", fmtDuration(durationMs)],
     ...runUsageFacts(usage),
-    ["Steps recorded", String(events.length)],
+    ["Steps recorded", String(page.total ?? events.length)],
     ["Browser steps", String(recording?.stepCount ?? 0)],
     ["Artifacts", fmtBytes(recording?.sizeBytes ?? 0)],
   ];
@@ -260,6 +269,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
             completed={timeline.completed}
             control={control}
             stopRunId={stopRunId}
+            olderCursor={page.before}
+            runId={run.id}
           />
 
           {delegation && delegation.plans.length > 0 ? <DelegationPlanLive initial={delegation} /> : null}
@@ -296,6 +307,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
+          {/* Phase 18.3 (WS=flow): what the run changed, and undo — its starter or an admin; not while it runs. */}
+          {!live && !run.parentRunId && (run.startedBy === user.id || roleAtLeast(membership?.role, "admin")) ? <UndoRunPanel runId={run.id} /> : null}
           {run.status === "failed" && failure ? (
             <Banner
               status="failed"

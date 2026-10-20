@@ -96,10 +96,10 @@ describe("magic link → session", () => {
 });
 
 describe("helpers", () => {
-  it("throttles magic-link resends per link+address", () => {
-    assert.equal(mayResendMagicLink("lnk_t", "a@b.example", NOW), true);
-    assert.equal(mayResendMagicLink("lnk_t", "a@b.example", NOW + 1000), false);
-    assert.equal(mayResendMagicLink("lnk_t", "a@b.example", NOW + 61_000), true);
+  it("throttles magic-link resends per link+address", async () => {
+    assert.equal(await mayResendMagicLink("lnk_t", "a@b.example", NOW), true);
+    assert.equal(await mayResendMagicLink("lnk_t", "a@b.example", NOW + 1000), false);
+    assert.equal(await mayResendMagicLink("lnk_t", "a@b.example", NOW + 61_000), true);
   });
 
   it("emailed links use the configured origin, never a request Host", () => {

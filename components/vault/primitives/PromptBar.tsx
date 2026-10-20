@@ -379,10 +379,10 @@ export default function PromptBar({
                       {source.brand ? BRANDS[source.brand] : <Icon size={15}>{GLYPHS[source.glyph ?? "clip"]}</Icon>}
                     </span>
                   )}
-                  <span className="shrink-0 text-[12.5px] font-medium text-ink">
+                  <span className="shrink-0 text-[0.78125rem] font-medium text-ink">
                     {row.name}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{row.desc}</span>
+                  <span className="min-w-0 flex-1 truncate text-[0.75rem] text-muted">{row.desc}</span>
                 </button>
                 {source?.connect && (
                   <button
@@ -390,7 +390,7 @@ export default function PromptBar({
                     aria-pressed={connected}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => setConnected((current) => !current)}
-                    className={`relative z-10 shrink-0 rounded-full px-2 text-[12px] font-medium transition-colors duration-100 ${
+                    className={`relative z-10 shrink-0 rounded-full px-2 text-[0.75rem] font-medium transition-colors duration-100 ${
                       connected ? "text-muted" : "text-ink hover:underline"
                     }`}
                   >
@@ -401,11 +401,11 @@ export default function PromptBar({
             );
           })}
           {rows.length === 0 && (
-            <div className="flex h-9 items-center px-2 text-[12px] text-muted">
+            <div className="flex h-9 items-center px-2 text-[0.75rem] text-muted">
               No matches for “{query}”
             </div>
           )}
-          <div className="mt-1 border-t border-line px-2 pt-1.5 pb-1 text-[11px] text-muted">
+          <div className="mt-1 border-t border-line px-2 pt-1.5 pb-1 text-[0.6875rem] text-muted">
             {menu === "at" ? "Type to search sources & files" : "Type to search commands"}
           </div>
         </div>
@@ -445,8 +445,8 @@ export default function PromptBar({
               }}
               className="relative z-10 flex h-7.5 w-full items-center gap-2 rounded-sm px-2 text-left"
             >
-              <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{m.name}</span>
-              <span className="shrink-0 text-[11px] text-muted">{m.tag}</span>
+              <span className="min-w-0 flex-1 truncate text-[0.78125rem] font-medium text-ink">{m.name}</span>
+              <span className="shrink-0 text-[0.6875rem] text-muted">{m.tag}</span>
               <span className={`shrink-0 text-ink ${m.key === model.key ? "" : "invisible"}`}>
                 <Icon size={13} strokeWidth={2.5}><path d="M20 6L9 17l-5-5" /></Icon>
               </span>
@@ -466,7 +466,7 @@ export default function PromptBar({
         <span
           ref={measureRef}
           aria-hidden="true"
-          className="pointer-events-none absolute invisible whitespace-pre text-[13px] leading-[18px]"
+          className="pointer-events-none absolute invisible whitespace-pre text-[0.8125rem] leading-[18px]"
         >
           {draft}
         </span>
@@ -476,7 +476,7 @@ export default function PromptBar({
             {attachments.map((file, i) => (
               <span
                 key={`${file}-${i}`}
-                className={`flex h-6.5 items-center gap-1.5 bg-paper py-1 pr-1 pl-1.5 text-[11.5px] text-muted shadow-hairline rounded-full`}
+                className={`flex h-6.5 items-center gap-1.5 bg-paper py-1 pr-1 pl-1.5 text-[0.71875rem] text-muted shadow-hairline rounded-full`}
                 style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
               >
                 <Icon size={12}><g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></g></Icon>
@@ -552,7 +552,7 @@ export default function PromptBar({
             placeholder={listening ? "Listening…" : placeholder ?? "Write a message…"}
             aria-label="Prompt"
             data-focus-ring="container"
-            className={`${tall ? "min-h-[68px] px-2 py-2 text-[14px] leading-5" : "min-h-7 px-1 py-[5px] text-[13px] leading-[18px]"} min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-subtle ${
+            className={`${tall ? "min-h-[68px] px-2 py-2 text-[0.875rem] leading-5" : "min-h-7 px-1 py-[5px] text-[0.8125rem] leading-[18px]"} min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-subtle ${
               wide ? "col-span-full col-start-1 row-start-1" : "col-start-2 row-start-1"
             }`}
           />
@@ -567,7 +567,7 @@ export default function PromptBar({
               setPlusOpen(false);
               setModelOpen((current) => !current);
             }}
-            className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-ink rounded-full ${wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
+            className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[0.75rem] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-ink rounded-full ${wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
           >
             {model.name}
             <span className="text-muted">

@@ -3,7 +3,7 @@
 // pills for pressables, tokens only, no legacy violet.
 
 export const inputCls =
-  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-[0.8125rem] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 export const btnPrimary =
   "flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg disabled:opacity-100";

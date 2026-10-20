@@ -6,7 +6,7 @@
 // square; green quarter-disc) — lib/aos/notifications decides. The other
 // kinds are informational and use neutral Lucide icons.
 
-import { CheckCheck, Siren, UserPlus, type LucideIcon } from "lucide-react";
+import { AlarmClock, AtSign, CheckCheck, MessageCircle, Siren, UserPlus, type LucideIcon, Receipt, Ticket, Video } from "lucide-react";
 import { StatusShape } from "@/components/aos/StatusShape";
 import { notificationStatus } from "@/lib/aos/notifications";
 import { STATUS_META } from "@/lib/aos/status";
@@ -16,7 +16,16 @@ export type NotificationKind =
   | "approval_decided"
   | "alert_fired"
   | "run_failed"
-  | "invite_accepted";
+  | "invite_accepted"
+  // Phase 18.2 (WS=comms): Messages and Reminders.
+  | "mention"
+  | "direct_message"
+  | "reminder_due"
+  // Phase 18.3 (WS=trust): Notifications 2.0.
+  | "run_finished"
+  | "invoice_paid"
+  | "ticket_assigned"
+  | "meeting_starting";
 
 export interface NotificationItem {
   id: string;
@@ -34,6 +43,13 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   alert_fired: "Alerts",
   run_failed: "Failed runs",
   invite_accepted: "Team",
+  mention: "Mentions",
+  direct_message: "Direct messages",
+  reminder_due: "Reminders",
+  run_finished: "Finished runs",
+  invoice_paid: "Invoices paid",
+  ticket_assigned: "Tickets",
+  meeting_starting: "Meetings",
 };
 
 /** Neutral lead icon for notifications that are not an agent state. */
@@ -43,6 +59,14 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, LucideIcon> = {
   alert_fired: Siren,
   run_failed: Siren,
   invite_accepted: UserPlus,
+  mention: AtSign,
+  direct_message: MessageCircle,
+  reminder_due: AlarmClock,
+  // Phase 18.3: run_finished draws the done quarter-disc (an agent state).
+  run_finished: CheckCheck,
+  invoice_paid: Receipt,
+  ticket_assigned: Ticket,
+  meeting_starting: Video,
 };
 
 export function NotificationIcon({ kind, title = "" }: { kind: NotificationKind; title?: string }) {

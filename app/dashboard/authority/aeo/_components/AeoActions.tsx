@@ -15,7 +15,7 @@ import { confirmAction } from "@/lib/ui/feedback";
 
 // Agentic OS pressables: done = approve, running = run verbs.
 const btnP =
-  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-ink-hover disabled:opacity-40";
 const btnD =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
 const btnR =
@@ -120,14 +120,14 @@ export function CreatePromptSetForm() {
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
-        <Label htmlFor="aeo-prompts" className="text-[13px] font-medium text-muted">Prompts (one per line, 20–50 money prompts)</Label>
+        <Label htmlFor="aeo-prompts" className="text-[0.8125rem] font-medium text-muted">Prompts (one per line, 20–50 money prompts)</Label>
         <Textarea
           id="aeo-prompts"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={8}
           placeholder={"Best CRM for a 10-person agency\nAgency accounting software vs QuickBooks\n…"}
-          className="mt-1 font-mono text-xs border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
+          className="mt-1 font-mono text-xs border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
         />
       </div>
       <div className="flex items-center justify-between">
@@ -170,23 +170,23 @@ export function TriggerRunCard({ hasActiveSet, brand }: { hasActiveSet: boolean;
     <form onSubmit={submit} className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="aeo-brand" className="text-[13px] font-medium text-muted">Brand (for entity matching)</Label>
+          <Label htmlFor="aeo-brand" className="text-[0.8125rem] font-medium text-muted">Brand (for entity matching)</Label>
           <Input
             id="aeo-brand"
             value={brandInput}
             onChange={(e) => setBrandInput(e.target.value)}
             placeholder="Acme Studio"
-            className="mt-1 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
+            className="mt-1 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
           />
         </div>
         <div>
-          <Label htmlFor="aeo-domain" className="text-[13px] font-medium text-muted">Owned domain (optional)</Label>
+          <Label htmlFor="aeo-domain" className="text-[0.8125rem] font-medium text-muted">Owned domain (optional)</Label>
           <Input
             id="aeo-domain"
             value={ownedDomain}
             onChange={(e) => setOwnedDomain(e.target.value)}
             placeholder="acme.com"
-            className="mt-1 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
+            className="mt-1 border-line bg-paper text-[0.8125rem] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
           />
         </div>
       </div>

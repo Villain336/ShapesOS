@@ -16,7 +16,12 @@ import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
 import { STATUS_META } from "@/lib/aos/status";
 import { progressFraction } from "@/lib/aos/run-steps";
 import { cn } from "@/lib/utils";
+// Phase 18.1 (integration): the kit's words in the person's language — callers
+// pass their translator (server: getI18n, client: useI18n); English otherwise.
+import { createTranslator, type Translator } from "@/lib/i18n";
 import { AgentAvatar } from "./AgentAvatar";
+
+const EN: Translator = createTranslator("en");
 import { StatusShape } from "./StatusShape";
 
 function MaybeLink({
@@ -58,16 +63,18 @@ function Branch({
   last,
   onNavigate,
   content,
+  t = EN,
 }: {
   node: AgentNode;
   tone: "paper" | "night";
   last: boolean;
+  t?: Translator;
   onNavigate?: () => void;
   /** Rendered under the row, inside the branch (e.g. the approvals it is waiting on). */
   content?: React.ReactNode;
 }) {
   const night = tone === "night";
-  const meta = STATUS_META[node.status];
+  const meta = { label: t(`status.${node.status}`) };
   // The elbow meets the row's middle: rows are 48px (night) / 56px (paper).
   const elbow = night ? "top-6" : "top-7";
   return (
@@ -81,7 +88,7 @@ function Branch({
       <MaybeLink
         href={node.href}
         onNavigate={onNavigate}
-        label={`${node.name}: ${meta.label}. ${node.line}`}
+        label={t("kit.subAgentRow", { name: node.name, status: meta.label, line: node.line })}
         className={cn(
           "flex items-center gap-3 rounded-sm transition-[background-color] duration-150",
           night ? "min-h-12 px-2 py-1.5 hover:bg-night-hover" : "min-h-14 px-2.5 py-2 hover:bg-hover-paper",
@@ -106,25 +113,25 @@ function Branch({
           </span>
         )}
       </MaybeLink>
-      {node.children?.length ? <SubAgentRows nodes={node.children} tone={tone} onNavigate={onNavigate} /> : null}
+      {node.children?.length ? <SubAgentRows nodes={node.children} tone={tone} onNavigate={onNavigate} t={t} /> : null}
       {content ? <div className="pt-1 pb-3 pl-2.5">{content}</div> : null}
     </li>
   );
 }
 
 /** Phase 16: the sub-agents a run handed work to — compact rows, state shape first. */
-function SubAgentRows({ nodes, tone, onNavigate }: { nodes: AgentNode[]; tone: "paper" | "night"; onNavigate?: () => void }) {
+function SubAgentRows({ nodes, tone, onNavigate, t = EN }: { nodes: AgentNode[]; tone: "paper" | "night"; onNavigate?: () => void; t?: Translator }) {
   const night = tone === "night";
   return (
-    <ul aria-label="Sub-agents" className={cn("ml-5 border-l-2 pl-2", night ? "border-night-line" : "border-line")}>
+    <ul aria-label={t("kit.subAgents")} className={cn("ml-5 border-l-2 pl-2", night ? "border-night-line" : "border-line")}>
       {nodes.map((c) => {
-        const m = STATUS_META[c.status];
+        const m = { label: t(`status.${c.status}`) };
         return (
           <li key={c.key}>
             <MaybeLink
               href={c.href}
               onNavigate={onNavigate}
-              label={`${c.name}: ${m.label}. ${c.line}`}
+              label={t("kit.subAgentRow", { name: c.name, status: m.label, line: c.line })}
               className={cn(
                 "flex min-h-9 items-center gap-2 rounded-sm px-2 py-1 transition-[background-color] duration-150",
                 night ? "hover:bg-night-hover" : "hover:bg-hover-paper",
@@ -153,6 +160,7 @@ export function AgentTree({
   onNavigate,
   renderBranchContent,
   className,
+  t = EN,
 }: {
   lead: AgentNode;
   branches: AgentNode[];
@@ -167,9 +175,11 @@ export function AgentTree({
   /** Content hung under a branch (paper tone): e.g. the approvals that sub-agent is waiting on. */
   renderBranchContent?: (node: AgentNode) => React.ReactNode;
   className?: string;
+  /** The person's translator (status words, labels); English when absent. */
+  t?: Translator;
 }) {
   const night = tone === "night";
-  const meta = STATUS_META[lead.status];
+  const meta = { ...STATUS_META[lead.status], label: t(`status.${lead.status}`) };
   // When space is short, finished branches make way first; order is kept.
   const { shown, hidden } = maxBranches ? visibleBranches(branches, maxBranches) : { shown: branches, hidden: 0 };
   return (
@@ -178,7 +188,7 @@ export function AgentTree({
         <MaybeLink
           href={lead.href}
           onNavigate={onNavigate}
-          label={`${lead.name}, lead agent: ${meta.label}. ${lead.line}`}
+          label={t("kit.leadAgentRow", { name: lead.name, status: meta.label, line: lead.line })}
           className={cn(
             "flex items-center gap-3 rounded-sm transition-[background-color] duration-150",
             night ? "min-h-12 px-2 py-1.5 hover:bg-night-hover" : "min-h-14 px-2.5 py-2 hover:bg-hover-paper",
@@ -188,7 +198,7 @@ export function AgentTree({
           <span className="min-w-0 flex-1">
             <span className={cn("block truncate font-semibold", night ? "text-md leading-5 text-paper" : "text-base leading-5 text-ink")}>
               {lead.name}
-              <span className={cn("ml-1.5 font-normal", night ? "text-night-muted" : "text-muted")}>· Lead</span>
+              <span className={cn("ml-1.5 font-normal", night ? "text-night-muted" : "text-muted")}>· {t("kit.leadTag")}</span>
             </span>
             <span className={cn("block truncate", night ? "text-xs text-night-muted" : "text-md text-muted")}>{lead.line}</span>
           </span>
@@ -202,16 +212,16 @@ export function AgentTree({
         </MaybeLink>
       ) : null}
       {shown.length ? (
-        <ul aria-label={`Sub-agents under ${lead.name}`} style={{ marginLeft: trunkOffset ?? (night ? 13 : 25) }}>
+        <ul aria-label={t("kit.subAgentsUnder", { name: lead.name })} style={{ marginLeft: trunkOffset ?? (night ? 13 : 25) }}>
           {shown.map((b, i) => (
-            <Branch key={b.key} node={b} tone={tone} last={i === shown.length - 1 && hidden <= 0} onNavigate={onNavigate} content={renderBranchContent?.(b)} />
+            <Branch key={b.key} node={b} tone={tone} last={i === shown.length - 1 && hidden <= 0} onNavigate={onNavigate} content={renderBranchContent?.(b)} t={t} />
           ))}
           {hidden > 0 ? (
             <li className="relative pl-6">
               <span aria-hidden className={cn("absolute top-0 left-0 h-1/2 w-0.5", night ? "bg-night-line" : "bg-line")} />
               <span aria-hidden className={cn("absolute top-1/2 left-0 h-0.5 w-4", night ? "bg-night-line" : "bg-line")} />
               <span className={cn("block px-2 py-2 text-xs font-semibold", night ? "text-night-muted" : "text-muted")}>
-                {hidden} more {hidden === 1 ? "sub-agent" : "sub-agents"}
+                {t("kit.moreSubAgents", { count: hidden })}
               </span>
             </li>
           ) : null}

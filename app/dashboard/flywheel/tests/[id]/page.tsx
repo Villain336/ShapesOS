@@ -10,7 +10,7 @@ import { resolveExperimentStore } from "@/lib/flywheel/testlab/store";
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[0.625rem] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -20,7 +20,7 @@ function chip(text: React.ReactNode, cls?: string) {
 // running = agent run in progress, qa = awaiting attention, complete = neutral.
 function statusBadge(status: string) {
   const base =
-    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.625rem] font-semibold leading-tight";
   if (status === "running")
     return (
       <span className={`${base} bg-running text-white`}>
@@ -39,11 +39,11 @@ function statusBadge(status: string) {
 // QA outcomes: pass = neutral ink check, fail = failed-tint.
 function qaChip(passed: boolean) {
   return passed ? (
-    <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink">
+    <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ink">
       <CheckCircle2 className="h-3.5 w-3.5" /> pass
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-failed-tint px-2 py-0.5 text-[12px] font-semibold text-failed-text">
+    <span className="inline-flex items-center gap-1 rounded-full bg-failed-tint px-2 py-0.5 text-[0.75rem] font-semibold text-failed-text">
       <span className="size-2 rounded-[2px] bg-failed" aria-hidden /> fail
     </span>
   );
@@ -90,7 +90,7 @@ export default async function ExperimentDetailPage({ params }: { params: Promise
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="aos-heading">{experiment.name}</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">{experiment.hypothesis}</p>
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">{experiment.hypothesis}</p>
         </div>
         <div className="flex gap-2">
           {statusBadge(experiment.status)}

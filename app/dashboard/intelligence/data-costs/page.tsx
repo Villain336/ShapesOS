@@ -49,7 +49,7 @@ export default async function DataCostsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="aos-heading">Data costs</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
+          <p className="mt-0.5 max-w-2xl text-[0.8125rem] text-muted">
             Every external data call, metered per workspace. Rent goes down when this table does.
           </p>
         </div>

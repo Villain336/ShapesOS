@@ -131,7 +131,7 @@ export function LeaveDetail({
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <p className="mt-0.5 text-[0.8125rem] text-muted">
                 {LEAVE_TYPE_LABEL[leave.type] ?? leave.type} · {fmtDate(leave.startDate)} → {fmtDate(leave.endDate)} · #{shortLeaveId(leave.id)}
               </p>
             </div>
@@ -196,11 +196,11 @@ export function LeaveDetail({
                 </button>
               )}
               {(leave.status === "denied" || leave.status === "taken") && (
-                <p className="text-[13px] text-muted">This request is closed — no further transitions.</p>
+                <p className="text-[0.8125rem] text-muted">This request is closed — no further transitions.</p>
               )}
             </div>
 
-            <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[13px] text-muted">
+            <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[0.8125rem] text-muted">
               <p>
                 Approving goes to a manager&apos;s approval (Phase 14 gate) and records who decided
                 and when. Denying and marking taken apply immediately.
