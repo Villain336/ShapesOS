@@ -335,3 +335,72 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 :root.motion-reduce :is(.msg-enter, .widget-enter, .stream-caret) { animation: none; }
 :root.motion-reduce .stream-tail { filter: none; -webkit-mask-image: none; mask-image: none; }
 
+
+/* ------------------------------------------------------------------------
+ * Beta readiness (WS=legal): long-form prose on the public legal pages
+ * (components/site/LegalPage.tsx <article class="site-prose">). Tokens only.
+ * ---------------------------------------------------------------------- */
+.site-prose {
+  color: var(--aos-ink);
+  font-size: var(--aos-text-base);
+  line-height: 1.6;
+}
+.site-prose h3 {
+  margin-top: 1.5rem;
+  font-size: var(--aos-text-md);
+  font-weight: var(--aos-weight-heading);
+  font-stretch: var(--aos-stretch-heading);
+}
+.site-prose p,
+.site-prose ul,
+.site-prose ol,
+.site-prose table,
+.site-prose dl {
+  margin-top: 0.75rem;
+}
+.site-prose ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+}
+.site-prose ol {
+  list-style: decimal;
+  padding-left: 1.4rem;
+}
+.site-prose li + li {
+  margin-top: 0.3rem;
+}
+.site-prose a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.site-prose code {
+  font-family: var(--aos-font-mono);
+  font-size: var(--aos-text-sm);
+  background: var(--aos-hover);
+  border-radius: var(--aos-radius-key);
+  padding: 0 0.3em;
+}
+.site-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--aos-text-sm);
+}
+.site-prose th,
+.site-prose td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--aos-line);
+}
+.site-prose th {
+  font-weight: 600;
+  color: var(--aos-muted);
+}
+.site-prose dt {
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+.site-prose dd {
+  margin-top: 0.15rem;
+  color: var(--aos-muted);
+}

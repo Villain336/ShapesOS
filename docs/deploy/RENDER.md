@@ -264,6 +264,8 @@ FLEET_CONTACT_URL=
 # Needed before the first deploy
 # from the Stripe webhook pointed at https://app.shapesos.com/api/billing/webhook
 STRIPE_WEBHOOK_SECRET=
+# the monitored support address shown on /contact, /privacy and /security (beta gate: support address monitored)
+SUPPORT_EMAIL=
 
 # When you turn the feature on (leave out otherwise)
 # Sign in with Google (redirect https://app.shapesos.com/api/auth/callback/google)

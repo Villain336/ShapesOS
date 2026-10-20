@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import {
   ArrowRight,
   Bot,
@@ -180,14 +181,8 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 text-xs text-muted">
-          <span>ShapesOS — open-source marketing &amp; SEO workspace</span>
-          <Link href="/login" className="hover:text-ink">
-            Sign in
-          </Link>
-        </div>
-      </footer>
+      {/* Beta readiness (WS=legal): the shared footer with the legal and trust links. */}
+      <SiteFooter />
     </div>
   );
 }

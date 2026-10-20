@@ -15,6 +15,8 @@ import { contentEn } from "./content.en";
 import { trustEn } from "./trust.en";
 // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
 import { flowEn } from "./flow.en";
+// Beta readiness (WS=legal): chrome of the public legal and trust pages.
+import { legalEn } from "./legal.en";
 
 export const en = {
   common: {
@@ -998,6 +1000,8 @@ export const en = {
   trust: trustEn,
   // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
   flow: flowEn,
+  // Beta readiness (WS=legal): site header/footer, draft banner, consent line, contact and status pages.
+  legal: legalEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

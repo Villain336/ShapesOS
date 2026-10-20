@@ -1,0 +1,112 @@
+// ShapesOS — beta (WS=legal): cadenas del chrome de las páginas legales y de
+// confianza en español. Mismas claves y argumentos ICU que legal.en.ts. El
+// texto legal en sí está solo en inglés (en las páginas).
+
+import type { legalEn } from "./legal.en";
+
+type LegalCatalogue<T = typeof legalEn> = { readonly [K in keyof T]: T[K] extends string ? string : LegalCatalogue<T[K]> };
+
+export const legalEs: LegalCatalogue = {
+  site: {
+    home: "Inicio",
+    pricing: "Precios",
+    signIn: "Iniciar sesión",
+    startTrial: "Empezar la prueba gratis",
+    menu: "Sitio",
+  },
+  footer: {
+    tagline: "ShapesOS — espacio de marketing y operaciones de código abierto",
+    legal: "Legal",
+    trust: "Confianza",
+    terms: "Términos",
+    privacy: "Privacidad",
+    dpa: "Anexo de tratamiento de datos",
+    subprocessors: "Subencargados",
+    security: "Seguridad",
+    acceptableUse: "Uso aceptable",
+    cookies: "Cookies",
+    contact: "Contacto",
+    status: "Estado",
+    source: "Código fuente",
+  },
+  draft: {
+    title: "Borrador — no es asesoría legal, pendiente de revisión por un abogado",
+    body: "Este texto se escribió a partir de lo que el producto hace realmente y todavía no lo ha revisado un abogado. Cambiará antes de obligar a nadie.",
+  },
+  page: {
+    englishOnly: "Este documento está disponible solo en inglés.",
+    updated: "Última revisión {date}",
+    onThisPage: "En esta página",
+  },
+  consent: {
+    prefix: "Al continuar aceptas los",
+    terms: "Términos",
+    and: "y la",
+    privacy: "Política de privacidad",
+  },
+  contact: {
+    title: "Contacto",
+    subtitle: "Una dirección atendida para soporte, solicitudes de privacidad y avisos de seguridad.",
+    support: "Soporte",
+    supportBody: "Preguntas, facturación y cualquier cosa que no funcione.",
+    privacy: "Solicitudes de privacidad",
+    privacyBody: "Acceso, exportación, corrección o borrado que las herramientas de la app no cubran. Escribe desde el correo de tu cuenta.",
+    security: "Avisos de seguridad",
+    securityBody: "¿Encontraste una vulnerabilidad? Escribe a esta dirección con \"Security\" en el asunto. No abras un issue público.",
+    unset: "Esta instalación todavía no tiene una dirección de soporte configurada.",
+    targets: "Tiempos de respuesta",
+    targetSupport: "Soporte: primera respuesta en 2 días hábiles durante la beta.",
+    targetPrivacy: "Solicitudes de privacidad: confirmadas en 7 días, completadas en 30 días.",
+    targetSecurity: "Avisos de seguridad: acuse en 48 horas; triaje en 5 días hábiles.",
+    statusLink: "¿Algo no funciona? Mira primero la página de estado.",
+    address: "Dirección postal",
+    addressUnset: "Se añadirá tras la revisión legal.",
+  },
+  status: {
+    title: "Estado",
+    subtitle: "Salud en vivo del servicio alojado y registro de incidentes.",
+    overall: {
+      operational: "Todos los sistemas operativos",
+      degraded: "Algunos sistemas degradados",
+      partial_outage: "Interrupción parcial",
+      major_outage: "Interrupción mayor",
+      maintenance: "En mantenimiento",
+      unknown: "Estado desconocido",
+    },
+    state: {
+      operational: "Operativo",
+      degraded: "Degradado",
+      partial_outage: "Interrupción parcial",
+      major_outage: "Interrupción mayor",
+      maintenance: "Mantenimiento",
+      unknown: "Desconocido",
+    },
+    components: "Componentes",
+    component: "Componente",
+    stateColumn: "Estado",
+    detail: "Detalle",
+    manual: "Fijado por un operador",
+    derived: "Derivado en vivo de la comprobación de disponibilidad (GET /api/health) y de la cola de trabajos; la instantánea pública se renueva cada {seconds} segundos.",
+    checked: "Comprobado {date}",
+    openIncidents: "Incidentes abiertos",
+    pastIncidents: "Incidentes pasados (90 días)",
+    noOpen: "No hay incidentes abiertos.",
+    noPast: "Sin incidentes en los últimos 90 días.",
+    affected: "Afectados",
+    started: "Inicio {date}",
+    resolvedAt: "Resuelto {date}",
+    json: "Fuente JSON",
+    incidentStatus: {
+      investigating: "Investigando",
+      identified: "Identificado",
+      monitoring: "En observación",
+      resolved: "Resuelto",
+    },
+    impact: {
+      none: "Sin impacto",
+      minor: "Impacto menor",
+      major: "Impacto mayor",
+      critical: "Impacto crítico",
+    },
+  },
+};

@@ -297,6 +297,8 @@ export const TABLE = [
   ["SSO_WORKSPACE_ID", { cls: "paste", group: W }],
   ["SSO_DEFAULT_ROLE", { cls: "paste", group: W }],
   ["MARKETR_PLATFORM_OPERATORS", { cls: "paste", group: S, need: "launch", why: "your user id or email: who may run host-wide operations" }],
+  // Beta readiness (WS=legal): the support address on the public legal pages.
+  ["SUPPORT_EMAIL", { cls: "paste", group: W, need: "launch", why: "the monitored support address shown on /contact, /privacy and /security (beta gate: support address monitored)" }],
   ["MARKETR_CREDENTIALS_KEY_PREVIOUS", { cls: "paste", group: S, why: "only during a credential key rotation" }],
   ["SECRETS_PROVIDER", { cls: "exclude", why: "env (default); aws-kms is a documented stub" }],
   ["AWS_REGION", { cls: "exclude", why: "only for SECRETS_PROVIDER=aws-kms (not used on Render)" }],

@@ -19,6 +19,7 @@ import { KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmailSignIn } from "./EmailSignIn";
 import { safeNext } from "@/lib/auth/redirect";
+import { AuthFooterLinks } from "@/components/auth/AuthShell";
 import { CaptchaWidget, type CaptchaPublicConfig } from "@/components/security/CaptchaWidget";
 import {
   fetchAuthState,
@@ -298,7 +299,7 @@ function LoginBody({ captcha, emailAuth }: { captcha: CaptchaPublicConfig | null
   const fieldCls = `${inputCls} ${invalid ? "border-failed" : "border-control"}`;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas px-6 py-10">
       <div className="w-full max-w-sm rounded-lg bg-paper p-8 shadow-hairline">
         {pending ? (
           <SecondStep methods={pending.methods} next={next} />
@@ -399,6 +400,8 @@ function LoginBody({ captcha, emailAuth }: { captcha: CaptchaPublicConfig | null
           </>
         )}
       </div>
+      {/* Beta readiness (WS=legal): terms, privacy, status and contact under the card. */}
+      <AuthFooterLinks />
     </div>
   );
 }

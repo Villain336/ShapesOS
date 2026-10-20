@@ -9,6 +9,7 @@ import { useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { Field, FieldMessage, aosButton } from "@/components/aos";
 import { AuthShell, SentNotice } from "@/components/auth/AuthShell";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { postEmailAuth } from "@/components/auth/client";
 import { CaptchaWidget, type CaptchaPublicConfig } from "@/components/security/CaptchaWidget";
 
@@ -32,6 +33,8 @@ export default function SignupClient({
   const [inviteRequired, setInviteRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaKey, setCaptchaKey] = useState(0);
+  // Beta readiness (WS=legal): the consent line above the submit button.
+  const { t } = useI18n();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -128,6 +131,17 @@ export default function SignupClient({
         />
         {captcha && <CaptchaWidget config={captcha} onToken={setCaptchaToken} resetKey={captchaKey} />}
         <FieldMessage id="signup-error" error={errors.form} />
+        <p className="text-sm text-muted" data-testid="signup-consent">
+          {t("legal.consent.prefix")}{" "}
+          <Link href="/terms" className="font-semibold text-ink underline-offset-2 hover:underline">
+            {t("legal.consent.terms")}
+          </Link>{" "}
+          {t("legal.consent.and")}{" "}
+          <Link href="/privacy" className="font-semibold text-ink underline-offset-2 hover:underline">
+            {t("legal.consent.privacy")}
+          </Link>
+          .
+        </p>
         <button
           type="submit"
           disabled={busy || !name.trim() || !email.trim() || !password || (!!captcha && !captchaToken)}

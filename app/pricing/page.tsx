@@ -5,6 +5,7 @@
 // pools in metering/credits.ts). No number is typed on this page.
 
 import Link from "next/link";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import { ArrowRight, Check, KeyRound } from "lucide-react";
 import { PricingTable } from "@/components/billing/PricingTable";
 import { pricingPageData } from "@/lib/billing/plans";
@@ -110,14 +111,8 @@ export default function PricingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 text-xs text-muted">
-          <span>ShapesOS — prices in USD, before tax</span>
-          <Link href="/login" className="hover:text-ink">
-            Sign in
-          </Link>
-        </div>
-      </footer>
+      {/* Beta readiness (WS=legal): the shared footer with the legal and trust links. */}
+      <SiteFooter />
     </div>
   );
 }

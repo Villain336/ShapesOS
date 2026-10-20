@@ -11,6 +11,8 @@ import { contentEs } from "./content.es";
 import { trustEs } from "./trust.es";
 // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
 import { flowEs } from "./flow.es";
+// Beta (WS=legal): chrome de las páginas legales y de confianza.
+import { legalEs } from "./legal.es";
 
 export const es: Catalogue = {
   common: {
@@ -986,4 +988,6 @@ export const es: Catalogue = {
   trust: trustEs,
   // Phase 18.3 (WS=flow): Automatizaciones, compartir, Time Machine, sin conexión, push.
   flow: flowEs,
+  // Beta (WS=legal)
+  legal: legalEs,
 };
