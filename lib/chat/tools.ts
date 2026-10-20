@@ -53,6 +53,8 @@ import { NOTE_TOOLS } from "@/lib/notes/tools";
 import { FILE_TOOLS } from "@/lib/files/tools";
 import { PROCESS_TOOLS } from "@/lib/aos/tools";
 import { STORE_TOOLS } from "@/lib/store/tools";
+// Phase 22 (chat): how the transcript draws a tool's result (lib/chat/ui-hints.ts).
+import type { ToolUiHint } from "./ui-hints";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -131,6 +133,13 @@ export interface ToolDef {
     required?: string[];
   };
   execute: (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>;
+  /**
+   * Phase 22 (chat): the typed renderer for this tool's result in the
+   * transcript (records table, file card, image, diff, chart, text, an OpenUI
+   * program, a plan). Absent = inferred from the result's shape
+   * (lib/chat/tool-ui.ts).
+   */
+  ui?: ToolUiHint;
 }
 
 function str(v: unknown): string | undefined {
@@ -161,6 +170,7 @@ async function keywordOverview(projectId: string) {
 
 const get_keywords: ToolDef = {
   name: "get_keywords",
+  ui: "records",
   description:
     "List the project's saved keywords: phrase, volume, difficulty, intent, list name, tracked flag, and latest rank position.",
   kind: "safe",
@@ -197,6 +207,7 @@ const get_keywords: ToolDef = {
 
 const get_rankings: ToolDef = {
   name: "get_rankings",
+  ui: "records",
   description:
     "Rankings summary for the project: tracked keywords with latest position, movement vs previous check, the visibility score, and any rank-drop/gain alerts.",
   kind: "safe",
@@ -251,6 +262,7 @@ const get_rankings: ToolDef = {
 
 const get_competitors: ToolDef = {
   name: "get_competitors",
+  ui: "records",
   description:
     "List the project's tracked competitors (domains) plus the latest competitor-radar events (new keywords, gains, new pages, lost rankings).",
   kind: "safe",
@@ -293,6 +305,7 @@ const get_competitors: ToolDef = {
 
 const get_content: ToolDef = {
   name: "get_content",
+  ui: "records",
   description:
     "Content library overview: counts by status (brief/draft/editing/published) and the most recent content items with their keyword, status and SEO score.",
   kind: "safe",
@@ -336,6 +349,7 @@ const get_content: ToolDef = {
 
 const get_alerts: ToolDef = {
   name: "get_alerts",
+  ui: "records",
   description:
     "Open alert picture: recent alert events (rule, trigger, title, status) plus open site issues by severity.",
   kind: "safe",
@@ -419,6 +433,7 @@ const get_visibility_score: ToolDef = {
 
 const get_workflows: ToolDef = {
   name: "get_workflows",
+  ui: "records",
   description:
     "Automation workflows for the project: name, status, enabled, schedule, last run, node counts — plus the latest workflow runs.",
   kind: "safe",

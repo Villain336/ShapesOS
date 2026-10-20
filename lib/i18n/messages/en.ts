@@ -15,6 +15,8 @@ import { contentEn } from "./content.en";
 import { trustEn } from "./trust.en";
 // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
 import { flowEn } from "./flow.en";
+// Phase 22 (chat): the Claude Code-style chat (inline tools, approvals, modes, panels, composer).
+import { chatEn } from "./chat.en";
 
 export const en = {
   common: {
@@ -998,6 +1000,8 @@ export const en = {
   trust: trustEn,
   // Phase 18.3 (WS=flow): Automations, share sheet, Time Machine, offline, Web Push.
   flow: flowEn,
+  // Phase 22 (chat): inline tool calls and approvals, modes, generative UI, the panel rail, the composer.
+  chat: chatEn,
 } as const;
 
 /** The catalogue shape every locale must match (same keys, string leaves). */

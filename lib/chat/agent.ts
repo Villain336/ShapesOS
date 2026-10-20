@@ -52,12 +52,15 @@ import type { ChatContentBlock, ChatMessage, ChatToolResultBlock } from "@/lib/l
 import { getTool, type ToolContext } from "./tools";
 import {
   executeTool,
+  needsClick,
   proposalText as proposalTextFor,
   proposalsText,
   stopRequested,
   type ChatToolCall,
   type LoopContext,
 } from "./tool-exec";
+// Phase 22 (chat): the marker a decision row carries (lib/chat/blocks.ts reads it).
+import { CHAT_DECISION_TOOL } from "./ui-hints";
 import {
   TOOL_GROUP_LABELS,
   agentDisplayName,
@@ -658,6 +661,24 @@ export interface AgentTurnInput {
   handoffAt?: number;
   /** Phase 8: continue the run's saved transcript (the worker sets it). */
   resume?: boolean;
+  /**
+   * Phase 22 (chat): decisions made in the approval block (POST
+   * /api/chat/threads/[id]/decisions) instead of a typed "yes". The turn
+   * settles exactly these proposals (approve with the original or edited
+   * arguments, or deny), then carries on from the transcript that proposed
+   * them, in the same stream. userContent is then the decision's own line.
+   */
+  decisions?: ChatDecision[];
+}
+
+/** Phase 22 (chat): one decision on a held call. */
+export interface ChatDecision {
+  /** The proposal's tool_use id (the block's key); a legacy proposal without one is matched by tool + arguments. */
+  toolUseId?: string | null;
+  tool: string;
+  decision: "approve" | "deny";
+  /** Edited arguments (Edit → Save and approve). */
+  args?: Record<string, unknown>;
 }
 
 export interface AgentTurnOutput {
@@ -1060,7 +1081,17 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
 
   // 1. Confirmation path: "yes" + a pending proposal → execute it.
   //    ("yes" with nothing pending falls through to a normal turn.)
-  if (confirming && pending?.length) return confirmPending(turn, baseCtx, pending, toolFilter, { rules, connectorTools });
+  //    Phase 22: a decision from the approval block names its proposals;
+  //    Tier 3 / destructive calls are decided ONLY this way (a typed "yes"
+  //    leaves them pending and says so).
+  if (input.decisions?.length) {
+    const all = (await defaultTurnLoaders.pendingProposal(threadId)) ?? [];
+    return settleProposals(turn, baseCtx, matchDecisions(all, input.decisions), all, toolFilter, { rules, connectorTools });
+  }
+  if (confirming && pending?.length) {
+    const decided = pending.filter((c) => !needsClick(c.toolKind, c.tier)).map((call) => ({ call, decision: "approve" as const }));
+    return settleProposals(turn, baseCtx, decided, pending, toolFilter, { rules, connectorTools });
+  }
 
   // 2. Phase 17 (A8): a slash command needs no model — in live mode as in
   //    mock mode it runs straight through the tool gate (tiers unchanged).
@@ -1120,20 +1151,59 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   return out;
 }
 
+/** Phase 22 (chat): which pending proposal each decision names (by tool_use id, else tool + arguments). */
+export function matchDecisions(pending: readonly ChatToolCall[], decisions: readonly ChatDecision[]): ProposalChoice[] {
+  const out: ProposalChoice[] = [];
+  const used = new Set<ChatToolCall>();
+  for (const d of decisions) {
+    const call =
+      (d.toolUseId ? pending.find((c) => c.toolUseId === d.toolUseId && !used.has(c)) : undefined) ??
+      pending.find((c) => !used.has(c) && c.tool === d.tool && (!d.toolUseId || !c.toolUseId) && JSON.stringify(c.args ?? {}) === JSON.stringify(d.args ?? c.args ?? {})) ??
+      pending.find((c) => !used.has(c) && c.tool === d.tool && !c.toolUseId);
+    if (!call) continue;
+    used.add(call);
+    out.push({ call, decision: d.decision, ...(d.args && d.decision === "approve" ? { args: d.args } : {}) });
+  }
+  return out;
+}
+
+/** A pending proposal with the person's decision on it. */
+export interface ProposalChoice {
+  call: ChatToolCall;
+  decision: "approve" | "deny";
+  /** Edited arguments (approve only). */
+  args?: Record<string, unknown>;
+}
+
+/** Phase 22 (chat): the user row that records a decision made in the approval block. */
+export function decisionLine(choices: readonly ProposalChoice[]): string {
+  if (choices.length === 0) return "Nothing to decide";
+  const word = (c: ProposalChoice) => (c.decision === "deny" ? "Denied" : c.args ? "Edited and approved" : "Approved");
+  if (choices.length === 1) return `${word(choices[0]!)} ${choices[0]!.tool}`;
+  return choices.map((c) => `${word(c)} ${c.tool}`).join(" · ");
+}
+
 /**
- * "yes" on the pending proposals: run each as the agent that proposed it,
- * inside the grant it was proposed under (never wider than the thread's
- * grant now). Then (Phase 16) each goes back to the run that proposed it:
+ * Settle the held proposals the person decided — "yes" (every proposal a typed
+ * yes may decide), or the approval block's per-item decisions (Phase 22):
+ * run each approved one as the agent that proposed it, inside the grant it was
+ * proposed under (never wider than the thread's grant now); a denied one is
+ * recorded as not run. Then (Phase 16) each goes back to the run that
+ * proposed it:
  *   * a delegated sub-agent's → that sub-agent resumes from ITS transcript,
  *     on its own run, as its own agent (BUG 2: never under the lead);
  *   * a run that is waiting on sub-agents → its transcript gets the result
  *     (the join carries on from it);
  *   * this thread's own earlier turn → the model carries on inline (Phase 8).
+ * Proposals NOT decided (a Tier 3 / destructive call on a typed "yes", or an
+ * item the block did not decide yet) stay pending on the new reply, so the
+ * approval block keeps showing them.
  */
-async function confirmPending(
+async function settleProposals(
   turn: AgentTurnInput,
   baseCtx: LoopContext,
-  pending: ChatToolCall[],
+  choices: readonly ProposalChoice[],
+  pending: readonly ChatToolCall[],
   toolFilter: ((canonical: string) => boolean) | undefined,
   /** Phase 17: what the turn already loaded (the continuation reuses it). */
   loaded: { rules: StyleRule[]; connectorTools: Awaited<ReturnType<typeof connectorChatTools>> },
@@ -1142,13 +1212,28 @@ async function confirmPending(
   const agentKey = turn.agentKey ?? "lead";
   const grant = turn.grant ?? null;
   const mode = turn.mode ?? "default";
+  const decidedCalls = new Set(choices.map((c) => c.call));
+  const undecided = pending.filter((c) => !decidedCalls.has(c));
+  // Phase 22: a decision made in the block is its own user row (a notice in
+  // the transcript, never a bubble); a typed "yes" was saved by the route.
+  if (turn.decisions?.length) {
+    await saveMessage(threadId, "user", decisionLine(choices), [{ tool: CHAT_DECISION_TOOL, args: { decisions: choices.map((c) => ({ tool: c.call.tool, decision: c.decision, ...(c.args ? { edited: true } : {}) })) }, status: "executed" }]);
+  }
+  if (choices.length === 0) {
+    const held = undecided.filter((c) => needsClick(c.toolKind, c.tier));
+    const text = held.length
+      ? `${held.length === 1 ? `${held[0]!.tool} needs a click` : `${held.length} actions need a click`} in the approval block — money and irreversible actions are never run on a typed yes.`
+      : "Nothing is waiting for a decision.";
+    await saveMessage(threadId, "assistant", text, [...undecided]);
+    return { assistantText: text, toolCalls: [...undecided], threadTitle: null, awaitingConfirmation: undecided.length > 0 };
+  }
   const runInfo = await classifyProposalRuns(
     workspaceId,
-    pending.map((c) => c.runId).filter((x): x is string => !!x),
+    choices.map((c) => c.call.runId).filter((x): x is string => !!x),
   ).catch(() => new Map<string, { child: boolean; waitingOnChildren: boolean; status: string }>());
   const executed: ChatToolCall[] = [];
   const done: ProposalDecision[] = [];
-  for (const call of pending) {
+  for (const { call, decision, args: edited } of choices) {
     // Phase 5: run as the agent that proposed it, inside the grant it
     // was proposed under — never wider than the thread's grant now.
     const callAgent = call.agentKey && isAgentKey(call.agentKey) ? call.agentKey : agentKey;
@@ -1164,13 +1249,36 @@ async function confirmPending(
       grant: callGrant,
       runId: info?.child ? call.runId : baseCtx.runId,
     };
-    const exec: ChatToolCall = { tool: call.tool, args: call.args, confirmed: true, status: "executed", agentKey: callAgent };
-    const result = await executeTool(ctx, call.tool, call.args, exec);
+    // Phase 22 (chat): the executed copy keeps the proposal's tool_use id and
+    // run, so the transcript renders the held call and its result as ONE
+    // block (the duplicate-chip bug) and the live stream fills it in place.
+    const exec: ChatToolCall = {
+      tool: call.tool,
+      args: edited ?? call.args,
+      confirmed: true,
+      status: "executed",
+      agentKey: callAgent,
+      ...(edited ? { edited: true } : {}),
+      ...(call.toolUseId ? { toolUseId: call.toolUseId } : {}),
+      ...(call.runId ? { runId: call.runId } : {}),
+    };
+    if (decision === "deny") {
+      exec.status = "cancelled";
+      exec.confirmed = false;
+      exec.resultSummary = "Not run — you denied it.";
+      await runEventFor(ctx, `Denied ${call.tool}`, { kind: "tool_result", tool: call.tool, status: "cancelled", ...(call.toolUseId ? { toolUseId: call.toolUseId } : {}), denied: true });
+      executed.push(exec);
+      done.push({ call, exec, result: null });
+      continue;
+    }
+    const result = await executeTool(ctx, call.tool, exec.args, exec);
     executed.push(exec);
     done.push({ call, exec, result });
     await saveMessage(threadId, "tool", exec.resultSummary ?? "", [exec]);
   }
-  const cancelled = executed.some((c) => c.status === "cancelled");
+  // Stopped mid-way (a denied call is "cancelled" too, but by the person).
+  const deniedExecs = new Set(done.filter((d) => choices.find((ch) => ch.call === d.call)?.decision === "deny").map((d) => d.exec));
+  const cancelled = executed.some((c) => c.status === "cancelled" && !deniedExecs.has(c));
 
   // Phase 16: back to the run that proposed each one.
   const byRun = new Map<string, ProposalDecision[]>();
@@ -1195,7 +1303,11 @@ async function confirmPending(
   }
 
   // Phase 8: the model carries on from the transcript that proposed it.
-  if (inline.length && byRun.size === 0 && !cancelled && (await agentIsLive(agentKey, mode, baseCtx.workspaceId))) {
+  // Phase 22: only once every proposal of that transcript is decided (an
+  // undecided one would leave the model without its tool_result).
+  const inlineRunId = inline[0]?.call.runId;
+  const allDecided = !undecided.some((c) => c.runId === inlineRunId);
+  if (inline.length && byRun.size === 0 && !cancelled && allDecided && (await agentIsLive(agentKey, mode, baseCtx.workspaceId))) {
     const state = await continuationState(turn, inline).catch(() => null);
     if (state) {
       const loop = await runAgentLoop({
@@ -1206,21 +1318,34 @@ async function confirmPending(
         streamGuard: streamGuardFromRules(loaded.rules),
         deps: { connectorTools: loaded.connectorTools },
       });
-      // The confirmed calls (already saved as tool rows) lead the reply's calls.
-      return finishLiveTurn(turn, loop, executed, loaded.rules);
+      // The confirmed calls (already saved as tool rows) lead the reply's calls;
+      // the undecided proposals stay pending behind them.
+      return finishLiveTurn(turn, loop, [...executed, ...undecided], loaded.rules);
     }
   }
-  const failures = executed.filter((c) => c.status !== "executed");
+  const failures = executed.filter((c) => c.status !== "executed" && c.status !== "cancelled");
+  const denied = executed.filter((c) => c.status === "cancelled");
+  const ran = executed.filter((c) => c.status === "executed");
   let text = cancelled
     ? STOPPED_TEXT
     : failures.length === 0
-      ? `Done. ${executed.map((c) => c.resultSummary).join(" ")}`
+      ? [ran.length ? `Done. ${ran.map((c) => c.resultSummary).join(" ")}` : "", denied.length ? `Not run: ${denied.map((c) => c.tool).join(", ")}.` : ""].filter(Boolean).join(" ")
       : `Partially done. ${executed.map((c) => (c.status === "executed" ? `✔ ${c.resultSummary}` : `✘ ${c.tool}: ${c.resultSummary}`)).join("\n")}`;
   if (resumed > 0) {
     text += `\n\n${resumed === 1 ? "The sub-agent carries on" : `${resumed} sub-agents carry on`}; I'll check the results and answer here when the work is done.`;
   }
-  await saveMessage(threadId, "assistant", text, executed);
-  return { assistantText: text, toolCalls: executed, threadTitle: null, cancelled };
+  const held = undecided.filter((c) => needsClick(c.toolKind, c.tier));
+  if (!turn.decisions?.length && held.length) {
+    text += `\n\n${held.length === 1 ? `${held[0]!.tool} needs a click` : `${held.length} actions need a click`} in the approval block — money and irreversible actions are never run on a typed yes.`;
+  }
+  await saveMessage(threadId, "assistant", text, [...executed, ...undecided]);
+  return { assistantText: text, toolCalls: [...executed, ...undecided], threadTitle: null, cancelled, awaitingConfirmation: undecided.length > 0 };
+}
+
+/** One line on the run's timeline for a decision (never fails the turn). */
+async function runEventFor(ctx: LoopContext, summary: string, payload: Record<string, unknown>): Promise<void> {
+  if (!ctx.runId) return;
+  await appendAgentRunEvent(ctx.workspaceId, ctx.runId, { type: "gate", summary: summary.slice(0, 500), payload }).catch(() => undefined);
 }
 
 /**
@@ -1482,7 +1607,7 @@ export async function runTrackedAgentTurn(
   };
 
   // Build mode goes straight to the worker (a confirmation runs inline).
-  if (budget !== null && (budget === 0 || mode === "build") && !CONFIRM_RE.test(input.userContent.trim())) {
+  if (budget !== null && (budget === 0 || mode === "build") && !CONFIRM_RE.test(input.userContent.trim()) && !input.decisions?.length) {
     return queued();
   }
 

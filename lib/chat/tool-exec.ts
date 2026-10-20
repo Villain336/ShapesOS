@@ -28,6 +28,7 @@ import {
   toolGroup,
   type ToolContext,
   type ToolDef,
+  type ToolKind,
   type ToolResult,
 } from "./tools";
 import { TOOL_GROUP_LABELS, agentDisplayName, isAgentKey, isGroupBlocked, type ToolGroup } from "@/lib/agents/grants";
@@ -41,6 +42,9 @@ import { resolveConnectorTool } from "./connector-tools";
 // answer cache it also drops on a write (lib/chat/answer-cache.ts).
 import { isCacheableTool, toolCacheKey, toolResultCache } from "./tool-cache";
 import { answerCache } from "./answer-cache";
+// Phase 22 (chat): the typed renderer + structured payload a result carries to the transcript.
+import { uiHintFor, uiPayloadFor } from "./tool-ui";
+import type { ToolUiHint } from "./ui-hints";
 
 export const DELEGATE_TOOL = "delegate_to_subagent";
 /** Phase 16: hand a whole plan to sub-agents that run in parallel (lib/chat/delegation.ts). */
@@ -83,6 +87,21 @@ export interface ChatToolCall {
    * started (the chat's "Working with N sub-agents" card reads it live).
    */
   delegation?: { parentRunId: string; planId: string; tasks: number; goal: string };
+  /**
+   * Phase 22 (chat): how the transcript draws the result (ToolDef.ui or
+   * inferred) and the structured, capped payload the renderer reads
+   * (lib/chat/tool-ui.ts). On a held call: the tool's safety kind and its
+   * Phase 14 tier (3 = money / irreversible: the approval needs a click; a
+   * typed or spoken "yes" is refused).
+   */
+  ui?: ToolUiHint;
+  payload?: unknown;
+  toolKind?: ToolKind;
+  tier?: 0 | 1 | 2 | 3;
+  /** Phase 22 (genui): form / $variable state the person left on a render_ui block. */
+  uiState?: Record<string, unknown>;
+  /** Phase 22 (chat): the person edited the arguments before approving. */
+  edited?: boolean;
 }
 
 /** ToolContext plus the thread a delegated sub-agent writes its tool rows to. */
@@ -258,7 +277,27 @@ export async function executeTool(
       if (ctx.grant) call.grant = [...ctx.grant];
       // Phase 14: offered on every Tier 0–2 call (never Tier 3 / destructive).
       if (decision?.offerAuto) call.autoAction = toolAction(tool.name);
-      await runEvent(ctx, `Waiting for your OK: ${tool.name}`, { kind: "tool_result", tool: tool.name, status: "pending_confirmation", toolKind: tool.kind, ...ids }, "gate");
+      // Phase 22 (chat): the approval block needs the kind and tier (a Tier 3
+      // or destructive call is decided by a click, never a typed "yes").
+      call.toolKind = tool.kind;
+      if (decision) call.tier = decision.tier;
+      await runEvent(
+        ctx,
+        `Waiting for your OK: ${tool.name}`,
+        {
+          kind: "tool_result",
+          tool: tool.name,
+          status: "pending_confirmation",
+          toolKind: tool.kind,
+          args,
+          ...(decision ? { tier: decision.tier } : {}),
+          ...(call.autoAction ? { autoAction: call.autoAction } : {}),
+          ...(call.agentKey ? { agentKey: call.agentKey } : {}),
+          needsClick: needsClick(tool.kind, decision?.tier),
+          ...ids,
+        },
+        "gate",
+      );
       return null;
     }
     autoReason = decision.reason;
@@ -279,12 +318,22 @@ export async function executeTool(
     call.status = "executed";
     call.resultSummary = result.summary;
     collectDelegated(call, result);
+    // Phase 22 (chat): the typed renderer and its (capped) payload travel with
+    // the call (persisted rows) and the run event (the live stream).
+    call.ui = uiHintFor(tool, result);
+    call.payload = uiPayloadFor(call.ui, result, call.toolUseId);
     await auditToolExecution(ctx, tool, result.summary, autoReason);
     await runEvent(ctx, `${tool.name}: ${result.summary}`, {
       kind: "tool_result",
       tool: tool.name,
       status: "executed",
       ...ids,
+      ui: call.ui,
+      payload: call.payload,
+      ...(call.agentKey ? { agentKey: call.agentKey } : {}),
+      ...(call.confirmed ? { confirmed: true } : {}),
+      ...(call.edited ? { edited: true } : {}),
+      ...(call.delegation ? { delegation: call.delegation } : {}),
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
       // Phase 18.3 (WS=flow): what it wrote, for "Undo this agent run".
@@ -307,6 +356,15 @@ export async function executeTool(
     await runEvent(ctx, `${tool.name} failed: ${call.resultSummary}`, { kind: "tool_result", tool: tool.name, status: "error", ...ids });
     return null;
   }
+}
+
+/**
+ * Phase 22 (chat): does deciding this held call need a click in the approval
+ * block? Money and irreversible actions (Tier 3) and destructive tools: a
+ * typed or spoken "yes" is refused (owner rule, 2026-10-05).
+ */
+export function needsClick(kind: ToolKind | string | undefined, tier: number | undefined): boolean {
+  return kind === "destructive" || tier === 3;
 }
 
 /** Phase 18.3: is this group blocked for agents in the call's workspace? */

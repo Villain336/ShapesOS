@@ -76,6 +76,8 @@ export interface AguiTurnRequest {
    * is then re-emitted so the agent sees the applied result.
    */
   incomingState?: SharedAgentState;
+  /** Phase 22 (chat): decisions from the approval block (POST …/decisions) — the turn settles them and carries on. */
+  decisions?: AgentTurnInput["decisions"];
 }
 
 /** Context passed to the shared-state loaders/applier. */
@@ -260,7 +262,9 @@ function* toolCallEvents(
       messageId: `${toolCallId}:result`,
       toolCallId,
       content: call.resultSummary ?? "",
-      metadata: { marketr: { ...statusMeta, runId: meta.runId } },
+      // Phase 22 (chat): the typed renderer, its payload and the call's ids
+      // ride on the result so the transcript renders it inline.
+      metadata: { marketr: { ...statusMeta, runId: meta.runId, ...resultMeta(call) } },
     },
     meta,
   );
@@ -270,11 +274,46 @@ function* toolCallEvents(
       {
         type: EventType.CUSTOM,
         name: MARKETR_CUSTOM_NAMES.toolProposal,
-        value: { tool: call.tool, args: call.args, toolCallId },
+        value: proposalValue(call, toolCallId),
       },
       meta,
     );
   }
+}
+
+/** Phase 22 (chat): what a TOOL_CALL_RESULT carries besides its status (see lib/chat/blocks.ts). */
+function resultMeta(call: Partial<ChatToolCall> & Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof call.toolUseId === "string") out.toolUseId = call.toolUseId;
+  if (typeof call.ui === "string") out.ui = call.ui;
+  if (call.payload !== undefined) out.payload = call.payload;
+  if (typeof call.agentKey === "string") out.agentKey = call.agentKey;
+  if (typeof call.autoApproved === "string") out.autoApproved = call.autoApproved;
+  if (call.cached === true) out.cached = true;
+  if (call.edited === true) out.edited = true;
+  if (call.delegation && typeof call.delegation === "object") out.delegation = call.delegation;
+  if (typeof call.tier === "number") out.tier = call.tier;
+  if (typeof call.toolKind === "string") out.toolKind = call.toolKind;
+  return out;
+}
+
+/** Phase 22 (chat): the approval block's item (lib/chat/blocks.ts ApprovalItem). */
+function proposalValue(call: Partial<ChatToolCall> & Record<string, unknown>, toolCallId: string, agentRunId?: string | null): Record<string, unknown> {
+  const tier = typeof call.tier === "number" ? call.tier : undefined;
+  const toolKind = typeof call.toolKind === "string" ? call.toolKind : undefined;
+  return {
+    tool: call.tool,
+    args: call.args ?? {},
+    toolCallId,
+    ...(typeof call.toolUseId === "string" ? { toolUseId: call.toolUseId } : {}),
+    ...(toolKind ? { toolKind } : {}),
+    ...(tier !== undefined ? { tier } : {}),
+    ...(typeof call.autoAction === "string" ? { autoAction: call.autoAction } : {}),
+    ...(typeof call.agentKey === "string" ? { agentKey: call.agentKey } : {}),
+    ...(agentRunId ?? (typeof call.runId === "string" ? call.runId : null) ? { runId: agentRunId ?? call.runId } : {}),
+    needsClick: call.needsClick === true || toolKind === "destructive" || tier === 3,
+    ...(typeof call.resultSummary === "string" ? { summary: call.resultSummary } : {}),
+  };
 }
 
 /**
@@ -520,7 +559,7 @@ function createRunTail(
           {
             type: EventType.CUSTOM,
             name: MARKETR_CUSTOM_NAMES.thinking,
-            value: { step: Number(p.step ?? 0), state: p.state === "ended" ? "ended" : "started" },
+            value: { step: Number(p.step ?? 0), state: p.state === "ended" ? "ended" : "started", ...(typeof p.text === "string" ? { text: p.text } : {}) },
           },
           meta,
         ),
@@ -535,15 +574,21 @@ function createRunTail(
       if (st.seenTools.has(toolCallId)) return;
       st.seenTools.add(toolCallId);
       yield* closeMsg();
-      yield* emit(stamp({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: tool, parentMessageId: `${runIdAgui}:msg:assistant` }, meta));
-      yield* emit(stamp({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(args ?? {}) } as ToolCallArgsEvent, meta));
-      yield* emit(stamp({ type: EventType.TOOL_CALL_END, toolCallId }, meta));
+      // Phase 22 (chat): the model's tool_use id rides on every event of the
+      // call, so a client keys the block by it across streams.
+      const callMeta = { marketr: { runId: runIdAgui, toolUseId } };
+      yield* emit(stamp({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: tool, parentMessageId: `${runIdAgui}:msg:assistant`, metadata: callMeta }, meta));
+      yield* emit(stamp({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(args ?? {}), metadata: callMeta } as ToolCallArgsEvent, meta));
+      yield* emit(stamp({ type: EventType.TOOL_CALL_END, toolCallId, metadata: callMeta }, meta));
     };
     if (p.kind === "tool_start") {
       yield* start(p.args);
     } else if (p.kind === "tool_result") {
-      yield* start({});
+      // A held call's args are on the gate event too (no tool_start precedes a
+      // refused / interrupted call).
+      yield* start(p.args ?? {});
       const status = typeof p.status === "string" ? p.status : "executed";
+      const call = { ...p, tool, toolUseId, status } as Partial<ChatToolCall> & Record<string, unknown>;
       yield* emit(
         stamp(
           {
@@ -551,13 +596,13 @@ function createRunTail(
             messageId: `${toolCallId}:result`,
             toolCallId,
             content: typeof p.summary === "string" ? p.summary : ev.summary,
-            metadata: { marketr: { status, runId: runIdAgui } },
+            metadata: { marketr: { status, runId: runIdAgui, tool, ...resultMeta(call) } },
           },
           meta,
         ),
       );
       if (status === "pending_confirmation") {
-        yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.toolProposal, value: { tool, toolCallId } }, meta));
+        yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.toolProposal, value: proposalValue(call, toolCallId, st.agentRunId) }, meta));
       }
     }
   };
@@ -719,6 +764,7 @@ async function* streamLiveTurn(
       threadId: request.threadId,
       userContent: request.userContent,
       attachmentIds: request.attachmentIds,
+      ...(request.decisions?.length ? { decisions: request.decisions } : {}),
     },
     {
       onRunCreated: (id) => {
