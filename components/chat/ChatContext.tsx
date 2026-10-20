@@ -650,7 +650,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const loadMoreResult = useCallback(async (handle: string, offset: number, runId?: string) => {
     const threadId = activeIdRef.current;
-    const run = runId ?? blocksRef.current.find((b) => b.kind === "tool" && (b.toolUseId === handle || b.toolCallId === handle))?.kind === "tool" ? (blocksRef.current.find((b) => b.kind === "tool" && b.toolUseId === handle) as Extract<ChatBlock, { kind: "tool" }> | undefined)?.runId : runId;
+    const owner = blocksRef.current.find((b): b is Extract<ChatBlock, { kind: "tool" }> => b.kind === "tool" && b.toolUseId === handle);
+    const run = runId ?? owner?.runId;
     if (!threadId || !run) throw new Error("no run");
     const res = await fetch(`/api/chat/threads/${threadId}/results/${encodeURIComponent(handle)}?runId=${encodeURIComponent(run)}&offset=${offset}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`load more ${res.status}`);
@@ -668,7 +669,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const merged = persisted.map((b) => {
       if ((b.kind === "tool" || b.kind === "genui") && b.toolUseId && liveIds.has(b.toolUseId)) {
         const live = liveFold.blocks.find((x) => (x.kind === "tool" || x.kind === "genui") && x.toolUseId === b.toolUseId);
-        return live ? { ...live, id: b.id, messageId: b.messageId } : b;
+        if (!live) return b;
+        // The continuation re-announces the call without its arguments: keep the persisted ones.
+        if (live.kind === "tool" && b.kind === "tool") {
+          return {
+            ...b,
+            status: live.status,
+            resultText: live.resultText ?? b.resultText,
+            ui: live.ui ?? b.ui,
+            payload: live.payload ?? b.payload,
+            ...(live.confirmed ? { confirmed: true } : {}),
+            ...(live.autoApproved ? { autoApproved: live.autoApproved } : {}),
+          };
+        }
+        return { ...live, id: b.id, messageId: b.messageId };
       }
       if (b.kind === "approval") {
         const items = b.items.map((it) => {
