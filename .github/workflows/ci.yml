@@ -55,7 +55,15 @@ jobs:
       - name: Prisma validate
         run: npx prisma validate
 
+      - name: Swap for the typecheck
+        # tsc over this tree needs more than 8 GB of heap (it ran out of
+        # memory at 8192 on main after the 21B/19A merges; locally it passes
+        # at 11264). The runner has 8 GB of RAM, so give it swap first.
+        run: sh scripts/ci/add-swap.sh 16
+
       - name: Typecheck (next typegen + tsc)
+        env:
+          NODE_OPTIONS: --max-old-space-size=12288
         run: npm run typecheck
 
       - name: Secret scan (history)
