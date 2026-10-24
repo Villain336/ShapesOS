@@ -70,13 +70,15 @@ jobs:
         run: |
           # Fail if any tracked file in history matches secret shapes, excluding
           # known fixtures (documented in the F6 audit; verify-phase8-memory uses
-          # the canonical AWS docs example key as a redaction fixture). gitleaks is preferred
-          # when available; this grep set is the fallback.
+          # the canonical AWS docs example key as a redaction fixture; the Drive
+          # s3-presign test checks SigV4 query signing against the AWS docs
+          # vector, which uses the same documented example key). gitleaks is
+          # preferred when available; this grep set is the fallback.
           if command -v gitleaks >/dev/null; then
             gitleaks detect --source . --no-git -v
           else
             echo "gitleaks not installed; running fallback pattern scan on HEAD"
-            ! git grep -I -E 'sk-(live|test)-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' HEAD -- . ':!scripts/verify-llm-routing.mts' ':!components/SiteIde.tsx' ':!scripts/verify-phase8-memory.mts' ':!docs/phase7-launch-audit.md'
+            ! git grep -I -E 'sk-(live|test)-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' HEAD -- . ':!scripts/verify-llm-routing.mts' ':!components/SiteIde.tsx' ':!scripts/verify-phase8-memory.mts' ':!lib/filesystem/__tests__/s3-presign.test.ts' ':!docs/phase7-launch-audit.md'
           fi
 
       - name: Unit tests
