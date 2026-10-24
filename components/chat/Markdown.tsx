@@ -12,7 +12,7 @@ import { parseMarkdown, type MdBlock, type MdInline } from "@/lib/chat/markdown"
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
-function Inline({ nodes }: { nodes: readonly MdInline[] }) {
+function InlineText({ nodes }: { nodes: readonly MdInline[] }) {
   return (
     <>
       {nodes.map((n, i) => {
@@ -30,13 +30,13 @@ function Inline({ nodes }: { nodes: readonly MdInline[] }) {
           case "strong":
             return (
               <strong key={i} className="font-semibold text-ink">
-                <Inline nodes={n.c} />
+                <InlineText nodes={n.c} />
               </strong>
             );
           case "em":
             return (
               <em key={i}>
-                <Inline nodes={n.c} />
+                <InlineText nodes={n.c} />
               </em>
             );
           case "link": {
@@ -44,13 +44,13 @@ function Inline({ nodes }: { nodes: readonly MdInline[] }) {
             if (n.href.startsWith("/")) {
               return (
                 <Link key={i} href={n.href} className={cls}>
-                  <Inline nodes={n.c} />
+                  <InlineText nodes={n.c} />
                 </Link>
               );
             }
             return (
               <a key={i} href={n.href} className={cls} target="_blank" rel="noopener noreferrer">
-                <Inline nodes={n.c} />
+                <InlineText nodes={n.c} />
               </a>
             );
           }
@@ -94,14 +94,14 @@ function Block({ b }: { b: MdBlock }) {
     case "p":
       return (
         <p className="my-2 first:mt-0 last:mb-0">
-          <Inline nodes={b.c} />
+          <InlineText nodes={b.c} />
         </p>
       );
     case "h": {
       const Tag = (`h${Math.min(6, b.level + 2)}` as "h3" | "h4" | "h5" | "h6");
       return (
         <Tag className={cn("mt-4 mb-1.5 font-bold stretch-heading tracking-heading text-ink first:mt-0", b.level <= 2 ? "text-lg" : "text-base")}>
-          <Inline nodes={b.c} />
+          <InlineText nodes={b.c} />
         </Tag>
       );
     }
@@ -146,7 +146,7 @@ function Block({ b }: { b: MdBlock }) {
               <tr className="border-b border-line text-xs text-muted">
                 {b.head.map((c, i) => (
                   <th key={i} className={cn("px-3 py-2 font-medium", b.align[i] === "right" && "text-right", b.align[i] === "center" && "text-center")}>
-                    <Inline nodes={c} />
+                    <InlineText nodes={c} />
                   </th>
                 ))}
               </tr>
@@ -156,7 +156,7 @@ function Block({ b }: { b: MdBlock }) {
                 <tr key={ri} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   {r.map((c, i) => (
                     <td key={i} className={cn("px-3 py-2 align-top", b.align[i] === "right" && "text-right tabular-nums", b.align[i] === "center" && "text-center")}>
-                      <Inline nodes={c} />
+                      <InlineText nodes={c} />
                     </td>
                   ))}
                 </tr>

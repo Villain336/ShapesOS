@@ -51,7 +51,7 @@ export function vapidConfigFromEnv(env: NodeJS.ProcessEnv = process.env): VapidS
   }
   try {
     const pub = fromB64url(publicKey);
-    const priv = fromB64url(privateKey);
+    const priv = scalar32(fromB64url(privateKey));
     if (pub.length !== 65 || pub[0] !== 0x04) return { configured: false, reason: "VAPID_PUBLIC_KEY is not a 65-byte uncompressed P-256 point." };
     if (priv.length !== 32) return { configured: false, reason: "VAPID_PRIVATE_KEY is not a 32-byte P-256 key." };
     // The pair must match: derive the public point from the scalar.
@@ -64,17 +64,27 @@ export function vapidConfigFromEnv(env: NodeJS.ProcessEnv = process.env): VapidS
   return { configured: true, config: { publicKey, privateKey, subject } };
 }
 
+/**
+ * The P-256 private scalar as exactly 32 bytes. ECDH.getPrivateKey() drops
+ * leading zero bytes (about 1 key in 256), so a key generated that way, or
+ * pasted from such output, can be 31 bytes; left-pad it. Longer input is left
+ * as is so the length check still rejects it.
+ */
+function scalar32(buf: Buffer): Buffer {
+  return buf.length >= 32 ? buf : Buffer.concat([Buffer.alloc(32 - buf.length), buf]);
+}
+
 /** A fresh VAPID key pair (for docs / ops: `npx tsx -e …generateVapidKeys()`). */
 export function generateVapidKeys(): { publicKey: string; privateKey: string } {
   const ecdh = createECDH("prime256v1");
   ecdh.generateKeys();
-  return { publicKey: b64url(ecdh.getPublicKey()), privateKey: b64url(ecdh.getPrivateKey()) };
+  return { publicKey: b64url(ecdh.getPublicKey()), privateKey: b64url(scalar32(ecdh.getPrivateKey())) };
 }
 
 function privateKeyObject(publicKey: string, privateKey: string): KeyObject {
   const pub = fromB64url(publicKey);
   return createPrivateKey({
-    key: { kty: "EC", crv: "P-256", d: b64url(fromB64url(privateKey)), x: b64url(pub.subarray(1, 33)), y: b64url(pub.subarray(33, 65)) },
+    key: { kty: "EC", crv: "P-256", d: b64url(scalar32(fromB64url(privateKey))), x: b64url(pub.subarray(1, 33)), y: b64url(pub.subarray(33, 65)) },
     format: "jwk",
   });
 }

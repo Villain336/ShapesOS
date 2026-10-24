@@ -912,7 +912,8 @@ export class PrismaFundingStore {
             _count: { select: { views: true } },
           },
         });
-        return toShareLinkView(created);
+        // Same clock as the validation above, so `expired` agrees with it.
+        return toShareLinkView(created, now);
       } catch (e) {
         if (
           e instanceof Prisma.PrismaClientKnownRequestError &&

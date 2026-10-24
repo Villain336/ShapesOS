@@ -132,4 +132,31 @@ describe("VAPID (RFC 8292)", () => {
     const ok = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "https://shapes.example" } as unknown as NodeJS.ProcessEnv);
     assert.equal(ok.configured, true);
   });
+
+  // About 1 private scalar in 256 starts with a 0x00 byte. Node's
+  // ECDH.getPrivateKey() drops leading zeros, so such a key came out as 31
+  // bytes (42 base64url chars) and vapidConfigFromEnv then rejected the
+  // generator's own output (seen as a flaky failure of the test above).
+  const LEADING_ZERO_SCALAR = Buffer.from("00" + "11".repeat(31), "hex");
+  function leadingZeroPair(): { publicKey: string; scalar: Buffer } {
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(LEADING_ZERO_SCALAR);
+    return { publicKey: b64url(ecdh.getPublicKey()), scalar: LEADING_ZERO_SCALAR };
+  }
+
+  it("generates 32-byte private keys every time (leading zero bytes kept)", () => {
+    for (let i = 0; i < 2000; i++) {
+      const { privateKey } = generateVapidKeys();
+      assert.equal(fromB64url(privateKey).length, 32, `key ${i} is ${fromB64url(privateKey).length} bytes`);
+    }
+  });
+
+  it("accepts a private key whose leading zero byte was stripped, and signs with it", () => {
+    const { publicKey, scalar } = leadingZeroPair();
+    const stripped = b64url(scalar.subarray(1)); // 31 bytes, as older generated keys were
+    const status = vapidConfigFromEnv({ VAPID_PUBLIC_KEY: publicKey, VAPID_PRIVATE_KEY: stripped, VAPID_SUBJECT: "mailto:o@x.test" } as unknown as NodeJS.ProcessEnv);
+    assert.equal(status.configured, true, JSON.stringify(status));
+    const jwt = signVapidJwt({ audience: "https://push.example.net", subject: "mailto:o@x.test", publicKey, privateKey: stripped, now: Date.UTC(2026, 9, 6) });
+    assert.equal(verifyVapidJwt(jwt, publicKey).ok, true);
+  });
 });

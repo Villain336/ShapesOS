@@ -397,12 +397,18 @@ describe("share links", () => {
     const doc = await makeDoc(ws, "share");
     const v1 = doc.currentVersion!;
 
-    const pinned = await store.createShareLink(ws, {
-      docId: doc.id,
-      docVersionId: v1.id,
-      expiresAt: atDaysOut(14).toISOString(),
-      viewerEmails: ["VC@firm.com"],
-    });
+    // The expiry is relative to the test clock, so create against it too
+    // (with the real date, "14 days after 2026-10-01" is already past).
+    const pinned = await store.createShareLink(
+      ws,
+      {
+        docId: doc.id,
+        docVersionId: v1.id,
+        expiresAt: atDaysOut(14).toISOString(),
+        viewerEmails: ["VC@firm.com"],
+      },
+      NOW,
+    );
     assert.match(pinned.urlPath, /^\/r\/funding\/fsr_[0-9a-f]{32}$/);
     assert.equal(pinned.docId, doc.id);
     assert.equal(pinned.docVersionId, v1.id);
@@ -536,12 +542,16 @@ describe("share links", () => {
   it("an expired link fails closed at access time (expiry enforced on read)", async () => {
     const ws = await makeWorkspace();
     const doc = await makeDoc(ws, "expiry");
-    const link = await store.createShareLink(ws, {
-      docId: doc.id,
-      docVersionId: null,
-      expiresAt: atDaysOut(30).toISOString(),
-      viewerEmails: [],
-    });
+    const link = await store.createShareLink(
+      ws,
+      {
+        docId: doc.id,
+        docVersionId: null,
+        expiresAt: atDaysOut(30).toISOString(),
+        viewerEmails: [],
+      },
+      NOW,
+    );
     // Simulate time passing: the row expired after creation.
     await prisma.fundingShareLink.update({
       where: { id: link.id },
