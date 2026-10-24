@@ -1,9 +1,12 @@
 # Production image for Marketr (Next.js standalone)
-FROM node:22-alpine AS base
+# ONNX Runtime (loaded by transformers.js) requires glibc; Alpine's musl
+# aborts during native initialization, including next build's page collection.
+FROM node:22-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/*
 
 # --- deps ---
 FROM base AS deps
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 # .npmrc carries legacy-peer-deps (next-auth's nodemailer peer range lags).
 COPY package.json package-lock.json .npmrc ./
@@ -12,7 +15,6 @@ RUN npm ci
 
 # --- builder ---
 FROM base AS builder
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -42,7 +44,8 @@ RUN if [ -z "$CI" ]; then unset CI; fi; \
 # full dependency tree so the Prisma CLI is available; the slim runner is not.
 FROM base AS migrate
 # psql runs scripts/db/create-app-role.sql (\gexec / psql variables).
-RUN apk add --no-cache openssl postgresql-client
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json prisma.config.ts ./
@@ -70,7 +73,6 @@ CMD ["shapesos-backup", "--loop"]
 # agent_jobs and runs the agent loop (scripts/worker.mts). Same source and
 # dependencies as the app, run with tsx (no Next build needed).
 FROM base AS worker
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
@@ -78,7 +80,7 @@ COPY . .
 ENV DATABASE_URL="postgresql://marketr:marketr@localhost:5432/marketr?schema=public"
 RUN npx prisma generate
 ENV DATABASE_URL=""
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 --ingroup nodejs nextjs \
  && mkdir -p /app/.data /app/.run-artifacts \
  && chown -R nextjs:nodejs /app/.data /app/.run-artifacts
 USER nextjs
@@ -86,14 +88,13 @@ CMD ["node", "node_modules/tsx/dist/cli.mjs", "scripts/worker.mts"]
 
 # --- runner ---
 FROM base AS runner
-RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 # Build commit for GET /api/health and error reports (compose passes it as a
 # build arg: MARKETR_GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build).
 ARG MARKETR_GIT_COMMIT=""
 ENV MARKETR_GIT_COMMIT=$MARKETR_GIT_COMMIT
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 --ingroup nodejs nextjs
 # Runtime state directories (compose mounts named volumes here). Created and
 # owned by the app user so a fresh named volume inherits that ownership and is
 # writable: .data (reports, logos, site copies, local files), .run-artifacts
