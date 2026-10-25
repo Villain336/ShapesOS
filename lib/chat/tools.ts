@@ -1454,4 +1454,4 @@ export function toolCatalogForPrompt(grant?: readonly string[] | null): string {
       .join("\n    ");
     return `- ${t.name} [${t.kind}, min role: ${t.minRole}]\n  ${t.description}\n  args:\n    ${props}`;
   }).join("\n");
-  }
+}
