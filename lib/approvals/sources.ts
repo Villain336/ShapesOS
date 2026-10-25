@@ -1000,7 +1000,7 @@ const agentrun: InboxSource = {
         id: r.id,
         source: "agent_run",
         typeLabel: "Run review",
-        title: runPrompt(r.agentState) ?? `${humanize(r.agentKey)} run`,
+        title: runPrompt(r.agentState) ?? (r.agentKey ? `${humanize(r.agentKey)} run` : "Agent run"),
         detail: humanize(r.kind),
         requestedBy: r.startedBy && !r.startedBy.includes(":") ? r.startedBy : runAgentName(r.kind, r.agentKey),
         createdAt: r.createdAt,
