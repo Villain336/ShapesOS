@@ -70,19 +70,27 @@ test.describe("visual gate: workspace UX", () => {
     await page.getByRole("button", { name: "Open chat" }).click();
     const dock = page.getByRole("complementary", { name: "Chat" });
     await expect(dock).toBeVisible();
-    await expect
-      .poll(async () => {
-        const margin = await main.evaluate((el) => getComputedStyle(el).marginRight);
-        const w = await page.evaluate(() => document.documentElement.style.getPropertyValue("--chat-dock-w"));
-        return { margin, w };
-      })
-      .toEqual(expect.objectContaining({ margin: expect.stringMatching(/^[1-9]\d*(\.\d+)?px$/) }));
-    const after = await main.boundingBox();
     const dockBox = await dock.boundingBox();
+    expect(dockBox).not.toBeNull();
+    // The push transition runs 150ms (globals.css: margin-right 150ms ease).
+    // Measuring mid-transition reads a fractional margin (this exact race
+    // failed the first two runs: 1.86px and 12.25px "overlaps" that were
+    // really settle-in-progress, confirmed on the failure pixels). Wait for
+    // the column to settle at the dock's rendered width, then measure.
+    await expect
+      .poll(
+        () => main.evaluate((el) => parseFloat(getComputedStyle(el).marginRight)),
+        { message: "push margin settles at dock width" },
+      )
+      .toBeGreaterThan(dockBox!.width - 2);
+    const after = await main.boundingBox();
     expect(after!.width).toBeLessThan(before!.width);
-    // Push mode: the main column's content edge does not cross the dock's
-    // content edge. 8px tolerance covers the dock's transparent 6px resize
-    // strip (w-1.5) plus subpixel rounding of the fractional margin.
+    // Push, not overlay: the column shrinks by exactly the dock width.
+    expect(before!.width - after!.width).toBeGreaterThan(dockBox!.width - 2);
+    expect(before!.width - after!.width).toBeLessThan(dockBox!.width + 2);
+    // Content edges meet: the main column's right edge stops at the dock's
+    // left edge (8px covers the dock's transparent 6px resize strip (w-1.5)
+    // plus subpixel rounding).
     expect(after!.x + after!.width).toBeLessThanOrEqual(dockBox!.x + 8);
     await page.screenshot({ path: `${SHOTS}/04-chat-dock-push.png`, fullPage: true });
 
