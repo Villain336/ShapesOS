@@ -153,7 +153,7 @@ export default async function ProjectPage({
         <DeleteProjectButton projectId={project.id} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
         <Stat label="Keywords saved" value={project.keywords.length} icon={<Key className="size-4" />} />
         <Stat label="Tracked" value={trackedCount} icon={<TrendingUp className="size-4" />} />
         <Stat label="Competitors" value={project.competitors.length} icon={<Crosshair className="size-4" />} />
