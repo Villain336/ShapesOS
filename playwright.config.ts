@@ -27,7 +27,7 @@ export default defineConfig({
     {
       name: "e2e",
       testMatch: /.*\.spec\.ts/,
-      testIgnore: /pwa\.spec\.ts/,
+      testIgnore: [/pwa\.spec\.ts/, /demo\.spec\.ts/],
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
@@ -37,6 +37,20 @@ export default defineConfig({
         // which every gotoClean() waits on, so these specs run without it.
         // The worker itself is covered by the "pwa" project below.
         serviceWorkers: "block",
+      },
+    },
+    // 4) release demo walkthrough: records video (not a gate; the e2e
+    //    project ignores demo.spec.ts so the suite never runs it twice).
+    {
+      name: "demo",
+      testMatch: /demo\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "scripts/e2e/.auth.json",
+        serviceWorkers: "block",
+        viewport: { width: 1280, height: 800 },
+        video: { mode: "on", size: { width: 1280, height: 800 } },
       },
     },
     // 3) the offline layer's service worker, in a browser that allows it.
