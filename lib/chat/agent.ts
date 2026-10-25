@@ -49,7 +49,7 @@ import { getLlmProviderFor } from "@/lib/llm";
 import { resolveWorkloadForWorkspace } from "@/lib/llm/workspace";
 import { workloadForAgent } from "@/lib/llm/router";
 import type { ChatContentBlock, ChatMessage, ChatToolResultBlock } from "@/lib/llm/types";
-import { getTool, type ToolContext } from "./tools";
+import { getTool, type ChatMode, type ToolContext } from "./tools";
 import {
   executeTool,
   needsClick,
@@ -375,6 +375,8 @@ export interface WorkspaceContextParts {
   nudge?: string | null;
   /** Phase 17 (A3): the thread's "facts so far" summary (labelled; never replaces the transcript). */
   factsSummary?: string | null;
+  /** Phase 22 (chat): how the thread's mode shapes this turn (Plan mode guidance). */
+  modeNote?: string | null;
 }
 
 /**
@@ -394,6 +396,7 @@ export function workspaceContextBlock(parts: WorkspaceContextParts): string {
     parts.supplements ? `\n${parts.supplements}` : "",
     parts.factsSummary ? `\n## FACTS GATHERED EARLIER IN THIS CONVERSATION (a summary of past tool results — a summary, not the record; re-run a tool when freshness matters)\n${parts.factsSummary}` : "",
     parts.nudge ? `\nNote on this request: ${parts.nudge}` : "",
+    parts.modeNote ? `\n${parts.modeNote}` : "",
     CONTEXT_CLOSE,
   ]
     .filter((l): l is string => l !== null && l !== "")
@@ -657,6 +660,11 @@ export interface AgentTurnInput {
   signal?: AbortSignal;
   /** Phase 8: "build" runs the Operator on the code workload (default: from the grant). */
   mode?: "build" | "default";
+  /**
+   * Phase 22 (chat): the thread's conversation mode. In "plan" every non-safe
+   * tool is proposed (no auto-approve rules) and the agent plans first.
+   */
+  chatMode?: ChatMode;
   /** Phase 8: hand off to the worker at a step boundary after this (epoch ms). */
   handoffAt?: number;
   /** Phase 8: continue the run's saved transcript (the worker sets it). */
@@ -857,6 +865,9 @@ function loopContext(input: AgentTurnInput, confirmed = false): LoopContext {
     userId: input.userId,
     role: input.role,
     confirmed,
+    // Phase 22 (chat): the thread's conversation mode (the confirmation gate
+    // reads it; plan mode proposes every non-safe tool).
+    chatMode: input.chatMode,
     // Turn-scoped skill loading state (milestone 21): load_skill records slugs
     // here; the connector-tool declared-tool gate reads them.
     loadedSkills: new Set<string>(),
@@ -948,6 +959,13 @@ async function freshTurnPrompt(
     supplements: [supplements, attachmentSection].filter(Boolean).join("\n\n"),
     nudge: autoDelegation && grantCanDelegate(grant) ? delegationNudge(trimmed) : null,
     factsSummary,
+    // Phase 22 (chat): plan mode — think and lay out the plan first; the
+    // runtime proposes every non-safe tool, so list the steps and let the
+    // person approve them one by one. Never claim a step already ran.
+    modeNote:
+      input.chatMode === "plan"
+        ? "This thread is in Plan mode: lay out the plan first, then take it one proposed step at a time. Every change is proposed to the person before it runs — call the tool for the step you are on and the runtime asks for their OK. Say what you plan to do, not what you have done."
+        : null,
   });
   // Phase 17 evaluation knob: CHAT_CACHE_LAYOUT=legacy rebuilds the
   // pre-Phase-17 shape (the dynamic context inside the system prompt, so the
@@ -1519,6 +1537,8 @@ export interface ChatTurnJobPayload {
   agentKey: AgentKey;
   grant: ToolGroup[];
   mode: "build" | "default";
+  /** Phase 22 (chat): carried across the worker hand-off (lib/agents/queue). */
+  chatMode?: ChatMode;
 }
 
 export interface TrackedTurnOptions {
@@ -1597,6 +1617,7 @@ export async function runTrackedAgentTurn(
     agentKey: profile.agentKey,
     grant: profile.grant,
     mode,
+    ...(input.chatMode ? { chatMode: input.chatMode } : {}),
   };
   const queued = async (): Promise<AgentTurnOutput & { runId: string }> => {
     await enqueueAgentJob({ workspaceId: input.workspaceId, kind: "chat_turn", runId: run.id, payload: job });
