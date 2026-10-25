@@ -90,6 +90,9 @@ export async function POST(req: Request) {
               threadId: thread.id,
               userContent: content,
               attachmentIds,
+              // Phase 22 (chat): the thread's mode drives the confirmation gate
+              // (plan mode proposes every non-safe tool).
+              chatMode: thread.mode === "plan" || thread.mode === "auto" ? thread.mode : "ask",
               // Phase 16 slice 4: UI→agent shared state (may be absent).
               incomingState: (state ?? undefined) as import("@/lib/agents/agui/shared-state").SharedAgentState | undefined,
             },
