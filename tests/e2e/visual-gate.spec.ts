@@ -38,6 +38,23 @@ function watchNetwork(page: Page) {
   };
 }
 
+// Stat-card labels must fit their card - never collide with the corner
+// icon (parent pixel gate, run 40230829776: icons struck through labels
+// when the pushed work column squeezed the 4-up grid). scrollWidth >
+// clientWidth is exactly the "text spills toward the icon" condition.
+async function expectStatLabelsFit(page: Page) {
+  const labels = ["Keywords saved", "Tracked", "Competitors", "Content items"];
+  for (const label of labels) {
+    const matches = await page.getByText(label, { exact: true }).all();
+    expect(matches.length, `stat label "${label}" renders`).toBeGreaterThan(0);
+    for (const el of matches) {
+      if (!(await el.isVisible())) continue;
+      const fits = await el.evaluate((n) => n.scrollWidth <= n.clientWidth + 1);
+      expect(fits, `stat label "${label}" overflows its card`).toBe(true);
+    }
+  }
+}
+
 async function gotoWithDiag(page: Page, url: string) {
   const dump = watchNetwork(page);
   try {
@@ -185,6 +202,7 @@ test.describe("visual gate: workspace UX", () => {
     expect(resized!.width).toBeGreaterThan(dockBox!.width + 60);
     await page.screenshot({ path: `${SHOTS}/05-chat-dock-resized.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05b-chat-dock-resized-viewport.png` });
+    await expectStatLabelsFit(page);
 
     await page.getByRole("button", { name: "Close chat" }).click();
     await expect(dock).toBeHidden();
@@ -237,6 +255,7 @@ test.describe("visual gate: workspace UX", () => {
     expect(mb!.width).toBeGreaterThanOrEqual(400);
     await page.screenshot({ path: `${SHOTS}/08-clamped-push.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/08b-clamped-push-viewport.png` });
+    await expectStatLabelsFit(page);
     await page.getByRole("button", { name: "Close chat" }).click();
   });
 
