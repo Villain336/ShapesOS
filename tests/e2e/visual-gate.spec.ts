@@ -16,6 +16,39 @@ const SHOTS = "test-results/visual-gate";
 
 const htmlClass = (page: Page) => page.evaluate(() => document.documentElement.className);
 
+// DIAG (networkidle hang hunt, run 905e451): the narrow/mid gotos below timed
+// out waiting for networkidle even though the trace showed every recorded
+// request complete and the page fully rendered. Track the driver's own
+// request/WS events and dump what is still open when the wait times out.
+function watchNetwork(page: Page) {
+  const pending = new Map<string, number>();
+  page.on("request", (r) => pending.set(`${r.method()} ${r.url()}`, Date.now()));
+  page.on("requestfinished", (r) => pending.delete(`${r.method()} ${r.url()}`));
+  page.on("requestfailed", (r) => {
+    pending.delete(`${r.method()} ${r.url()}`);
+    console.log("DIAG requestfailed:", r.method(), r.url(), "::", r.failure()?.errorText);
+  });
+  page.on("websocket", (ws) => {
+    console.log("DIAG websocket open:", ws.url());
+    ws.on("close", () => console.log("DIAG websocket close:", ws.url()));
+    ws.on("socketerror", (e) => console.log("DIAG websocket error:", ws.url(), e));
+  });
+  return () => {
+    console.log("DIAG still-pending at timeout:", JSON.stringify([...pending.keys()], null, 1));
+  };
+}
+
+async function gotoWithDiag(page: Page, url: string) {
+  const dump = watchNetwork(page);
+  try {
+    await page.goto(url, { waitUntil: "networkidle" });
+  } catch (e) {
+    dump();
+    throw e;
+  }
+}
+
+
 test.describe("visual gate: workspace UX", () => {
   test("shell renders light, pinned rows + foldable groups, theme toggle persists", async ({ page }) => {
     await page.goto("/dashboard", { waitUntil: "networkidle" });
@@ -117,7 +150,7 @@ test.describe("visual gate: workspace UX", () => {
     // overlay fallback - no push margin, full-width work column beneath.
     await page.setViewportSize({ width: 980, height: 800 });
     const { projectId } = loadIds();
-    await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
+    await gotoWithDiag(page, `/dashboard/projects/${projectId}`);
     await page.getByRole("button", { name: "Open chat" }).click();
     const dock = page.getByRole("complementary", { name: "Chat" });
     await expect(dock).toBeVisible();
@@ -140,7 +173,7 @@ test.describe("visual gate: workspace UX", () => {
     });
     await page.setViewportSize({ width: 1152, height: 800 });
     const { projectId } = loadIds();
-    await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
+    await gotoWithDiag(page, `/dashboard/projects/${projectId}`);
     await page.getByRole("button", { name: "Open chat" }).click();
     const dock = page.getByRole("complementary", { name: "Chat" });
     await expect(dock).toBeVisible();
