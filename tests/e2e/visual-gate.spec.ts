@@ -80,8 +80,10 @@ test.describe("visual gate: workspace UX", () => {
     const after = await main.boundingBox();
     const dockBox = await dock.boundingBox();
     expect(after!.width).toBeLessThan(before!.width);
-    // Push mode: main column and dock do not overlap horizontally.
-    expect(after!.x + after!.width).toBeLessThanOrEqual(dockBox!.x + 1);
+    // Push mode: the main column's content edge does not cross the dock's
+    // content edge. 8px tolerance covers the dock's transparent 6px resize
+    // strip (w-1.5) plus subpixel rounding of the fractional margin.
+    expect(after!.x + after!.width).toBeLessThanOrEqual(dockBox!.x + 8);
     await page.screenshot({ path: `${SHOTS}/04-chat-dock-push.png`, fullPage: true });
 
     // Drag the separator 120px left: the dock widens and the column shrinks.
