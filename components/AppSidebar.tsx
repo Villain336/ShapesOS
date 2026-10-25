@@ -1038,4 +1038,5 @@ export function MobileNav({
         </Dialog.Root>
       </div>
     </header>
+  );
 }
