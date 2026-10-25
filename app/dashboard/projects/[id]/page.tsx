@@ -176,7 +176,7 @@ export default async function ProjectPage({
                   return (
                     <li key={link.href}>
                       <Link
-                        href={`${base}/${link.href}`}
+                        href={link.href.startsWith("/") ? link.href : `${base}/${link.href}`}
                         className="group flex items-center gap-3 rounded-control px-2 py-2 transition-[background-color] duration-150 hover:bg-hover"
                       >
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-inset text-ink-2">
