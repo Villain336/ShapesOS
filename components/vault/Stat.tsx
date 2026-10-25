@@ -24,7 +24,7 @@ export function Stat({
     <Card className={className}>
       <CardBody className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[0.78125rem] font-medium text-ink-2">{label}</div>
+          <div className="break-words text-[0.78125rem] font-medium text-ink-2">{label}</div>
           <div className="mt-1 truncate text-[1.5rem] font-semibold tracking-tight text-ink tabular-nums">
             {value}
           </div>
