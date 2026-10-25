@@ -26,6 +26,11 @@ function at(min: number) {
 function fixtures() {
   const both = <T extends Record<string, unknown>>(make: (ws: string) => T[]) => [...make(A), ...make(B)];
   return {
+    // Oct 2026 (comparison follow-up): one run waiting on a person, one live.
+    agentRun: both((ws) => [
+      { id: `${ws}_runwait`, workspaceId: ws, kind: "chat", agentKey: "lead", status: "awaiting_confirmation", startedBy: "u_editor", agentState: { task: "Ship the About page refresh" }, createdAt: at(9) },
+      { id: `${ws}_runlive`, workspaceId: ws, kind: "chat", agentKey: "lead", status: "running", startedBy: "u_editor", agentState: { task: "Still working" }, createdAt: at(10) },
+    ]),
     missionApproval: both((ws) => [
       { id: `${ws}_mission`, workspaceId: ws, status: "pending", expiresAt: LATER, missionId: `${ws}_m1`, action: "send_email", tier: 3, bindingJson: { amountCents: 1200 }, createdBy: "u_editor", createdAt: at(5), mission: { template: "outreach_sprint" } },
       { id: `${ws}_mission_expired`, workspaceId: ws, status: "pending", expiresAt: EARLIER, missionId: null, action: "old", tier: 1, bindingJson: {}, createdBy: "agent:x", createdAt: at(50), mission: null },
@@ -128,8 +133,8 @@ describe("approvals inbox: workspace scoping", () => {
     const h = harness();
     await loadInbox(viewer("owner"), h.opts);
     // mission_approvals, report_send_approvals, composio_action_approvals,
-    // social_publications
-    assert.equal(h.scoped.length, 4);
+    // social_publications, agent_runs (run-review signposts, Oct 2026)
+    assert.equal(h.scoped.length, 5);
     assert.ok(h.scoped.every((w) => w === A));
   });
 
@@ -146,7 +151,7 @@ describe("approvals inbox: workspace scoping", () => {
     assert.ok(!ids.has(`${A}_nudge2`), "approved nudge is gone");
     assert.ok(ids.has(`${A}_social`), "submitted social post");
     assert.ok(!ids.has(`${A}_social_draft`), "a draft post is not an approval");
-    assert.equal(res.total, 18, "16 + the autopilot draft and the workflow gate (Phase 18.3)");
+    assert.equal(res.total, 19, "16 + the autopilot draft, the workflow gate and the waiting agent run");
     assert.ok(!ids.has(`${A}_ap_done`), "a decided autopilot item is gone");
   });
 
@@ -291,10 +296,10 @@ describe("approvals inbox: resilience and display", () => {
 });
 
 describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17)", () => {
-  it("are the 16th and 17th sources", () => {
+  it("are the 16th, 17th and 18th sources", () => {
     const keys = INBOX_SOURCE_DEFS.map((d) => d.key);
-    assert.equal(keys.length, 17);
-    assert.deepEqual(keys.slice(15), ["autopilot", "workflow"]);
+    assert.equal(keys.length, 18);
+    assert.deepEqual(keys.slice(15), ["autopilot", "workflow", "agent_run"]);
   });
 
   it("autopilot lists pending drafts (not gates, not decided) and decides through the existing autopilot routes", async () => {
@@ -326,5 +331,17 @@ describe("approvals inbox: autopilot and workflow (Phase 18.3, sources 16 and 17
       assert.equal(i.approve, null);
     }
     assert.ok(res.items.some((i) => i.source === "workflow"));
+  });
+
+  it("agent_run signposts runs waiting on a person to their review, with no blind inline decision", async () => {
+    const res = await loadInbox(viewer("editor", { userId: "u_other" }), harness().opts);
+    const runs = res.items.filter((i) => i.source === "agent_run");
+    assert.deepEqual(runs.map((i) => i.id), [`${A}_runwait`], "only the awaiting_confirmation run, not the live one");
+    assert.equal(runs[0]!.title, "Ship the About page refresh");
+    assert.equal(runs[0]!.href, `/dashboard/runs/${A}_runwait`);
+    assert.equal(runs[0]!.typeLabel, "Run review");
+    assert.equal(runs[0]!.canDecide, true);
+    assert.equal(runs[0]!.approve, null);
+    assert.equal(runs[0]!.deny, null);
   });
 });
