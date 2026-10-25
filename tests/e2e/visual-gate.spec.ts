@@ -112,6 +112,54 @@ test.describe("visual gate: workspace UX", () => {
     await expect(dock).toBeHidden();
   });
 
+  test("narrow desktop: dock floats over content instead of squeezing it", async ({ page }) => {
+    // 980px < 1028px push threshold (288 nav + 320 dock + 420 min work):
+    // overlay fallback - no push margin, full-width work column beneath.
+    await page.setViewportSize({ width: 980, height: 800 });
+    const { projectId } = loadIds();
+    await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Open chat" }).click();
+    const dock = page.getByRole("complementary", { name: "Chat" });
+    await expect(dock).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.chatDock ?? "unset"))
+      .toBe("unset");
+    const main = page.locator("[data-shell-main]");
+    expect(await main.evaluate((el) => getComputedStyle(el).marginRight)).toBe("0px");
+    await page.screenshot({ path: `${SHOTS}/07-narrow-overlay.png`, fullPage: true });
+    await page.getByRole("button", { name: "Close chat" }).click();
+  });
+
+  test("mid desktop: a wide saved dock clamps so the work column stays usable", async ({ page }) => {
+    // 1152px pushes, but a saved 720px width would leave 144px of work -
+    // the clamp caps the dock at 1152 - 288 - 420 = 444px.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("shapesos:chatdock:width", "720");
+      } catch {}
+    });
+    await page.setViewportSize({ width: 1152, height: 800 });
+    const { projectId } = loadIds();
+    await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Open chat" }).click();
+    const dock = page.getByRole("complementary", { name: "Chat" });
+    await expect(dock).toBeVisible();
+    await expect
+      .poll(async () => (await dock.boundingBox())?.width ?? 0, { message: "dock clamps to 444px" })
+      .toBeLessThanOrEqual(446);
+    const main = page.locator("[data-shell-main]");
+    await expect
+      .poll(() => main.evaluate((el) => parseFloat(getComputedStyle(el).marginRight)))
+      .toBeGreaterThan(440);
+    const mb = await main.boundingBox();
+    expect(1152 - mb!.x - mb!.width).toBeGreaterThan(440); // margin matches dock
+    // Work column stays usable: 420 by the clamp math vs body width, 400
+    // asserted to absorb a 15px classic scrollbar plus subpixel.
+    expect(mb!.width).toBeGreaterThanOrEqual(400);
+    await page.screenshot({ path: `${SHOTS}/08-clamped-push.png`, fullPage: true });
+    await page.getByRole("button", { name: "Close chat" }).click();
+  });
+
   test("mobile viewport renders without horizontal overflow", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard", { waitUntil: "networkidle" });
