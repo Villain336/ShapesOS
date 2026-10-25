@@ -78,6 +78,8 @@ export interface AguiTurnRequest {
   incomingState?: SharedAgentState;
   /** Phase 22 (chat): decisions from the approval block (POST …/decisions) — the turn settles them and carries on. */
   decisions?: AgentTurnInput["decisions"];
+  /** Phase 22 (chat): the thread's conversation mode (ask / plan / auto). */
+  chatMode?: AgentTurnInput["chatMode"];
 }
 
 /** Context passed to the shared-state loaders/applier. */
@@ -411,6 +413,7 @@ export async function* streamChatTurnAgui(
       threadId: request.threadId,
       userContent: request.userContent,
       attachmentIds: request.attachmentIds,
+      ...(request.chatMode ? { chatMode: request.chatMode } : {}),
     });
   } catch (err) {
     yield* emit(
@@ -767,6 +770,7 @@ async function* streamLiveTurn(
       userContent: request.userContent,
       attachmentIds: request.attachmentIds,
       ...(request.decisions?.length ? { decisions: request.decisions } : {}),
+      ...(request.chatMode ? { chatMode: request.chatMode } : {}),
     },
     {
       onRunCreated: (id) => {
