@@ -157,6 +157,14 @@ export default function PromptBar({
   const [connected, setConnected] = useState(false);
   const [active, setActive] = useState(0);
   const [listening, setListening] = useState(false);
+  // Oct 2026 (comparison pick #4): real dictation when embedded (demo=false)
+  // via the Web Speech API; the canned DICTATION string remains demo-theater
+  // only. Unsupported browsers hide the mic below.
+  const [speechSupported] = useState(
+    () => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window),
+  );
+  const recognitionRef = useRef<{ stop: () => void; abort: () => void } | null>(null);
+  const dictationBaseRef = useRef("");
   const [auto, setAuto] = useState(demo);
   const [autoStep, setAutoStep] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -249,16 +257,76 @@ export default function PromptBar({
     return () => clearTimeout(t);
   }, [auto, autoStep]);
 
-  /* dictation resolves after a beat, like a real transcript landing */
+  /* demo theater: dictation resolves after a beat, like a transcript landing.
+     Real dictation (demo=false) is the Web Speech API effect below. */
   useEffect(() => {
-    if (!listening) return;
+    if (!listening || !demo) return;
     const t = setTimeout(() => {
       setDraft((current) => (current ? `${current.trimEnd()} ${DICTATION}` : DICTATION));
       setListening(false);
       inputRef.current?.focus();
     }, 2200);
     return () => clearTimeout(t);
-  }, [listening]);
+  }, [listening, demo]);
+
+  /* Real dictation: stream final + interim results into the draft. */
+  useEffect(() => {
+    if (!listening || demo) return;
+    // The Web Speech API is nonstandard; TS's DOM lib has no types for it.
+    interface DictationRecognition {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onerror: (() => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+      abort: () => void;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: new () => DictationRecognition;
+      webkitSpeechRecognition?: new () => DictationRecognition;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) {
+      setListening(false);
+      return;
+    }
+    const recognition = new Ctor();
+    recognitionRef.current = recognition;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = document.documentElement.lang || "en-US";
+    dictationBaseRef.current = "";
+    setDraft((current) => {
+      dictationBaseRef.current = current.trimEnd();
+      return current;
+    });
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i]![0]!.transcript;
+      }
+      const base = dictationBaseRef.current;
+      setDraft(base ? `${base} ${transcript.trim()}` : transcript.trim());
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+    }
+    return () => {
+      recognitionRef.current = null;
+      try {
+        recognition.stop();
+      } catch {
+        // already stopped
+      }
+    };
+  }, [listening, demo]);
 
   /* Move wrapped text above the controls, then grow to a compact maximum. */
   useLayoutEffect(() => {
@@ -575,7 +643,8 @@ export default function PromptBar({
             </span>
           </button>
 
-          {/* dictation */}
+          {/* dictation: hidden on real surfaces without the Web Speech API */}
+          {demo || speechSupported ? (
           <button
             type="button"
             aria-label={listening ? "Stop dictation" : "Start dictation"}
@@ -598,6 +667,8 @@ export default function PromptBar({
             )}
           </button>
 
+          ) : null}
+
           {/* send — round pill in both variants (pressables are pills) */}
           <button
             type="button"
@@ -617,4 +688,4 @@ export default function PromptBar({
       </div>
     </div>
   );
-}
+            }
