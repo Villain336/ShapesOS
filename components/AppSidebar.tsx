@@ -1039,4 +1039,4 @@ export function MobileNav({
       </div>
     </header>
   );
-    }
+}
