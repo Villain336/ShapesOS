@@ -478,7 +478,9 @@ describe("backfill migration", () => {
       assert.equal(byPath.get("/files/a")!.parentId, byPath.get("/files")!.id);
       assert.equal(byPath.get("/files")!.parentId, null);
       const files = await prisma.workspaceFile.findMany({ where: { workspaceId: ws }, orderBy: { logicalPath: "asc" } });
-      assert.deepEqual(files.map((f) => f.logicalPath), [...legacy].sort(), "logical_path is untouched");
+      // Compare as sets: ORDER BY follows the database collation (CI's en_US.utf8
+      // puts "case.txt" before "Case.txt", the C locale the other way round).
+      assert.deepEqual(files.map((f) => f.logicalPath).sort(), [...legacy].sort(), "logical_path is untouched");
       const keyed = files.filter((f) => f.pathKey !== null).map((f) => f.logicalPath);
       assert.ok(keyed.includes("/files/a/b/one.txt"));
       assert.equal(keyed.filter((p) => p.toLowerCase() === "/files/case.txt").length, 1, "of two paths differing only by case, one keeps the key and the other stays NULL");

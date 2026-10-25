@@ -282,7 +282,8 @@ function* toolCallEvents(
 }
 
 /** Phase 22 (chat): what a TOOL_CALL_RESULT carries besides its status (see lib/chat/blocks.ts). */
-function resultMeta(call: Partial<ChatToolCall> & Record<string, unknown>): Record<string, unknown> {
+function resultMeta(input: Partial<ChatToolCall> | Record<string, unknown>): Record<string, unknown> {
+  const call = input as Partial<ChatToolCall> & Record<string, unknown>;
   const out: Record<string, unknown> = {};
   if (typeof call.toolUseId === "string") out.toolUseId = call.toolUseId;
   if (typeof call.ui === "string") out.ui = call.ui;
@@ -298,7 +299,8 @@ function resultMeta(call: Partial<ChatToolCall> & Record<string, unknown>): Reco
 }
 
 /** Phase 22 (chat): the approval block's item (lib/chat/blocks.ts ApprovalItem). */
-function proposalValue(call: Partial<ChatToolCall> & Record<string, unknown>, toolCallId: string, agentRunId?: string | null): Record<string, unknown> {
+function proposalValue(input: Partial<ChatToolCall> | Record<string, unknown>, toolCallId: string, agentRunId?: string | null): Record<string, unknown> {
+  const call = input as Partial<ChatToolCall> & Record<string, unknown>;
   const tier = typeof call.tier === "number" ? call.tier : undefined;
   const toolKind = typeof call.toolKind === "string" ? call.toolKind : undefined;
   return {

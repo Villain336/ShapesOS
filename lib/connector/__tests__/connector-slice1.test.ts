@@ -337,10 +337,17 @@ describe("graph lifecycle", () => {
     const person = await store.addPerson(ws, { name: "Dana", consentedBy: "me" });
     await store.recordTouchValue(ws, person.id, "inbound", daysAgo(1), NOW);
 
-    const updated = await store.updateRelationship(ws, person.id, {
-      notes: "Met at Raleigh Founded.",
-      boundaries: "don't ask for intros more than quarterly",
-    });
+    // Pass the test clock: without it warmth is scored against the real date
+    // and the fixed 1-day-old touch decays as the calendar moves on.
+    const updated = await store.updateRelationship(
+      ws,
+      person.id,
+      {
+        notes: "Met at Raleigh Founded.",
+        boundaries: "don't ask for intros more than quarterly",
+      },
+      NOW,
+    );
     assert.equal(updated.notes, "Met at Raleigh Founded.");
     assert.equal(updated.boundaries, "don't ask for intros more than quarterly");
     // Warmth recomputed from signals, untouched by the patch:
