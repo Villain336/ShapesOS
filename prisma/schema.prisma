@@ -3475,6 +3475,11 @@ model AiChatThread {
   // it may use (server-computed grant; empty = the agent's defaults).
   agentKey     String   @default("lead") @map("agent_key")
   allowedTools String[] @default([]) @map("allowed_tools")
+  // Phase 22 (chat): the thread's conversation mode. "ask" and "auto" keep
+  // today's behavior (non-safe tools are proposed; per-agent auto-approve
+  // rules may let Tier 0-2 writes run). "plan" plans first and proposes
+  // EVERY non-safe tool — auto-approve rules never apply.
+  mode String @default("ask") @map("mode")
   // Phase 17 (A3, WS=model): a short "facts so far" summary of earlier
   // turns' read-tool results (lib/chat/facts.ts), carried into the next
   // turn's context block as a labelled summary — never a transcript.

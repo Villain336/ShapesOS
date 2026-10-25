@@ -16,6 +16,9 @@ import { DashboardMain } from "@/components/DashboardMain";
 import { AppTopBar } from "@/components/AppTopBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ChatProvider } from "@/components/chat/ChatContext";
+// Oct 2026 (approved redesign): the docked assistant, available on every
+// dashboard page (not just /dashboard/assistant).
+import { ChatDock } from "@/components/chat/ChatDock";
 import { CommandBar } from "@/components/command-bar/CommandBar";
 // Phase 4d: New task composer (sidebar pill, Overview, ⌘K, ⌘N).
 import { NewTaskDialog } from "@/components/command-bar/NewTaskDialog";
@@ -35,7 +38,8 @@ import { BrandTheme } from "@/components/BrandTheme";
 import { sanitizeBrandHex } from "@/lib/brand-theme";
 import { prisma } from "@/lib/prisma";
 // Phase 3: hosted trial notice + billing reachable from the sidebar.
-import { getMembership, roleAtLeast } from "@/lib/authz";
+import { getMembership, requireProjectRole, roleAtLeast } from "@/lib/authz";
+import { llmStatus } from "@/lib/llm";
 import { trialView } from "@/lib/billing/trial";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { planHasFeature } from "@/lib/billing/entitlements";
@@ -101,6 +105,18 @@ export default async function DashboardLayout({
     prisma.workspace.findUnique({ where: { id: workspace.id }, select: { frozenAt: true } }).catch(() => null),
   ]);
   const initialDock = { pinned: desk?.nav.pinned ?? [], recents };
+
+  // Oct 2026 (approved redesign): the docked chat needs the same default
+  // project and flags the assistant page computes (its own page re-checks
+  // access; the dock only opens threads the thread API re-authorizes).
+  const dockProjects = await prisma.project.findMany({
+    where: { workspaceId: workspace.id },
+    select: { id: true, domain: true },
+    orderBy: { createdAt: "asc" },
+    take: 1,
+  }).catch(() => [] as { id: string; domain: string }[]);
+  const dockProject = dockProjects[0] ?? null;
+  const dockCanEdit = dockProject ? (await requireProjectRole(user.id, dockProject.id, "editor")) !== null : false;
   const trial = trialView(workspace);
 
   const sidebarProps = {
@@ -186,6 +202,12 @@ export default async function DashboardLayout({
         <ShareSheetHost role={role} workspaceId={workspace.id} />
         <OfflineProvider userKey={offlineKey} workspaceId={workspace.id} />
         <FeedbackHost />
+        <ChatDock
+          project={dockProject}
+          canEdit={dockCanEdit}
+          mockMode={!llmStatus().isLive}
+          workspaceId={workspace.id}
+        />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
@@ -202,7 +224,9 @@ export default async function DashboardLayout({
         />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
-          <div className="min-w-0 flex-1">
+          {/* data-shell-main: the chat dock (ChatDock) shifts this column left
+              while it is open so chat sits beside the work, not over it. */}
+          <div className="min-w-0 flex-1" data-shell-main="">
             <AppTopBar />
             {/* Phase 18.1 (WS=desk): Control Center → Pause all agents froze the workspace. */}
             {frozen?.frozenAt ? <PausedBanner since={frozen.frozenAt.toISOString()} canResume={isAdmin} /> : null}

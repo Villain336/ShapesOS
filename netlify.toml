@@ -1,0 +1,10 @@
+# ShapesOS — Netlify deploy previews. Production hosting is Render; Netlify
+# builds only PR previews, and `next build` (Turbopack compile + its own tsc
+# pass) outgrew the preview build container (exit 137 on every branch, main
+# included). CI already gates the full typecheck as its own verify step
+# (next typegen + tsc), so the preview build skips the in-build re-check —
+# next.config.ts honors SKIP_BUILD_TYPECHECK for exactly this.
+[build.environment]
+  SKIP_BUILD_TYPECHECK = "1"
+  NODE_OPTIONS = "--max-old-space-size=6144"
+  NEXT_TELEMETRY_DISABLED = "1"

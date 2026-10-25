@@ -25,6 +25,9 @@ export const INBOX_SOURCES = [
   // Phase 18.3 (WS=trust): the 16th and 17th sources — one approvals queue.
   "autopilot",
   "workflow",
+  // Oct 2026 (comparison follow-up): runs paused for a person's OK, linking
+  // straight to their run review.
+  "agent_run",
 ] as const;
 
 export type InboxSourceKey = (typeof INBOX_SOURCES)[number];
@@ -49,6 +52,7 @@ export const INBOX_SOURCE_LABELS: Record<InboxSourceKey, string> = {
   // Phase 18.3 (WS=trust)
   autopilot: "Autopilot",
   workflow: "Workflow",
+  agent_run: "Agent run",
 };
 
 export function isInboxSource(value: unknown): value is InboxSourceKey {

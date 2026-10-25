@@ -79,6 +79,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       threadId: thread.id,
       userContent: content,
       attachmentIds,
+      // Phase 22 (chat): the thread's mode drives the confirmation gate.
+      chatMode: thread.mode === "plan" || thread.mode === "auto" ? thread.mode : "ask",
     });
   } catch (err) {
     return errorResponse(err, "POST /api/chat/threads/[id]/messages");

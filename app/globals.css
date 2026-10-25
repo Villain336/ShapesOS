@@ -194,9 +194,17 @@ body {
 }
 
 /* Phase 18.1: the black sidebar needs an edge on a dark canvas. */
-:root:is(.dark, .theme-dark) aside.aos-night { box-shadow: inset -1px 0 0 var(--aos-night-line); }
-@media (prefers-color-scheme: dark) {
-  :root.theme-system aside.aos-night { box-shadow: inset -1px 0 0 var(--aos-night-line); }
+/* The sidebar needs an edge in every theme (the value follows the theme). */
+aside.aos-night { box-shadow: inset -1px 0 0 var(--aos-night-line); }
+
+/* Chat dock: chat beside the work, not over it. While the dock is open on
+ * desktop it publishes --chat-dock-w and shifts the whole main column left
+ * (top bar included). Below md the dock is hidden, so no offset applies. */
+@media (min-width: 768px) {
+  :root[data-chat-dock="open"] [data-shell-main] {
+    margin-right: var(--chat-dock-w, 380px);
+    transition: margin-right 150ms ease;
+  }
 }
 
 /* Phase 18.1 (density): the shell's own rows follow --aos-row-h. The
@@ -334,4 +342,3 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 }
 :root.motion-reduce :is(.msg-enter, .widget-enter, .stream-caret) { animation: none; }
 :root.motion-reduce .stream-tail { filter: none; -webkit-mask-image: none; mask-image: none; }
-

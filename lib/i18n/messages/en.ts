@@ -63,6 +63,12 @@ export const en = {
     planLabel: "{plan} plan",
     newTask: "New task",
     newTaskHint: "New task (⌘N)",
+    pinnedChat: "Chat",
+    pinnedFeed: "Feed",
+    groupCollapse: "Collapse {group}",
+    groupExpand: "Expand {group}",
+    themeToggleToLight: "Switch to light mode",
+    themeToggleToDark: "Switch to dark mode",
     search: "Search (⌘K)",
     expandSidebar: "Expand sidebar",
     collapseSidebar: "Collapse sidebar",
@@ -257,6 +263,8 @@ export const en = {
       // Phase 18.3 (WS=trust)
       autopilot: "Autopilot",
       workflow: "Workflow",
+      // Oct 2026 (comparison follow-up): runs waiting on a person's OK.
+      agent_run: "Agent run",
     },
   },
 

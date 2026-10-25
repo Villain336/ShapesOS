@@ -31,7 +31,9 @@ import {
   PinOff,
   CreditCard,
   LogOut,
+  LayoutDashboard,
   Menu as MenuIcon,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -59,7 +61,7 @@ import { LogoMark } from "@/components/aos/LogoMark";
 import { AgentTree } from "@/components/aos/AgentTree";
 import { CountBadge } from "@/components/aos/AgentAvatar";
 import { StatusShape } from "@/components/aos/StatusShape";
-import { activeNavHref, NAV_GROUPS, visibleNavGroups, type NavItem } from "@/lib/nav/config";
+import { activeNavHref, NAV_GROUPS, pathMatches, visibleNavGroups, type NavItem } from "@/lib/nav/config";
 // Phase 18.1 (WS=desk): the dock — pins + recents over the one nav list.
 import { pinnedNavItems } from "@/lib/desktop/nav-overlay";
 import { appForHref } from "@/lib/desktop/recents";
@@ -76,6 +78,8 @@ import { localizeNavGroups } from "@/lib/nav/i18n";
 import { navText } from "@/lib/i18n";
 // Phase 18.2 (WS=comms): the Messages row shows its unread count.
 import { useMessagesUnread } from "@/components/comms/useMessagesUnread";
+// Member-requested (Oct 2026): one-click light/dark switch, bottom of the sidebar.
+import { ThemeToggle } from "@/components/preferences/ThemeToggle";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
@@ -83,6 +87,13 @@ export type SidebarTree = { lead: AgentNode; branches: AgentNode[] } | null;
 export type SidebarUsage = { used: number; cap: number; pct: number } | null;
 
 const COLLAPSE_KEY = "shapesos:sidebar:collapsed";
+const GROUPS_FOLDED_KEY = "shapesos:sidebar:groups-folded";
+// Oct 2026 (approved redesign): the two destinations pinned above the nav
+// groups. Labels are shell strings (lib/i18n/messages).
+const PINNED_ROWS = [
+  { href: "/dashboard/assistant", labelKey: "shell.pinnedChat", icon: MessageSquare },
+  { href: "/dashboard", labelKey: "shell.pinnedFeed", icon: LayoutDashboard },
+] as const;
 const ACTIVITY_POLL_MS = 45_000;
 const MAX_RUNNING_ROWS = 4;
 
@@ -209,7 +220,7 @@ function WorkspaceMenu({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block text-[1.0625rem] leading-5 font-extrabold stretch-display tracking-heading text-paper">ShapesOS</span>
+              <span className="block text-[1.0625rem] leading-5 font-extrabold stretch-display tracking-heading text-night-text">ShapesOS</span>
               <span className="block truncate text-xs text-night-muted">{current?.name ?? t("shell.workspace")}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-night-soft" aria-hidden />
@@ -282,7 +293,7 @@ function UserRow({
   const router = useRouter();
   const { t } = useI18n(); // p18-find i18n
   const avatar = (
-    <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-paper text-xs font-extrabold text-ink">
+    <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-paper text-xs font-extrabold text-ink shadow-hairline">
       {initials(user)}
     </span>
   );
@@ -299,7 +310,7 @@ function UserRow({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-base leading-5 font-semibold text-paper">{user.name ?? user.email ?? t("shell.signedIn")}</span>
+              <span className="block truncate text-base leading-5 font-semibold text-night-text">{user.name ?? user.email ?? t("shell.signedIn")}</span>
               <span className="block truncate text-xs text-night-muted">{plan ?? user.email}</span>
             </span>
             <SlidersHorizontal className="size-4 shrink-0 text-night-soft" aria-hidden />
@@ -378,11 +389,11 @@ function NavRow({
             onClick={onNavigate}
             className={cn(
               "relative flex size-11 items-center justify-center rounded-full transition-[background-color,color] duration-150",
-              active ? "bg-paper text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+              active ? "bg-paper text-ink shadow-hairline" : "text-night-soft hover:bg-night-hover hover:text-night-text",
             )}
           >
             <Icon aria-hidden className="size-[18px]" />
-            {count > 0 ? <span aria-hidden className={cn("absolute top-2 right-2 size-2 rounded-full ring-2 ring-ink", unreadRow ? "bg-paper" : "bg-needs")} /> : null}
+            {count > 0 ? <span aria-hidden className={cn("absolute top-2 right-2 size-2 rounded-full ring-2 ring-night", unreadRow ? "bg-paper" : "bg-needs")} /> : null}
           </Link>
         </RailTip>
       </li>
@@ -397,7 +408,7 @@ function NavRow({
         className={cn(
           "flex h-10 items-center gap-3 rounded-full px-3 text-base transition-[background-color,color] duration-150",
           onTogglePin && "pr-10",
-          active ? "bg-paper font-semibold text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+          active ? "bg-paper font-semibold text-ink shadow-hairline" : "text-night-soft hover:bg-night-hover hover:text-night-text",
         )}
       >
         <Icon aria-hidden className="size-[18px] shrink-0" />
@@ -413,7 +424,7 @@ function NavRow({
           title={pinned ? t("desk.dock.unpinHint") : t("desk.dock.pinHint")}
           className={cn(
             "absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100",
-            active ? "text-ink hover:bg-hover" : "text-night-soft hover:bg-night-raised hover:text-paper",
+            active ? "text-ink hover:bg-hover" : "text-night-soft hover:bg-night-raised hover:text-night-text",
           )}
         >
           {pinned ? <PinOff className="size-3.5" aria-hidden /> : <Pin className="size-3.5" aria-hidden />}
@@ -473,7 +484,7 @@ function DockSections({
               type="button"
               onClick={() => setEditing((e) => !e)}
               aria-pressed={editing}
-              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
+              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-night-text"
             >
               {editing ? t("desk.dock.done") : t("desk.dock.reorder")}
             </button>
@@ -530,7 +541,7 @@ function DockSections({
                 openAppSwitcher();
               }}
               title={t("desk.dock.switchHint")}
-              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-paper"
+              className="rounded-full px-2 py-0.5 text-xs font-semibold text-night-soft hover:bg-night-hover hover:text-night-text"
             >
               {t("desk.dock.switch")}
             </button>
@@ -545,7 +556,7 @@ function DockSections({
                     <Link
                       href={r.href}
                       onClick={onNavigate}
-                      className="flex h-9 items-center gap-3 rounded-full px-3 text-sm text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
+                      className="flex h-9 items-center gap-3 rounded-full px-3 text-sm text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-night-text"
                     >
                       <Icon aria-hidden className="size-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{r.kind === "app" ? (navText(messages, r.href).label ?? r.title) : r.title}</span>
@@ -584,10 +595,50 @@ function NavList({
   // in the person's language (lib/nav/i18n overlay).
   const groups = useMemo(() => localizeNavGroups(visibleNavGroups(role), messages), [role, messages]);
   const pinnedSet = new Set(dock.pinned);
+  // Oct 2026 (approved redesign): titled groups fold away; the choice is a
+  // per-viewer convenience kept in localStorage.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(GROUPS_FOLDED_KEY);
+      if (raw) setFolded(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      // storage unavailable: groups stay open
+    }
+  }, []);
+  function toggleGroup(id: string) {
+    setFolded((prev) => {
+      const nextSet = new Set(prev);
+      if (nextSet.has(id)) nextSet.delete(id);
+      else nextSet.add(id);
+      try {
+        window.localStorage.setItem(GROUPS_FOLDED_KEY, JSON.stringify([...nextSet]));
+      } catch {
+        // best effort
+      }
+      return nextSet;
+    });
+  }
   return (
     <div className="flex flex-col gap-3">
+      {/* Oct 2026 (approved redesign): Chat and Feed pinned above the nav.
+          Shortcuts to existing destinations (/dashboard/assistant and
+          /dashboard); the full groups below keep their own rows. */}
+      <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")} aria-label={t("shell.pinnedChat")}>
+        {PINNED_ROWS.map((row) => (
+          <NavRow
+            key={row.href}
+            item={{ href: row.href, label: t(row.labelKey), icon: row.icon, description: "" }}
+            active={row.href === "/dashboard" ? pathname === "/dashboard" : pathMatches(pathname, row.href)}
+            collapsed={collapsed}
+            count={0}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </ul>
       {groups.map((group) => {
         const headingId = `${uid}-nav-${group.id}`;
+        const isFolded = !collapsed && group.title != null && folded.has(group.id);
         return (
           <div key={group.id} className="contents">
             <div
@@ -597,24 +648,34 @@ function NavList({
               className={cn(group.id === "account" && "border-t border-night-line pt-3", collapsed && group.title && "border-t border-night-line pt-3")}
             >
               {group.title && !collapsed ? (
-                <div id={headingId} className="mb-1 px-3 text-xs font-semibold text-night-muted">
-                  {group.title}
-                </div>
+                <button
+                  type="button"
+                  id={headingId}
+                  onClick={() => toggleGroup(group.id)}
+                  aria-expanded={!isFolded}
+                  aria-label={isFolded ? t("shell.groupExpand", { group: group.title }) : t("shell.groupCollapse", { group: group.title })}
+                  className="mb-1 flex w-full items-center justify-between rounded-sm px-3 py-0.5 text-xs font-semibold text-night-muted transition-colors hover:text-night-text"
+                >
+                  <span>{group.title}</span>
+                  <ChevronDown className={cn("size-3.5 transition-transform duration-150", isFolded && "-rotate-90")} aria-hidden />
+                </button>
               ) : null}
-              <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
-                {group.items.map((item) => (
-                  <NavRow
-                    key={item.href}
-                    item={item}
-                    active={item.href === current}
-                    collapsed={collapsed}
-                    count={item.badge === "needs-you" ? needsYou : 0}
-                    pinned={pinnedSet.has(item.href)}
-                    onTogglePin={collapsed ? undefined : dock.toggle}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </ul>
+              {!isFolded ? (
+                <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
+                  {group.items.map((item) => (
+                    <NavRow
+                      key={item.href}
+                      item={item}
+                      active={item.href === current}
+                      collapsed={collapsed}
+                      count={item.badge === "needs-you" ? needsYou : 0}
+                      pinned={pinnedSet.has(item.href)}
+                      onTogglePin={collapsed ? undefined : dock.toggle}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </ul>
+              ) : null}
             </div>
             {/* Phase 18.1: the dock sits right under Home (Overview). */}
             {group.id === "home" ? <DockSections pathname={pathname} collapsed={collapsed} needsYou={needsYou} role={role} dock={dock} onNavigate={onNavigate} /> : null}
@@ -685,10 +746,10 @@ function UsageMeterBox({ usage }: { usage: NonNullable<SidebarUsage> }) {
     >
       <span className="flex items-center justify-between text-xs">
         <span className="text-night-soft">{t("shell.usageThisMonth")}</span>
-        <span className="font-semibold text-paper tabular-nums">{usage.pct}%</span>
+        <span className="font-semibold text-night-text tabular-nums">{usage.pct}%</span>
       </span>
       <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-night-line">
-        <span className="block h-full rounded-full bg-paper" style={{ width: `${usage.pct}%` }} />
+        <span className="block h-full rounded-full bg-night-text" style={{ width: `${usage.pct}%` }} />
       </span>
     </Link>
   );
@@ -748,7 +809,7 @@ export function SidebarPanel({
       onClick={onToggleCollapsed}
       aria-label={collapsed ? t("shell.expandSidebar") : t("shell.collapseSidebar")}
       aria-expanded={!collapsed}
-      className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
+      className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-night-text"
     >
       {collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
     </button>
@@ -767,7 +828,7 @@ export function SidebarPanel({
                 type="button"
                 onClick={onClose}
                 aria-label={t("shell.closeNavigation")}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft hover:bg-night-hover hover:text-paper"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft hover:bg-night-hover hover:text-night-text"
               >
                 <X className="size-4" aria-hidden />
               </button>
@@ -783,7 +844,7 @@ export function SidebarPanel({
                 }}
                 aria-label={t("shell.newTask")}
                 aria-haspopup="dialog"
-                className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink"
+                className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink shadow-hairline"
               >
                 <Plus className="size-5" aria-hidden />
               </button>
@@ -798,7 +859,7 @@ export function SidebarPanel({
                 }}
                 aria-haspopup="dialog"
                 title={t("shell.newTaskHint")}
-                className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink"
+                className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink shadow-hairline"
               >
                 <Plus className="size-4" aria-hidden />
                 {t("shell.newTask")}
@@ -811,7 +872,7 @@ export function SidebarPanel({
                 }}
                 aria-label={t("shell.search")}
                 title={t("shell.search")}
-                className="aos-press flex size-11 shrink-0 items-center justify-center rounded-full bg-night-raised text-paper hover:bg-night-line"
+                className="aos-press flex size-11 shrink-0 items-center justify-center rounded-full bg-night-raised text-night-text hover:bg-night-line"
               >
                 <Search className="size-4" aria-hidden />
               </button>
@@ -829,6 +890,7 @@ export function SidebarPanel({
           {usage && !collapsed ? <UsageMeterBox usage={usage} /> : null}
           <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
             <UserRow user={user} plan={planText} collapsed={collapsed} canManageBilling={canManageBilling} />
+            <ThemeToggle />
             {toggle}
           </div>
         </div>

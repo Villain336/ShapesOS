@@ -59,6 +59,9 @@ import type { ToolUiHint } from "./ui-hints";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
+/** Phase 22 (chat): the thread's conversation mode (see AiChatThread.mode). */
+export type ChatMode = "ask" | "plan" | "auto";
+
 export interface ToolContext {
   projectId: string;
   workspaceId: string;
@@ -66,6 +69,12 @@ export interface ToolContext {
   role: WorkspaceRole;
   /** True only when the user explicitly confirmed this action (chat "yes"). */
   confirmed: boolean;
+  /**
+   * Phase 22 (chat): the thread's mode. In "plan" the confirmation gate
+   * proposes EVERY non-safe tool — per-agent auto-approve rules are skipped
+   * so nothing writes before the person approves the plan's steps.
+   */
+  chatMode?: ChatMode;
   /**
    * Turn-scoped set of skill slugs the agent loaded via load_skill this
    * turn (milestone 21). The connector-tool declared-tool gate in

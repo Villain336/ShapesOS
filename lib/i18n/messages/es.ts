@@ -59,6 +59,12 @@ export const es: Catalogue = {
     planLabel: "Plan {plan}",
     newTask: "Nueva tarea",
     newTaskHint: "Nueva tarea (⌘N)",
+    pinnedChat: "Chat",
+    pinnedFeed: "Actividad",
+    groupCollapse: "Contraer {group}",
+    groupExpand: "Expandir {group}",
+    themeToggleToLight: "Cambiar al modo claro",
+    themeToggleToDark: "Cambiar al modo oscuro",
     search: "Buscar (⌘K)",
     expandSidebar: "Expandir barra lateral",
     collapseSidebar: "Contraer barra lateral",
@@ -252,6 +258,8 @@ export const es: Catalogue = {
       // Phase 18.3 (WS=trust)
       autopilot: "Piloto automático",
       workflow: "Flujo de trabajo",
+      // Oct 2026 (comparison follow-up): runs waiting on a person's OK.
+      agent_run: "Ejecución de agente",
     },
   },
 
