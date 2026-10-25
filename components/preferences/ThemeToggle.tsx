@@ -37,6 +37,16 @@ export function ThemeToggle() {
   const { t } = useI18n();
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [pending, setPending] = useState(false);
+  // What <html> currently paints. Read after mount only: this client
+  // component still renders on the server, where `document` does not exist
+  // (calling paintedTheme() in render 500s every shell page).
+  const [paintedDom, setPaintedDom] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    // Deferred so the first client paint still matches the server render.
+    const id = requestAnimationFrame(() => setPaintedDom(paintedTheme()));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -51,7 +61,7 @@ export function ThemeToggle() {
     };
   }, []);
 
-  const painted = prefs ? (prefs.theme === "system" ? paintedTheme() : prefs.theme) : paintedTheme();
+  const painted = prefs ? (prefs.theme === "system" ? paintedDom : prefs.theme) : paintedDom;
   const next: ThemePreference = painted === "dark" ? "light" : "dark";
   const label = next === "light" ? t("shell.themeToggleToLight") : t("shell.themeToggleToDark");
 
