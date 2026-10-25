@@ -97,7 +97,7 @@ const PINNED_ROWS = [
 // The pinned rows own these destinations; the same items stay in the nav
 // config for hotkeys, ⌘K search and active-route matching, but each route
 // renders once (pinned row), never twice (pinned + group row both lit).
-const PINNED_HREFS = new Set(PINNED_ROWS.map((row) => row.href));
+const PINNED_HREFS: ReadonlySet<string> = new Set(PINNED_ROWS.map((row) => row.href));
 const ACTIVITY_POLL_MS = 45_000;
 const MAX_RUNNING_ROWS = 4;
 
@@ -1039,4 +1039,4 @@ export function MobileNav({
       </div>
     </header>
   );
-}
+                }
