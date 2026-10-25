@@ -271,6 +271,36 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
     assert.ok(events.some((e) => e.type === "gate" && /Refused research_question/.test(e.summary)));
   });
 
+  it("plan mode proposes every non-safe tool — a per-agent auto-approve rule is skipped (Phase 22)", async () => {
+    // The same audit_site auto rule the next test relies on: in plan mode it
+    // must NOT run the write — every non-safe call is proposed to the person.
+    await withWorkspaceScope(WS_A, async (tx) => {
+      await tx.automationSetting.create({
+        data: { workspaceId: WS_A, agentKey: "lead", action: "audit_site", behavior: "auto", updatedBy: USER },
+      });
+    });
+    try {
+      const t = await thread("lead");
+      script = () => ({ calls: [{ tool: "run_seo_audit", args: {} }] });
+      const out = await runTrackedAgentTurn({
+        projectId,
+        workspaceId: WS_A,
+        userId: USER,
+        role: "editor",
+        threadId: t.id,
+        userContent: "Audit the site",
+        chatMode: "plan",
+      });
+      const audit = byTool(out.toolCalls, "run_seo_audit");
+      assert.equal(audit.status, "pending_confirmation", `plan mode proposes even a rule-covered write: ${audit.resultSummary}`);
+      assert.equal(audit.autoApproved, undefined, "no auto-approve reason in plan mode");
+      assert.equal(out.awaitingConfirmation, true);
+      await stopThreadRuns({ workspaceId: WS_A, threadId: t.id, userId: USER });
+    } finally {
+      await withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A } }));
+    }
+  });
+
   it("auto-approves under an agent rule (Phase 14: Tier 0-2); Tier 3 still asks with a forced auto row; Stop drops the proposal", async () => {
     await withWorkspaceScope(WS_A, async (tx) => {
       await tx.automationSetting.create({
