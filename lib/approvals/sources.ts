@@ -26,6 +26,7 @@ import type {
   InboxViewer,
 } from "./types";
 import { INBOX_SOURCE_LABELS } from "./types";
+import { runAgentName, runPrompt } from "@/lib/aos/runs";
 import { clip, factLines, humanize, money } from "./format";
 
 export { factLines, humanize };
@@ -970,6 +971,50 @@ const workflow: InboxSource = {
   },
 };
 
+/** Oct 2026 (comparison follow-up): agent runs paused at awaiting_confirmation
+ * — the lead or a delegated sub-agent holding a proposal for a person's OK.
+ * The card is a signpost, not a decision: the diff and Approve / Reject /
+ * Ask-for-changes / Undo live on the run review it links to. RLS table. */
+const agentrun: InboxSource = {
+  key: "agent_run",
+  viewRole: "viewer",
+  async load(ctx) {
+    const { viewer } = ctx;
+    const rows = await ctx.scoped((tx) =>
+      tx.agentRun.findMany({
+        where: { workspaceId: viewer.workspaceId, status: "awaiting_confirmation" },
+        orderBy: { createdAt: "desc" },
+        take: ctx.limit,
+        select: {
+          id: true,
+          kind: true,
+          agentKey: true,
+          startedBy: true,
+          agentState: true,
+          createdAt: true,
+        },
+      }),
+    );
+    return rows.map((r) =>
+      makeItem({
+        id: r.id,
+        source: "agent_run",
+        typeLabel: "Run review",
+        title: runPrompt(r.agentState) ?? `${humanize(r.agentKey)} run`,
+        detail: humanize(r.kind),
+        requestedBy: r.startedBy && !r.startedBy.includes(":") ? r.startedBy : runAgentName(r.kind, r.agentKey),
+        createdAt: r.createdAt,
+        risk: "medium",
+        href: `/dashboard/runs/${enc(r.id)}`,
+        canDecide: isEditor(viewer),
+        blockedReason: EDITOR_REASON,
+        // No inline actions: the decision needs the run's diff, so the card
+        // leads to the review screen instead of approving blind.
+      }),
+    );
+  },
+};
+
 export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   mission,
   spend,
@@ -989,4 +1034,5 @@ export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   // Phase 18.3 (WS=trust)
   autopilot,
   workflow,
+  agentrun,
 ];
