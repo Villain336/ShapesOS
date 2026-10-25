@@ -263,8 +263,10 @@ export async function executeTool(
   // (Phase 14: Tier 0–2). Tier 3 and destructive tools always ask.
   let autoReason: string | undefined;
   if (tool.kind !== "safe" && !ctx.confirmed) {
+    // Phase 22 (chat): in plan mode nothing writes silently — every non-safe
+    // call is proposed, even one a per-agent auto-approve rule would cover.
     const decision =
-      tool.kind === "destructive"
+      tool.kind === "destructive" || ctx.chatMode === "plan"
         ? null
         : await autoApprovalFor(ctx.workspaceId, {
             agentKey: ctx.agentKey ?? "lead",
