@@ -75,6 +75,24 @@ export function ChatDock({
     return () => setSession(null);
   }, [open, hidden, project, canEdit, mockMode, setSession]);
 
+  // Beside the work, not over it: while the dock is open it publishes its
+  // width on the root and the shell's main column (data-shell-main) shifts
+  // left by the same amount (globals.css, md+ only).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!open || hidden) {
+      delete root.dataset.chatDock;
+      root.style.removeProperty("--chat-dock-w");
+      return;
+    }
+    root.dataset.chatDock = "open";
+    root.style.setProperty("--chat-dock-w", `${width}px`);
+    return () => {
+      delete root.dataset.chatDock;
+      root.style.removeProperty("--chat-dock-w");
+    };
+  }, [open, hidden, width]);
+
   const setOpenPersist = useCallback((next: boolean) => {
     setOpen(next);
     try {
