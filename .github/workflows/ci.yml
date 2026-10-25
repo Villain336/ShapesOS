@@ -202,8 +202,10 @@ jobs:
         if: failure()
         run: tail -n 200 /tmp/marketr-e2e-server.log || true
 
-      - name: Upload Playwright report (on failure)
-        if: failure()
+      - name: Upload Playwright report
+        # Always: the visual-gate spec's review screenshots land in
+        # test-results/visual-gate/ on green runs too.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
