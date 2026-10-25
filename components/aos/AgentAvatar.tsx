@@ -95,7 +95,7 @@ export function CountBadge({
         tone === "needs" && "bg-needs text-ink",
         tone === "running" && "bg-running text-paper",
         tone === "ink" && "bg-ink text-paper",
-        tone === "paper" && "bg-paper text-ink",
+        tone === "paper" && "bg-paper text-ink shadow-hairline",
         className,
       )}
       {...(label ? { role: "img", "aria-label": label, title: label } : {})}
