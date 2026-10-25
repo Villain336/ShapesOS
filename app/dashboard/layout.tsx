@@ -224,7 +224,9 @@ export default async function DashboardLayout({
         />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
-          <div className="min-w-0 flex-1">
+          {/* data-shell-main: the chat dock (ChatDock) shifts this column left
+              while it is open so chat sits beside the work, not over it. */}
+          <div className="min-w-0 flex-1" data-shell-main="">
             <AppTopBar />
             {/* Phase 18.1 (WS=desk): Control Center → Pause all agents froze the workspace. */}
             {frozen?.frozenAt ? <PausedBanner since={frozen.frozenAt.toISOString()} canResume={isAdmin} /> : null}
