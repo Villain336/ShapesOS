@@ -448,12 +448,15 @@ export async function resolveConnectorTool(
       const refined = await adapter.resolveAction(tool, args, hookCtx).catch(() => null);
       if (refined) action = refined;
     }
-    const decision = await autoApprovalFor(ctx.workspaceId, {
-      agentKey: ctx.agentKey ?? "lead",
-      action,
-      description: `${toolDef.name}: ${toolDef.description}`,
-      destructive: toolDef.destructive === true,
-    }).catch(() => null);
+    // Phase 22 (chat): plan mode proposes every write — no auto-approve rule.
+    const decision = ctx.chatMode === "plan"
+      ? null
+      : await autoApprovalFor(ctx.workspaceId, {
+          agentKey: ctx.agentKey ?? "lead",
+          action,
+          description: `${toolDef.name}: ${toolDef.description}`,
+          destructive: toolDef.destructive === true,
+        }).catch(() => null);
     if (!decision?.auto) {
       // Phase 15.4 (zernio): a dry run before the proposal (an ad create's
       // validateOnly). A failed dry run is never proposed; a passing one is
