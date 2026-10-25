@@ -258,6 +258,8 @@ export const es: Catalogue = {
       // Phase 18.3 (WS=trust)
       autopilot: "Piloto automático",
       workflow: "Flujo de trabajo",
+      // Oct 2026 (comparison follow-up): runs waiting on a person's OK.
+      agent_run: "Ejecución de agente",
     },
   },
 
