@@ -77,6 +77,10 @@ test.describe("visual gate: workspace UX", () => {
     const groupHeading = page.getByRole("button", { name: /^Collapse / }).first();
     await expect(groupHeading).toBeVisible();
 
+    // One route, one active row: the pinned Feed row owns /dashboard; the
+    // Overview item stays in nav config (hotkeys/⌘K) but renders only there.
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+
     // Expected initial state is light (e2e member default + CI prefers light).
     expect(await htmlClass(page)).not.toMatch(/\bdark\b/);
     await page.screenshot({ path: `${SHOTS}/01-light-dashboard.png`, fullPage: true });
