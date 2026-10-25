@@ -391,6 +391,44 @@
   --aos-failed-tint: #FCECEA;
 }
 
+
+/* Member-requested (Oct 2026): light mode flips the night surfaces too -
+   the sidebar, toasts and code blocks go light instead of staying black
+   ("make everything light mode, even the sidebar"). Values mirror the light
+   neutrals above, and the on-night status/focus colors step down to their
+   light-surface values. theme-system follows the OS, so the dark-OS media
+   query below restores the black night surfaces for it. */
+:root.theme-light,
+:root.theme-system {
+  --aos-night: #FFFFFF;
+  --aos-night-hover: #F0F0ED;
+  --aos-night-raised: #ECECE8;
+  --aos-night-line: #E2E2DF;
+  --aos-night-border: #D6D6D2;
+  --aos-night-text: #1C1C1A;
+  --aos-night-text-soft: #5E5E5B;
+  --aos-night-text-muted: #76766F;
+  --aos-running-on-night: #2450E0;
+  --aos-done-on-night: #1E8A52;
+  --aos-failed-on-night: #D92D20;
+  --aos-focus-on-night: #2450E0;
+}
+@media (prefers-color-scheme: dark) {
+  :root.theme-system {
+    --aos-night: #000000;
+    --aos-night-hover: #1C1C1B;
+    --aos-night-raised: #2A2A28;
+    --aos-night-line: #3A3A38;
+    --aos-night-border: #4A4A47;
+    --aos-night-text: #FFFFFF;
+    --aos-night-text-soft: #BDBDB8;
+    --aos-night-text-muted: #A3A39E;
+    --aos-running-on-night: #4D74FF;
+    --aos-done-on-night: #1FA862;
+    --aos-failed-on-night: #E5392B;
+    --aos-focus-on-night: #4D74FF;
+  }
+}
 @media (prefers-color-scheme: dark) {
   :root.theme-system :is(.bg-running, .bg-done, .bg-failed, .bg-needs) {
     --aos-ink: #000000;
