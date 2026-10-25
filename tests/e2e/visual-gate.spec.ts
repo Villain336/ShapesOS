@@ -126,6 +126,46 @@ test.describe("visual gate: workspace UX", () => {
     // plus subpixel rounding).
     expect(after!.x + after!.width).toBeLessThanOrEqual(dockBox!.x + 8);
     await page.screenshot({ path: `${SHOTS}/04-chat-dock-push.png`, fullPage: true });
+    // Viewport-only capture: fullPage stitching renders the fixed dock only
+    // over the first viewport, which misreads as "content fine beneath it".
+    await page.screenshot({ path: `${SHOTS}/04b-chat-dock-push-viewport.png` });
+    // DIAG (parent pixel review, run 905e451): the pushed column's BOX shrinks
+    // to the dock edge, but the stat cards render ~700px wide inside a ~592px
+    // column - sliced at the dock edge. The margin is applied around a
+    // non-shrinking child somewhere below data-shell-main. Name the elements
+    // whose right edge crosses the column's right edge.
+    console.log(
+      "DIAG dock-open overflow:",
+      JSON.stringify(
+        await page.evaluate(() => {
+          const main = document.querySelector("[data-shell-main]")!;
+          const mr = main.getBoundingClientRect();
+          const bad: Array<Record<string, unknown>> = [];
+          for (const el of Array.from(main.querySelectorAll("*"))) {
+            const r = el.getBoundingClientRect();
+            if (r.right > mr.right + 1 && r.width > 4 && r.height > 4) {
+              const chain: string[] = [];
+              let cur: Element | null = el;
+              while (cur && cur !== main && chain.length < 5) {
+                chain.push(`${cur.tagName.toLowerCase()}.${String(cur.className).split(" ").slice(0, 3).join(".")}`);
+                cur = cur.parentElement;
+              }
+              bad.push({ chain: chain.join(" < "), right: Math.round(r.right), w: Math.round(r.width) });
+              if (bad.length >= 15) break;
+            }
+          }
+          return {
+            mainRight: Math.round(mr.right),
+            mainWidth: Math.round(mr.width),
+            mainScrollW: (main as HTMLElement).scrollWidth,
+            mainClientW: (main as HTMLElement).clientWidth,
+            docScrollW: document.documentElement.scrollWidth,
+            winInner: window.innerWidth,
+            offenders: bad,
+          };
+        }),
+      ),
+    );
 
     // Drag the separator 120px left: the dock widens and the column shrinks.
     const handle = page.getByRole("separator", { name: "Resize chat panel" });
@@ -140,6 +180,7 @@ test.describe("visual gate: workspace UX", () => {
     const resized = await dock.boundingBox();
     expect(resized!.width).toBeGreaterThan(dockBox!.width + 60);
     await page.screenshot({ path: `${SHOTS}/05-chat-dock-resized.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/05b-chat-dock-resized-viewport.png` });
 
     await page.getByRole("button", { name: "Close chat" }).click();
     await expect(dock).toBeHidden();
