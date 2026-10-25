@@ -90,7 +90,7 @@ test.describe("visual gate: workspace UX", () => {
       .not.toMatch(/\bdark\b/);
   });
 
-  test("chat dock pushes the main column and drag-resizes", async ({ page }) => {
+  test("chat dock pushes the main column and drag-resizes", async ({ page }, testInfo) => {
     const { projectId } = loadIds();
     await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
 
@@ -134,10 +134,7 @@ test.describe("visual gate: workspace UX", () => {
     // column - sliced at the dock edge. The margin is applied around a
     // non-shrinking child somewhere below data-shell-main. Name the elements
     // whose right edge crosses the column's right edge.
-    console.log(
-      "DIAG dock-open overflow:",
-      JSON.stringify(
-        await page.evaluate(() => {
+    const overflowReport = await page.evaluate(() => {
           const main = document.querySelector("[data-shell-main]")!;
           const mr = main.getBoundingClientRect();
           const bad: Array<Record<string, unknown>> = [];
@@ -154,18 +151,25 @@ test.describe("visual gate: workspace UX", () => {
               if (bad.length >= 15) break;
             }
           }
-          return {
-            mainRight: Math.round(mr.right),
-            mainWidth: Math.round(mr.width),
-            mainScrollW: (main as HTMLElement).scrollWidth,
-            mainClientW: (main as HTMLElement).clientWidth,
-            docScrollW: document.documentElement.scrollWidth,
-            winInner: window.innerWidth,
-            offenders: bad,
-          };
-        }),
-      ),
-    );
+      return {
+        mainRight: Math.round(mr.right),
+        mainWidth: Math.round(mr.width),
+        mainScrollW: (main as HTMLElement).scrollWidth,
+        mainClientW: (main as HTMLElement).clientWidth,
+        docScrollW: document.documentElement.scrollWidth,
+        winInner: window.innerWidth,
+        offenders: bad,
+      };
+    });
+    await testInfo.attach("dock-open-overflow.json", {
+      body: JSON.stringify(overflowReport, null, 1),
+      contentType: "application/json",
+    });
+    // The pushed column's content must actually reflow into it: no element
+    // may cross the column's right edge (parent pixel review, run 905e451:
+    // fullPage stitching once misread this as sliced cards; the viewport
+    // capture 04b/05b is the ground truth this assert mirrors numerically).
+    expect(overflowReport.offenders, "content overflows the pushed column").toEqual([]);
 
     // Drag the separator 120px left: the dock widens and the column shrinks.
     const handle = page.getByRole("separator", { name: "Resize chat panel" });
@@ -201,6 +205,7 @@ test.describe("visual gate: workspace UX", () => {
     const main = page.locator("[data-shell-main]");
     expect(await main.evaluate((el) => getComputedStyle(el).marginRight)).toBe("0px");
     await page.screenshot({ path: `${SHOTS}/07-narrow-overlay.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/07b-narrow-overlay-viewport.png` });
     await page.getByRole("button", { name: "Close chat" }).click();
   });
 
@@ -231,6 +236,7 @@ test.describe("visual gate: workspace UX", () => {
     // asserted to absorb a 15px classic scrollbar plus subpixel.
     expect(mb!.width).toBeGreaterThanOrEqual(400);
     await page.screenshot({ path: `${SHOTS}/08-clamped-push.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/08b-clamped-push-viewport.png` });
     await page.getByRole("button", { name: "Close chat" }).click();
   });
 
