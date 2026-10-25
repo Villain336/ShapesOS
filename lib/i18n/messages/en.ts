@@ -263,6 +263,8 @@ export const en = {
       // Phase 18.3 (WS=trust)
       autopilot: "Autopilot",
       workflow: "Workflow",
+      // Oct 2026 (comparison follow-up): runs waiting on a person's OK.
+      agent_run: "Agent run",
     },
   },
 
