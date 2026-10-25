@@ -12,8 +12,12 @@ test("workspace UX walkthrough", async ({ page }) => {
   test.setTimeout(150000);
   const beat = (ms = 1400) => page.waitForTimeout(ms);
 
-  // 1. Light shell: pinned Chat/Feed rows and the nav groups.
-  await page.goto("/dashboard", { waitUntil: "networkidle" });
+  // 1. Light shell: pinned Chat/Feed rows and the nav groups. Record on a
+  //    project page: /dashboard Home redirects admins to the onboarding
+  //    wizard in the seeded e2e workspace (onboardingCompletedAt null),
+  //    which would fill the video with setup instead of the workspace.
+  const { projectId } = loadIds();
+  await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
   await beat(2200);
 
   // 2. Collapse a nav group, then re-expand it.
@@ -38,11 +42,8 @@ test("workspace UX walkthrough", async ({ page }) => {
   await page.getByRole("button", { name: "Switch to light mode" }).click();
   await beat(1200);
 
-  // 6. The chat dock beside the work: open it on a project page and the
-  //    column reflows to make room (push, not overlay).
-  const { projectId } = loadIds();
-  await page.goto(`/dashboard/projects/${projectId}`, { waitUntil: "networkidle" });
-  await beat();
+  // 6. The chat dock beside the work: open it and the column reflows to
+  //    make room (push, not overlay).
   await page.getByRole("button", { name: "Open chat" }).click();
   const dock = page.getByRole("complementary", { name: "Chat" });
   await expect(dock).toBeVisible();
