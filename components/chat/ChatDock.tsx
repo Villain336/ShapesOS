@@ -27,6 +27,13 @@ const WIDTH_KEY = "shapesos:chatdock:width";
 const DEFAULT_WIDTH = 400;
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
+// Push mode must leave a usable work column: the sidebar takes up to 288px
+// (w-72; rail mode is narrower, which only leaves more room) and the work
+// area should keep at least 420px. Below that viewport the dock floats over
+// the content (no push) and its width is capped to the viewport.
+const NAV_W = 288;
+const MIN_WORK_W = 420;
+const PUSH_MIN_VW = NAV_W + MIN_WIDTH + MIN_WORK_W; // 1028
 /** Routes where the dock would duplicate the page's own chat. */
 const HIDDEN_PREFIXES = ["/dashboard/assistant", "/dashboard/chat"];
 
@@ -51,20 +58,48 @@ export function ChatDock({
   const { setSession } = useChat();
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  // Live viewport width for the push/overlay fallback (0 until measured on
+  // the client; an unmeasured first paint keeps the desktop default).
+  const [vw, setVw] = useState(0);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    const measure = () => setVw(window.innerWidth);
+    const id = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   // Per-viewer panel state (client-only; first paint matches the server).
   useEffect(() => {
-    try {
-      setOpen(window.localStorage.getItem(OPEN_KEY) === "1");
-      const w = Number(window.localStorage.getItem(WIDTH_KEY));
-      if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
-    } catch {
-      // storage unavailable: defaults
-    }
+    // Deferred a frame so the first client paint still matches the server.
+    const id = requestAnimationFrame(() => {
+      try {
+        setOpen(window.localStorage.getItem(OPEN_KEY) === "1");
+        const w = Number(window.localStorage.getItem(WIDTH_KEY));
+        if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
+      } catch {
+        // storage unavailable: defaults
+      }
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const hidden = !project || HIDDEN_PREFIXES.some((p) => pathname.startsWith(p));
+
+  // Wide desktop: push the work aside at the chosen width (clamped so the
+  // work column never drops below MIN_WORK_W). Narrow desktop: float over
+  // the content instead, capped to the viewport with a small gutter.
+  const push = vw === 0 || vw >= PUSH_MIN_VW;
+  const effWidth =
+    vw === 0
+      ? width
+      : push
+        ? Math.min(width, Math.max(MIN_WIDTH, vw - NAV_W - MIN_WORK_W))
+        : Math.min(width, Math.max(MIN_WIDTH, vw - 32));
 
   // The dock owns the chat session while it is open. The assistant page sets
   // and clears its own session around its mount; the dock is hidden there,
@@ -75,23 +110,25 @@ export function ChatDock({
     return () => setSession(null);
   }, [open, hidden, project, canEdit, mockMode, setSession]);
 
-  // Beside the work, not over it: while the dock is open it publishes its
-  // width on the root and the shell's main column (data-shell-main) shifts
-  // left by the same amount (globals.css, md+ only).
+  // Beside the work on wide desktop, over it on narrow: while pushing, the
+  // dock publishes its effective width on the root and the shell's main
+  // column (data-shell-main) shifts left by the same amount (globals.css,
+  // md+ only). In overlay mode nothing is published, so the column keeps
+  // the full width beneath the floating dock.
   useEffect(() => {
     const root = document.documentElement;
-    if (!open || hidden) {
+    if (!open || hidden || !push) {
       delete root.dataset.chatDock;
       root.style.removeProperty("--chat-dock-w");
       return;
     }
     root.dataset.chatDock = "open";
-    root.style.setProperty("--chat-dock-w", `${width}px`);
+    root.style.setProperty("--chat-dock-w", `${effWidth}px`);
     return () => {
       delete root.dataset.chatDock;
       root.style.removeProperty("--chat-dock-w");
     };
-  }, [open, hidden, width]);
+  }, [open, hidden, push, effWidth]);
 
   const setOpenPersist = useCallback((next: boolean) => {
     setOpen(next);
@@ -167,7 +204,7 @@ export function ChatDock({
     <aside
       aria-label="Chat"
       className="fixed inset-y-0 right-0 z-40 hidden md:flex"
-      style={{ width }}
+      style={{ width: effWidth }}
     >
       {/* Resize handle */}
       <div
