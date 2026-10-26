@@ -625,6 +625,8 @@ export const en = {
     failed: "The preview couldn't start: {reason}",
     empty: "No tabs open. Open one to see a project's dev server.",
     stopsItself: "Running previews use paid compute. Pause a preview to stop its compute charges.",
+    sessionExpired: "This preview's session expired. Reloading loses any unsaved state in the previewed app.",
+    reloadPreview: "Reload preview",
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit
