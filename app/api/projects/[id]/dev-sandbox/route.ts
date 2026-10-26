@@ -52,6 +52,9 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   if ("error" in r) return r.error;
   const row = await getDevSandboxRow(r.project.workspaceId, r.project.id);
   const previews: { port: number; url: string }[] = [];
+  // Issuance failure is SURFACED (previewError), never swallowed into a
+  // misleading "no preview" state: the panel shows an explicit error.
+  let previewError = false;
   if (row && row.status === "running") {
     for (const port of row.exposedPorts) {
       try {
@@ -63,13 +66,14 @@ export async function GET(req: NextRequest, ctx: Ctx) {
           userId: r.user.id,
         });
         if (t) previews.push({ port, url: `${devPreviewPath(r.project.id, port)}cap/${t.raw}/` });
+        else previewError = true;
       } catch {
-        // Token issuance must not break the status read itself.
+        previewError = true;
         console.warn("[dev-sandbox] preview token issuance failed for a port");
       }
     }
   }
-  return Response.json({ ...shape(row, r.project.id), previews });
+  return Response.json({ ...shape(row, r.project.id), previews, ...(previewError ? { previewError: true } : {}) });
 }
 
 /** POST — ensure running: create on first open, resume when paused. This
