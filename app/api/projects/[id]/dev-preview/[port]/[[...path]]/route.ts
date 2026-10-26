@@ -20,7 +20,7 @@ import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { proxyDevPreview, devPreviewPath } from "@/lib/sandbox/dev-preview-proxy";
-import { verifyDevPreviewToken } from "@/lib/sandbox/dev-preview-token";
+import { issueOrRenewDevPreviewToken, verifyDevPreviewToken } from "@/lib/sandbox/dev-preview-token";
 import { getDevSandboxRow } from "@/lib/sandbox/dev-sandbox";
 
 export const dynamic = "force-dynamic";
@@ -60,15 +60,37 @@ async function handle(req: NextRequest, ctx: Ctx): Promise<Response> {
     return proxyDevPreview(req, { projectId: p.id, port: p.port, path: rest }, { workspaceId: project.workspaceId, canWrite: false, linkPrefix });
   }
 
-  // Session fallback (same-origin panel): role-checked, mints nothing.
+  // Session fallback (same-origin panel), role-checked. A directly-proxied
+  // DOCUMENT is broken by design: the CSP-sandboxed page is an opaque
+  // origin, so its subresource requests arrive cross-site WITHOUT the
+  // session cookie and 401. Bounce reads to this session's OWN capability
+  // URL (canonical path) so the whole graph rides the bearer prefix;
+  // writes keep the direct editor-checked path.
   const user = await requireUser();
   if (!user) return new Response("Sign in to view this preview.", { status: 401 });
   const project = await prisma.project.findFirst({ where: { id: p.id, workspace: accessibleWorkspaceWhere(user.id) } });
   if (!project) return new Response("Not found", { status: 404 });
-  const canWrite = !!(await requireProjectRole(user.id, project.id, "editor"));
-  if (!canWrite && !(await requireProjectRole(user.id, project.id, "viewer"))) {
+  if (!(await requireProjectRole(user.id, project.id, "viewer"))) {
     return new Response("You can't view this preview.", { status: 403 });
   }
+  if (READ_METHODS.has(req.method)) {
+    const sbRow = await getDevSandboxRow(project.workspaceId, project.id);
+    if (sbRow && sbRow.status === "running") {
+      try {
+        const issued = await issueOrRenewDevPreviewToken({
+          workspaceId: project.workspaceId, projectId: project.id, port, sandboxId: sbRow.sandboxId, userId: user.id,
+        });
+        if (issued) {
+          const rest = segs.map((s) => encodeURIComponent(s)).join("/");
+          const to = `${devPreviewPath(project.id, port)}cap/${issued.raw}/${rest}${new URL(req.url).search}`;
+          return Response.redirect(new URL(to, req.url), 302);
+        }
+      } catch {
+        // Issuance failure must not break the fallback: proxy directly.
+      }
+    }
+  }
+  const canWrite = !!(await requireProjectRole(user.id, project.id, "editor"));
   return proxyDevPreview(req, { projectId: p.id, port: p.port, path: segs }, { workspaceId: project.workspaceId, canWrite });
 }
 
