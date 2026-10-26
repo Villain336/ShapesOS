@@ -84,6 +84,15 @@ export async function proxyDevPreview(
   // client JS, breaking every vite-internal @path). Keep RFC 3986 sub-delims,
   // ":" and "@" raw; still escape "?", "#", "%", spaces, etc.
   const seg = encodeDevPreviewPathSegment;
+  // Sensitive-path guard (defense in depth; the dev server remains the real
+  // boundary). The previewed app necessarily possesses its own bearer, so
+  // any content it serves can exfiltrate whatever the dev server will serve:
+  // framework dev servers happily return project files like .env, and Vite's
+  // /@fs/<absolute> reads any path inside its fs.allow root. Refuse the
+  // obvious sensitive shapes at the proxy; documented in the PR body.
+  if ((params.path ?? []).some((s) => s === ".env" || s.startsWith(".env.") || s === ".git" || s === "@fs")) {
+    return text(404, "Not found.");
+  }
   const rest = (params.path ?? []).map(seg).join("/");
   const candidates = [`${prefix}${rest}`, `/${rest}`];
   const body = READ_METHODS.has(method) ? undefined : await req.arrayBuffer();
@@ -198,4 +207,4 @@ async function bufferWithCap(body: ReadableStream<Uint8Array> | null, cap: numbe
     chunks.push(value);
   }
   return new TextDecoder().decode(Buffer.concat(chunks));
-}
+                                     }
