@@ -110,13 +110,13 @@ describe("share_preview", () => {
     assert.ok(!cmds.includes("npm run dev"));
   });
 
-  it("reports plainly when the server never answers", async () => {
+  it("reports plainly when the server never answers", { timeout: 30_000 }, async () => {
     devSandbox.failCurl = true;
     const r = await share_preview.execute(ctx, { port: 3000 });
     assert.match(r.summary, /didn't come up/);
     assert.match(r.summary, /EADDRINUSE/, "log tail surfaced");
     assert.deepEqual(devSandbox.exposed, [], "nothing exposed on failure");
-  }, { timeout: 30_000 });
+  });
 
   it("vite detected from an explicit command gets --base appended directly", async () => {
     const r = await share_preview.execute(ctx, { port: 3000, command: "vite --port 3000" });
