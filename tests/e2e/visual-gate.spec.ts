@@ -77,8 +77,12 @@ test.describe("visual gate: workspace UX", () => {
     const groupHeading = page.getByRole("button", { name: /^Collapse / }).first();
     await expect(groupHeading).toBeVisible();
 
-    // One route, one active row: the pinned Feed row owns /dashboard; the
-    // Overview item stays in nav config (hotkeys/⌘K) but renders only there.
+    // One route, one active row: pinned rows own /dashboard and
+    // /dashboard/assistant; the matching group items stay in nav config
+    // (hotkeys/⌘K/activeNavHref) but render only as the pinned row.
+    // /dashboard redirects to the onboarding wizard in the seeded workspace
+    // (onboardingCompletedAt null), so the pinned Chat route carries the check.
+    await page.goto("/dashboard/assistant", { waitUntil: "networkidle" });
     await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
 
     // Expected initial state is light (e2e member default + CI prefers light).
