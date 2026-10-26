@@ -196,8 +196,16 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
         ) : null}
       </div>
       <div className="min-h-0 flex-1">
+        {/* sandbox mirrors SANDBOX_PREVIEW_CSP (observed-compatible in the
+            real-browser harness): belt+braces if the CSP header is lost. */}
         {running ? (
-          <iframe key={frameKey} src={src} title={tab.key} className="h-full w-full border-0 bg-white" />
+          <iframe
+            key={frameKey}
+            src={src}
+            title={tab.key}
+            sandbox="allow-scripts allow-forms allow-modals allow-downloads"
+            className="h-full w-full border-0 bg-white"
+          />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p className="max-w-md text-sm text-muted">
