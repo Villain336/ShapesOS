@@ -11,13 +11,13 @@ import { Globe, Pause, Play, Plus, RotateCw, X } from "lucide-react";
 
 interface ProjectOpt { id: string; name: string }
 interface Tab { key: string; projectId: string; port: number }
-type Status = { status: string; exposedPorts: number[]; previews?: { port: number; url: string }[] } | null;
+type Status = { status: string; exposedPorts: number[]; previews?: { port: number; url: string }[]; previewError?: boolean } | null;
 
 export interface BrowserLabels {
   newTab: string; closeTab: string; project: string; pickProject: string; port: string;
   openTab: string; start: string; starting: string; resume: string; resuming: string;
   pause: string; paused: string; none: string; empty: string; stopsItself: string;
-  sessionExpired: string; reloadPreview: string;
+  sessionExpired: string; reloadPreview: string; tokenError: string;
 }
 
 const STORE_KEY = "shapes.dev-preview.tabs.v1";
@@ -148,8 +148,12 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
   const refresh = useCallback(async () => {
     try {
       const r = await fetch(`/api/projects/${tab.projectId}/dev-sandbox`, { cache: "no-store" });
-      if (r.ok) setStatus(await r.json());
-      else setStatus({ status: "none", exposedPorts: [] });
+      if (r.ok) {
+        const body = (await r.json()) as Status;
+        setStatus(body);
+        // Surfaced issuance failure (never swallowed into "no preview").
+        if (body?.previewError) setError(labels.tokenError);
+      } else setStatus({ status: "none", exposedPorts: [] });
     } catch {
       setStatus({ status: "none", exposedPorts: [] });
     }
