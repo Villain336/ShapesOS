@@ -93,6 +93,8 @@ describe("share_preview", () => {
     assert.match(cmds, /npm run dev/, "detected dev script started");
     assert.match(cmds, /PORT=3000/, "port passed to the server");
     assert.match(cmds, /BASE_PATH=\/api\/projects\/p1\/dev-preview\/3000\//, "preview base path set");
+    assert.match(cmds, /npm run dev -- --base=\/api\/projects\/p1\/dev-preview\/3000\//, "vite base flag forwarded through the npm script");
+    assert.equal((r.details as { baseHandling?: string })?.baseHandling, "cli-flag");
     assert.deepEqual(devSandbox.exposed, [3000]);
     assert.deepEqual(portsRecorded, [[3000]], "port recorded on the row for the proxy allowlist");
     const url = (r.details as { url?: string })?.url;
@@ -115,4 +117,29 @@ describe("share_preview", () => {
     assert.match(r.summary, /EADDRINUSE/, "log tail surfaced");
     assert.deepEqual(devSandbox.exposed, [], "nothing exposed on failure");
   }, { timeout: 30_000 });
+
+  it("vite detected from an explicit command gets --base appended directly", async () => {
+    const r = await share_preview.execute(ctx, { port: 3000, command: "vite --port 3000" });
+    const cmds = devSandbox.execs.map((e) => e.cmd).join("\n");
+    assert.match(cmds, /vite --port 3000 --base=\/api\/projects\/p1\/dev-preview\/3000\//);
+    assert.equal((r.details as { baseHandling?: string })?.baseHandling, "cli-flag");
+  });
+
+  it("next.js: no blind injection, the result says to set basePath", async () => {
+    devSandbox.packageJson = JSON.stringify({ scripts: { dev: "next dev" }, dependencies: { next: "15.0.0" } });
+    const r = await share_preview.execute(ctx, { port: 3000 });
+    const cmds = devSandbox.execs.map((e) => e.cmd).join("\n");
+    assert.ok(!cmds.includes("--base"), "no flag injected for next");
+    assert.equal((r.details as { baseHandling?: string })?.baseHandling, "needs-next-config");
+    assert.match(r.summary, /basePath/);
+  });
+
+  it("unknown framework: no injection, the result scopes the asset limitation", async () => {
+    devSandbox.packageJson = JSON.stringify({ scripts: { dev: "python3 -m http.server" } });
+    const r = await share_preview.execute(ctx, { port: 3000 });
+    const cmds = devSandbox.execs.map((e) => e.cmd).join("\n");
+    assert.ok(!cmds.includes("--base"), "no flag on an arbitrary command");
+    assert.equal((r.details as { baseHandling?: string })?.baseHandling, "none");
+    assert.match(r.summary, /root-absolute/);
+  });
 });
