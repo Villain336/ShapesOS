@@ -34,6 +34,7 @@ import {
   Inbox,
   Kanban,
   LayoutDashboard,
+  LayoutGrid,
   Mail,
   Megaphone,
   MessageSquare,
@@ -114,6 +115,9 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "home",
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, description: "Home: what needs attention", keywords: "home dashboard main" },
+      // The widget desktop: Home became the flat Feed (approved redesign); the
+      // arrangeable widget grid the member had lives on here, layouts intact.
+      { href: "/dashboard/desktop", label: "Desktop", icon: LayoutGrid, description: "Home as an arrangeable widget desktop", keywords: "desktop widgets grid home arrange customize layout" },
       // Phase 18.2 (WS=comms): the everyday communication apps.
       { href: "/dashboard/mail", label: "Mail", icon: Mail, description: "One inbox: mail, lead conversations, social DMs", keywords: "email inbox gmail outlook messages dms compose reply unread" },
       { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText, description: "Team channels, direct messages and your agents", keywords: "chat channels dm direct message threads team slack mention agents", badge: "unread-messages" },
