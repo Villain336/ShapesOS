@@ -319,6 +319,16 @@ describe("session fallback (canonical mint+redirect)", () => {
     assert.equal(res.status, 401);
   });
 
+  it("session fallback preserves raw @ pchar in the redirect target (Vite-internal paths)", async () => {
+    sessionUser = { id: "u1" };
+    const res = await req("/api/projects/p1/dev-preview/3000/@vite/client");
+    assert.equal(res.status, 302);
+    const loc = res.headers.get("location") ?? "";
+    assert.ok(loc.includes("/@vite/client"), `redirect must keep @ raw, got ${loc}`);
+    assert.ok(!loc.includes("%40vite"), `redirect must not percent-encode @, got ${loc}`);
+    sessionUser = null;
+  });
+
   it("non-member session -> 404 (project invisible through accessibleWorkspaceWhere)", async () => {
     sessionUser = { id: "intruder" };
     const res = await req("/api/projects/p1/dev-preview/3000/");
