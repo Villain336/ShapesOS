@@ -41,7 +41,7 @@ const tx = {
       }
       return { count: n };
     },
-    create: async ({ data }: { data: Omit<Row, "id" | "createdAt" | "lastRenewedAt" | "revokedAt"> }) => {
+    create: async ({ data }: { data: Omit<Row, "id" | "createdAt" | "lastRenewedAt" | "revokedAt"> & { createdAt?: Date } }) => {
       const row: Row = { ...data, id: `t${++seq}`, createdAt: data.createdAt ?? new Date(), lastRenewedAt: null, revokedAt: null };
       store.set(row.id, row);
       return row;
@@ -92,6 +92,7 @@ describe("dev-preview token pruning (cron hygiene)", () => {
 describe("dev-preview capability tokens", () => {
   it("mint: 43-char base64url raw, stored as hash + envelope, never plaintext", async () => {
     const t = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t);
     assert.ok(t && /^[A-Za-z0-9_-]{43}$/.test(t.raw));
     assert.equal(t.reused, false);
     const row = [...store.values()].find((r) => r.tokenHash === mod.hashDevPreviewToken(t.raw));
@@ -103,8 +104,10 @@ describe("dev-preview capability tokens", () => {
 
   it("renew: SAME raw token re-served, expiry slides, reused=true (src stability)", async () => {
     const t1 = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t1);
     const later = new Date(NOW.getTime() + 30 * 60 * 1000);
     const t2 = await mod.issueOrRenewDevPreviewToken(IN, later);
+    assert.ok(t2);
     assert.equal(t2.raw, t1.raw, "same raw token across renewal");
     assert.equal(t2.reused, true);
     assert.equal(t2.expiresAt.getTime() - later.getTime(), mod.DEV_PREVIEW_TOKEN_TTL_MS, "sliding expiry extended from the renewal time");
@@ -113,8 +116,10 @@ describe("dev-preview capability tokens", () => {
   it("absolute cap: past 24h from createdAt a fresh token is minted even mid-session", async () => {
     store.clear();
     const t1 = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t1);
     const pastCap = new Date(NOW.getTime() + mod.DEV_PREVIEW_TOKEN_MAX_LIFE_MS + 1000);
     const t2 = await mod.issueOrRenewDevPreviewToken(IN, pastCap);
+    assert.ok(t2);
     assert.notEqual(t2.raw, t1.raw, "fresh token past the absolute cap");
     assert.equal(t2.reused, false);
   });
@@ -122,6 +127,7 @@ describe("dev-preview capability tokens", () => {
   it("verify: valid token yields claims; project/port binding enforced", async () => {
     store.clear();
     const t = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t);
     const v = await mod.verifyDevPreviewToken("ws1", t.raw, "p1", 3000, NOW);
     assert.deepEqual(v, { userId: "u1", workspaceId: "ws1", projectId: "p1", port: 3000, sandboxId: "sb1" });
     assert.equal(await mod.verifyDevPreviewToken("ws1", t.raw, "p2", 3000, NOW), null, "other project");
@@ -132,6 +138,7 @@ describe("dev-preview capability tokens", () => {
   it("verify NEVER extends expiry (bearer traffic cannot keep a token alive)", async () => {
     store.clear();
     const t = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t);
     const row = [...store.values()][0];
     const before_ = row.expiresAt.getTime();
     await mod.verifyDevPreviewToken("ws1", t.raw, "p1", 3000, new Date(NOW.getTime() + 10 * 60 * 1000));
@@ -142,6 +149,7 @@ describe("dev-preview capability tokens", () => {
   it("expired, absolute-capped, and revoked tokens verify null", async () => {
     store.clear();
     const t = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t);
     assert.equal(await mod.verifyDevPreviewToken("ws1", t.raw, "p1", 3000, new Date(NOW.getTime() + mod.DEV_PREVIEW_TOKEN_TTL_MS + 1)), null, "expired");
     assert.equal(await mod.verifyDevPreviewToken("ws1", t.raw, "p1", 3000, new Date(NOW.getTime() + mod.DEV_PREVIEW_TOKEN_MAX_LIFE_MS + 1)), null, "absolute cap");
     await mod.revokeDevPreviewTokens("ws1", "p1", NOW);
@@ -151,8 +159,10 @@ describe("dev-preview capability tokens", () => {
   it("undecryptable envelope: revoked and re-minted (key-rotation safe)", async () => {
     store.clear();
     const t1 = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t1);
     for (const r of store.values()) r.tokenEnc = "corrupt";
     const t2 = await mod.issueOrRenewDevPreviewToken(IN, NOW);
+    assert.ok(t2);
     assert.notEqual(t2.raw, t1.raw);
     assert.equal(t2.reused, false);
   });
