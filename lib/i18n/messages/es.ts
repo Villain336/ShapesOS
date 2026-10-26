@@ -617,7 +617,7 @@ export const es: Catalogue = {
     none: "Aún no hay vista previa. Inicia una para correr el servidor de desarrollo de este proyecto aquí.",
     failed: "La vista previa no pudo iniciar: {reason}",
     empty: "No hay pestañas abiertas. Abre una para ver el servidor de desarrollo de un proyecto.",
-    stopsItself: "Las vistas previas se pausan solas tras 15 minutos quietas y dejan de facturar al pausarse.",
+    stopsItself: "Las vistas previas en ejecucion consumen computo de pago. Pausa una vista previa para detener sus cargos de computo.",
   },
 
   kit: {
