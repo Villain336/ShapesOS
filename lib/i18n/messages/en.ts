@@ -624,7 +624,7 @@ export const en = {
     none: "No dev preview yet. Start one to run this project's dev server here.",
     failed: "The preview couldn't start: {reason}",
     empty: "No tabs open. Open one to see a project's dev server.",
-    stopsItself: "Previews pause themselves after 15 minutes quiet and stop billing when paused.",
+    stopsItself: "Running previews use paid compute. Pause a preview to stop its compute charges.",
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit
