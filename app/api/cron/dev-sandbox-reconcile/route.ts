@@ -14,6 +14,7 @@ import type { NextRequest } from "next/server";
 import { cronGate } from "@/lib/cron/gate";
 import { prisma } from "@/lib/prisma";
 import { reconcileDevSandboxes } from "@/lib/sandbox/dev-sandbox";
+import { pruneDevPreviewTokens } from "@/lib/sandbox/dev-preview-token";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,14 @@ export async function POST(req: NextRequest) {
   const workspaces = gate.isCron
     ? await prisma.workspace.findMany({ select: { id: true } })
     : [{ id: gate.workspaceId! }];
-  const results: { workspaceId: string; markedPaused: number; ceilingDestroyed: number; error?: string }[] = [];
+  const results: { workspaceId: string; markedPaused: number; ceilingDestroyed: number; tokensPruned?: number; error?: string }[] = [];
   for (const ws of workspaces) {
     try {
       const r = await reconcileDevSandboxes(ws.id);
-      if (r.markedPaused || r.ceilingDestroyed) results.push({ workspaceId: ws.id, ...r });
+      // Expired/revoked capability rows are dead on arrival; prune past the
+      // grace window so the table stays bounded (24h forensics window).
+      const tokensPruned = await pruneDevPreviewTokens(ws.id).catch(() => 0);
+      if (r.markedPaused || r.ceilingDestroyed || tokensPruned) results.push({ workspaceId: ws.id, ...r, tokensPruned });
     } catch (err) {
       results.push({ workspaceId: ws.id, markedPaused: 0, ceilingDestroyed: 0, error: err instanceof Error ? err.message : String(err) });
     }
