@@ -26,3 +26,6 @@ ALTER TABLE "project_dev_preview_tokens" FORCE ROW LEVEL SECURITY;
 CREATE POLICY "project_dev_preview_tokens_tenant_isolation" ON "project_dev_preview_tokens" FOR ALL
   USING ("workspace_id" = current_setting('app.workspace_id', true))
   WITH CHECK ("workspace_id" = current_setting('app.workspace_id', true));
+
+-- Workspace cascade: deleting a workspace removes its dev-preview tokens (orphan guard).
+ALTER TABLE "project_dev_preview_tokens" ADD CONSTRAINT "project_dev_preview_tokens_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
