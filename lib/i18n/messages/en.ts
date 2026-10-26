@@ -100,6 +100,7 @@ export const en = {
     },
     items: {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
+      "/dashboard/desktop": { label: "Desktop", description: "Home as an arrangeable widget desktop" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
