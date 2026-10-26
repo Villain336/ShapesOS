@@ -35,8 +35,8 @@ mock.module("@/lib/substrate/memory/rls", {
             if (!row || !matches) return { count: 0 };
             const merged = { ...row } as Record<string, unknown>;
             for (const [k, v] of Object.entries(data)) {
-              merged[k] = v && typeof v === "object" && "increment" in (v as Record<string, unknown>)
-                ? (row as unknown as Record<string, number>)[k] + (v as { increment: number }).increment
+              merged[k] = v && typeof v === "object" && "increment" in (v as unknown as Record<string, unknown>)
+                ? (row as unknown as Record<string, number>)[k] + (v as unknown as { increment: number }).increment
                 : v;
             }
             rows.set(where.projectId, merged as unknown as DevSandboxRow);
@@ -149,10 +149,10 @@ describe("dev sandbox lifecycle", () => {
     const { provider, calls, live } = stubProvider({ persistent: true });
     setSandboxProviderForTests(provider);
     // Pre-seed a winner that appears between create and insert.
-    const origCreate = (provider as { createPersistent: Function }).createPersistent;
-    (provider as { createPersistent: Function }).createPersistent = async (ctx: unknown, o: PersistentSandboxOptions) => {
+    const origCreate = (provider as unknown as { createPersistent: Function }).createPersistent;
+    (provider as unknown as { createPersistent: Function }).createPersistent = async (ctx: unknown, o: PersistentSandboxOptions) => {
       const sb = await origCreate(ctx, o);
-      rows.set("p1", { id: "pds-winner", workspaceId: "ws1", projectId: "p1", provider: "e2b", sandboxId: "sb-winner", status: "running", ttlSeconds: 900, exposedPorts: [], secretEnc: null, createdAt: new Date(), lastResumedAt: new Date(), pausedAt: null, destroyedAt: null });
+      rows.set("p1", { id: "pds-winner", workspaceId: "ws1", projectId: "p1", provider: "e2b", sandboxId: "sb-winner", status: "running", mode: "test", createCount: 1, ttlSeconds: 900, exposedPorts: [], secretEnc: null, createdAt: new Date(), lastResumedAt: new Date(), pausedAt: null, destroyedAt: null });
       live.set("sb-winner", stubSandbox("sb-winner", calls));
       return sb;
     };
