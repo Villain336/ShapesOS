@@ -618,6 +618,8 @@ export const es: Catalogue = {
     failed: "La vista previa no pudo iniciar: {reason}",
     empty: "No hay pestañas abiertas. Abre una para ver el servidor de desarrollo de un proyecto.",
     stopsItself: "Las vistas previas en ejecucion consumen computo de pago. Pausa una vista previa para detener sus cargos de computo.",
+    sessionExpired: "La sesion de esta vista previa expiro. Recargar pierde el estado no guardado de la app.",
+    reloadPreview: "Recargar vista previa",
   },
 
   kit: {
