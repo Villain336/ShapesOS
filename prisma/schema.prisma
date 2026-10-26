@@ -1,3 +1,43 @@
+// Read-only preview capability for the in-product browser (v2, replaces the
+
+// ambient capability cookie): an unguessable bearer URL per
+
+// (user, project, port, sandbox generation). tokenHash verifies requests;
+
+// tokenEnc (secrets envelope) lets the status endpoint re-serve the SAME raw
+
+// token to its owning session so a live pane never reloads for renewal.
+
+model ProjectDevPreviewToken {
+
+  id            String    @id @default(cuid()) @map("id")
+
+  workspaceId   String    @map("workspace_id")  projectId     String    @map("project_id")
+
+  port          Int       @map("port")
+
+  sandboxId     String    @map("sandbox_id")
+
+  userId        String    @map("user_id")
+
+  tokenHash     String    @unique @map("token_hash")
+
+  tokenEnc      String    @map("token_enc")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  expiresAt     DateTime  @map("expires_at")  lastRenewedAt DateTime? @map("last_renewed_at")
+
+  revokedAt     DateTime? @map("revoked_at")
+
+
+
+  @@index([workspaceId, projectId, port])
+
+  @@map("project_dev_preview_tokens")
+
+}
+
 // Marketr — Prisma data model (spec §6).
 // Source of truth: docs/specs/SPEC.md. Milestone 1: schema only, no business logic yet.
 
