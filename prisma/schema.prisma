@@ -34,6 +34,8 @@ lastRenewedAt DateTime? @map("last_renewed_at")
 
   revokedAt     DateTime? @map("revoked_at")
 
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
 
 
   @@index([workspaceId, projectId, port])
@@ -617,6 +619,8 @@ enum SiteSourceType {
 
 model Workspace {
   attributionBundles AttributionBundle[]
+
+  projectDevPreviewTokens ProjectDevPreviewToken[]
   id                 String              @id @default(cuid())
   name               String
   // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
