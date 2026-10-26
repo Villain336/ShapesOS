@@ -90,7 +90,18 @@ export async function proxyDevPreview(
   // framework dev servers happily return project files like .env, and Vite's
   // /@fs/<absolute> reads any path inside its fs.allow root. Refuse the
   // obvious sensitive shapes at the proxy; documented in the PR body.
-  if ((params.path ?? []).some((s) => s === ".env" || s.startsWith(".env.") || s === ".git" || s === "@fs")) {
+  // Path segments arrive DECODED (Next decodes %2e/%2f before params), so a
+  // literal ".." or a segment with an embedded slash/backslash would reach
+  // the dev server as a traversal after our own re-encoding - refuse them
+  // deterministically instead of relying on upstream normalization.
+  // Dotfile guards cover the common credential files; NOT exhaustive
+  // (residual: *.pem, id_rsa outside .ssh, etc. - named in the PR body).
+  // @fs stays fail-closed for v1: monorepo/npm-linked deps living OUTSIDE
+  // the project root are UNSUPPORTED (documented, not silently relaxed).
+  if ((params.path ?? []).some((s) =>
+    /^\.{2,}$/.test(s) || s.includes("/") || s.includes("\\") ||
+    s === ".env" || s.startsWith(".env.") || s === ".git" || s === "@fs" ||
+    s === ".npmrc" || s === ".aws" || s === ".ssh" || s === ".gnupg" || s === ".docker")) {
     return text(404, "Not found.");
   }
   const rest = (params.path ?? []).map(seg).join("/");
@@ -207,4 +218,4 @@ async function bufferWithCap(body: ReadableStream<Uint8Array> | null, cap: numbe
     chunks.push(value);
   }
   return new TextDecoder().decode(Buffer.concat(chunks));
-                                     }
+}
