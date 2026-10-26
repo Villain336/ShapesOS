@@ -97,6 +97,9 @@ export const share_preview: ToolDef = {
     if (!ensured.ok) return { summary: ensured.reason, details: { unavailable: true, reason: ensured.reason } };
     const dev = ensured.sandbox;
 
+/** Single-quote a path for the sandbox shell (no expansion possible). */
+const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
     // 1. Sync the workdir: tarball out of the run sandbox, into the dev one.
     let runSb: Sandbox;
     try {
@@ -106,13 +109,14 @@ export const share_preview: ToolDef = {
       throw err;
     }
     const src = str(args.dir) ?? ".";
-    const pack = await runSb.exec(`tar czf /tmp/share-preview.tgz -C "${runSb.workdir}/${src === "." ? "" : src}" .`, { timeoutMs: 120_000 });
+    const srcDir = src === "." ? runSb.workdir : `${runSb.workdir}/${src}`;
+    const pack = await runSb.exec(`tar czf /tmp/share-preview.tgz -C ${shq(srcDir)} .`, { timeoutMs: 120_000 });
     if (pack.exitCode !== 0) return { summary: `share_preview: couldn't package the workdir: ${pack.stderr.slice(0, 300)}`, details: { error: "pack" } };
     const tarball = await runSb.readFile("/tmp/share-preview.tgz");
     const dest = `${dev.workdir}/app`;
-    await dev.exec(`mkdir -p "${dest}"`, { timeoutMs: 10_000 });
+    await dev.exec(`mkdir -p ${shq(dest)}`, { timeoutMs: 10_000 });
     await dev.writeFile("/tmp/share-preview.tgz", tarball);
-    const unpack = await dev.exec(`tar xzf /tmp/share-preview.tgz -C "${dest}" && rm /tmp/share-preview.tgz`, { timeoutMs: 120_000 });
+    const unpack = await dev.exec(`tar xzf /tmp/share-preview.tgz -C ${shq(dest)} && rm /tmp/share-preview.tgz`, { timeoutMs: 120_000 });
     if (unpack.exitCode !== 0) return { summary: `share_preview: couldn't unpack into the dev sandbox: ${unpack.stderr.slice(0, 300)}`, details: { error: "unpack" } };
 
     // 2. Install + start the dev server, detached, with the preview base path.
