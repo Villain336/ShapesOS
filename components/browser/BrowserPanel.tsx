@@ -120,7 +120,7 @@ export function BrowserPanel({ projects, labels }: { projects: ProjectOpt[]; lab
               className="w-24 rounded-md border border-line bg-panel px-2 py-1 text-sm"
             />
           </label>
-          <button type="button" onClick={openTab} className="rounded-md bg-accent px-3 py-1.5 text-sm text-on-accent">
+          <button type="button" onClick={openTab} className="rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground">
             {labels.openTab}
           </button>
         </div>
@@ -208,7 +208,7 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
               type="button"
               disabled={busy !== null}
               onClick={() => act("POST", status?.status === "paused" ? "resume" : "start")}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm text-on-accent disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground disabled:opacity-50"
             >
               <Play className="h-3.5 w-3.5" aria-hidden />
               {status?.status === "paused"
@@ -220,4 +220,4 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
       </div>
     </div>
   );
-    }
+}
