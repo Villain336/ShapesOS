@@ -51,6 +51,7 @@ export default async function BrowserPage() {
     stopsItself: t("browser.stopsItself"),
     sessionExpired: t("browser.sessionExpired"),
     reloadPreview: t("browser.reloadPreview"),
+    tokenError: t("browser.tokenError"),
   };
 
   return (
