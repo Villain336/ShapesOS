@@ -40,7 +40,7 @@ const LABELS = {
 
 describe("BrowserPanel token rotation", () => {
   let root: import("react-dom/client").Root;
-  let container: HTMLElement;
+  let container: InstanceType<typeof window.HTMLElement>; // happy-dom element, not the TS DOM lib type
   let act: typeof import("react").act;
 
   before(async () => {
@@ -53,7 +53,7 @@ describe("BrowserPanel token rotation", () => {
     window.document.body.appendChild(container);
     mock.timers.enable({ apis: ["setInterval"] });
     await act(async () => {
-      root = createRoot(container);
+      root = createRoot(container as unknown as Element | DocumentFragment); // happy-dom node -> react-dom Container
       root.render(<BrowserPanel projects={[{ id: "p1", name: "proj" }]} labels={LABELS} />);
     });
   });
