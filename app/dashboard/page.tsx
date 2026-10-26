@@ -101,9 +101,9 @@ function FeedRow({
             <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
           </div>
         ) : null}
-        <div className="mt-1.5 text-xs text-subtle">{source}</div>
+        <div className="mt-1.5 text-xs text-muted">{source}</div>
       </div>
-      <span className="shrink-0 text-xs text-subtle" title={when}>
+      <span className="shrink-0 text-xs text-muted" title={when}>
         {timeLabel}
       </span>
     </li>
@@ -176,17 +176,17 @@ export default async function DashboardPage() {
       {/* Greeting */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-subtle">{format.date(now, "date")}</p>
+          <p className="text-sm text-muted">{format.date(now, "date")}</p>
           <h1 className="aos-heading">{t(`home.greeting.${daypart}`, { name: firstName })}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
             <span>{t("home.plan")}</span>
             <ValuePill>{workspace.plan}</ValuePill>
-            <span aria-hidden className="text-subtle">·</span>
+            <span aria-hidden className="text-muted">·</span>
             <span>{t("home.data")}</span>
             <ValuePill>{provider.isLive ? t("home.dataLive") : t("home.dataMock")}</ValuePill>
             {lastRun ? (
               <>
-                <span aria-hidden className="text-subtle">·</span>
+                <span aria-hidden className="text-muted">·</span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="size-3.5" aria-hidden />
                   {t("home.lastAutomation", { name: lastRun.workflow.name, ago: timeAgo(lastRun.startedAt, now, locale) })}
@@ -216,7 +216,7 @@ export default async function DashboardPage() {
       {/* Needs you: pending requests as flat rows with inline decisions. */}
       {inbox && inbox.items.length ? (
         <section aria-label={t("home.feed.needsYou")}>
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
             {t("home.feed.needsYou")}
           </h2>
           <FeedNeedsYou items={inbox.items} />
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
       {/* Running now: the lead agent and its sub-agents, live. */}
       {running.length ? (
         <section aria-label={t("home.feed.runningNow")}>
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
             {t("home.feed.runningNow")}
           </h2>
           <ul>
@@ -250,7 +250,7 @@ export default async function DashboardPage() {
       {/* Earlier: what finished or stopped, newest first. */}
       {earlier.length ? (
         <section aria-label={t("home.feed.earlierToday")}>
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
             {t("home.feed.earlierToday")}
           </h2>
           <ul>
@@ -274,12 +274,12 @@ export default async function DashboardPage() {
       {/* Today, from the lead agent. */}
       {briefing && briefing.status === "ready" && briefing.body ? (
         <section aria-label={t("home.feed.briefing")} className="rounded-lg border border-line bg-surface p-4">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
             {t("home.feed.briefing")}
           </h2>
           <p className="text-sm leading-relaxed text-ink">{briefing.body}</p>
           {briefing.writtenAt ? (
-            <p className="mt-2 text-xs text-subtle">
+            <p className="mt-2 text-xs text-muted">
               {t("home.feed.writtenAgo", { ago: timeAgo(new Date(briefing.writtenAt), now, locale) })}
             </p>
           ) : null}
