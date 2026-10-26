@@ -15,6 +15,7 @@
 
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getDevSandboxRow } from "./dev-sandbox";
+import { rewritePreviewHtml } from "./dev-preview-html";
 import {
   forwardRequestHeaders,
   isPreviewCapable,
@@ -116,5 +117,52 @@ export async function proxyDevPreview(
       headers.delete("location");
     }
   }
+  // CORS for the sandboxed (opaque-origin) preview document: its module
+  // scripts, fetch and XHR run in CORS mode with credentials (the path-scoped
+  // capability cookie), which requires an explicit ACAO. "null" is the opaque
+  // origin these documents carry - it opens nothing to named origins beyond
+  // what the capability cookie already intends (observed in the real-browser
+  // harness: without this, vite's module graph 401s/blocks).
+  headers.set("access-control-allow-origin", "null");
+  headers.set("access-control-allow-credentials", "true");
+
+  // HTML bootstrap: make the previewed app actually run from an opaque
+  // origin. (1) module scripts need crossorigin="use-credentials" or they
+  // never send the capability cookie (observed). (2) app fetch/XHR default
+  // to credentials "same-origin" - never sent from an opaque origin - and to
+  // root-absolute paths that would hit ShapesOS instead of the dev server;
+  // the bootstrap routes same-origin absolute paths back through the preview
+  // prefix and forces credentials. Buffered and capped; larger HTML streams
+  // through unchanged (module scripts then 401 - logged, not hidden).
+  const ctype = headers.get("content-type") ?? "";
+  if (method === "GET" && res.status === 200 && ctype.includes("text/html")) {
+    const html = await bufferWithCap(res.body, MAX_HTML_REWRITE_BYTES);
+    if (html !== null) {
+      headers.delete("content-length");
+      return new Response(rewritePreviewHtml(html, prefix), { status: res.status, statusText: res.statusText, headers });
+    }
+    console.warn(`[dev-preview] HTML over ${MAX_HTML_REWRITE_BYTES} bytes: served without the module/credentials bootstrap`);
+  }
   return new Response(method === "HEAD" ? null : res.body, { status: res.status, statusText: res.statusText, headers });
 }
+
+const MAX_HTML_REWRITE_BYTES = 4 * 1024 * 1024;
+
+async function bufferWithCap(body: ReadableStream<Uint8Array> | null, cap: number): Promise<string | null> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
