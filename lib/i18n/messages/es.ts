@@ -620,6 +620,7 @@ export const es: Catalogue = {
     stopsItself: "Las vistas previas en ejecucion consumen computo de pago. Pausa una vista previa para detener sus cargos de computo.",
     sessionExpired: "La sesion de esta vista previa expiro. Recargar pierde el estado no guardado de la app.",
     reloadPreview: "Recargar vista previa",
+    tokenError: "No se pudo renovar la sesion de la vista previa. Recarga para intentarlo de nuevo.",
   },
 
   kit: {
