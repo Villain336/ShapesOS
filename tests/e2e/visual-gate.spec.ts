@@ -85,8 +85,6 @@ test.describe("visual gate: workspace UX", () => {
     // original duplicate Feed+Overview regression case.
     await page.goto("/dashboard/assistant", { waitUntil: "networkidle" });
     await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
-    // Pixel evidence for the active-row result on the assistant route.
-    await page.screenshot({ path: `${SHOTS}/01b-assistant-active-row.png`, fullPage: true });
     await page.goto("/dashboard", { waitUntil: "networkidle" });
     await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
 
