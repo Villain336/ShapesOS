@@ -162,9 +162,15 @@ export const SANDBOX_PREVIEW_CSP = [
   "object-src 'none'",
 ].join("; ");
 
-/** Phase 8: is this a sandbox preview path (see SANDBOX_PREVIEW_CSP)? */
+/** Phase 8 + in-product browser: is this a sandbox preview path (see
+ *  SANDBOX_PREVIEW_CSP)? Covers the agent-runs preview AND the project
+ *  dev-preview (/api/projects/<id>/dev-preview/<port>/...) - same untrusted
+ *  dev-server content, same opaque-origin policy. Without this the path
+ *  falls through to API_CONTENT_SECURITY_POLICY (default-src 'none'), which
+ *  the proxy force-sets over the route's own CSP. */
 export function isSandboxPreviewPath(pathname: string): boolean {
-  return /^\/api\/agent-runs\/[^/]+\/preview\/\d+(\/|$)/.test(pathname);
+  return /^\/api\/agent-runs\/[^/]+\/preview\/\d+(\/|$)/.test(pathname)
+    || /^\/api\/projects\/[^/]+\/dev-preview\/\d+(\/|$)/.test(pathname);
 }
 
 /** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
