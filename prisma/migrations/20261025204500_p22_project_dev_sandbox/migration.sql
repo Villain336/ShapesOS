@@ -27,3 +27,10 @@ CREATE INDEX "project_dev_sandboxes_workspace_id_status_idx" ON "project_dev_san
 
 ALTER TABLE "project_dev_sandboxes" ADD CONSTRAINT "project_dev_sandboxes_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "project_dev_sandboxes" ADD CONSTRAINT "project_dev_sandboxes_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Tenant isolation, same convention as the other workspace-scoped tables.
+ALTER TABLE "project_dev_sandboxes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "project_dev_sandboxes" FORCE ROW LEVEL SECURITY;
+CREATE POLICY "project_dev_sandboxes_tenant_isolation" ON "project_dev_sandboxes" FOR ALL
+  USING ("workspace_id" = current_setting('app.workspace_id', true))
+  WITH CHECK ("workspace_id" = current_setting('app.workspace_id', true));
