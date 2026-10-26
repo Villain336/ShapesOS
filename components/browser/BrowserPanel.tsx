@@ -6,17 +6,18 @@
 // sandbox is paused shows Resume (the ONLY wake path - explicit, never
 // traffic-driven); a project with none shows Start.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Globe, Pause, Play, Plus, RotateCw, X } from "lucide-react";
 
 interface ProjectOpt { id: string; name: string }
 interface Tab { key: string; projectId: string; port: number }
-type Status = { status: string; exposedPorts: number[] } | null;
+type Status = { status: string; exposedPorts: number[]; previews?: { port: number; url: string }[] } | null;
 
 export interface BrowserLabels {
   newTab: string; closeTab: string; project: string; pickProject: string; port: string;
   openTab: string; start: string; starting: string; resume: string; resuming: string;
   pause: string; paused: string; none: string; empty: string; stopsItself: string;
+  sessionExpired: string; reloadPreview: string;
 }
 
 const STORE_KEY = "shapes.dev-preview.tabs.v1";
@@ -154,6 +155,16 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
     }
   }, [tab.projectId]);
   useEffect(() => { refresh(); }, [refresh]);
+  // Owning-session renewal: while this tab is VISIBLE, poll status so the
+  // preview token's sliding expiry is extended. Background tabs are
+  // throttled by the browser; the 1h TTL absorbs it, and a lapsed token
+  // surfaces the explicit reload affordance below - never a silent reload.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [refresh]);
 
   const act = async (method: "POST" | "DELETE", which: "start" | "resume" | "pause") => {
     setBusy(which);
@@ -172,12 +183,26 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
   };
 
   const running = status?.status === "running";
-  const src = `/api/projects/${tab.projectId}/dev-preview/${tab.port}/`;
+  // The iframe URL comes from the status endpoint (capability URL). It is
+  // NEVER rendered: the token is a bearer secret, so chrome shows the
+  // tokenless project:port label only.
+  const previewUrl = status?.previews?.find((p) => p.port === tab.port)?.url ?? null;
+  // Token rotation while a LIVE document is loaded must not silently swap
+  // the iframe src (that reloads the app and loses unsaved state): surface
+  // an explicit reload affordance instead.
+  const lastUrl = useRef<string | null>(null);
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    if (!previewUrl) { lastUrl.current = null; setExpired(false); return; }
+    if (lastUrl.current && lastUrl.current !== previewUrl && running) setExpired(true);
+    if (!expired) lastUrl.current = previewUrl;
+  }, [previewUrl, running, expired]);
+  const src = previewUrl ?? `/api/projects/${tab.projectId}/dev-preview/${tab.port}/`;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-line px-3 py-1.5 text-xs">
-        <span className="text-muted">{src}</span>
+        <span className="text-muted">{tab.key}</span>
         <span className="flex-1" />
         {running ? (
           <>
@@ -198,14 +223,30 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
       <div className="min-h-0 flex-1">
         {/* sandbox mirrors SANDBOX_PREVIEW_CSP (observed-compatible in the
             real-browser harness): belt+braces if the CSP header is lost. */}
-        {running ? (
-          <iframe
-            key={frameKey}
-            src={src}
-            title={tab.key}
-            sandbox="allow-scripts allow-forms allow-modals allow-downloads"
-            className="h-full w-full border-0 bg-white"
-          />
+        {running && previewUrl ? (
+          <div className="flex h-full min-h-0 flex-col">
+            {expired ? (
+              <div className="flex items-center justify-center gap-3 border-b border-line bg-panel px-3 py-2 text-xs">
+                <span className="text-muted">{labels.sessionExpired}</span>
+                <button
+                  type="button"
+                  onClick={() => { lastUrl.current = previewUrl; setExpired(false); setFrameKey((k) => k + 1); }}
+                  className="flex items-center gap-1.5 rounded-md bg-accent px-2 py-1 text-accent-foreground"
+                >
+                  <RotateCw className="h-3 w-3" aria-hidden /> {labels.reloadPreview}
+                </button>
+              </div>
+            ) : null}
+            {/* expired: keep the OLD src mounted (unsaved state survives)
+                until the user explicitly reloads. */}
+            <iframe
+              key={frameKey}
+              src={expired && lastUrl.current ? lastUrl.current : src}
+              title={tab.key}
+              sandbox="allow-scripts allow-forms allow-modals allow-downloads"
+              className="h-full w-full flex-1 border-0 bg-white"
+            />
+          </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p className="max-w-md text-sm text-muted">
