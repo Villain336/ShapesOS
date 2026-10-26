@@ -35,7 +35,7 @@ import {
 import { AgentWorker } from "../worker";
 import type { AgentJobHandler } from "../handlers";
 import { enqueueMissionLaunch, runMissionJob, type MissionJobPayload } from "@/lib/agents/mission-runtime";
-import { startMission } from "@/lib/missions/engine";
+import { approveMissionPlan, startMission } from "@/lib/missions/engine";
 import { createPrismaMissionStore } from "@/lib/missions/prisma-store";
 import { isWorkspaceFrozen } from "@/lib/orchestrator/killswitch";
 import { executorGrant } from "@/lib/orchestrator/executor-grants";
@@ -232,7 +232,53 @@ describe("agent queue (Postgres, app role)", () => {
       goal: { metric: "booked_jobs", targetValue: 40, timeframeDays: 90 },
       name: "P8 queue test",
     });
+    // The whole-plan gate: launching is refused while the plan is unapproved.
+    await assert.rejects(
+      enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER }),
+      /awaiting/,
+    );
+    // A person approves the drafted plan, then the launch is queued.
+    await approveMissionPlan(deps, mission.id, WS_A, USER);
     const launch = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER });
+    // Retry-safe + idempotent: a repeat launch returns the same run and job
+    // instead of double-starting the worker.
+    const again = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER });
+    assert.equal(again.runId, launch.runId, "same launch run on retry");
+    assert.equal(again.jobId, launch.jobId, "same queued job on retry");
+
+    // True-parallel launches converge: the mission-row lock serializes the
+    // check+create, so both callers adopt the one launch run and job.
+    const [c1, c2] = await Promise.all([
+      enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER }),
+      enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER }),
+    ]);
+    assert.equal(c1.runId, launch.runId, "concurrent launch adopts the existing run");
+    assert.equal(c2.runId, launch.runId, "concurrent launch adopts the existing run");
+    assert.equal((await jobsOf(WS_A, "mission")).length, 1, "still exactly one mission job");
+
+    // Failure after the run was created but before the job: a retry adopts
+    // the orphaned run and queues its job instead of starting a second run.
+    const mission2 = await startMission(deps, {
+      workspaceId: WS_A,
+      userId: USER,
+      templateId: "home-services.booked-job-growth",
+      goal: { metric: "booked_jobs", targetValue: 40, timeframeDays: 90 },
+      name: "P8 orphan-run retry",
+    });
+    await approveMissionPlan(deps, mission2.id, WS_A, USER);
+    const orphan = await createAgentRun({
+      workspaceId: WS_A,
+      kind: "mission",
+      startedBy: USER,
+      missionId: mission2.id,
+      agentKey: "lead",
+      agentState: { missionId: mission2.id },
+    });
+    const resumed = await enqueueMissionLaunch({ missionId: mission2.id, workspaceId: WS_A, userId: USER });
+    assert.equal(resumed.runId, orphan.id, "retry adopts the orphaned launch run");
+    assert.ok(resumed.jobId, "retry queues the missing job");
+    const runs = await jobsOf(WS_A, "mission");
+    assert.equal(runs.filter((j) => j.runId === orphan.id).length, 1, "one job for the adopted run");
     const [job] = (await jobsOf(WS_A, "mission")).filter((j) => j.runId === launch.runId);
     assert.ok(job, "the launch queued a mission job");
     assert.equal(job!.status, "queued");
