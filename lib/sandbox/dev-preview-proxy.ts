@@ -61,7 +61,15 @@ export async function proxyDevPreview(
 
   const incoming = new URL(req.url);
   const prefix = devPreviewPath(params.projectId, port);
-  const rest = (params.path ?? []).map(encodeURIComponent).join("/");
+  // Segment-safe encoding: encodeURIComponent is too aggressive for path
+  // segments - it escapes legal pchar characters like "@" to "%40", and real
+  // dev servers treat those as DIFFERENT paths (observed against Vite v8:
+  // "<base>/%40vite/client" returns the SPA fallback HTML instead of the HMR
+  // client JS, breaking every vite-internal @path). Keep RFC 3986 sub-delims,
+  // ":" and "@" raw; still escape "?", "#", "%", spaces, etc.
+  const seg = (s: string) =>
+    encodeURIComponent(s).replace(/%(21|24|26|27|28|29|2A|2B|2C|3A|3B|3D|40)/gi, (m) => decodeURIComponent(m));
+  const rest = (params.path ?? []).map(seg).join("/");
   const candidates = [`${prefix}${rest}`, `/${rest}`];
   const body = READ_METHODS.has(method) ? undefined : await req.arrayBuffer();
   if (body && body.byteLength > MAX_BODY_BYTES) return text(413, "Request body too large for a preview.");
