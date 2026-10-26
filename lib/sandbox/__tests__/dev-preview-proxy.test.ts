@@ -33,7 +33,7 @@ before(async () => {
 function mkRow(over: Partial<DevSandboxRow> = {}): DevSandboxRow {
   return {
     id: "pds-1", workspaceId: "ws1", projectId: "p1", provider: "e2b", sandboxId: "sb-1",
-    status: "running", ttlSeconds: 900, exposedPorts: [3000], secretEnc: null,
+    status: "running", mode: "test", createCount: 1, ttlSeconds: 900, exposedPorts: [3000], secretEnc: null,
     createdAt: new Date(), lastResumedAt: null, pausedAt: null, destroyedAt: null, ...over,
   };
 }
