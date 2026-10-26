@@ -49,6 +49,8 @@ export default async function BrowserPage() {
     none: t("browser.none"),
     empty: t("browser.empty"),
     stopsItself: t("browser.stopsItself"),
+    sessionExpired: t("browser.sessionExpired"),
+    reloadPreview: t("browser.reloadPreview"),
   };
 
   return (
