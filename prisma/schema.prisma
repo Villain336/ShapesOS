@@ -12,7 +12,9 @@ model ProjectDevPreviewToken {
 
   id            String    @id @default(cuid()) @map("id")
 
-  workspaceId   String    @map("workspace_id")  projectId     String    @map("project_id")
+  workspaceId   String    @map("workspace_id")  
+
+projectId     String    @map("project_id")
 
   port          Int       @map("port")
 
@@ -26,7 +28,9 @@ model ProjectDevPreviewToken {
 
   createdAt     DateTime  @default(now()) @map("created_at")
 
-  expiresAt     DateTime  @map("expires_at")  lastRenewedAt DateTime? @map("last_renewed_at")
+  expiresAt     DateTime  @map("expires_at")  
+
+lastRenewedAt DateTime? @map("last_renewed_at")
 
   revokedAt     DateTime? @map("revoked_at")
 
