@@ -586,6 +586,16 @@ export const es: Catalogue = {
       listMore: "{list} y {count} más",
       scheduleFailed: "La última ejecución programada falló",
     },
+    // El Feed (rediseño plano aprobado): etiquetas de sección y enlaces.
+    feed: {
+      needsYou: "Te necesita",
+      runningNow: "En marcha",
+      earlierToday: "Más temprano",
+      briefing: "Hoy, de tu agente principal",
+      writtenAgo: "escrito {ago}",
+      agent: "Agente",
+      openDesktop: "Abrir el escritorio",
+    },
   },
 
   kit: {
