@@ -68,15 +68,15 @@ function Row({
               <Link href={item.href} className={aosButton({ variant: "secondary", size: "sm" })}>
                 {t("desk.views.review")}
               </Link>
-              {item.blockedReason ? <span className="text-xs text-subtle">{item.blockedReason}</span> : null}
+              {item.blockedReason ? <span className="text-xs text-muted">{item.blockedReason}</span> : null}
             </>
           )}
         </div>
-        <div className="mt-1.5 text-xs text-subtle">
+        <div className="mt-1.5 text-xs text-muted">
           {[item.agent, item.typeLabel, t("status.needs")].filter(Boolean).join(" · ")}
         </div>
       </div>
-      <span className="shrink-0 text-xs text-subtle" title={format.date(item.createdAt, "dateTime")}>
+      <span className="shrink-0 text-xs text-muted" title={format.date(item.createdAt, "dateTime")}>
         {ageLabel(item.createdAt)}
       </span>
     </li>
