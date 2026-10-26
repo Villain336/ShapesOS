@@ -592,6 +592,16 @@ export const en = {
       listMore: "{list} and {count} more",
       scheduleFailed: "The last scheduled run failed",
     },
+    // The Feed (approved flat-feed redesign): section labels and links.
+    feed: {
+      needsYou: "Needs you",
+      runningNow: "Running now",
+      earlierToday: "Earlier",
+      briefing: "Today, from your lead agent",
+      writtenAgo: "written {ago}",
+      agent: "Agent",
+      openDesktop: "Open desktop",
+    },
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit
