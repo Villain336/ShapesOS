@@ -33,7 +33,8 @@ test("dev preview browser: tab strip, tab persistence, spend-gated start", async
   await expect(page.getByRole("button", { name: "Start preview" })).toBeVisible();
 
   await page.getByRole("button", { name: "New tab" }).click();
-  await page.getByLabel("Port").fill("5173");
+  // exact: the sidebar's "Pin <row>" buttons (e.g. "Pin Reports") also contain "port".
+  await page.getByLabel("Port", { exact: true }).fill("5173");
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.getByRole("tab")).toHaveCount(2);
   await page.screenshot({ path: `${SHOTS}/12b-browser-tabs.png`, fullPage: true });
