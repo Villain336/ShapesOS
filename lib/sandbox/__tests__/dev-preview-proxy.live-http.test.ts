@@ -63,6 +63,19 @@ before(async () => {
       res.end(hit[1]);
       return;
     }
+    if (req.url === `${BASE}@vite/client`) {
+      if (req.headers.upgrade) {
+        res.writeHead(426).end("upgrade header leaked through the proxy");
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/javascript" });
+      res.end("__vite_hmr_client__");
+      return;
+    }
+    if (req.url === `${BASE}%40vite/client`) {
+      res.writeHead(418).end("encoded-at must not reach the dev server");
+      return;
+    }
     if (req.method === "POST" && req.url === `${BASE}api/save`) {
       let body = "";
       req.on("data", (c) => (body += c));
@@ -153,6 +166,13 @@ describe("dev preview proxy over live HTTP (vite-with-base dev server)", () => {
     assert.match(await res.text(), /rootOnly/, "answered from the dev server's root");
   });
 
+  it("dev-server @paths forward raw (regression: %40 broke vite's client route)", async () => {
+    row = mkRow();
+    const res = await get(`${BASE}@vite/client`);
+    assert.equal(res.status, 200, "not the 418 sentinel the fixture returns for the encoded form");
+    assert.match(await res.text(), /__vite_hmr_client__/);
+  });
+
   it("the websocket ceiling, observed: an upgrade attempt gets no 101 and no upgrade forwarding", async () => {
     row = mkRow();
     const res = await proxyDevPreview(
@@ -161,6 +181,6 @@ describe("dev preview proxy over live HTTP (vite-with-base dev server)", () => {
       { workspaceId: "ws1", canWrite: true },
     );
     assert.notEqual(res.status, 101, "no websocket handshake through the proxy - HMR unavailable, page unaffected");
-    assert.equal(res.status, 404, "treated as a plain GET (the dev server 404s the unknown path)");
+    assert.equal(res.status, 200, "treated as a plain GET with the upgrade headers stripped (fixture 426s if one leaks)");
   });
 });
