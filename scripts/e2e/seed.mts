@@ -37,9 +37,9 @@ async function main() {
     console.log(`[e2e-seed] reusing workspace ${workspace.id}`);
   }
 
-  // The flat-feed Home (/dashboard) redirects to the onboarding wizard until
-  // onboardingCompletedAt is stamped; the disposable e2e workspace is always
-  // "past" onboarding so feed specs exercise the real Home.
+  // /dashboard redirects to the onboarding wizard while onboardingCompletedAt
+  // is null; the disposable e2e workspace is always "past" onboarding so the
+  // shell specs exercise the real Home route.
   await prisma.workspace.update({
     where: { id: workspace.id },
     data: { onboardingCompletedAt: new Date() },
