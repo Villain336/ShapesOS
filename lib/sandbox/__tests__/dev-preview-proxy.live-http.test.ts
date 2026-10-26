@@ -96,7 +96,7 @@ after(() => server?.close());
 function mkRow(): DevSandboxRow {
   return {
     id: "pds-1", workspaceId: "ws1", projectId: "p1", provider: "docker", sandboxId: "sb-live",
-    status: "running", ttlSeconds: 900, exposedPorts: [3000], secretEnc: null,
+    status: "running", mode: "test", createCount: 1, ttlSeconds: 900, exposedPorts: [3000], secretEnc: null,
     createdAt: new Date(), lastResumedAt: null, pausedAt: null, destroyedAt: null,
   };
 }
