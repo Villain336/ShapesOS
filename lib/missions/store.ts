@@ -100,6 +100,12 @@ export interface MissionStore {
   createMission(input: CreateMissionInput): Promise<StoredMission>;
   getMission(missionId: string, workspaceId: string): Promise<StoredMission | null>;
   updateMission(missionId: string, workspaceId: string, patch: UpdateMissionPatch): Promise<StoredMission>;
+  /**
+   * Atomically claim the planned -> active transition: exactly one concurrent
+   * caller receives the activated mission; everyone else gets null (the
+   * mission was not planned). The durable half of the whole-plan gate.
+   */
+  claimMissionActivation(missionId: string, workspaceId: string): Promise<StoredMission | null>;
   listMissions(workspaceId: string): Promise<StoredMission[]>;
   /** Hash-chained append (GENESIS -> ...), same chain contract as M1's audit.appendMissionEvent. */
   appendEvent(missionId: string, workspaceId: string, input: AppendEventInput): Promise<StoredMissionEvent>;
@@ -173,6 +179,15 @@ export function createMemoryMissionStore(): MissionStore {
         ...(patch.termination !== undefined ? { termination: patch.termination } : {}),
         updatedAt: new Date(),
       };
+      missions.set(missionId, next);
+      return next;
+    },
+
+    async claimMissionActivation(missionId, workspaceId) {
+      // Single-threaded: the check-and-set cannot interleave.
+      const m = missions.get(missionId);
+      if (!m || m.workspaceId !== workspaceId || m.status !== "planned") return null;
+      const next: StoredMission = { ...m, status: "active", updatedAt: new Date() };
       missions.set(missionId, next);
       return next;
     },
