@@ -97,6 +97,7 @@ export const es: Catalogue = {
     items: {
       "/dashboard": { label: "Resumen", description: "Inicio: lo que necesita atención" },
       "/dashboard/desktop": { label: "Escritorio", description: "Inicio como escritorio de widgets organizables" },
+      "/dashboard/browser": { label: "Navegador", description: "Vistas previas: los servidores de desarrollo de tus proyectos en pestañas" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
       // Phase 18.2 (WS=comms)
@@ -597,6 +598,29 @@ export const es: Catalogue = {
       agent: "Agente",
       openDesktop: "Abrir el escritorio",
     },
+  },
+
+  browser: {
+    title: "Navegador",
+    newTab: "Nueva pestaña",
+    closeTab: "Cerrar pestaña",
+    project: "Proyecto",
+    pickProject: "Elige un proyecto",
+    port: "Puerto",
+    openTab: "Abrir",
+    start: "Iniciar vista previa",
+    starting: "Iniciando…",
+    resume: "Reanudar",
+    resuming: "Reanudando…",
+    pause: "Pausar",
+    paused: "Esta vista previa está en pausa. Reanúdala para seguir trabajando: nada corre mientras está en pausa.",
+    none: "Aún no hay vista previa. Inicia una para correr el servidor de desarrollo de este proyecto aquí.",
+    failed: "La vista previa no pudo iniciar: {reason}",
+    empty: "No hay pestañas abiertas. Abre una para ver el servidor de desarrollo de un proyecto.",
+    stopsItself: "Las vistas previas en ejecucion consumen computo de pago. Pausa una vista previa para detener sus cargos de computo.",
+    sessionExpired: "La sesion de esta vista previa expiro. Recargar pierde el estado no guardado de la app.",
+    reloadPreview: "Recargar vista previa",
+    tokenError: "No se pudo renovar la sesion de la vista previa. Recarga para intentarlo de nuevo.",
   },
 
   kit: {

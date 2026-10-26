@@ -15,6 +15,8 @@ import {
   shouldSendHsts,
   USER_CONTENT_CSP,
   USER_FILE_VIEW_CSP,
+  isSandboxPreviewPath,
+  SANDBOX_PREVIEW_CSP,
 } from "../headers";
 import { brandLogoHeaders } from "../../brand-logo";
 import { buildDownloadHeaders } from "../../filesystem/download";
@@ -191,5 +193,29 @@ describe("user-content responses", () => {
     assert.equal(h["x-content-type-options"], "nosniff");
     assert.equal(h["content-security-policy"], "sandbox");
     assert.match(buildDownloadHeaders("image/png", "a.png")["content-disposition"], /^inline;/);
+  });
+});
+
+describe("sandbox preview path classification", () => {
+  it("covers agent-runs preview AND project dev-preview; other API paths keep the API policy", () => {
+    assert.equal(isSandboxPreviewPath("/api/agent-runs/run1/preview/3000/"), true);
+    assert.equal(isSandboxPreviewPath("/api/agent-runs/run1/preview/3000"), true);
+    assert.equal(isSandboxPreviewPath("/api/projects/p1/dev-preview/3000/"), true);
+    assert.equal(isSandboxPreviewPath("/api/projects/p1/dev-preview/3000/src/main.js"), true);
+    assert.equal(isSandboxPreviewPath("/api/projects/p1/dev-preview/3000/cap/abc123/"), true);
+    assert.equal(isSandboxPreviewPath("/api/projects/p1/dev-preview/abc/"), false, "non-numeric port");
+    assert.equal(isSandboxPreviewPath("/api/projects/p1/dev-sandbox"), false);
+    assert.equal(isSandboxPreviewPath("/api/projects/p1"), false);
+    assert.equal(isSandboxPreviewPath("/api/agent-runs/run1"), false);
+    assert.equal(
+      contentSecurityPolicyFor("/api/projects/p1/dev-preview/3000/", { nonce: "x" }),
+      SANDBOX_PREVIEW_CSP,
+      "dev-preview classifies to the sandbox policy, not the API policy",
+    );
+    assert.notEqual(
+      contentSecurityPolicyFor("/api/projects/p1/dev-sandbox", { nonce: "x" }),
+      SANDBOX_PREVIEW_CSP,
+      "the status endpoint keeps the API policy",
+    );
   });
 });
