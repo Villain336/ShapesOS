@@ -54,3 +54,16 @@ test("dev preview browser: tab strip, tab persistence, spend-gated start", async
   for (const _ of [0, 1]) await page.getByRole("button", { name: "Close tab" }).first().click();
   await expect(page.getByText("No tabs open. Open one to see a project's dev server.")).toBeVisible();
 });
+
+test("dev preview route gets the sandbox-preview CSP through the real middleware", async ({ request }) => {
+  // On-wire classification: the proxy force-sets CSP on every response, so
+  // the dev-preview path must classify as SANDBOX_PREVIEW_CSP (opaque-origin
+  // sandbox) and NOT fall through to the API policy (default-src 'none').
+  // Status is irrelevant here (401/404 unauthenticated) - the middleware
+  // stamps the header either way.
+  const res = await request.get("/api/projects/any-project/dev-preview/3000/");
+  const csp = res.headers()["content-security-policy"] ?? "";
+  expect(csp).toContain("sandbox allow-scripts");
+  expect(csp).toContain("frame-ancestors 'self'");
+  expect(csp).not.toContain("default-src 'none'");
+});
