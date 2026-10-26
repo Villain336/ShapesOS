@@ -25,17 +25,48 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : undefined;
 }
 
-/** Detect the dev command from package.json scripts in the synced dir. */
-async function detectDevCommand(sb: Sandbox, dir: string): Promise<string | null> {
+type DevFramework = "vite" | "astro" | "next" | "unknown";
+
+/**
+ * Detect the dev command AND the framework from package.json in the synced
+ * dir. The framework decides how (or whether) the preview base path can be
+ * applied - per-framework, never a blind flag on arbitrary commands:
+ * vite/astro accept --base on the CLI (forwarded through npm scripts);
+ * next only honors basePath from next.config (v1 does not rewrite project
+ * config); anything else gets no injection - relative-URL apps still work
+ * through the proxy's root fallback, root-absolute apps need their own base.
+ */
+async function detectDevServer(sb: Sandbox, dir: string): Promise<{ command: string | null; framework: DevFramework }> {
   const r = await sb.exec(`cat "${dir}/package.json"`, { timeoutMs: 10_000 }).catch(() => null);
-  if (!r || r.exitCode !== 0) return null;
+  if (!r || r.exitCode !== 0) return { command: null, framework: "unknown" };
   try {
-    const pkg = JSON.parse(r.stdout) as { scripts?: Record<string, string>; };
-    const pm = "npm";
-    if (pkg.scripts?.dev) return `${pm} run dev`;
-    if (pkg.scripts?.start) return `${pm} start`;
+    const pkg = JSON.parse(r.stdout) as {
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const scriptText = Object.values(pkg.scripts ?? {}).join(" ");
+    let framework: DevFramework = "unknown";
+    if (deps.vite || /\bvite\b/.test(scriptText)) framework = "vite";
+    else if (deps.astro || /\bastro\b/.test(scriptText)) framework = "astro";
+    else if (deps.next || /\bnext\b/.test(scriptText)) framework = "next";
+    const command = pkg.scripts?.dev ? "npm run dev" : pkg.scripts?.start ? "npm start" : null;
+    return { command, framework };
   } catch { /* fall through */ }
-  return null;
+  return { command: null, framework: "unknown" };
+}
+
+/** Apply the preview base to the start command where the framework supports it. */
+function withBase(command: string, framework: DevFramework, base: string): { command: string; baseHandling: "cli-flag" | "needs-next-config" | "none" } {
+  if (framework === "vite" || framework === "astro") {
+    if (command.startsWith("npm run ") || command.startsWith("npm start")) {
+      return { command: `${command} -- --base=${base}`, baseHandling: "cli-flag" };
+    }
+    if (/\b(vite|astro)\b/.test(command)) return { command: `${command} --base=${base}`, baseHandling: "cli-flag" };
+  }
+  if (framework === "next") return { command, baseHandling: "needs-next-config" };
+  return { command, baseHandling: "none" };
 }
 
 export const share_preview: ToolDef = {
@@ -85,11 +116,17 @@ export const share_preview: ToolDef = {
     if (unpack.exitCode !== 0) return { summary: `share_preview: couldn't unpack into the dev sandbox: ${unpack.stderr.slice(0, 300)}`, details: { error: "unpack" } };
 
     // 2. Install + start the dev server, detached, with the preview base path.
-    const command = str(args.command) ?? (await detectDevCommand(dev, dest));
-    if (!command) return { summary: "share_preview: no package.json dev/start script found; pass the command explicitly.", details: { error: "command" } };
+    const detected = await detectDevServer(dev, dest);
+    const explicit = str(args.command);
+    const framework: DevFramework = explicit
+      ? /\bvite\b/.test(explicit) ? "vite" : /\bastro\b/.test(explicit) ? "astro" : "unknown"
+      : detected.framework;
+    const rawCommand = explicit ?? detected.command;
+    if (!rawCommand) return { summary: `share_preview: no package.json dev/start script found; pass the command explicitly.`, details: { error: "command" } };
+    const base = devPreviewPath(ctx.projectId, port);
+    const { command, baseHandling } = withBase(rawCommand, framework, base);
     const install = await dev.exec("test -d node_modules || npm install --no-audit --no-fund", { timeoutMs: 300_000 });
     if (install.exitCode !== 0) return { summary: `share_preview: install failed: ${install.stderr.slice(-300)}`, details: { error: "install" } };
-    const base = devPreviewPath(ctx.projectId, port);
     await dev.exec(
       `cd "${dest}" && (fuser -k ${port}/tcp 2>/dev/null || true) && nohup env PORT=${port} HOSTNAME=0.0.0.0 BASE_PATH=${base} sh -lc 'exec ${command}' > /tmp/share-preview-${port}.log 2>&1 &`,
       { timeoutMs: 10_000 },
@@ -110,9 +147,15 @@ export const share_preview: ToolDef = {
     await dev.exposePort(port);
     const row = await getDevSandboxRow(ctx.workspaceId, ctx.projectId);
     await touchDevSandboxPorts(ctx.workspaceId, ctx.projectId, [...new Set([...(row?.exposedPorts ?? []), port])]);
+    const baseNote =
+      baseHandling === "cli-flag"
+        ? ""
+        : baseHandling === "needs-next-config"
+          ? "\nHeads-up: this is a Next.js app - set basePath to " + base + " in next.config or its assets won't load through the preview (v1 doesn't rewrite project config)."
+          : "\nHeads-up: the dev server wasn't given the preview base path; apps with root-absolute asset URLs won't load assets through the preview (relative URLs work).";
     return {
-      summary: `Hosted in the browser: open Browser (dashboard) → the tab for port ${port}, or ${base}\nIt keeps running after this run; it pauses itself when quiet and wakes from Resume in the panel.`,
-      details: { url: base, port, projectId: ctx.projectId },
+      summary: `Hosted in the browser: open Browser (dashboard) → the tab for port ${port}, or ${base}\nIt keeps running after this run; it pauses itself when quiet and wakes from Resume in the panel.${baseNote}`,
+      details: { url: base, port, projectId: ctx.projectId, framework, baseHandling },
     };
   },
 };
