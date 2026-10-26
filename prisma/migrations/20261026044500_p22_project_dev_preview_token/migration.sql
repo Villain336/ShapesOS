@@ -18,7 +18,7 @@ CREATE TABLE "project_dev_preview_tokens" (
 );
 
 CREATE UNIQUE INDEX "project_dev_preview_tokens_token_hash_key" ON "project_dev_preview_tokens"("token_hash");
-CREATE INDEX "project_dev_preview_tokens_workspace_project_port_idx" ON "project_dev_preview_tokens"("workspace_id", "project_id", "port");
+CREATE INDEX "project_dev_preview_tokens_workspace_id_project_id_port_idx" ON "project_dev_preview_tokens"("workspace_id", "project_id", "port");
 
 -- Tenant isolation, same convention as the other workspace-scoped tables.
 ALTER TABLE "project_dev_preview_tokens" ENABLE ROW LEVEL SECURITY;
