@@ -202,7 +202,18 @@ export async function ensureDevSandbox(
       const state = await aware.sandboxState(row.sandboxId);
       resumable = state !== "gone";
       if (state === "paused") {
-        const paused = await aware.attachPaused(row.sandboxId, row.secretEnc);
+        // secretEnc is encrypted at rest (lib/secrets); decrypt failure is
+        // fail-closed: attach without the secret would resume the wrong way.
+        let resumeSecret: string | null = null;
+        if (row.secretEnc) {
+          try {
+            const { secrets } = await import("@/lib/secrets");
+            resumeSecret = secrets().decrypt(row.secretEnc);
+          } catch {
+            resumeSecret = null;
+          }
+        }
+        const paused = await aware.attachPaused(row.sandboxId, resumeSecret);
         sb = paused ? asPauseCapable(paused) : null;
       } else if (state === "running") {
         const live = await provider.get(row.sandboxId);
@@ -233,7 +244,15 @@ export async function ensureDevSandbox(
     sandboxId: created.id,
     ttlSeconds: persist.timeoutSeconds,
     mode: bounds.mode,
-    secretEnc: "persistSecret" in created && typeof created.persistSecret === "function" ? created.persistSecret() : null,
+    secretEnc: await (async (): Promise<string | null> => {
+      // At-rest convention (same as lib/sandbox/index.ts): persistSecret
+      // output is encrypted with the app secrets key, never stored plaintext.
+      if (!("persistSecret" in created) || typeof created.persistSecret !== "function") return null;
+      const plain = created.persistSecret();
+      if (!plain) return null;
+      const { secrets } = await import("@/lib/secrets");
+      return secrets().encrypt(plain);
+    })(),
   });
   if (!inserted) {
     // Lost a concurrent create race: destroy the duplicate, use the winner.
