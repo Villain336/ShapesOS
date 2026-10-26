@@ -627,6 +627,7 @@ export const en = {
     stopsItself: "Running previews use paid compute. Pause a preview to stop its compute charges.",
     sessionExpired: "This preview's session expired. Reloading loses any unsaved state in the previewed app.",
     reloadPreview: "Reload preview",
+    tokenError: "Couldn't renew the preview session. Reload to try again.",
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit
