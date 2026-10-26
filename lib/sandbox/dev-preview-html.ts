@@ -45,3 +45,15 @@ export function rewritePreviewHtml(html: string, basePrefix: string, linkPrefix:
 export function rewritePreviewCss(css: string, basePrefix: string, linkPrefix: string): string {
   return css.split(basePrefix).join(linkPrefix);
 }
+
+/** Same base->link replacement for JavaScript modules. Dev servers bake the
+ *  STATIC tokenless base into transformed module source (static imports,
+ *  vite-internal paths like @vite/client's imports, dynamic import()
+ *  specifiers). Module-graph fetches are performed by the JS engine - the
+ *  bootstrap cannot intercept them - so without this rewrite the graph
+ *  arrives tokenless, fails closed (401), and the pane renders nothing
+ *  (observed with real Chromium + real Vite v8: src/dep.js and
+ *  node_modules/vite/dist/client/env.mjs both arrived tokenless). */
+export function rewritePreviewJs(js: string, basePrefix: string, linkPrefix: string): string {
+  return js.split(basePrefix).join(linkPrefix);
+}
