@@ -6,7 +6,7 @@
 // sandbox is paused shows Resume (the ONLY wake path - explicit, never
 // traffic-driven); a project with none shows Start.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Globe, Pause, Play, Plus, RotateCw, X } from "lucide-react";
 
 interface ProjectOpt { id: string; name: string }
@@ -188,16 +188,24 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
   // tokenless project:port label only.
   const previewUrl = status?.previews?.find((p) => p.port === tab.port)?.url ?? null;
   // Token rotation while a LIVE document is loaded must not silently swap
-  // the iframe src (that reloads the app and loses unsaved state): surface
-  // an explicit reload affordance instead.
-  const lastUrl = useRef<string | null>(null);
+  // the iframe src (that reloads the app and loses unsaved state). The
+  // RENDERED url is its own state: it advances only on first load, on an
+  // explicit user reload, or when no live document is mounted - never as a
+  // side effect of a status poll returning a rotated token.
+  const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   useEffect(() => {
-    if (!previewUrl) { lastUrl.current = null; setExpired(false); return; }
-    if (lastUrl.current && lastUrl.current !== previewUrl && running) setExpired(true);
-    if (!expired) lastUrl.current = previewUrl;
-  }, [previewUrl, running, expired]);
-  const src = previewUrl ?? `/api/projects/${tab.projectId}/dev-preview/${tab.port}/`;
+    if (!previewUrl || !running) { setRenderedUrl(null); setExpired(false); return; }
+    if (renderedUrl === null || renderedUrl === previewUrl) {
+      setRenderedUrl(previewUrl);
+      setExpired(false);
+      return;
+    }
+    // Rotation while a document is live: hold the OLD url, show the
+    // explicit reload affordance. Nothing here touches renderedUrl.
+    setExpired(true);
+  }, [previewUrl, running, renderedUrl]);
+  const src = renderedUrl ?? previewUrl ?? "";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -230,18 +238,18 @@ function PreviewPane({ tab, labels }: { tab: Tab; labels: BrowserLabels }) {
                 <span className="text-muted">{labels.sessionExpired}</span>
                 <button
                   type="button"
-                  onClick={() => { lastUrl.current = previewUrl; setExpired(false); setFrameKey((k) => k + 1); }}
+                  onClick={() => { setRenderedUrl(previewUrl); setExpired(false); setFrameKey((k) => k + 1); }}
                   className="flex items-center gap-1.5 rounded-md bg-accent px-2 py-1 text-accent-foreground"
                 >
                   <RotateCw className="h-3 w-3" aria-hidden /> {labels.reloadPreview}
                 </button>
               </div>
             ) : null}
-            {/* expired: keep the OLD src mounted (unsaved state survives)
-                until the user explicitly reloads. */}
+            {/* renderedUrl holds the OLD url while expired (unsaved state
+                survives) until the user explicitly reloads. */}
             <iframe
               key={frameKey}
-              src={expired && lastUrl.current ? lastUrl.current : src}
+              src={src}
               title={tab.key}
               sandbox="allow-scripts allow-forms allow-modals allow-downloads"
               className="h-full w-full flex-1 border-0 bg-white"
