@@ -101,6 +101,7 @@ export const en = {
     items: {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
       "/dashboard/desktop": { label: "Desktop", description: "Home as an arrangeable widget desktop" },
+      "/dashboard/browser": { label: "Browser", description: "Dev previews: your projects' dev servers in tabs" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
@@ -603,6 +604,27 @@ export const en = {
       agent: "Agent",
       openDesktop: "Open desktop",
     },
+  },
+
+  // In-product browser "Dev preview" v1: tab strip and per-tab controls.
+  browser: {
+    title: "Browser",
+    newTab: "New tab",
+    closeTab: "Close tab",
+    project: "Project",
+    pickProject: "Pick a project",
+    port: "Port",
+    openTab: "Open",
+    start: "Start preview",
+    starting: "Starting…",
+    resume: "Resume",
+    resuming: "Resuming…",
+    pause: "Pause",
+    paused: "This preview is paused. Resume it to keep working - nothing runs while paused.",
+    none: "No dev preview yet. Start one to run this project's dev server here.",
+    failed: "The preview couldn't start: {reason}",
+    empty: "No tabs open. Open one to see a project's dev server.",
+    stopsItself: "Previews pause themselves after 15 minutes quiet and stop billing when paused.",
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit
