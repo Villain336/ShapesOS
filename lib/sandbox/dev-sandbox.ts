@@ -271,8 +271,9 @@ export async function pauseDevSandbox(workspaceId: string, projectId: string): P
  * this ceiling (never refreshed, computed from createdAt) is the app-side
  * last resort - the provider-side backstop is the TTL itself (the sandbox
  * stops even if this reconciler never runs). This is a safety cap, NOT a
- * budget: ongoing production spend is owner-approved separately and this
- * number is not derived from any approval. It is also NOT the bound for an
+ * budget: no production spend approval exists (checked 2026-10-26);
+ * production spend REQUIRES a future explicit owner grant, and this number
+ * is not derived from any approval. It is also NOT the bound for an
  * authorized spend test - that is TEST_BOUNDS below, deliberately separate.
  */
 export const DEV_SANDBOX_ABSOLUTE_CEILING_MS = 8 * 60 * 60 * 1000;
@@ -297,12 +298,14 @@ export const PRODUCTION_BOUNDS: DevSandboxBounds = {
 };
 
 /**
- * Bounds for a bounded, owner-authorized spend TEST: one sandbox
- * workspace-wide, 20-minute created-at kill, 5-minute running TTL. At the
- * grounded default E2B rate (~$0.17/running-hour, docs quote 2026-10-25)
- * the worst case is ~$0.06 of runtime - deliberately far under the
- * discussed $1 test spend. A test run ALSO needs spendEnabledForTests();
- * nothing here starts a sandbox on its own.
+ * Bounds for a bounded spend TEST, IF the owner ever authorizes one: one
+ * sandbox workspace-wide, 20-minute created-at kill, 5-minute running TTL.
+ * At the grounded default E2B rate (~$0.17/running-hour, docs quote
+ * 2026-10-25) the worst case is ~$0.06 of runtime. NO test-spend grant
+ * exists today (the owner was asked 2026-10-25 and has not answered);
+ * these bounds are the shape a future grant could reference, nothing more.
+ * A test run ALSO needs spendEnabledForTests(); nothing here starts a
+ * sandbox on its own.
  */
 export const TEST_BOUNDS: DevSandboxBounds = {
   mode: "test",
@@ -316,8 +319,10 @@ export const TEST_BOUNDS: DevSandboxBounds = {
  * The flag (SHAPES_DEV_PREVIEW) opens the surface (status reads, the tab
  * UI, pause). Starting or waking a sandbox spends money, so POST requires
  * one of these, both OFF by default:
- *   SHAPES_DEV_PREVIEW_SPEND=1  owner-approved production spend (unset now);
- *   SHAPES_DEV_PREVIEW_TEST=1   a bounded, owner-authorized test window.
+ *   SHAPES_DEV_PREVIEW_SPEND=1  production spend (REQUIRES a prior explicit
+ *                               owner grant; no such grant exists, unset);
+ *   SHAPES_DEV_PREVIEW_TEST=1   a bounded test window (REQUIRES a prior
+ *                               explicit owner grant; none exists, unset).
  * Pause (DELETE) and status (GET) never require this gate.
  */
 export function boundsForMode(mode: string): DevSandboxBounds {
@@ -342,7 +347,7 @@ export function devSandboxSpendAllowed(
  * Hard cap on TOTAL test-mode sandboxes one workspace may ever create -
  * across rows, including destroyed ones, so destroy/recreate loops can't
  * multiply spend. Worst case at the grounded default rate: 3 x 20 min x
- * ~$0.17/hr ~= $0.17 of runtime, far under the discussed $1 test spend.
+ * ~$0.17/hr ~= $0.17 of runtime, IF a test grant is ever given.
  */
 export const TEST_MAX_CREATES_PER_WORKSPACE = 3;
 
