@@ -163,6 +163,11 @@ before(async () => {
         return;
       }
       if (u === `${BASE}assets/style.css`) { res.writeHead(200, { "content-type": "text/css" }); res.end("body{color:red}"); return; }
+      if (u === `${BASE}src/main.js`) {
+        res.writeHead(200, { "content-type": "text/javascript" });
+        res.end(`import { msg } from "${BASE}src/dep.js"; import "${BASE}node_modules/vite/dist/client/env.mjs"; export default msg;`);
+        return;
+      }
       if (u === `${BASE}api/data`) { res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); return; }
       res.writeHead(404).end("nf");
     });
@@ -203,6 +208,17 @@ describe("capability bearer requests", () => {
     const html = await res.text();
     assert.ok(html.includes(`/cap/${raw}/`), "links carry the cap prefix");
     assert.ok(html.includes("window.fetch"), "fetch/XHR rewrite bootstrap injected");
+  });
+
+  it("T1c served JS modules are rewritten to the token-full prefix (module graph can't be bootstrap-intercepted)", async () => {
+    const raw = await mint();
+    const res = await req(capPath(raw, "src/main.js"));
+    assert.equal(res.status, 200);
+    const js = await res.text();
+    const capPrefix = `/api/projects/p1/dev-preview/3000/cap/${raw}/`;
+    assert.ok(js.includes(`"${capPrefix}src/dep.js"`), "static import specifier rewritten to token-full URL");
+    assert.ok(js.includes(`"${capPrefix}node_modules/vite/dist/client/env.mjs"`), "vite-internal import rewritten");
+    assert.ok(!js.includes(`"/api/projects/p1/dev-preview/3000/src/`), "no tokenless base-prefixed URL survives");
   });
 
   it("T2/T3 cap POST/PUT/DELETE are 401 and the upstream NEVER sees a write", async () => {
