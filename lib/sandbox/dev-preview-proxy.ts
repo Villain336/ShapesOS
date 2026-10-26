@@ -2,8 +2,10 @@
 // (in-product browser "Dev preview" v1, server-only). Mirrors the run-scoped
 // preview-proxy security posture, tightened for a shared project sandbox:
 //
-//  - Session-only: no signed-token path. The browser panel is same-origin,
-//    so app cookies ride the iframe; there is no cross-site surface.
+//  - Two auth paths, both enforced by the ROUTE before this runs: the
+//    browser panel's same-origin session, or a read-only capability URL
+//    (/cap/<token>/, lib/sandbox/dev-preview-token.ts). No cookies or
+//    ambient credentials are minted or required here.
 //  - viewer+ to look; POST/PUT/PATCH/DELETE need editor+ (a dev sandbox is
 //    shared project state - there is no single "starter").
 //  - Only ports recorded on the ProjectDevSandbox row, only the sandbox's
@@ -15,7 +17,7 @@
 
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getDevSandboxRow } from "./dev-sandbox";
-import { rewritePreviewHtml } from "./dev-preview-html";
+import { rewritePreviewCss, rewritePreviewHtml } from "./dev-preview-html";
 import {
   forwardRequestHeaders,
   isPreviewCapable,
@@ -39,7 +41,7 @@ export function devPreviewPath(projectId: string, port: number): string {
 export async function proxyDevPreview(
   req: Request,
   params: { projectId: string; port: string; path?: string[] },
-  ctx: { workspaceId: string; canWrite: boolean },
+  ctx: { workspaceId: string; canWrite: boolean; linkPrefix?: string },
 ): Promise<Response> {
   const port = Number(params.port);
   if (!isValidPreviewPort(port)) return text(404, "Not found");
@@ -62,6 +64,9 @@ export async function proxyDevPreview(
 
   const incoming = new URL(req.url);
   const prefix = devPreviewPath(params.projectId, port);
+  // Links/emitted URLs point at the token-full prefix when the request came
+  // in on a capability URL; the upstream always speaks the tokenless base.
+  const linkPrefix = ctx.linkPrefix ?? prefix;
   // Segment-safe encoding: encodeURIComponent is too aggressive for path
   // segments - it escapes legal pchar characters like "@" to "%40", and real
   // dev servers treat those as DIFFERENT paths (observed against Vite v8:
@@ -105,48 +110,60 @@ export async function proxyDevPreview(
   if (!res || !target) return text(502, "Preview upstream refused.");
 
   const headers = previewResponseHeaders(res.headers);
+  // Redirects: in-base Locations are rewritten to the LINK prefix (token
+  // preserved); external origins are DENIED (header dropped), never passed
+  // through - an upstream redirect must not bounce the pane off-origin with
+  // its capability URL.
   const loc = res.headers.get("location");
   if (loc) {
     try {
       const l = new URL(loc, target);
       if (l.origin === upstream.origin) {
-        const p = l.pathname.startsWith(prefix) ? l.pathname : `${prefix}${l.pathname.replace(/^\//, "")}`;
+        const p = l.pathname.startsWith(prefix) ? `${linkPrefix}${l.pathname.slice(prefix.length)}` : `${linkPrefix}${l.pathname.replace(/^\//, "")}`;
         headers.set("location", `${p}${l.search}${l.hash}`);
       } else headers.delete("location");
     } catch {
       headers.delete("location");
     }
   }
-  // CORS for the sandboxed (opaque-origin) preview document: its module
-  // scripts, fetch and XHR run in CORS mode with credentials (the path-scoped
-  // capability cookie), which requires an explicit ACAO. "null" is the opaque
-  // origin these documents carry - it opens nothing to named origins beyond
-  // what the capability cookie already intends (observed in the real-browser
-  // harness: without this, vite's module graph 401s/blocks).
+  // Credentialless CORS for the sandboxed (opaque-origin) preview document:
+  // module scripts and fetch/XHR run in CORS mode and need an explicit ACAO;
+  // "null" is the origin these documents carry. NO Access-Control-Allow-
+  // Credentials: auth is the URL token, never a cookie, so no ambient
+  // authority rides any request (v1's ACAC + SameSite=None cookie was the
+  // null-origin read primitive the security review removed).
   headers.set("access-control-allow-origin", "null");
-  headers.set("access-control-allow-credentials", "true");
+  // The capability token lives in the URL: never leak it via Referer to
+  // third-party origins the previewed app talks to.
+  headers.set("referrer-policy", "no-referrer");
 
-  // HTML bootstrap: make the previewed app actually run from an opaque
-  // origin. (1) module scripts need crossorigin="use-credentials" or they
-  // never send the capability cookie (observed). (2) app fetch/XHR default
-  // to credentials "same-origin" - never sent from an opaque origin - and to
-  // root-absolute paths that would hit ShapesOS instead of the dev server;
-  // the bootstrap routes same-origin absolute paths back through the preview
-  // prefix and forces credentials. Buffered and capped; larger HTML streams
-  // through unchanged (module scripts then 401 - logged, not hidden).
+  // Link rewriting (compatibility, NOT a boundary): the dev server emits
+  // the STATIC tokenless base (baked --base); served HTML and CSS get the
+  // request's token-full prefix instead, plus a bootstrap that rewrites
+  // runtime fetch/XHR URLs the same way. Buffered and capped; larger bodies
+  // stream through with the tokenless base (assets then 404 - logged, not
+  // hidden). No credentials are forced anywhere: auth is the URL token.
   const ctype = headers.get("content-type") ?? "";
   if (method === "GET" && res.status === 200 && ctype.includes("text/html")) {
-    const html = await bufferWithCap(res.body, MAX_HTML_REWRITE_BYTES);
+    const html = await bufferWithCap(res.body, MAX_REWRITE_BYTES);
     if (html !== null) {
       headers.delete("content-length");
-      return new Response(rewritePreviewHtml(html, prefix), { status: res.status, statusText: res.statusText, headers });
+      return new Response(rewritePreviewHtml(html, prefix, linkPrefix), { status: res.status, statusText: res.statusText, headers });
     }
-    console.warn(`[dev-preview] HTML over ${MAX_HTML_REWRITE_BYTES} bytes: served without the module/credentials bootstrap`);
+    console.warn(`[dev-preview] HTML over ${MAX_REWRITE_BYTES} bytes: served without link rewriting`);
+  }
+  if (method === "GET" && res.status === 200 && ctype.includes("text/css")) {
+    const css = await bufferWithCap(res.body, MAX_REWRITE_BYTES);
+    if (css !== null) {
+      headers.delete("content-length");
+      return new Response(rewritePreviewCss(css, prefix, linkPrefix), { status: res.status, statusText: res.statusText, headers });
+    }
+    console.warn(`[dev-preview] CSS over ${MAX_REWRITE_BYTES} bytes: served without link rewriting`);
   }
   return new Response(method === "HEAD" ? null : res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
-const MAX_HTML_REWRITE_BYTES = 4 * 1024 * 1024;
+const MAX_REWRITE_BYTES = 4 * 1024 * 1024;
 
 async function bufferWithCap(body: ReadableStream<Uint8Array> | null, cap: number): Promise<string | null> {
   if (!body) return "";
