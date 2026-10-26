@@ -35,7 +35,7 @@ const LABELS = {
   newTab: "New tab", closeTab: "Close", project: "Project", pickProject: "Pick", port: "Port",
   openTab: "Open", start: "Start", starting: "Starting", resume: "Resume", resuming: "Resuming",
   pause: "Pause", paused: "Paused", none: "None", empty: "Empty", stopsItself: "Stops",
-  sessionExpired: "Session expired", reloadPreview: "Reload preview",
+  sessionExpired: "Session expired", reloadPreview: "Reload preview", tokenError: "Token error",
 };
 
 describe("BrowserPanel token rotation", () => {
