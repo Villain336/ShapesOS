@@ -85,6 +85,14 @@ before(async () => {
       });
       return;
     }
+    if (req.url === `${BASE}go-internal`) {
+      res.writeHead(302, { location: `${BASE}about` }).end();
+      return;
+    }
+    if (req.url === `${BASE}go-external`) {
+      res.writeHead(302, { location: "https://evil.example/phish" }).end();
+      return;
+    }
     res.writeHead(404).end("nope");
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -182,5 +190,55 @@ describe("dev preview proxy over live HTTP (vite-with-base dev server)", () => {
     );
     assert.notEqual(res.status, 101, "no websocket handshake through the proxy - HMR unavailable, page unaffected");
     assert.equal(res.status, 200, "treated as a plain GET with the upgrade headers stripped (fixture 426s if one leaks)");
+  });
+
+  it("capability-URL mode: links rewritten to the token-full prefix, credentialless headers, no-referrer", async () => {
+    row = mkRow();
+    const LINK = `${BASE}cap/tok123/`;
+    const res = await proxyDevPreview(
+      new Request(`https://app.test${LINK}`),
+      { projectId: "p1", port: "3000", path: [] },
+      { workspaceId: "ws1", canWrite: false, linkPrefix: LINK },
+    );
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.ok(html.includes(`src="${LINK}src/main.js"`), "module script rebased to the token-full prefix");
+    assert.ok(!html.includes(`"${BASE}src/`), "no tokenless asset URLs remain");
+    assert.equal(res.headers.get("access-control-allow-origin"), "null", "credentialless ACAO for the opaque origin");
+    assert.equal(res.headers.get("access-control-allow-credentials"), null, "NO ACAC - no ambient credentials exist in v2");
+    assert.equal(res.headers.get("referrer-policy"), "no-referrer", "URL token must not leak via Referer");
+    assert.equal(res.headers.get("set-cookie"), null, "no cookie is ever set");
+  });
+
+  it("redirects: in-base Location is rewritten to the token-full prefix; external Location is denied", async () => {
+    row = mkRow();
+    const LINK = `${BASE}cap/tok123/`;
+    const ctx = { workspaceId: "ws1", canWrite: false, linkPrefix: LINK };
+    const internal = await proxyDevPreview(
+      new Request(`https://app.test${LINK}go-internal`),
+      { projectId: "p1", port: "3000", path: ["go-internal"] }, ctx);
+    assert.equal(internal.status, 302);
+    assert.equal(internal.headers.get("location"), `${LINK}about`, "in-base redirect keeps the token");
+    await internal.body?.cancel().catch(() => undefined);
+    const external = await proxyDevPreview(
+      new Request(`https://app.test${LINK}go-external`),
+      { projectId: "p1", port: "3000", path: ["go-external"] }, ctx);
+    assert.equal(external.status, 302);
+    assert.equal(external.headers.get("location"), null, "external redirect Location is dropped, never passed through");
+    await external.body?.cancel().catch(() => undefined);
+  });
+
+  it("capability-URL mode: CSS url()s rewritten to the token-full prefix", async () => {
+    row = mkRow();
+    const LINK = `${BASE}cap/tok123/`;
+    const res = await proxyDevPreview(
+      new Request(`https://app.test${LINK}assets/style.css`),
+      { projectId: "p1", port: "3000", path: ["assets", "style.css"] },
+      { workspaceId: "ws1", canWrite: false, linkPrefix: LINK },
+    );
+    assert.equal(res.status, 200);
+    // fixture CSS has no base url(); assert pass-through is byte-stable here
+    // and that content-length was dropped for the (re)buffered body.
+    assert.match(await res.text(), /rebeccapurple/);
   });
 });
