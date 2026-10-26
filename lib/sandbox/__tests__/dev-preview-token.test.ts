@@ -32,6 +32,15 @@ const tx = {
       for (const r of store.values()) if (r.workspaceId === where.workspaceId && r.projectId === where.projectId && r.revokedAt === null) { Object.assign(r, data); n++; }
       return { count: n };
     },
+    deleteMany: async ({ where }: { where: { OR: { expiresAt?: { lt: Date }; revokedAt?: { lt: Date } }[] } }) => {
+      let n = 0;
+      for (const [id, r] of [...store.entries()]) {
+        const hit = where.OR.some((c) =>
+          (c.expiresAt && r.expiresAt < c.expiresAt.lt) || (c.revokedAt && r.revokedAt !== null && r.revokedAt < c.revokedAt.lt));
+        if (hit) { store.delete(id); n++; }
+      }
+      return { count: n };
+    },
     create: async ({ data }: { data: Omit<Row, "id" | "createdAt" | "lastRenewedAt" | "revokedAt"> }) => {
       const row: Row = { ...data, id: `t${++seq}`, createdAt: data.createdAt ?? new Date(), lastRenewedAt: null, revokedAt: null };
       store.set(row.id, row);
@@ -54,6 +63,31 @@ before(async () => {
 
 const NOW = new Date("2026-10-26T05:00:00Z");
 const IN = { workspaceId: "ws1", projectId: "p1", port: 3000, sandboxId: "sb1", userId: "u1" };
+
+describe("dev-preview token pruning (cron hygiene)", () => {
+  it("deletes expired/revoked rows past the grace window, keeps live and recent ones", async () => {
+    store.clear();
+    const NOW = new Date("2026-10-26T05:00:00Z");
+    const old_ = new Date(NOW.getTime() - 25 * 60 * 60 * 1000); // past 24h grace
+    const recent = new Date(NOW.getTime() - 2 * 60 * 60 * 1000); // inside grace
+    const mk = (over: Partial<Row>) => {
+      const row: Row = {
+        id: `t${++seq}`, workspaceId: "ws1", projectId: "p1", port: 3000, sandboxId: "sb1", userId: "u1",
+        tokenHash: `h${seq}`, tokenEnc: `e${seq}`, createdAt: old_, expiresAt: new Date(NOW.getTime() + 3600_000), lastRenewedAt: null, revokedAt: null, ...over,
+      };
+      store.set(row.id, row);
+      return row;
+    };
+    mk({ expiresAt: old_ }); // expired long ago -> prune
+    mk({ revokedAt: old_ }); // revoked long ago -> prune
+    mk({ expiresAt: recent }); // expired recently -> keep (grace)
+    mk({ revokedAt: recent }); // revoked recently -> keep (grace)
+    mk({}); // live (default future expiry) -> keep
+    const pruned = await mod.pruneDevPreviewTokens("ws1", NOW);
+    assert.equal(pruned, 2);
+    assert.equal(store.size, 3);
+  });
+});
 
 describe("dev-preview capability tokens", () => {
   it("mint: 43-char base64url raw, stored as hash + envelope, never plaintext", async () => {
