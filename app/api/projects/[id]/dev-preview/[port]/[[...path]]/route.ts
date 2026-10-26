@@ -19,7 +19,7 @@ import { NextRequest } from "next/server";
 import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { proxyDevPreview, devPreviewPath } from "@/lib/sandbox/dev-preview-proxy";
+import { proxyDevPreview, devPreviewPath, encodeDevPreviewPathSegment } from "@/lib/sandbox/dev-preview-proxy";
 import { issueOrRenewDevPreviewToken, verifyDevPreviewToken } from "@/lib/sandbox/dev-preview-token";
 import { getDevSandboxRow } from "@/lib/sandbox/dev-sandbox";
 
@@ -81,7 +81,7 @@ async function handle(req: NextRequest, ctx: Ctx): Promise<Response> {
           workspaceId: project.workspaceId, projectId: project.id, port, sandboxId: sbRow.sandboxId, userId: user.id,
         });
         if (issued) {
-          const rest = segs.map((s) => encodeURIComponent(s)).join("/");
+          const rest = segs.map(encodeDevPreviewPathSegment).join("/");
           const to = `${devPreviewPath(project.id, port)}cap/${issued.raw}/${rest}${new URL(req.url).search}`;
           return Response.redirect(new URL(to, req.url), 302);
         }
