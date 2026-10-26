@@ -201,8 +201,13 @@ export async function ensureDevSandbox(
     if (aware) {
       const state = await aware.sandboxState(row.sandboxId);
       resumable = state !== "gone";
-      if (state === "paused") sb = asPauseCapable(await aware.attachPaused(row.sandboxId, row.secretEnc));
-      else if (state === "running") sb = asPauseCapable(await provider.get(row.sandboxId));
+      if (state === "paused") {
+        const paused = await aware.attachPaused(row.sandboxId, row.secretEnc);
+        sb = paused ? asPauseCapable(paused) : null;
+      } else if (state === "running") {
+        const live = await provider.get(row.sandboxId);
+        sb = live ? asPauseCapable(live) : null;
+      }
     } else {
       const live = await provider.get(row.sandboxId);
       sb = live ? asPauseCapable(live) : null;
@@ -400,4 +405,4 @@ export async function reconcileDevSandboxes(workspaceId: string): Promise<Reconc
     if (!live) await markDevSandboxDestroyed(workspaceId, row.projectId);
   }
   return { markedPaused, ceilingDestroyed };
-      }
+}
