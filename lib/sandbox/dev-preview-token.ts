@@ -62,7 +62,7 @@ export async function verifyDevPreviewToken(
   // Scoped: the table is FORCE-RLS; outside a workspace scope every query
   // sees zero rows (fail closed). NEVER extends expiry.
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.projectDevPreviewToken.findUnique({ where: { tokenHash: hashDevPreviewToken(raw) } });
+    const row = await tx.projectDevPreviewToken.findUnique({ where: { tokenHash: hashDevPreviewToken(raw), workspaceId } });
     if (!row || row.revokedAt) return null;
     if (row.expiresAt.getTime() <= now.getTime()) return null;
     if (row.createdAt.getTime() + DEV_PREVIEW_TOKEN_MAX_LIFE_MS <= now.getTime()) return null;
@@ -105,13 +105,13 @@ export async function issueOrRenewDevPreviewToken(
         const { secrets } = await import("@/lib/secrets");
         const raw = secrets().decrypt(live.tokenEnc);
         await tx.projectDevPreviewToken.update({
-          where: { id: live.id },
+          where: { id: live.id, workspaceId },
           data: { expiresAt, lastRenewedAt: now },
         });
         return { raw, expiresAt, reused: true };
       } catch {
         // Undecryptable row (key rotation, corruption): revoke and re-mint.
-        await tx.projectDevPreviewToken.update({ where: { id: live.id }, data: { revokedAt: now } });
+        await tx.projectDevPreviewToken.update({ where: { id: live.id, workspaceId }, data: { revokedAt: now } });
       }
     }
     const raw = randomBytes(TOKEN_BYTES).toString("base64url");
@@ -137,7 +137,7 @@ export async function pruneDevPreviewTokens(workspaceId: string, now: Date = new
   const cutoff = new Date(now.getTime() - DEV_PREVIEW_TOKEN_PRUNE_GRACE_MS);
   return withWorkspaceScope(workspaceId, async (tx) => {
     const r = await tx.projectDevPreviewToken.deleteMany({
-      where: { OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }] },
+      where: { workspaceId, OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }] },
     });
     return r.count;
   });
