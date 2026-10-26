@@ -223,7 +223,9 @@ describe("capability bearer requests", () => {
 
   it("T1d sensitive dev-server paths (.env, .git, @fs escapes) are refused at the proxy, upstream untouched", async () => {
     const raw = await mint();
-    for (const p of [".env", ".env.local", ".git/config", "@fs/etc/passwd"]) {
+    for (const p of [".env", ".env.local", ".git/config", "@fs/etc/passwd",
+                     ".npmrc", ".aws/credentials", ".ssh/id_rsa", ".gnupg/secring.gpg", ".docker/config.json",
+                     "..", "....//etc/passwd", "..\\..\\windows"]) {
       seen.length = 0;
       const res = await req(capPath(raw, p));
       assert.equal(res.status, 404, `${p} refused`);
