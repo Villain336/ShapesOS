@@ -28,7 +28,7 @@ export default async function BrowserPage() {
 
   const projects = await prisma.project.findMany({
     where: { workspaceId: workspace.id },
-    select: { id: true, name: true, domain: true },
+    select: { id: true, domain: true },
     orderBy: { createdAt: "asc" },
     take: 100,
   });
@@ -54,7 +54,7 @@ export default async function BrowserPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <BrowserPanel
-        projects={projects.map((p) => ({ id: p.id, name: p.name ?? p.domain }))}
+        projects={projects.map((p) => ({ id: p.id, name: p.domain }))}
         labels={labels}
       />
     </div>
