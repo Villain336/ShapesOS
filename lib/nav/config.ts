@@ -71,7 +71,6 @@ import {
   BookUser,
   CalendarDays,
   Mailbox,
-  Globe,
 } from "lucide-react";
 
 export type NavGroupId = "home" | "grow" | "design" | "operate" | "agents" | "account";
