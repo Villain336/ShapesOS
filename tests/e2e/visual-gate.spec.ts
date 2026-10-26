@@ -77,6 +77,17 @@ test.describe("visual gate: workspace UX", () => {
     const groupHeading = page.getByRole("button", { name: /^Collapse / }).first();
     await expect(groupHeading).toBeVisible();
 
+    // One route, one active row: pinned rows own /dashboard and
+    // /dashboard/assistant; the matching group items stay in nav config
+    // (hotkeys/⌘K/activeNavHref) but render only as the pinned row.
+    // The e2e seed stamps onboardingCompletedAt, so /dashboard renders Home
+    // instead of the wizard; both routes carry the check - /dashboard is the
+    // original duplicate Feed+Overview regression case.
+    await page.goto("/dashboard/assistant", { waitUntil: "networkidle" });
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+
     // Expected initial state is light (e2e member default + CI prefers light).
     expect(await htmlClass(page)).not.toMatch(/\bdark\b/);
     await page.screenshot({ path: `${SHOTS}/01-light-dashboard.png`, fullPage: true });

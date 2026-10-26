@@ -37,6 +37,14 @@ async function main() {
     console.log(`[e2e-seed] reusing workspace ${workspace.id}`);
   }
 
+  // /dashboard redirects to the onboarding wizard while onboardingCompletedAt
+  // is null; the disposable e2e workspace is always "past" onboarding so the
+  // shell specs exercise the real Home route.
+  await prisma.workspace.update({
+    where: { id: workspace.id },
+    data: { onboardingCompletedAt: new Date() },
+  });
+
   for (const m of [
     { userId: adminUserId, email: ADMIN_EMAIL, role: "owner" as const },
     { userId: editorUserId, email: EDITOR_EMAIL, role: "editor" as const },

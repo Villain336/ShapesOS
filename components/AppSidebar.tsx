@@ -94,6 +94,10 @@ const PINNED_ROWS = [
   { href: "/dashboard/assistant", labelKey: "shell.pinnedChat", icon: MessageSquare },
   { href: "/dashboard", labelKey: "shell.pinnedFeed", icon: LayoutDashboard },
 ] as const;
+// The pinned rows own these destinations; the same items stay in the nav
+// config for hotkeys, ⌘K search and active-route matching, but each route
+// renders once (pinned row), never twice (pinned + group row both lit).
+const PINNED_HREFS: ReadonlySet<string> = new Set(PINNED_ROWS.map((row) => row.href));
 const ACTIVITY_POLL_MS = 45_000;
 const MAX_RUNNING_ROWS = 4;
 
@@ -662,7 +666,9 @@ function NavList({
               ) : null}
               {!isFolded ? (
                 <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
-                  {group.items.map((item) => (
+                  {group.items
+                    .filter((item) => !PINNED_HREFS.has(item.href))
+                    .map((item) => (
                     <NavRow
                       key={item.href}
                       item={item}
@@ -1033,4 +1039,4 @@ export function MobileNav({
       </div>
     </header>
   );
-}
+                }
