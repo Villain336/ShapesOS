@@ -38,6 +38,16 @@ export function devPreviewPath(projectId: string, port: number): string {
   return `/api/projects/${projectId}/dev-preview/${port}/`;
 }
 
+// Segment-safe encoding shared by the proxy and the route's canonical
+// redirect: encodeURIComponent is too aggressive for path segments - it
+// escapes legal pchar characters like "@" to "%40", and real dev servers
+// treat those as DIFFERENT paths (observed against Vite v8:
+// "<base>/%40vite/client" returns the SPA fallback HTML instead of the HMR
+// client JS, breaking every vite-internal @path). Keep RFC 3986 sub-delims,
+// ":" and "@" raw; still escape "?", "#", "%", spaces, etc.
+export const encodeDevPreviewPathSegment = (s: string): string =>
+  encodeURIComponent(s).replace(/%(21|24|26|27|28|29|2A|2B|2C|3A|3B|3D|40)/gi, (m) => decodeURIComponent(m));
+
 export async function proxyDevPreview(
   req: Request,
   params: { projectId: string; port: string; path?: string[] },
@@ -73,8 +83,7 @@ export async function proxyDevPreview(
   // "<base>/%40vite/client" returns the SPA fallback HTML instead of the HMR
   // client JS, breaking every vite-internal @path). Keep RFC 3986 sub-delims,
   // ":" and "@" raw; still escape "?", "#", "%", spaces, etc.
-  const seg = (s: string) =>
-    encodeURIComponent(s).replace(/%(21|24|26|27|28|29|2A|2B|2C|3A|3B|3D|40)/gi, (m) => decodeURIComponent(m));
+  const seg = encodeDevPreviewPathSegment;
   const rest = (params.path ?? []).map(seg).join("/");
   const candidates = [`${prefix}${rest}`, `/${rest}`];
   const body = READ_METHODS.has(method) ? undefined : await req.arrayBuffer();
