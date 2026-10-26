@@ -72,6 +72,50 @@ async function main() {
     console.log(`[e2e-seed] reusing project ${project.id}`);
   }
 
+  // Pending approvals for the Home feed's Needs-you semantics spec
+  // (tests/e2e/visual-gate.spec.ts): two decidable mission approvals and one
+  // authority approval the admin already approved (the blocked row). All are
+  // synthetic rows in the disposable e2e database — deciding them in CI
+  // exercises the real queue routes without touching anything live.
+  const later = new Date(Date.now() + 86_400_000);
+  for (const a of [
+    { id: "e2e-feed-approve", action: "send_estimate", bindingJson: { amountCents: 485000 } },
+    { id: "e2e-feed-deny", action: "pause_campaign", bindingJson: {} },
+  ]) {
+    await prisma.missionApproval.upsert({
+      where: { id: a.id },
+      update: { status: "pending", expiresAt: later },
+      create: {
+        id: a.id,
+        workspaceId: workspace.id,
+        action: a.action,
+        tier: 1,
+        bindingJson: a.bindingJson,
+        bindingHash: "e2e",
+        status: "pending",
+        expiresAt: later,
+        createdBy: "agent:lead",
+      },
+    });
+  }
+  await prisma.authorityApproval.upsert({
+    where: { id: "e2e-feed-blocked" },
+    update: { status: "pending", expiresAt: later },
+    create: {
+      id: "e2e-feed-blocked",
+      workspaceId: workspace.id,
+      type: "review_reply_post",
+      status: "pending",
+      bindingJson: { subject: "Reply to Dana K.'s review" },
+      bindingHash: "e2e",
+      createdBy: "agent:reviews",
+      approversJson: [adminUserId],
+      twoPersonRequired: true,
+      expiresAt: later,
+    },
+  });
+  console.log("[e2e-seed] seeded feed approvals (2 decidable, 1 blocked)");
+
   // A connected mock connector so connector-dependent UI has data.
   const existingConn = await prisma.connectorConnection.findFirst({
     where: { workspaceId: workspace.id, connectorKey: "mock-oauth" },

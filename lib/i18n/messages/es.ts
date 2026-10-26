@@ -96,6 +96,7 @@ export const es: Catalogue = {
     },
     items: {
       "/dashboard": { label: "Resumen", description: "Inicio: lo que necesita atención" },
+      "/dashboard/desktop": { label: "Escritorio", description: "Inicio como escritorio de widgets organizables" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contactos, oportunidades, embudo" },
       "/dashboard/crm/inbox": { label: "Bandeja", description: "Conversaciones con leads: SMS y correo" },
       // Phase 18.2 (WS=comms)
@@ -585,6 +586,16 @@ export const es: Catalogue = {
       listTwo: "{first} y {last}",
       listMore: "{list} y {count} más",
       scheduleFailed: "La última ejecución programada falló",
+    },
+    // El Feed (rediseño plano aprobado): etiquetas de sección y enlaces.
+    feed: {
+      needsYou: "Te necesita",
+      runningNow: "En marcha",
+      earlierToday: "Más temprano",
+      briefing: "Hoy, de tu agente principal",
+      writtenAgo: "escrito {ago}",
+      agent: "Agente",
+      openDesktop: "Abrir el escritorio",
     },
   },
 

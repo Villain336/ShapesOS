@@ -100,6 +100,7 @@ export const en = {
     },
     items: {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
+      "/dashboard/desktop": { label: "Desktop", description: "Home as an arrangeable widget desktop" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
@@ -591,6 +592,16 @@ export const en = {
       listTwo: "{first} and {last}",
       listMore: "{list} and {count} more",
       scheduleFailed: "The last scheduled run failed",
+    },
+    // The Feed (approved flat-feed redesign): section labels and links.
+    feed: {
+      needsYou: "Needs you",
+      runningNow: "Running now",
+      earlierToday: "Earlier",
+      briefing: "Today, from your lead agent",
+      writtenAgo: "written {ago}",
+      agent: "Agent",
+      openDesktop: "Open desktop",
     },
   },
 

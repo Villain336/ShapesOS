@@ -16,11 +16,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Inbox, Loader2, RefreshCw, Search } from "lucide-react";
-import { refreshNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
+import { useApprovalDecide } from "@/components/approvals/useApprovalDecide";
 import { AgentTree, ApprovalCard, Banner, FilterPill, aosButton } from "@/components/aos";
 import {
   ageLabel,
-  type InboxAction,
   type InboxItem,
   type InboxResult,
   type InboxSourceKey,
@@ -32,35 +31,15 @@ import {
   approvalQuestion,
   approvalsBanner,
   approveLabelFor,
-  decisionToast,
   editLabelFor,
   groupApprovals,
   type MissionAgentIndex,
 } from "@/lib/aos/approvals";
-import { toast, toastError } from "@/lib/ui/feedback";
 // Phase 18.1 (WS=find): the inbox chrome in the person's language. Item text
 // (titles, details, requester) is workspace data and is never translated.
 import { useI18n } from "@/components/i18n/I18nProvider";
 
 type SourceFilter = InboxSourceKey | "all";
-
-async function runAction(action: InboxAction): Promise<void> {
-  const res = await fetch(action.url, {
-    method: action.method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(action.body ?? {}),
-  });
-  if (!res.ok) {
-    let message = `Request failed (${res.status}).`;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      /* keep the status message */
-    }
-    throw new Error(message);
-  }
-}
 
 function cardId(item: InboxItem): string {
   return `approval-${item.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -127,7 +106,7 @@ export default function ApprovalsInbox({
   const [source, setSource] = useState<SourceFilter>(initialSource);
   const [onlyMine, setOnlyMine] = useState(false);
   const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState<{ key: string; which: "approve" | "deny" } | null>(null);
+  const { busy, decide: decideApproval } = useApprovalDecide();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
@@ -173,28 +152,18 @@ export default function ApprovalsInbox({
   const firstMine = useMemo(() => (data?.items ?? []).find((i) => i.canDecide) ?? null, [data]);
 
   async function decide(item: InboxItem, which: "approve" | "deny") {
-    const action = which === "approve" ? item.approve : item.deny;
-    if (!action) return;
-    setBusy({ key: item.key, which });
-    try {
-      await runAction(action);
+    await decideApproval(item, which, (decided) =>
       setData((prev) =>
         prev
           ? {
               ...prev,
-              items: prev.items.filter((i) => i.key !== item.key),
+              items: prev.items.filter((i) => i.key !== decided.key),
               total: prev.total - 1,
-              actionable: prev.actionable - (item.canDecide ? 1 : 0),
+              actionable: prev.actionable - (decided.canDecide ? 1 : 0),
             }
           : prev,
-      );
-      toast({ ...decisionToast(item, which), status: "done" });
-      refreshNeedsYouCount();
-    } catch (e) {
-      toastError(which === "approve" ? t("approvals.couldNotApprove") : t("approvals.couldNotDeny"), e instanceof Error ? e.message : t("approvals.decisionFailed"));
-    } finally {
-      setBusy(null);
-    }
+      ),
+    );
   }
 
   if (data === null && !loadError) {
