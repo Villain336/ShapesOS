@@ -17,7 +17,7 @@
 
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getDevSandboxRow } from "./dev-sandbox";
-import { rewritePreviewCss, rewritePreviewHtml } from "./dev-preview-html";
+import { rewritePreviewCss, rewritePreviewJs, rewritePreviewHtml } from "./dev-preview-html";
 import {
   forwardRequestHeaders,
   isPreviewCapable,
@@ -147,7 +147,7 @@ export async function proxyDevPreview(
   headers.set("referrer-policy", "no-referrer");
 
   // Link rewriting (compatibility, NOT a boundary): the dev server emits
-  // the STATIC tokenless base (baked --base); served HTML and CSS get the
+  // the STATIC tokenless base (baked --base); served HTML, JS and CSS get the
   // request's token-full prefix instead, plus a bootstrap that rewrites
   // runtime fetch/XHR URLs the same way. Buffered and capped; larger bodies
   // stream through with the tokenless base (assets then 404 - logged, not
@@ -160,6 +160,14 @@ export async function proxyDevPreview(
       return new Response(rewritePreviewHtml(html, prefix, linkPrefix), { status: res.status, statusText: res.statusText, headers });
     }
     console.warn(`[dev-preview] HTML over ${MAX_REWRITE_BYTES} bytes: served without link rewriting`);
+  }
+  if (method === "GET" && res.status === 200 && /javascript|ecmascript/.test(ctype)) {
+    const js = await bufferWithCap(res.body, MAX_REWRITE_BYTES);
+    if (js !== null) {
+      headers.delete("content-length");
+      return new Response(rewritePreviewJs(js, prefix, linkPrefix), { status: res.status, statusText: res.statusText, headers });
+    }
+    console.warn(`[dev-preview] JS over ${MAX_REWRITE_BYTES} bytes: served without link rewriting`);
   }
   if (method === "GET" && res.status === 200 && ctype.includes("text/css")) {
     const css = await bufferWithCap(res.body, MAX_REWRITE_BYTES);
@@ -191,4 +199,3 @@ async function bufferWithCap(body: ReadableStream<Uint8Array> | null, cap: numbe
   }
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
-
