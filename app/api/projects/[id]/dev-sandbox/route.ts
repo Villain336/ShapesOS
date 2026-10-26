@@ -8,6 +8,8 @@ import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/a
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ensureDevSandbox, getDevSandboxRow, pauseDevSandbox, devSandboxSpendAllowed, DEV_SANDBOX_DEFAULT_TTL_SECONDS } from "@/lib/sandbox/dev-sandbox";
+import { issueOrRenewDevPreviewToken, revokeDevPreviewTokens } from "@/lib/sandbox/dev-preview-token";
+import { devPreviewPath } from "@/lib/sandbox/dev-preview-proxy";
 
 export const dynamic = "force-dynamic";
 
@@ -40,17 +42,40 @@ function shape(row: Awaited<ReturnType<typeof getDevSandboxRow>>, projectId: str
   };
 }
 
-/** GET — current dev-sandbox status for the browser panel. */
+/** GET — current dev-sandbox status for the browser panel. While the
+ * sandbox runs, also issues/renews this session's read-only capability
+ * URLs (one per exposed port): idempotent - the SAME raw token is re-served
+ * while it lives (sliding expiry renewed HERE, never by bearer requests),
+ * so an open pane's iframe src stays stable and never reloads for renewal. */
 export async function GET(req: NextRequest, ctx: Ctx) {
   const r = await load(req, ctx, "viewer");
   if ("error" in r) return r.error;
   const row = await getDevSandboxRow(r.project.workspaceId, r.project.id);
-  return Response.json(shape(row, r.project.id));
+  const previews: { port: number; url: string }[] = [];
+  if (row && row.status === "running") {
+    for (const port of row.exposedPorts) {
+      try {
+        const t = await issueOrRenewDevPreviewToken({
+          workspaceId: r.project.workspaceId,
+          projectId: r.project.id,
+          port,
+          sandboxId: row.sandboxId,
+          userId: r.user.id,
+        });
+        if (t) previews.push({ port, url: `${devPreviewPath(r.project.id, port)}cap/${t.raw}/` });
+      } catch {
+        // Token issuance must not break the status read itself.
+        console.warn("[dev-sandbox] preview token issuance failed for a port");
+      }
+    }
+  }
+  return Response.json({ ...shape(row, r.project.id), previews });
 }
 
 /** POST — ensure running: create on first open, resume when paused. This
- * SPENDS (compute time), so it needs the spend gate, never the flag alone:
- * owner-approved production spend or a bounded authorized test window. */
+ * SPENDS (compute time), so it needs the spend gate, never the flag alone.
+ * NO spend grant exists (checked 2026-10-26): both gates REQUIRE a prior
+ * explicit owner grant and stay unset until one is given. */
 export async function POST(req: NextRequest, ctx: Ctx) {
   const r = await load(req, ctx, "editor");
   if ("error" in r) return r.error;
@@ -66,10 +91,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   return Response.json({ ...shape(result.row, r.project.id), woke: result.woke });
 }
 
-/** DELETE — pause now (billing stops at the pause). */
+/** DELETE — pause now (billing stops at the pause). Revokes live preview
+ * tokens with it: a paused pane's URLs die immediately, not at expiry. */
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   const r = await load(req, ctx, "editor");
   if ("error" in r) return r.error;
+  await revokeDevPreviewTokens(r.project.workspaceId, r.project.id).catch(() => undefined);
   const result = await pauseDevSandbox(r.project.workspaceId, r.project.id);
   if (!result.ok) return Response.json({ error: result.reason }, { status: 409 });
   return Response.json({ ok: true });
