@@ -221,6 +221,16 @@ describe("capability bearer requests", () => {
     assert.ok(!js.includes(`"/api/projects/p1/dev-preview/3000/src/`), "no tokenless base-prefixed URL survives");
   });
 
+  it("T1d sensitive dev-server paths (.env, .git, @fs escapes) are refused at the proxy, upstream untouched", async () => {
+    const raw = await mint();
+    for (const p of [".env", ".env.local", ".git/config", "@fs/etc/passwd"]) {
+      seen.length = 0;
+      const res = await req(capPath(raw, p));
+      assert.equal(res.status, 404, `${p} refused`);
+      assert.equal(seen.length, 0, `${p} never reaches upstream`);
+    }
+  });
+
   it("T2/T3 cap POST/PUT/DELETE are 401 and the upstream NEVER sees a write", async () => {
     const raw = await mint();
     for (const method of ["POST", "PUT", "DELETE"]) {
