@@ -128,6 +128,21 @@ export async function issueOrRenewDevPreviewToken(
   });
 }
 
+/** Grace after expiry/revocation before rows are deleted (forensics window). */
+export const DEV_PREVIEW_TOKEN_PRUNE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** Delete rows past the grace window (cron hygiene). Expiry/revocation
+ * already kills the bearer; this only bounds table growth. */
+export async function pruneDevPreviewTokens(workspaceId: string, now: Date = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - DEV_PREVIEW_TOKEN_PRUNE_GRACE_MS);
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const r = await tx.projectDevPreviewToken.deleteMany({
+      where: { OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }] },
+    });
+    return r.count;
+  });
+}
+
 /** Revoke every live token for a sandbox generation (pause/destroy). */
 export async function revokeDevPreviewTokens(workspaceId: string, projectId: string, now: Date = new Date()): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
