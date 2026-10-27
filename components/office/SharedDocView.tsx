@@ -14,6 +14,8 @@ function Segs({ segs }: { segs: Seg[] }) {
         if (s.italic) n = <em>{n}</em>;
         if (s.underline) n = <u>{n}</u>;
         if (s.strike) n = <s>{n}</s>;
+        // href was validated by safeHref (absolute http/https/mailto only).
+        if (s.href) n = <a href={s.href} target="_blank" rel="noopener noreferrer nofollow" className="text-ink underline underline-offset-2">{n}</a>;
         return <span key={i}>{n}</span>;
       })}
     </>
@@ -24,6 +26,23 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
   return (
     <>
       {blocks.map((b, i) => {
+        if (b.table) {
+          return (
+            <div key={i} className="mb-3 overflow-x-auto" data-shared-table>
+              <table className="min-w-full border-collapse text-sm text-ink">
+                <tbody>
+                  {b.table.map((row, ri) => (
+                    <tr key={ri}>
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="border border-line px-3 py-1.5 align-top"><Blocks blocks={cell} /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
         const empty = b.segs.every((s) => s.text.trim() === "");
         if (empty && b.level === 0) return <div key={i} className="h-3" aria-hidden />;
         if (b.level === 1) return <h2 key={i} className="mb-3 text-xl font-semibold text-ink"><Segs segs={b.segs} /></h2>;
