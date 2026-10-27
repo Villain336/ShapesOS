@@ -87,7 +87,7 @@ test.describe("share links beyond Studio", () => {
     // The share panel on the doc's toolbar.
     await gotoClean(page, `/dashboard/office?open=${doc.id}`);
     await page.getByRole("button", { name: "Share", exact: true }).click();
-    await expect(page.getByText("Share links")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Share links" })).toBeVisible();
     await expect(page.getByText(/No share links yet/)).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/office-share-panel.png` });
 
