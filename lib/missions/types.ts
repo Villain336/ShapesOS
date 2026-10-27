@@ -140,19 +140,12 @@ export const META_STEPS: ReadonlySet<string> = new Set([
   "killswitch.resume_blocked",
   "approval.requested",
   "approval.decided",
-  // Orchestrator run-loop bookkeeping (lib/orchestrator/orchestrator.ts, mission-runtime.ts):
-  // the run finished, stopped for a person, or hit a cap. None of these is a step of work.
-  "complete",
-  "escalate",
-  "terminate",
-  "mission.awaiting_human",
 ]);
 
-/** The orchestrator logs a routing record (`route.N`) before each hop; the hop itself is `exec.N`. */
-const ROUTE_RECORD = /^route\.\d+$/;
-
+// stepCount (every non-meta event) is unchanged on purpose: it feeds the maxSteps termination check.
+// What the header shows as "steps done" is completedPlanStepKeys below, a separate count.
 export function isCountedStep(step: string | null | undefined): boolean {
-  return !!step && !META_STEPS.has(step) && !ROUTE_RECORD.test(step);
+  return !!step && !META_STEPS.has(step);
 }
 
 /**
@@ -164,7 +157,7 @@ export function isCountedStep(step: string | null | undefined): boolean {
  * unrelated events are real work, but they are not steps of this plan, so they do not move progress.
  */
 export function completedPlanStepKeys(
-  events: ReadonlyArray<{ step: string | null; args?: Record<string, unknown> | null }>,
+  events: ReadonlyArray<{ step: string | null; args?: Record<string, unknown> | null; observation?: Record<string, unknown> | null }>,
   planKeys: readonly string[],
 ): Set<string> {
   const keys = new Set(planKeys.filter((k) => k.length > 0));
@@ -172,7 +165,7 @@ export function completedPlanStepKeys(
   const routedKey = new Map<string, string>();
   for (const e of events) {
     const step = e.step ?? "";
-    if (keys.has(step)) {
+    if (keys.has(step) && e.observation?.failure !== true) {
       done.add(step);
       continue;
     }
