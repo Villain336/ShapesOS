@@ -35,6 +35,18 @@ export const DRAFT_SAFE_EXECUTORS: readonly string[] = ["researcher", "planner",
 
 const DRAFTS_ONLY_NOTE = " (In this variant no step sends or publishes; any draft stays a draft for a person to use.)";
 
+const LEANS_ON_GATE = /approv|gate|publish|send/i;
+
+/** The description with every clause that names a gate/approval/send removed. A
+ *  step whose every clause leans on the gate keeps its first clause. */
+function withoutGateClauses(description: string): string {
+  const clauses = description.split(/\s*[;\u2014]\s*/).map((c) => c.replace(/\.+$/, "").trim()).filter(Boolean);
+  const kept = clauses.filter((c) => !LEANS_ON_GATE.test(c));
+  const use = kept.length > 0 ? kept : clauses.slice(0, 1);
+  const text = use.join("; ");
+  return text.charAt(0).toUpperCase() + text.slice(1) + ".";
+}
+
 function renumber(steps: PlanStepDef[]): PlanStepDef[] {
   return steps.map((s, i) => ({ ...s, order: i + 1 }));
 }
@@ -55,9 +67,11 @@ export function buildPlanAlternatives(template: MissionTemplate): PlanAlternativ
 
   const keep = base.filter((s) => s.tier === 0 && s.kind !== "approval" && DRAFT_SAFE_EXECUTORS.includes(s.executor));
   if (keep.length > 0 && keep.length < base.length) {
-    // Retained steps whose prose leans on a removed approval/publish step get a
-    // plain note instead of a dangling reference.
-    const steps = renumber(keep).map((s) => (/approv|gate|publish|send/i.test(s.description) ? { ...s, description: s.description + DRAFTS_ONLY_NOTE } : s));
+    // Retained steps whose prose leans on a removed approval/publish step: drop
+    // the clause that names the gate, then add the plain note. Leaving the
+    // clause ("sends stay in draft until the approval gate clears") would tell
+    // the reader a gate exists in a plan that no longer has one.
+    const steps = renumber(keep).map((s) => (LEANS_ON_GATE.test(s.description) ? { ...s, description: withoutGateClauses(s.description) + DRAFTS_ONLY_NOTE } : s));
     out.push({
       id: "drafts-only",
       label: "Drafts and analysis only",
