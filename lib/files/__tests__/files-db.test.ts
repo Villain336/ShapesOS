@@ -144,6 +144,7 @@ describe("Files (DB)", () => {
     } finally {
       release();
       await oldRun;
+      await trashFile({ workspaceId: WS, fileId: raceId });
       await deleteFile({ workspaceId: WS, fileId: raceId });
     }
   });
