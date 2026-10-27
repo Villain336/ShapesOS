@@ -7,6 +7,13 @@ import { expect, test } from "@playwright/test";
 import { gotoClean } from "./helpers";
 
 test.describe("workspace instructions", () => {
+  // Independent multi-write smoke test shares the seeded admin's server budget with prior tests.
+  // Fresh browser contexts reset visit pacing, not the server's write window. Preserve real limits
+  // and every status assertion; start after that prior window, never retry a failed save.
+  test.beforeAll(async () => {
+    test.setTimeout(75000);
+    await new Promise((resolve) => setTimeout(resolve, 61000));
+  });
   test("admin saves, it persists, stale saves are refused, signed-out is refused", async ({ page, browser }) => {
     await gotoClean(page, "/dashboard/settings/instructions");
     const box = page.getByLabel("Instructions for agents");
