@@ -45,6 +45,19 @@ test.describe("share links with real editor output", () => {
     await page.keyboard.type("Editor table test");
     await page.keyboard.press("Enter");
 
+    // The ribbon has Start / Insert tabs; table controls live under Insert.
+    await page.getByRole("button", { name: "Insert", exact: true }).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${OUT}/01b-insert-tab.png` });
+    writeFileSync(
+      `${OUT}/insert-tab-buttons.txt`,
+      await page.evaluate(() =>
+        [...document.querySelectorAll("button,[role=button],[data-u-command]")]
+          .map((e) => `${e.tagName} cmd=${e.getAttribute("data-u-command")} aria=${e.getAttribute("aria-label")} text=${(e.textContent || "").trim().slice(0, 30)}`)
+          .filter((l) => !/Pin |Collapse/.test(l))
+          .join("\n"),
+      ),
+    );
     // Insert a table through the toolbar.
     const tableBtn = page
       .locator('[data-u-command*="able" i], [aria-label*="table" i], [title*="table" i]')
