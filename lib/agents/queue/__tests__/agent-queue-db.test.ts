@@ -242,9 +242,9 @@ describe("agent queue (Postgres, app role)", () => {
     const launch = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER });
     // Retry-safe + idempotent: a repeat launch returns the same run and job
     // instead of double-starting the worker.
-    const again = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER });
-    assert.equal(again.runId, launch.runId, "same launch run on retry");
-    assert.equal(again.jobId, launch.jobId, "same queued job on retry");
+    const retryLaunch = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: WS_A, userId: USER });
+    assert.equal(retryLaunch.runId, launch.runId, "same launch run on retry");
+    assert.equal(retryLaunch.jobId, launch.jobId, "same queued job on retry");
 
     // True-parallel launches converge: the mission-row lock serializes the
     // check+create, so both callers adopt the one launch run and job.
