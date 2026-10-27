@@ -21,7 +21,30 @@ test.describe("share links beyond Studio", () => {
     });
     expect(create.status(), "doc created").toBe(201);
     const { doc } = (await create.json()) as { doc: { id: string } };
-    // Put real content in it so the public render pixel is meaningful.
+    // Put representative content in it: a heading, a blank spacer, body text
+    // with bold + italic runs, and bullets, so the render is checked against
+    // real structure and not one line.
+    const lines = [
+      { t: "Quarterly plan", h: "heading1" },
+      { t: "" },
+      { t: "Revenue grew 12% quarter over quarter.", bold: [0, 7], italic: [8, 12] },
+      { t: "Ship the share links", bullet: true },
+      { t: "Review the audit trail", bullet: true },
+    ];
+    let off = 0;
+    const paragraphs: unknown[] = [];
+    const textRuns: unknown[] = [];
+    for (const [i, l] of lines.entries()) {
+      paragraphs.push({
+        startIndex: off,
+        paragraphId: `p${i}`,
+        ...(l.h ? { paragraphStyle: { headingId: l.h } } : {}),
+        ...(l.bullet ? { bullet: { listType: "BULLET_LIST", listId: "l1", nestingLevel: 0 } } : {}),
+      });
+      if (l.bold) textRuns.push({ st: off + l.bold[0], ed: off + l.bold[1], ts: { bl: 1 } });
+      if (l.italic) textRuns.push({ st: off + l.italic[0], ed: off + l.italic[1], ts: { it: 1 } });
+      off += l.t.length + 2;
+    }
     const patch = await page.request.patch(`/api/office/docs/${doc.id}`, {
       data: {
         snapshot: {
@@ -29,15 +52,31 @@ test.describe("share links beyond Studio", () => {
           title: "Share-gate pixel doc",
           locale: "enUS",
           documentStyle: {},
-          body: {
-            dataStream: "This shared doc renders for anyone with the link.\r\n",
-            paragraphs: [{ startIndex: 0, paragraphId: "p0" }],
-            textRuns: [],
-          },
+          body: { dataStream: lines.map((l) => `${l.t}\r\n`).join(""), paragraphs, textRuns },
         },
       },
     });
     expect(patch.status(), "doc content saved").toBe(200);
+
+    // Content the read-only viewer cannot show faithfully is refused, not
+    // silently dropped: a doc containing a table gets no share link.
+    const tbl = await page.request.post("/api/office/docs", { data: { kind: "doc", title: "Has a table" } });
+    const { doc: tdoc } = (await tbl.json()) as { doc: { id: string } };
+    const tpatch = await page.request.patch(`/api/office/docs/${tdoc.id}`, {
+      data: {
+        snapshot: {
+          id: "e2e-table-doc",
+          title: "Has a table",
+          locale: "enUS",
+          documentStyle: {},
+          body: { dataStream: "cell\r\n", paragraphs: [{ startIndex: 0, paragraphId: "p0" }], textRuns: [], tables: [{ startIndex: 0, endIndex: 5, tableId: "t1" }] },
+        },
+      },
+    });
+    expect(tpatch.status(), "table doc saved").toBe(200);
+    const refused = await page.request.post(`/api/office/docs/${tdoc.id}/shares`, { data: {} });
+    expect(refused.status(), "unsupported content is refused").toBe(422);
+    expect(((await refused.json()) as { reason: string }).reason).toMatch(/tables/);
 
     // Workspace boundary / no-oracle at the route level: unknown doc ids
     // are plain 404s, never a distinction between "exists elsewhere" and
@@ -66,8 +105,13 @@ test.describe("share links beyond Studio", () => {
     expect(res!.status(), "public page 200").toBe(200);
     await expect(pub.getByRole("heading", { name: "Share-gate pixel doc" })).toBeVisible();
     await expect(pub.getByText(/shared read-only/)).toBeVisible();
-    // The populated document text actually renders (not a blank frame).
-    await expect(pub.getByText("This shared doc renders for anyone with the link.")).toBeVisible();
+    // The populated structure renders: heading, bold + italic runs, bullets.
+    await expect(pub.getByRole("heading", { name: "Quarterly plan" })).toBeVisible();
+    await expect(pub.locator("article strong")).toHaveText("Revenue");
+    await expect(pub.locator("article em")).toHaveText("grew");
+    await expect(pub.getByText("Ship the share links")).toBeVisible();
+    await expect(pub.getByText("Review the audit trail")).toBeVisible();
+    expect(await pub.locator("article p").count()).toBe(3);
     // True read-only: no editor is mounted at all - no toolbar, no
     // contenteditable/textbox/canvas, no inputs, no "edits stay local" banner.
     expect(await pub.locator('[contenteditable], textarea, input, canvas, [role="toolbar"], [role="textbox"]').count()).toBe(0);
