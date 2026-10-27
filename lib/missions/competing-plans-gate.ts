@@ -1,22 +1,31 @@
-// ShapesOS - the server-side gate for competing plans. OFF unless BOTH are set
-// by the operator: COMPETING_PLANS_ENABLED=1 and COMPETING_PLANS_CAP_MICRO_USD
-// (a positive integer: the most one run may cost at the conservative ceiling).
-// Pure; no prisma. Enabling is an owner decision about real spend.
+// ShapesOS - the gate for competing plans: ALWAYS OFF in this change.
+//
+// There is deliberately no environment flag that turns it on. A flag plus an
+// operator cap is not the owner's payment approval and would not pass through the
+// existing budget/permission gates, so it would be an unmetered bypass waiting to
+// be switched on. Enabling needs, at minimum (none of which exist yet):
+//   1. the owner's explicit approval of real spend and a per-run price limit,
+//      recorded where the existing budget gates read it;
+//   2. provider usage metering for the calls, debited through those gates;
+//   3. candidate persistence + revision-bound adoption with approval separation.
+// Pure; no prisma.
 
 export interface CompetingPlansGate {
-  enabled: boolean;
-  capMicroUsd: number | null;
+  enabled: false;
   reason: string;
+  missing: readonly string[];
 }
 
-export function competingPlansGate(env: Record<string, string | undefined> = process.env): CompetingPlansGate {
-  if (env.COMPETING_PLANS_ENABLED !== "1") {
-    return { enabled: false, capMicroUsd: null, reason: "Off. Running competing plans calls a paid model and needs the owner's approval and a spend limit first." };
-  }
-  const raw = env.COMPETING_PLANS_CAP_MICRO_USD;
-  const cap = raw && /^[0-9]+$/.test(raw) ? Number(raw) : NaN;
-  if (!Number.isSafeInteger(cap) || cap <= 0) {
-    return { enabled: false, capMicroUsd: null, reason: "Off. A positive COMPETING_PLANS_CAP_MICRO_USD spend ceiling is required." };
-  }
-  return { enabled: true, capMicroUsd: cap, reason: "On." };
+export const COMPETING_PLANS_MISSING: readonly string[] = Object.freeze([
+  "the owner's approval of real spend and a per-run price limit, recorded in the existing budget gates",
+  "usage metering for the model calls through those gates",
+  "stored candidates with revision-bound adoption and a separate approval",
+]);
+
+export function competingPlansGate(): CompetingPlansGate {
+  return {
+    enabled: false,
+    reason: "Off. Running competing plans calls a paid model, and the approval, metering and adoption steps it needs are not built yet.",
+    missing: COMPETING_PLANS_MISSING,
+  };
 }
