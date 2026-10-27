@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createMemoryMissionStore } from "../store";
 import { approveMissionPlan, planRevision, startMission, MissionError, type EngineDeps } from "../engine";
-import { adoptCandidate, candidateToSnapshot, type StoredCandidate } from "../competing-plans-adopt";
+import { adoptCandidate, candidateToSnapshot, recordCandidates, loadStoredCandidate, type StoredCandidate } from "../competing-plans-adopt";
 
 const WS = "ws_adopt";
 const USER = "u1";
@@ -84,5 +84,35 @@ describe("adoptCandidate", () => {
     const rev0 = planRevision(m.planSnapshot);
     await approveMissionPlan(d, m.id, WS, USER, { expectedRevision: rev0 });
     await assert.rejects(adoptCandidate(d, { stored: stored(m), missionId: m.id, workspaceId: WS, userId: USER, expectedRevision: rev0 }), (e) => status(e) === 409);
+  });
+});
+
+describe("recordCandidates / loadStoredCandidate", () => {
+  it("records only valid candidates, round-trips them, and adoption works from the stored copy", async () => {
+    const d = deps();
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: TPL, goal: GOAL });
+    const rev0 = planRevision(m.planSnapshot);
+    const bad = { summary: "s", steps: [{ ...cand.steps[0], executor: "human" }] };
+    const rec = await recordCandidates(d, { missionId: m.id, workspaceId: WS, userId: USER, baseRevision: rev0, candidates: [{ lensId: "x", candidate: bad }, { lensId: "y", candidate: cand }] });
+    assert.equal(rec.stored.length, 1, "the invalid one is dropped, the valid one kept");
+    const loaded = await loadStoredCandidate(d, m.id, WS, rec.stored[0].id);
+    assert.ok(loaded);
+    const r = await adoptCandidate(d, { stored: loaded!, missionId: m.id, workspaceId: WS, userId: USER, expectedRevision: rev0 });
+    assert.equal(r.mission.status, "planned");
+  });
+  it("refuses to record against a stale revision, or when nothing is valid", async () => {
+    const d = deps();
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: TPL, goal: GOAL });
+    await assert.rejects(recordCandidates(d, { missionId: m.id, workspaceId: WS, userId: USER, baseRevision: "stale", candidates: [{ lensId: "y", candidate: cand }] }), (e) => status(e) === 409);
+    await assert.rejects(recordCandidates(d, { missionId: m.id, workspaceId: WS, userId: USER, baseRevision: planRevision(m.planSnapshot), candidates: [{ lensId: "x", candidate: {} }] }), (e) => status(e) === 422);
+  });
+  it("does not load another workspace's or mission's candidate, or a forged id", async () => {
+    const d = deps();
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: TPL, goal: GOAL });
+    const rec = await recordCandidates(d, { missionId: m.id, workspaceId: WS, userId: USER, baseRevision: planRevision(m.planSnapshot), candidates: [{ lensId: "y", candidate: cand }] });
+    await assert.rejects(loadStoredCandidate(d, m.id, "other_ws", rec.stored[0].id));
+    assert.equal(await loadStoredCandidate(d, m.id, WS, "nope:0"), null);
+    assert.equal(await loadStoredCandidate(d, m.id, WS, `${rec.eventId}:9`), null);
+    assert.equal(await loadStoredCandidate(d, m.id, WS, "garbage"), null);
   });
 });
