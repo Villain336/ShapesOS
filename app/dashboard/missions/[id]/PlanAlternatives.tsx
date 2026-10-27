@@ -75,10 +75,10 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
 
   const cap = data.spendCapCents === null ? null : `$${(data.spendCapCents / 100).toLocaleString("en-US")}`;
   return (
-    <section aria-label="Plan alternatives" className="mb-5 rounded-lg bg-paper px-4 py-4 shadow-hairline">
-      <h3 className="text-md font-semibold text-ink">Plan alternatives</h3>
+    <section aria-label="Plan variants" className="mb-5 rounded-lg bg-paper px-4 py-4 shadow-hairline">
+      <h3 className="text-md font-semibold text-ink">Plan variants</h3>
       <p className="mt-1 text-sm text-muted">
-        Different versions of this same drafted plan. They are not run side by side, and no time or cost forecast is made for any of them.
+        Variants of this one template plan, not independent competing plans. They are not run side by side, and no time or cost forecast is made for any of them.
         {cap ? ` The mission's spend limit is ${cap} whichever you choose; that is a limit, not an estimate.` : " Cost: unknown."}{" "}
         Choosing one does not start the mission. You still approve the plan you end up with.
       </p>
