@@ -55,7 +55,7 @@ test("choosing a plan alternative changes the draft but never starts the mission
   expect(detail.mission.status, "choosing does not start the mission").toBe("planned");
   expect(detail.stepCount, "choosing is not an executed step").toBe(0);
   expect(detail.progress, "choosing is not progress").toBe(0);
-  await expect(page.getByText("0% of goal")).toBeVisible();
+  await expect(page.getByText("0% of plan")).toBeVisible();
 
   // The revision reviewed before the switch can no longer be approved.
   const stale = await page.request.post(`/api/missions/${id}/approve-plan`, { data: { planRevision: before.currentRevision } });
