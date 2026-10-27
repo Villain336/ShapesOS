@@ -46,7 +46,10 @@ test.describe("share links with real editor output", () => {
     await page.keyboard.press("Enter");
 
     // The ribbon has Start / Insert tabs; table controls live under Insert.
-    await page.getByRole("button", { name: "Insert", exact: true }).click();
+    const tab = page.locator('button[title="Insert"], [role=tab]:has-text("Insert")').first();
+    await tab.click({ timeout: 10_000, force: true }).catch(async () => {
+      await page.getByText("Insert", { exact: true }).first().click({ timeout: 10_000 });
+    });
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/01b-insert-tab.png` });
     writeFileSync(
