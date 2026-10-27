@@ -74,9 +74,28 @@ test.describe("mission plan gate", () => {
       expect(ran, `the ${executor} step ran`).toContain(executor);
     }
 
+    // The header accounts for what ran: three of the plan's eight steps are done (the rest wait behind
+    // the approval step), progress is plan progress, and the no-model executors' cost estimate is not
+    // shown as money spent.
+    const after = (await (await page.request.get(`/api/missions/${mission.id}`)).json()) as {
+      completedSteps: number;
+      planStepCount: number;
+      progress: number;
+      totalCostCents: number;
+      estimatedCostCents: number;
+    };
+    expect(after.completedSteps, "plan steps done").toBe(3);
+    expect(after.planStepCount, "plan steps").toBe(8);
+    expect(after.progress, "progress is plan progress").toBeCloseTo(3 / 8, 5);
+    expect(after.estimatedCostCents, "mock-mode executor cost is flagged as an estimate").toBe(after.totalCostCents);
+
     // Settled viewport capture: reload so no toast is on screen, then wait for the page to idle.
     await gotoClean(page, `/dashboard/missions/${mission.id}`);
     await expect(page.getByText("Mission timeline")).toBeVisible();
+    await expect(page.getByText("38% of plan · 3/8 steps")).toBeVisible();
+    await expect(page.getByText("estimated, nothing billed")).toBeVisible();
+    await expect(page.getByText("of goal")).toHaveCount(0);
+    await expect(page.locator("p", { hasText: "of plan" })).not.toContainText("spent");
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/approved-mission-settled.png` });
   });
