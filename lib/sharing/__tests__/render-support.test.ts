@@ -153,3 +153,27 @@ describe("tables", () => {
     assert.equal(assessSnapshot("doc", { drawings: { d: { drawingId: "d" } }, body: { dataStream: "x\r\n", paragraphs: [{ startIndex: 0 }] } }).ok, false);
   });
 });
+
+// REAL editor output: captured from the app's own Univer editor in CI (insert a 5x3 table via
+// the toolbar, save through the Save button, read the stored snapshot back), not hand-built.
+// Note the shape it taught us: every cell is "\x1c \r \n \x1d" and the "\n" is listed in
+// body.sectionBreaks, which the hand-built fixtures above did not have.
+import { readFileSync } from "node:fs";
+describe("real editor snapshot (table)", () => {
+  const snap = JSON.parse(readFileSync(new URL("./fixtures/editor-table.json", import.meta.url), "utf8"));
+  it("is accepted and renders as text then a 3x5 table", () => {
+    assert.deepEqual(assessSnapshot("doc", snap), { ok: true });
+    const blocks = docToBlocks(snap);
+    assert.equal(blocks[0].segs.map((x) => x.text).join(""), "Editor table test");
+    const t = blocks.find((b) => b.table)!.table!;
+    assert.equal(t.length, 3);
+    assert.ok(t.every((r) => r.length === 5));
+  });
+  it("a section break anywhere but inside a table cell still refuses", () => {
+    const bad = JSON.parse(JSON.stringify(snap));
+    bad.body.sectionBreaks.push({ sectionId: "x", startIndex: 3 });
+    const a = assessSnapshot("doc", bad);
+    assert.equal(a.ok, false);
+  });
+});
+
