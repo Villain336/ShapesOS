@@ -27,6 +27,8 @@ export async function GET(
       events: loaded.events.map(serializeEvent),
       approvals: loaded.approvals.map(serializeApproval),
       stepCount: loaded.stepCount,
+      completedSteps: loaded.completedSteps,
+      estimatedCostCents: loaded.estimatedCostCents,
       planStepCount: loaded.planStepCount,
       totalCostCents: loaded.totalCostCents,
       consecutiveFailures: loaded.consecutiveFailures,
