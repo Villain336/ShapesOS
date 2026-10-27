@@ -99,7 +99,8 @@ export MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)"
 export E2E_MOCK_OAUTH=1
 export E2E_MOCK_OAUTH_CLIENT_ID=e2e-mock-client
 export E2E_MOCK_OAUTH_CLIENT_SECRET=e2e-mock-secret
-export LLM_API_KEY=e2e-no-llm LLM_MODEL=e2e-no-model
+# No provider credentials: scripts/e2e/run.sh forces every LLM key/model/base-URL empty or loopback so the router uses its mock provider.
+export LLM_API_KEY="" OPENAI_API_KEY="" ANTHROPIC_API_KEY="" LLM_MODEL="" LLM_BASE_URL=http://127.0.0.1:9 OPENAI_BASE_URL=http://127.0.0.1:9
 
 npx prisma migrate deploy
 npm run build
