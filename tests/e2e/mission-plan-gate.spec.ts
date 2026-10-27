@@ -35,6 +35,18 @@ test.describe("mission plan gate", () => {
     await expect(approve).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/planned-mission-banner.png`, fullPage: true });
 
+    // The plan under review: the Plan tab renders the complete drafted
+    // snapshot - the same planSnapshot the approve call fingerprints via
+    // planRevision, so what is shown here is exactly what approval binds to.
+    const detail = await page.request.get(`/api/missions/${mission.id}`);
+    expect(detail.status(), "mission detail readable").toBe(200);
+    const detailJson = (await detail.json()) as { mission: { planSnapshot: { steps?: unknown[] } } };
+    const plannedSteps = detailJson.mission.planSnapshot.steps?.length ?? 0;
+    expect(plannedSteps, "drafted plan has steps").toBeGreaterThan(0);
+    await page.getByRole("tab", { name: "Plan" }).click();
+    await expect(page.locator("table tbody tr")).toHaveCount(plannedSteps);
+    await page.screenshot({ path: `${SHOTS}/planned-mission-plan-tab.png`, fullPage: true });
+
     await approve.click();
     await expect(bannerTitle).toBeHidden({ timeout: 15000 });
     await page.screenshot({ path: `${SHOTS}/approved-mission.png`, fullPage: true });
