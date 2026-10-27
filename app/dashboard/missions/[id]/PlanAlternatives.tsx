@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast, toastError } from "@/lib/ui/feedback";
 import { aosButton } from "@/components/aos";
+import { comparePlans, type CompareStep } from "@/lib/missions/plan-compare";
 
 interface Alt {
   id: string;
@@ -18,12 +19,56 @@ interface Alt {
   outsideActionSteps: number;
   checkpointCount: number;
   omitted: string[];
+  steps: CompareStep[];
 }
 interface Data {
   status: string;
   currentRevision: string;
   spendCapCents: number | null;
   alternatives: Alt[];
+}
+
+
+function PlanComparison({ alternatives, currentRevision }: { alternatives: Alt[]; currentRevision: string }) {
+  const result = comparePlans(alternatives.map((a) => ({ id: a.id, label: a.label, steps: a.steps })));
+  const cols = `minmax(0,1.4fr) repeat(${alternatives.length}, minmax(0,1fr))`;
+  return (
+    <details className="mt-3 rounded-md bg-canvas p-3" data-testid="plan-compare">
+      <summary className="cursor-pointer text-sm font-semibold text-ink">Compare steps side by side</summary>
+      <p className="mt-2 text-xs text-muted">
+        These are variants of one template plan, not independent runs, laid next to each other step by step. Nothing was run to produce this, and there is no time or cost estimate.
+        Differences are shown against the first variant.
+      </p>
+      <div role="table" aria-label="Plan variants compared" className="mt-2 text-xs">
+        <div role="row" className="grid gap-2 border-b border-hairline pb-1 font-semibold text-ink" style={{ gridTemplateColumns: cols }}>
+          <span role="columnheader">Step</span>
+          {alternatives.map((a) => (
+            <span role="columnheader" key={a.id}>
+              {a.label}
+              {a.revision === currentRevision ? " (current)" : ""}
+            </span>
+          ))}
+        </div>
+        {result.rows.map((r) => (
+          <div role="row" key={r.key} data-testid={`compare-row-${r.key}`} className="grid gap-2 border-b border-hairline py-1" style={{ gridTemplateColumns: cols }}>
+            <span role="rowheader" className="text-ink">{r.title}</span>
+            {r.cells.map((c, i) => (
+              <span role="cell" key={alternatives[i].id} data-diff={r.diff[i]} className={r.diff[i] === "missing" ? "text-muted" : r.diff[i] === "changed" ? "font-semibold text-ink" : "text-ink"}>
+                {c === null ? "Not in this variant" : `${c.executor}${c.tier > 0 ? `, acts outside (tier ${c.tier})` : ", drafts only"}${c.checkpointAfter ? ", checkpoint after" : ""}`}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <ul className="mt-2 text-xs text-muted">
+        {result.summary.slice(1).map((s) => (
+          <li key={s.id}>
+            {s.label}: {s.missingFromBaseline} step{s.missingFromBaseline === 1 ? "" : "s"} left out, {s.changed} changed, {s.notInBaseline} added, compared with {alternatives[0].label}.
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 export function PlanAlternatives({ missionId, status, onChanged }: { missionId: string; status: string; onChanged: () => Promise<void> | void }) {
@@ -113,6 +158,7 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
           );
         })}
       </ul>
+      <PlanComparison alternatives={data.alternatives} currentRevision={data.currentRevision} />
       <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md bg-canvas p-3" data-testid="competing-plans-gate">
         <button type="button" className={aosButton({ variant: "secondary", size: "sm" })} disabled>
           Generate competing plans
