@@ -2,7 +2,7 @@
 // Run: npx tsx --test lib/sharing/__tests__/render-support.test.ts
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { assessSnapshot, docToBlocks, sheetToGrids, slideToPages } from "../render-support";
+import { assessSnapshot, docToBlocks, safeHref, sheetToGrids, slideToPages } from "../render-support";
 import { buildDocSnapshot, buildSheetSnapshot, buildSlideSnapshot } from "../../univer/snapshots";
 
 describe("assessSnapshot", () => {
@@ -64,5 +64,92 @@ describe("renderers", () => {
     assert.equal(p[0].title, "One");
     assert.equal(p[0].elements.length, 2);
     assert.equal(p[0].elements[1].map((x) => x.segs.map((s) => s.text).join("")).join("|"), "a|b");
+  });
+});
+
+// ---- Links and tables (Univer 1.0.2 shapes: tokens from DataStreamTreeTokenType,
+// customRanges with rangeType 0 = HYPERLINK and properties.url). Fixtures are
+// hand-built from those types, NOT captured from the editor; unlike shapes fail closed.
+const LS = "\u001F", LE = "\u001E";
+const linkDoc = (url: unknown, extra: object = {}) => {
+  const stream = `See ${LS}the docs${LE} now\r\n`;
+  return {
+    body: {
+      dataStream: stream,
+      paragraphs: [{ startIndex: 0 }],
+      customRanges: [{ rangeId: "r1", rangeType: 0, startIndex: stream.indexOf(LS), endIndex: stream.indexOf(LE), properties: { url } }],
+      ...extra,
+    },
+  };
+};
+describe("links", () => {
+  it("renders a hyperlink as a segment with its href, sentinels removed, text intact", () => {
+    const d = linkDoc("https://example.com/a?b=1");
+    assert.deepEqual(assessSnapshot("doc", d), { ok: true });
+    const segs = docToBlocks(d)[0].segs;
+    assert.equal(segs.map((s) => s.text).join(""), "See the docs now");
+    assert.deepEqual(segs.filter((s) => s.href).map((s) => [s.text, s.href]), [["the docs", "https://example.com/a?b=1"]]);
+  });
+  it("accepts https, http and mailto only; everything else refuses the share", () => {
+    for (const ok of ["https://x.test", "http://x.test/p", "mailto:a@b.test"]) assert.equal(assessSnapshot("doc", linkDoc(ok)).ok, true, ok);
+    for (const bad of ["javascript:alert(1)", "data:text/html,x", "file:///etc/passwd", "//evil.test", "/relative", "https://x.test/a b", "", undefined, 5, "vbscript:x"]) {
+      const r = assessSnapshot("doc", linkDoc(bad as never));
+      assert.equal(r.ok, false, String(bad));
+    }
+    assert.equal(safeHref("JaVaScRiPt:alert(1)"), null);
+    assert.equal(safeHref("https://x.test\u0000"), null);
+  });
+  it("refuses internal links, non-link custom ranges, misaligned or overlapping ranges", () => {
+    assert.equal(assessSnapshot("doc", linkDoc("https://x.test", { customRanges: [{ rangeId: "r", rangeType: 0, startIndex: 4, endIndex: 13, properties: { bookmarkId: "b" } }] })).ok, false);
+    const d = linkDoc("https://x.test");
+    (d.body.customRanges[0] as { rangeType: number }).rangeType = 3;
+    assert.equal(assessSnapshot("doc", d).ok, false);
+    const m = linkDoc("https://x.test");
+    (m.body.customRanges[0] as { startIndex: number }).startIndex = 0;
+    assert.equal(assessSnapshot("doc", m).ok, false);
+    assert.equal(assessSnapshot("doc", { body: { dataStream: `a${LS}b\r\n`, paragraphs: [{ startIndex: 0 }], customRanges: [] } }).ok, false);
+  });
+});
+
+const T = { TS: "\u001A", RS: "\u001B", CS: "\u001C", CE: "\u001D", RE: "\u000E", TE: "\u000F" };
+const tableDoc = (extra: object = {}, tableSource: object = {}) => ({
+  body: {
+    dataStream: `Before\r\n${T.TS}${T.RS}${T.CS}A1\r${T.CE}${T.CS}B1\r${T.CE}${T.RE}${T.RS}${T.CS}A2\r${T.CE}${T.CS}B2\r${T.CE}${T.RE}${T.TE}After\r\n`,
+    paragraphs: [{ startIndex: 0 }, {}, {}, {}, {}, {}],
+    tables: [{ tableId: "t1", startIndex: 8, endIndex: 40 }],
+    ...extra,
+  },
+  tableSource: { t1: { tableId: "t1", tableRows: [{ tableCells: [{}, {}] }, { tableCells: [{}, {}] }], ...tableSource } },
+});
+describe("tables", () => {
+  it("renders a 2x2 table in place between paragraphs with every cell's text", () => {
+    const d = tableDoc();
+    assert.deepEqual(assessSnapshot("doc", d), { ok: true });
+    const b = docToBlocks(d);
+    assert.equal(b.length, 3);
+    assert.equal(b[0].segs.map((s) => s.text).join(""), "Before");
+    const rows = b[1].table!;
+    assert.deepEqual(rows.map((r) => r.map((c) => c.map((x) => x.segs.map((s) => s.text).join("")).join("|"))), [["A1", "B1"], ["A2", "B2"]]);
+    assert.equal(b[2].segs.map((s) => s.text).join(""), "After");
+  });
+  it("refuses merged cells, nested or malformed tables, tables in slides, and tables with no tokens", () => {
+    const merged = tableDoc({}, { tableRows: [{ tableCells: [{ columnSpan: 2 }] }] });
+    assert.equal(assessSnapshot("doc", merged).ok, false);
+    const nested = tableDoc();
+    nested.body.dataStream = nested.body.dataStream.replace(`A1\r`, `${T.TS}${T.RS}${T.CS}x\r${T.CE}${T.RE}${T.TE}`);
+    assert.equal(assessSnapshot("doc", nested).ok, false);
+    const broken = tableDoc();
+    broken.body.dataStream = broken.body.dataStream.replace(T.TE, "");
+    assert.equal(assessSnapshot("doc", broken).ok, false);
+    assert.equal(assessSnapshot("doc", { body: { dataStream: "x\r\n", paragraphs: [{ startIndex: 0 }], tables: [{ tableId: "t" }] } }).ok, false);
+    const slide = { body: { pages: { p: { pageElements: { e: { type: 2, richText: { rich: tableDoc() } } } } } } };
+    assert.equal(assessSnapshot("slide", slide).ok, false);
+  });
+  it("still refuses what is not drawn: images, column groups, block ranges, custom blocks, stray tokens", () => {
+    assert.equal(assessSnapshot("doc", { body: { dataStream: "x\r\n", paragraphs: [{ startIndex: 0 }], columnGroups: [{ columnGroupId: "c" }] } }).ok, false);
+    assert.equal(assessSnapshot("doc", { body: { dataStream: "x\r\n", paragraphs: [{ startIndex: 0 }], blockRanges: [{ startIndex: 0 }] } }).ok, false);
+    assert.equal(assessSnapshot("doc", { body: { dataStream: "x\b\r\n", paragraphs: [{ startIndex: 0 }] } }).ok, false);
+    assert.equal(assessSnapshot("doc", { body: { dataStream: "x\u0012y\r\n", paragraphs: [{ startIndex: 0 }] } }).ok, false);
+    assert.equal(assessSnapshot("doc", { drawings: { d: { drawingId: "d" } }, body: { dataStream: "x\r\n", paragraphs: [{ startIndex: 0 }] } }).ok, false);
   });
 });
