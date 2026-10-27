@@ -99,7 +99,7 @@ test.describe("share links beyond Studio", () => {
     expect(token.startsWith("osh_")).toBe(true);
 
     // The public page: a fresh, signed-out context sees the read-only doc.
-    const anon = await browser.newContext();
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } }); // explicitly signed out: the config storageState is otherwise inherited
     const pub = await anon.newPage();
     const res = await pub.goto(`/o/${token}`, { waitUntil: "domcontentloaded" });
     expect(res!.status(), "public page 200").toBe(200);
@@ -163,7 +163,7 @@ test.describe("share links beyond Studio", () => {
     const { token } = (await mint.json()) as { token: string };
     expect(token.startsWith("rsh_")).toBe(true);
 
-    const anon = await browser.newContext();
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } }); // explicitly signed out: the config storageState is otherwise inherited
     // Route contract: PDF bytes, inline disposition, noindex, exact length.
     const res = await anon.request.get(`/r/report/${token}/raw`);
     expect(res.status(), "public PDF bytes 200").toBe(200);
