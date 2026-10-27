@@ -42,4 +42,18 @@ test("the plan variants can be compared step by step, labelled as variants", asy
   // Comparing changes nothing: the mission is still the unstarted draft.
   const detail = (await (await page.request.get(`/api/missions/${id}`)).json()) as { mission: { status: string } };
   expect(detail.mission.status).toBe("planned");
+
+  // Narrow viewport: the controls stay reachable and nothing in the table is clipped off-screen.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.scrollIntoViewIfNeeded();
+  await expect(table).toBeVisible();
+  const box = await table.boundingBox();
+  expect(box, "table has a box").not.toBeNull();
+  expect(box!.x + box!.width, "table fits the viewport width").toBeLessThanOrEqual(390 + 1);
+  await panel.getByText("Compare steps side by side").click();
+  await expect(table).toBeHidden();
+  await panel.getByText("Compare steps side by side").click();
+  await expect(table).toBeVisible();
+  await panel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}/compare-narrow-viewport.png` });
 });
