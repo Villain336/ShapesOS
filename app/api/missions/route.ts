@@ -1,16 +1,16 @@
 // Marketr — /api/missions
 // GET  -> dense mission list (viewer+)
-// POST -> start a mission from a template (editor+). Tier 0: drafts plans,
-//         executes nothing by itself. Phase 8: the launch is queued for the
-//         agent worker (lib/agents/mission-runtime.ts), which runs the plan's
-//         steps up to the first human approval as sub-agent loops.
+// POST -> draft a mission from a template (editor+). Tier 0: drafts plans,
+//         executes nothing. The mission holds at "planned" until a person
+//         approves the whole plan via POST /api/missions/:id/approve-plan —
+//         only then is the launch queued for the agent worker
+//         (lib/agents/mission-runtime.ts).
 
 import type { NextRequest } from "next/server";
 import { missionsGuard, safetyError, readJson, serializeMission, toListItem, missionDeps } from "./_lib";
 import { loadMission, startMission, type LoadedMission } from "@/lib/missions/engine";
 import { missionAgentView } from "@/lib/aos/missions";
 import { safeMissionRuns } from "@/lib/aos/missions.server";
-import { enqueueMissionLaunch } from "@/lib/agents/mission-runtime";
 // Phase 18.2 (WS=content): templates removed in the Store.
 import { removedMissionTemplates } from "@/lib/store/state";
 
@@ -52,19 +52,10 @@ export async function POST(req: NextRequest) {
       goal: body.goal,
       name: typeof body.name === "string" ? body.name : undefined,
     });
-    // Phase 8: queue the launch. The mission exists either way; a queue
-    // failure is reported, never hidden.
-    let launch: { runId: string; jobId: string } | null = null;
-    let launchError: string | null = null;
-    try {
-      launch = await enqueueMissionLaunch({ missionId: mission.id, workspaceId: gate.workspaceId, userId: gate.userId });
-    } catch (err) {
-      launchError = err instanceof Error ? err.message : "could not queue the mission";
-    }
-    return Response.json(
-      { mission: serializeMission(mission), runId: launch?.runId ?? null, ...(launchError ? { launchError } : {}) },
-      { status: 201 },
-    );
+    // Whole-plan gate: the mission stays "planned" and nothing is queued
+    // until a person approves the drafted plan (approve-plan route, which is
+    // where the launch is enqueued).
+    return Response.json({ mission: serializeMission(mission), awaitingPlanApproval: true }, { status: 201 });
   } catch (err) {
     return safetyError(err);
   }

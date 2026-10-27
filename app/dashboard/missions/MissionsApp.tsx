@@ -318,6 +318,7 @@ function missionTools(v: MissionView): string[] {
 }
 
 function cardAction(m: MissionListItem, v: MissionView) {
+  if (m.status === "planned") return { label: "Review plan", href: `/dashboard/missions/${m.id}#plan` };
   if (v.status === "needs") return { label: "Review", href: `/dashboard/missions/${m.id}#approvals` };
   if (v.status === "failed" && v.runId) return { label: "Open run", href: `/dashboard/runs/${v.runId}` };
   return { label: "Open mission", href: `/dashboard/missions/${m.id}` };

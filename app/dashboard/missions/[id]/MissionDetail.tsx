@@ -128,6 +128,8 @@ interface MissionDetailData {
   stepCount: number;
   planStepCount: number;
   totalCostCents: number;
+  /** Fingerprint of the drafted plan this page loaded; sent back with the plan approval. */
+  planRevision: string;
   progress: number;
   termination: { done: boolean; reason: string | null };
   nextCheckpoint: string | null;
@@ -475,6 +477,7 @@ export function MissionDetail({ missionId }: { missionId: string }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("log");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"pause" | "resume" | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
   const [deciding, setDeciding] = useState<{ id: string; which: "approve" | "deny" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -516,6 +519,24 @@ export function MissionDetail({ missionId }: { missionId: string }) {
       toastError(action === "pause" ? "Couldn't pause" : "Couldn't resume", e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function approvePlan() {
+    if (!data) return;
+    setPlanBusy(true);
+    try {
+      const r = await api<{ ok: boolean; status: string; launchError?: string }>(`/api/missions/${missionId}/approve-plan`, {
+        method: "POST",
+        body: JSON.stringify({ planRevision: data.planRevision }),
+      });
+      if (r.launchError) toastError("Plan approved, but the start could not be queued", r.launchError);
+      else toast({ title: "Plan approved", description: "The mission is starting.", status: "running" });
+      await load();
+    } catch (e) {
+      toastError("Couldn't approve the plan", e instanceof Error ? e.message : undefined);
+    } finally {
+      setPlanBusy(false);
     }
   }
 
@@ -623,6 +644,15 @@ export function MissionDetail({ missionId }: { missionId: string }) {
 
       {error ? <ErrorBox message={error} /> : null}
 
+      {m.status === "planned" ? (
+        <Banner
+          status="needs"
+          title="Review the plan before anything runs"
+          description={`The Strategist drafted ${steps.length} steps (the Plan tab below). Nothing runs until you approve the whole plan - and money, sends and publishing still ask again at their own step.`}
+          action={{ label: planBusy ? "Approving..." : "Approve plan and start", onClick: () => void approvePlan() }}
+        />
+      ) : null}
+
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         {/* Mission timeline: the lead's delegations, then what is still to come. */}
         <div className="order-2 min-w-0 lg:order-1">
@@ -636,7 +666,7 @@ export function MissionDetail({ missionId }: { missionId: string }) {
               busy={busy !== null}
               pauseLabel="Pause mission"
               resumeLabel="Resume mission"
-              onPause={m.status === "active" || m.status === "planned" ? () => void pauseResume("pause") : undefined}
+              onPause={m.status === "active" ? () => void pauseResume("pause") : undefined}
               onResume={m.status === "paused" ? () => void pauseResume("resume") : undefined}
               headingLevel="h2"
               emptyText="The lead hasn't handed anything off yet."

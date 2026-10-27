@@ -165,7 +165,9 @@ export function fromMissionStatus(s: string, pendingApprovals = 0): AosStatus | 
   if (pendingApprovals > 0 && (s === "active" || s === "paused" || s === "planned")) return "needs";
   switch (s) {
     case "planned":
-      return "queued";
+      // Planned now means the drafted plan is waiting on a person's approval
+      // (the whole-plan gate) — that is a "needs you" state, not queueing.
+      return "needs";
     case "active":
       return "running";
     case "paused":
