@@ -51,6 +51,6 @@ test("choosing a plan alternative changes the draft but never starts the mission
   const stale = await page.request.post(`/api/missions/${id}/approve-plan`, { data: { planRevision: before.currentRevision } });
   expect(stale.status()).toBe(409);
   // A second choice from the stale revision is refused too.
-  const staleChoice = await page.request.post(`/api/missions/${id}/plan-alternatives`, { data: { alternativeId: "review-first", planRevision: before.currentRevision } });
+  const staleChoice = await page.request.post(`/api/missions/${id}/plan-alternatives`, { data: { alternativeId: "as-templated", planRevision: before.currentRevision } });
   expect(staleChoice.status()).toBe(409);
 });
