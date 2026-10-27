@@ -13,6 +13,7 @@ import { gotoClean, loadIds } from "./helpers";
 const SHOTS = "test-results/share-links";
 
 test.describe("share links beyond Studio", () => {
+  test.describe.configure({ timeout: 120_000 }); // Univer + pdf.js mounts exceed the 30s default
   test("an Office doc shares by token link; the public page is read-only, private-clean, and dies on revoke", async ({ page, browser }) => {
     loadIds();
     const create = await page.request.post("/api/office/docs", {
