@@ -327,7 +327,7 @@ function cardAction(m: MissionListItem, v: MissionView) {
 function cardMeta(m: MissionListItem, v: MissionView): string {
   if (v.status === "done") return "Finished";
   if (v.progress) return stepCounter(v.progress.done, v.progress.total);
-  return m.nextCheckpoint ? `Next: ${m.nextCheckpoint}` : `${Math.round(m.progress * 100)}% of goal`;
+  return m.nextCheckpoint ? `Next: ${m.nextCheckpoint}` : `${Math.round(m.progress * 100)}% of plan`;
 }
 
 export function MissionsApp({ hiddenTemplateIds = [] }: { hiddenTemplateIds?: string[] } = {}) {
