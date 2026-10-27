@@ -93,7 +93,7 @@ test.describe("mission plan gate", () => {
     await gotoClean(page, `/dashboard/missions/${mission.id}`);
     await expect(page.getByText("Mission timeline")).toBeVisible();
     await expect(page.getByText("38% of plan · 3/8 steps")).toBeVisible();
-    await expect(page.getByText("model estimate, not metered")).toBeVisible();
+    await expect(page.getByText("execution estimate, not metered")).toBeVisible();
     await expect(page.getByText("of goal")).toHaveCount(0);
     await expect(page.locator("p", { hasText: "of plan" })).not.toContainText("spent");
     await page.waitForTimeout(1500);
