@@ -22,7 +22,9 @@ test.describe("workspace instructions", () => {
     await page.reload();
     await expect(page.getByLabel("Instructions for agents")).toHaveValue(text);
     await expect(page.getByText(/it is guidance/).first()).toBeVisible();
-    await page.screenshot({ path: "test-results/workspace-instructions/saved.png", fullPage: false });
+    await expect(page.getByTestId("instructions-scope")).toContainText("Not included: one-off generation features");
+    await expect(page.getByText(`Revision ${before.instructions.revision + 1},`).first()).toBeVisible();
+    await page.getByTestId("instructions").screenshot({ path: "test-results/workspace-instructions/saved.png" });
 
     // Stale save: the revision the editor saw is no longer current.
     const stale = await page.request.put("/api/settings/instructions", { data: { body: "stale", expectedRevision: before.instructions.revision } });
