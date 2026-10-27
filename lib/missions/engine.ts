@@ -18,6 +18,7 @@ import {
   checkTermination,
   isCountedStep,
   missionProgress,
+  completedPlanStepKeys,
   validateGoal,
   type CheckpointReason,
   type CheckpointRecord,
@@ -77,7 +78,11 @@ export interface LoadedMission {
   events: StoredMissionEvent[];
   approvals: StoredMissionApproval[];
   stepCount: number;
+  /** How many of the plan's own steps are done (see completedPlanStepKeys). */
+  completedSteps: number;
   totalCostCents: number;
+  /** The part of totalCostCents that is the cost model's estimate, not a metered or billed amount. */
+  estimatedCostCents: number;
   consecutiveFailures: number;
   progress: number;
   termination: { done: boolean; reason: TerminationReason | null };
@@ -97,9 +102,11 @@ export async function loadMission(
 
   let stepCount = 0;
   let totalCostCents = 0;
+  let estimatedCostCents = 0;
   for (const e of events) {
     if (isCountedStep(e.step)) stepCount += 1;
     totalCostCents += e.costCents;
+    if ((e.observation as Record<string, unknown> | undefined)?.costEstimated === true) estimatedCostCents += e.costCents;
   }
   // Trailing run of failed step events (meta/housekeeping events don't break the run).
   let consecutiveFailures = 0;
@@ -127,18 +134,21 @@ export async function loadMission(
   });
 
   const planSteps = planStepsOf(mission);
-  const progress = missionProgress(planSteps.length, stepCount, mission.status);
+  const completedSteps = completedPlanStepKeys(events, planSteps.map((s) => s.key)).size;
+  const progress = missionProgress(planSteps.length, completedSteps, mission.status);
   const nextCheckpoint =
     mission.status === "complete"
       ? null
-      : (planSteps.find((s) => s.checkpointAfter && s.order > stepCount)?.title ?? null);
+      : (planSteps.find((s) => s.checkpointAfter && s.order > completedSteps)?.title ?? null);
 
   return {
     mission,
     events,
     approvals,
     stepCount,
+    completedSteps,
     totalCostCents,
+    estimatedCostCents,
     consecutiveFailures,
     progress,
     termination,
@@ -164,10 +174,11 @@ function readGoalCurrentValue(
   return undefined;
 }
 
-function planStepsOf(mission: StoredMission): Array<{ order: number; title: string; checkpointAfter: boolean }> {
-  const snap = mission.planSnapshot as { steps?: Array<{ order?: number; title?: string; checkpointAfter?: boolean }> };
+function planStepsOf(mission: StoredMission): Array<{ key: string; order: number; title: string; checkpointAfter: boolean }> {
+  const snap = mission.planSnapshot as { steps?: Array<{ key?: string; order?: number; title?: string; checkpointAfter?: boolean }> };
   const steps = Array.isArray(snap?.steps) ? snap.steps : [];
   return steps.map((s, i) => ({
+    key: typeof s.key === "string" ? s.key : "",
     order: typeof s.order === "number" ? s.order : i + 1,
     title: typeof s.title === "string" ? s.title : `Step ${i + 1}`,
     checkpointAfter: s.checkpointAfter === true,
