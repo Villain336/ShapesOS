@@ -117,6 +117,37 @@ describe("Files (DB)", () => {
     assert.ok(!(await spotlight(WS, "viewer", "vellichor", { userId: ANA })).hits.some((h) => h.id === fileId));
   });
 
+  it("a paused old-version index cannot replace newer text, and a different tenant cannot index it", async () => {
+    const separate = await writeFile({ workspaceId: WS, logicalPath: "/files/index-race.pdf", kind: "file", bytes: V2, mimeType: "application/pdf", createdBy: ANA });
+    const raceId = separate.id;
+    let extracted!: () => void;
+    const ready = new Promise<void>((resolve) => { extracted = resolve; });
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => { release = resolve; });
+    const oldRun = indexFileText(WS, raceId, {
+      embed: false,
+      beforeWrite: async () => { extracted(); await wait; },
+    });
+    await ready;
+    try {
+      // Overwrite this separate file with different bytes while its extraction
+      // is paused; the stale extraction must be refused even if its hash matches an existing row.
+      await overwriteFile({ workspaceId: WS, fileId: raceId, bytes: V1, mimeType: "application/pdf", userId: BEN });
+      const current = await indexFileText(WS, raceId, { embed: false });
+      assert.ok(current.status === "indexed" || current.status === "unchanged");
+      release();
+      assert.equal((await oldRun).status, "superseded");
+      const row = await withWorkspaceScope(WS, (tx) => tx.searchText.findFirst({ where: { workspaceId: WS, fileId: raceId } }));
+      assert.ok(row?.content?.includes("vellichor"), "newest version remains indexed");
+      assert.ok(!row?.content?.includes("pyrrhic"));
+      assert.equal((await indexFileText(`${WS}-other`, raceId, { embed: false })).status, "missing");
+    } finally {
+      release();
+      await oldRun;
+      await deleteFile({ workspaceId: WS, fileId: raceId });
+    }
+  });
+
   it("restore makes the old bytes a NEW version; history only grows", async () => {
     const res = await restoreFileVersion(WS, fileId, 1, ANA);
     assert.equal(res.version, 3);
