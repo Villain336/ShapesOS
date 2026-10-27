@@ -1,7 +1,8 @@
 // ShapesOS mobile — the core apps on the phone (Phase 18.3, WS=trust):
 // Missions, and READ-ONLY Files, Calendar and Mail over the 18.2 APIs
 // (/api/files, /api/comms/calendar/events, /api/comms/mail/threads). Writing
-// stays on the web, where the tool gates and approvals live. A source that
+// stays on the web, where the tool gates and approvals live, except plain-text
+// Docs (Phase 25), which save through the same PATCH route and its checks. A source that
 // isn't connected says so; nothing is faked (a mock event is labelled).
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -20,11 +21,13 @@ import {
   type MailThread,
 } from "../api/os";
 import { MissionsScreen } from "./MissionsScreen";
+import { DocsScreen } from "./DocsScreen";
 import { color, font, radius } from "../theme";
 
-type App = "missions" | "files" | "calendar" | "mail";
+type App = "missions" | "docs" | "files" | "calendar" | "mail";
 const APPS: Array<{ id: App; label: string }> = [
   { id: "missions", label: "Missions" },
+  { id: "docs", label: "Docs" },
   { id: "files", label: "Files" },
   { id: "calendar", label: "Calendar" },
   { id: "mail", label: "Mail" },
@@ -49,6 +52,7 @@ export function AppsScreen() {
       </View>
       <View style={styles.body}>
         {app === "missions" ? <MissionsScreen /> : null}
+        {app === "docs" ? <DocsScreen /> : null}
         {app === "files" ? <FilesView /> : null}
         {app === "calendar" ? <CalendarView /> : null}
         {app === "mail" ? <MailView /> : null}
