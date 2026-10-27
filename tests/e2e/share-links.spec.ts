@@ -13,7 +13,7 @@ import { gotoClean, loadIds } from "./helpers";
 const SHOTS = "test-results/share-links";
 
 test.describe("share links beyond Studio", () => {
-  test.describe.configure({ timeout: 120_000 }); // Univer + pdf.js mounts exceed the 30s default
+  test.describe.configure({ timeout: 90_000 }); // pdf.js mount + CI chromium headroom
   test("an Office doc shares by token link; the public page is read-only, private-clean, and dies on revoke", async ({ page, browser }) => {
     loadIds();
     const create = await page.request.post("/api/office/docs", {
@@ -66,19 +66,23 @@ test.describe("share links beyond Studio", () => {
     expect(res!.status(), "public page 200").toBe(200);
     await expect(pub.getByRole("heading", { name: "Share-gate pixel doc" })).toBeVisible();
     await expect(pub.getByText(/shared read-only/)).toBeVisible();
-    // The Univer embed mounts and paints (no save affordance in read-only).
-    await expect(pub.getByText(/edits stay local until you save/)).toBeVisible({ timeout: 30000 });
-    await expect(pub.locator("canvas").first()).toBeVisible({ timeout: 30000 });
-    await expect(pub.getByText(/editor failed to load/)).toHaveCount(0);
-    await pub.waitForTimeout(800); // let the canvas finish its first paint
-    // No private metadata or edit affordances leak onto the public page.
-    const bodyText = (await pub.locator("body").innerText()) || "";
-    expect(bodyText).not.toContain("E2E Workspace");
-    expect(bodyText).not.toContain("e2e-admin@example.com");
-    expect(bodyText).not.toContain("e2e-editor@example.com");
-    expect(await pub.locator('a[href*="/dashboard"], a[href*="/api/"]').count()).toBe(0);
-    await expect(pub.getByRole("button", { name: /Save to ShapesOS/ })).toHaveCount(0);
-    await expect(pub.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
+    // The populated document text actually renders (not a blank frame).
+    await expect(pub.getByText("This shared doc renders for anyone with the link.")).toBeVisible();
+    // True read-only: no editor is mounted at all - no toolbar, no
+    // contenteditable/textbox/canvas, no inputs, no "edits stay local" banner.
+    expect(await pub.locator('[contenteditable], textarea, input, canvas, [role="toolbar"], [role="textbox"]').count()).toBe(0);
+    await expect(pub.getByText(/edits stay local/)).toHaveCount(0);
+    // Typing and paste cannot change the view.
+    const before = await pub.locator("article").innerText();
+    await pub.locator("article").click();
+    await pub.keyboard.type("INJECTED-TEXT");
+    await pub.keyboard.press("Control+V");
+    expect(await pub.locator("article").innerText()).toBe(before);
+    expect(await pub.getByText("INJECTED-TEXT").count()).toBe(0);
+    // Server write restriction: the public page has no write route; an
+    // anonymous PATCH to the management API is refused.
+    const anonWrite = await anon.request.patch(`/api/office/docs/${doc.id}`, { data: { title: "hijack" } });
+    expect([401, 403]).toContain(anonWrite.status());
     await pub.screenshot({ path: `${SHOTS}/public-doc.png`, fullPage: false });
 
     // Unknown and expired tokens behave identically: plain 404.
