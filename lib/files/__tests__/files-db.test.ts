@@ -37,6 +37,7 @@ import { listFileAccess, requireFileAction, setFileAccess, type FileActor } from
 import { createShareLink, listShareLinks, revokeShareLink } from "../shares";
 import { createAnnotation, exportAnnotations, listAnnotations, removeAnnotation } from "../annotations";
 import { spotlight } from "@/lib/search/records";
+import { indexFileText } from "@/lib/search/text-index";
 import { GET as rawGET, POST as rawPOST } from "@/app/r/file/[token]/raw/route";
 
 const RUN = randomUUID().slice(0, 8);
@@ -91,6 +92,12 @@ describe("Files (DB)", () => {
   it("an overwrite keeps the previous bytes as a version; quota counts both; Spotlight re-indexes", async () => {
     const res = await overwriteFile({ workspaceId: WS, fileId, bytes: V2, mimeType: "application/pdf", userId: BEN });
     assert.equal(res.version, 2);
+    // Two writers for the current version must both settle without a unique-key race.
+    const indexed = await Promise.all([
+      indexFileText(WS, fileId, { embed: false }),
+      indexFileText(WS, fileId, { embed: false }),
+    ]);
+    assert.ok(indexed.every((r) => r.status === "indexed" || r.status === "unchanged"));
     const versions = await listFileVersions(WS, fileId);
     assert.deepEqual(versions!.map((v) => [v.version, v.current]), [[2, true], [1, false]]);
     assert.equal(versions![0]!.createdBy, BEN, "the current version is Ben's");
