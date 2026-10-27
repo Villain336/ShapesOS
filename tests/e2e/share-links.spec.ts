@@ -117,6 +117,8 @@ test.describe("share links beyond Studio", () => {
     await expect(pub.getByText("Ship the share links")).toBeVisible();
     await expect(pub.getByText("Review the audit trail")).toBeVisible();
     expect(await pub.locator("article p").count()).toBe(3);
+    // Exact text across inline nodes: whitespace at run boundaries is preserved.
+    expect(await pub.locator("article p").first().innerText()).toBe("Revenue grew 12% quarter over quarter.");
     // True read-only: no editor is mounted at all - no toolbar, no
     // contenteditable/textbox/canvas, no inputs, no "edits stay local" banner.
     expect(await pub.locator('[contenteditable], textarea, input, canvas, [role="toolbar"], [role="textbox"]').count()).toBe(0);
@@ -211,6 +213,55 @@ test.describe("share links beyond Studio", () => {
     expect(gone.status(), "revoked report bytes 404").toBe(404);
     const gonePage = await pub.goto(`/r/report/${token}`, { waitUntil: "domcontentloaded" });
     expect(gonePage!.status(), "revoked report page 404s").toBe(404);
+    await anon.close();
+  });
+
+  test("links and tables render faithfully on the public page; unsafe links refuse the share", async ({ page, browser }) => {
+    const LS = "\u001F", LE = "\u001E";
+    const T = { TS: "\u001A", RS: "\u001B", CS: "\u001C", CE: "\u001D", RE: "\u000E", TE: "\u000F" };
+    const link = (url: string) => {
+      const stream = `Read ${LS}the handbook${LE} first\r\n${T.TS}${T.RS}${T.CS}Plan\r${T.CE}${T.CS}Owner\r${T.CE}${T.RE}${T.RS}${T.CS}Q4\r${T.CE}${T.CS}Tico\r${T.CE}${T.RE}${T.TE}Done\r\n`;
+      return {
+        id: "e2e-rich", title: "Rich share", locale: "enUS", documentStyle: {},
+        body: {
+          dataStream: stream,
+          paragraphs: [{ startIndex: 0, paragraphId: "p0" }, {}, {}, {}, {}, {}],
+          textRuns: [],
+          customRanges: [{ rangeId: "r1", rangeType: 0, startIndex: stream.indexOf(LS), endIndex: stream.indexOf(LE), properties: { url } }],
+          tables: [{ tableId: "t1", startIndex: stream.indexOf(T.TS), endIndex: stream.indexOf(T.TE) + 1 }],
+        },
+        tableSource: { t1: { tableId: "t1", tableRows: [{ tableCells: [{}, {}] }, { tableCells: [{}, {}] }] } },
+      };
+    };
+    const make = async (title: string, url: string) => {
+      const c = await page.request.post("/api/office/docs", { data: { kind: "doc", title } });
+      const { doc } = (await c.json()) as { doc: { id: string } };
+      const p = await page.request.patch(`/api/office/docs/${doc.id}`, { data: { snapshot: link(url) } });
+      expect(p.status(), "rich doc saved").toBe(200);
+      return doc.id;
+    };
+    const bad = await make("Unsafe link", "javascript:alert(1)");
+    const refused = await page.request.post(`/api/office/docs/${bad}/shares`, { data: {} });
+    expect(refused.status(), "unsafe link refuses the share").toBe(422);
+    expect(((await refused.json()) as { reason: string }).reason).toMatch(/link/);
+
+    const good = await make("Rich share", "https://example.com/handbook");
+    const mint = await page.request.post(`/api/office/docs/${good}/shares`, { data: { label: "e2e rich", expiresInDays: 1 } });
+    expect(mint.status(), "rich doc share minted").toBe(201);
+    const { token } = (await mint.json()) as { token: string };
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const pub = await anon.newPage();
+    expect((await pub.goto(`/o/${token}`, { waitUntil: "domcontentloaded" }))!.status()).toBe(200);
+    const a = pub.getByRole("link", { name: "the handbook" });
+    await expect(a).toHaveAttribute("href", "https://example.com/handbook");
+    await expect(a).toHaveAttribute("rel", /noopener/);
+    expect(await pub.locator("article p").first().innerText()).toBe("Read the handbook first");
+    const cells = await pub.locator("article [data-shared-table] td").allInnerTexts();
+    expect(cells.map((c) => c.trim())).toEqual(["Plan", "Owner", "Q4", "Tico"]);
+    await expect(pub.getByText("Done")).toBeVisible();
+    expect(await pub.locator("article").innerText()).not.toMatch(/[\u0000-\u0008\u000e-\u001f]/);
+    await pub.setViewportSize({ width: 900, height: 700 });
+    await pub.locator("article").screenshot({ path: `${SHOTS}/public-links-tables.png` });
     await anon.close();
   });
 });
