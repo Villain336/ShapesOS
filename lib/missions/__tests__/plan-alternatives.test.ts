@@ -102,3 +102,4 @@ describe("selectPlanAlternative", () => {
     assert.ok(sel.status === "fulfilled" || app.status === "fulfilled");
   });
 });
+
