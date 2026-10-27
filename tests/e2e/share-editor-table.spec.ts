@@ -79,11 +79,11 @@ test.describe("share links with real editor output", () => {
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/04-table-in-editor.png` });
     // Type into the first two cells (the caret lands in the first cell after insert).
+    // Observed in CI: after Insert the caret is NOT inside the table (text typed now is lost);
+    // the first Tab moves it into the first cell. Then type, Tab to the next cell, type.
+    await page.keyboard.press("Tab");
     await page.keyboard.type("Plan");
-    await page.waitForTimeout(300);
-    // Tab does not move between cells in this editor (the first run replaced the text), so click
-    // the second cell instead; coordinates come from the viewport capture 04b of the previous run.
-    await page.mouse.click(687, 422);
+    await page.keyboard.press("Tab");
     await page.keyboard.type("Owner");
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${OUT}/04b-cells-typed.png` });
