@@ -5,17 +5,18 @@
 // bad JSON, schema or safety rejection) never drops the others.
 //
 // What this is not (stated plainly):
-//  - It is OFF by default. See competing-plans-gate.ts: nothing here runs
-//    unless the owner has set an explicit flag AND a spend ceiling.
+//  - It is NOT wired to any route or job. See competing-plans-gate.ts: it stays
+//    off until owner spend approval, metering and adoption exist.
 //  - Candidates are PROPOSALS for a person to read. Nothing here writes a mission
 //    plan; adopting a candidate is not built (it would need its own revision-bound
 //    persistence and approval, like selectPlanAlternative).
 //  - A candidate may only use draft-safe executors, tier 0, no approval step: the
 //    same limits as the "Drafts and analysis only" variant. A model cannot propose
 //    a step that acts outside the workspace.
-//  - The cost ceiling is a CONSERVATIVE CEILING, not a forecast and not a charge.
-//    No budget is reserved or debited from it; real spend is whatever the provider
-//    reports per call (costMicroUsd, null when a price is unknown).
+//  - The cost figure is a WORST-CASE BOUND under stated assumptions, not a forecast and
+//    not a charge. No budget is reserved or debited from it; real spend is whatever
+//    the provider reports per call (costMicroUsd, null when a price is unknown), and
+//    that metering must be wired through the budget gates before any live use.
 //
 // Prompt authority: the system prompt is the mission-planner constitution only.
 // The goal is passed as quoted data inside the user turn and the model is told it
@@ -77,7 +78,7 @@ export interface ComposeInput {
   lenses?: readonly CandidateLens[];
   /** Output-token cap per call (a hard cap sent to the provider). */
   maxTokensPerCall: number;
-  /** The owner's ceiling for the whole run, micro-USD. Required: there is no default. */
+  /** The limit for the whole run, micro-USD. Required: there is no default. It is not an approval. */
   capMicroUsd: number;
   signal?: AbortSignal;
 }
@@ -96,16 +97,24 @@ export function buildUserTurn(goal: string, lens: CandidateLens): string {
   ].join("\n\n");
 }
 
+/** Fixed allowance for provider-added wrapper tokens (roles, formatting) per call. */
+export const WRAPPER_TOKEN_ALLOWANCE = 256;
+
 /**
- * Conservative ceiling for one call: input assumed at most one token per two
- * characters of the prompt, output at the maxTokens cap, both at the model's
- * listed price. null when the model has no confirmed price.
+ * Worst-case bound for one call, at the model's listed price: input tokens are
+ * bounded by UTF-8 BYTES (a token covers at least one byte, so this holds for any
+ * language or code) plus a fixed wrapper allowance covering the system prompt, the
+ * user turn and the output schema text that are all inside promptBytes; output at
+ * the maxTokens cap. The provider's reported usage is authoritative; this only
+ * decides whether to refuse before calling. null when the model has no confirmed price.
  */
-export function callCeilingMicroUsd(model: string, promptChars: number, maxTokens: number): number | null {
+export function callCeilingMicroUsd(model: string, promptBytes: number, maxTokens: number): number | null {
   const p = priceFor(model);
   if (!p || p.input === null || p.output === null) return null;
-  return Math.ceil(Math.ceil(promptChars / 2) * p.input + maxTokens * p.output);
+  return Math.ceil((promptBytes + WRAPPER_TOKEN_ALLOWANCE) * p.input + maxTokens * p.output);
 }
+
+const bytes = (s: string) => new TextEncoder().encode(s).length;
 
 function firstText(r: ChatResponse): string {
   for (const b of r.content) if (b.type === "text") return b.text;
@@ -135,15 +144,15 @@ export async function composeCandidates(input: ComposeInput): Promise<{ ceilingM
   const lenses = input.lenses ?? DEFAULT_LENSES;
   if (lenses.length < 2 || lenses.length > 4) throw new CompetingPlansRefused("bad_input", "Competing plans need 2 to 4 lenses.");
 
-  // Refuse BEFORE any call: the whole run's conservative ceiling must fit the owner's ceiling.
+  // Refuse BEFORE any call: the whole run's worst-case bound (all N calls) must fit the limit.
   let ceiling = 0;
   for (const l of lenses) {
-    const c = callCeilingMicroUsd(input.model, MISSION_PLANNER_SYSTEM_PROMPT.length + buildUserTurn(goal, l).length, input.maxTokensPerCall);
+    const c = callCeilingMicroUsd(input.model, bytes(MISSION_PLANNER_SYSTEM_PROMPT) + bytes(buildUserTurn(goal, l)), input.maxTokensPerCall);
     if (c === null) throw new CompetingPlansRefused("unpriced_model", `No confirmed price for model "${input.model}"; nothing was called.`);
     ceiling += c;
   }
   if (ceiling > input.capMicroUsd) {
-    throw new CompetingPlansRefused("over_ceiling", `Conservative ceiling ${ceiling} micro-USD exceeds the allowed ${input.capMicroUsd}; nothing was called.`);
+    throw new CompetingPlansRefused("over_ceiling", `Worst-case bound ${ceiling} micro-USD exceeds the limit ${input.capMicroUsd}; nothing was called.`);
   }
 
   // Independent calls: one failing never affects another.
