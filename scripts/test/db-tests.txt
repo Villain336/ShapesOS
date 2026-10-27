@@ -282,3 +282,6 @@ lib/drive/__tests__/base-version-db.test.ts
 
 # Phase 21B (drive): a person id that is not a plain slug (the self-host "admin:<email>" login) still gets a private home - reversible folder name, owned file, invisible to others in listing and journal.
 lib/drive/__tests__/home-ids-db.test.ts
+
+# Phase 24 (store): bundle routes - viewer/non-member/signed-out refused and nothing installs, bad input refused, editor accepted but each member fails on its own gate, admin installs only the selected members (connector skipped, re-run is a no-op).
+lib/store/__tests__/bundles-route-db.test.ts
