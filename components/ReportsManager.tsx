@@ -5,6 +5,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import ShareLinksPanel from "@/components/sharing/ShareLinksPanel";
 import { confirmAction } from "@/lib/ui/feedback";
 
 const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ssr: false });
@@ -59,6 +60,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
   const [editorKey, setEditorKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [shareReportId, setShareReportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<Report[]>([]);
@@ -380,7 +382,8 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 <h3 className="mb-2 text-sm font-semibold text-ink">Generated reports</h3>
                 <ul className="flex flex-col gap-2">
                   {history.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between rounded-sm border border-line px-3 py-2 text-sm">
+                    <li key={r.id} className="flex flex-col gap-2 rounded-sm border border-line px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between">
                       <span className="text-muted">
                         {r.period} · {new Date(r.createdAt).toLocaleString()}
                         <span
@@ -404,12 +407,31 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                         {r.error && <span className="ml-2 text-xs text-failed-text">{r.error.slice(0, 120)}</span>}
                       </span>
                       {r.status === "ready" && (
-                        <a
-                          href={`/api/reports/${r.id}/download`}
-                          className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline"
-                        >
-                          Download PDF
-                        </a>
+                        <span className="flex items-center gap-1.5">
+                          <a
+                            href={`/api/reports/${r.id}/download`}
+                            className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline"
+                          >
+                            Download PDF
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setShareReportId((cur) => (cur === r.id ? null : r.id))}
+                            className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline"
+                          >
+                            Share
+                          </button>
+                        </span>
+                      )}
+                      </div>
+                      {shareReportId === r.id && (
+                        <div className="mt-2 w-full">
+                          <ShareLinksPanel
+                            endpoint={`/api/reports/${r.id}/shares`}
+                            subjectLabel="report"
+                            publicPath={(token) => `/r/report/${token}`}
+                          />
+                        </div>
                       )}
                     </li>
                   ))}
