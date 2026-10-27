@@ -80,10 +80,10 @@ export default function SharedDocView({ kind, snapshot }: { kind: string; snapsh
   );
 }
 
-export function UnsupportedShare({ reason }: { reason: string }) {
+export function UnsupportedShare() {
   return (
     <div className="rounded-lg bg-paper px-8 py-6 text-sm text-muted shadow-hairline" role="status">
-      This document can&apos;t be shown in the read-only viewer ({reason}). Ask the owner to export it instead.
+      This shared document is unavailable.
     </div>
   );
 }
