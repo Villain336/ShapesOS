@@ -97,3 +97,32 @@ function decodeURIComponentSafe(s: string): string {
     return s;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Reporting visits: pacing (PURE)
+// ---------------------------------------------------------------------------
+// Reporting a visit is optional telemetry, but it is a state-changing POST, so it spends the same
+// per-user write budget (60 a minute) as real saves. A page visit is reported once the page has
+// settled, at most one report per RECENTS_MIN_GAP_MS (the latest page wins), and never while the
+// server has asked the client to back off.
+
+/** Wait for the new page's <title> before reporting the visit. */
+export const RECENTS_SETTLE_MS = 600;
+/** At most one visit report per this long. Pages passed through faster are not worth a switch-back. */
+export const RECENTS_MIN_GAP_MS = 5000;
+/** Back-off when a 429 carries no usable Retry-After. */
+export const RECENTS_DEFAULT_BACKOFF_MS = 30_000;
+
+/** Milliseconds to wait before reporting the current page. */
+export function recentsPostDelay(input: { now: number; lastSentAt: number | null; pausedUntil: number | null }): number {
+  const sinceLast = input.lastSentAt === null ? 0 : Math.max(0, input.lastSentAt + RECENTS_MIN_GAP_MS - input.now);
+  const backoff = input.pausedUntil === null ? 0 : Math.max(0, input.pausedUntil - input.now);
+  return Math.max(RECENTS_SETTLE_MS, sinceLast, backoff);
+}
+
+/** The back-off a 429 asks for: its Retry-After seconds (bounded to 1s..10min), else the default. */
+export function recentsBackoffMs(retryAfterHeader: string | null | undefined): number {
+  const s = Number(retryAfterHeader);
+  if (!retryAfterHeader || !Number.isFinite(s) || s <= 0) return RECENTS_DEFAULT_BACKOFF_MS;
+  return Math.min(600, Math.max(1, Math.ceil(s))) * 1000;
+}
