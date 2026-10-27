@@ -56,6 +56,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       if (err instanceof Error && err.message === "DOC_NOT_FOUND") {
         return Response.json({ error: "Doc not found" }, { status: 404 });
       }
+      if (err instanceof Error && err.message.startsWith("UNSUPPORTED_CONTENT:")) {
+        return Response.json(
+          { error: "This document has content the read-only viewer can't show yet", reason: err.message.slice(20) },
+          { status: 422 },
+        );
+      }
       throw err;
     }
   } catch (e) {
