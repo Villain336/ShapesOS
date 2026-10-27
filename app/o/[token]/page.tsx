@@ -5,20 +5,13 @@
 // time. Never: workspace name, members, or anything else in the workspace.
 
 import { notFound } from "next/navigation";
-import nextDynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { recordDocShareOpen, resolveDocShareToken } from "@/lib/sharing/doc-shares";
+import SharedDocEmbed from "@/components/office/SharedDocEmbed";
 
 export const dynamic = "force-dynamic";
 
-const SharedDocEmbed = nextDynamic(() => import("@/components/office/SharedDocEmbed"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-[560px] items-center justify-center rounded-lg bg-paper shadow-hairline">
-      <span className="text-sm text-muted">Loading…</span>
-    </div>
-  ),
-});
+
 
 export async function generateMetadata() {
   return { title: "Shared document — ShapesOS", robots: { index: false, follow: false } };
