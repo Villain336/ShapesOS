@@ -1,0 +1,100 @@
+name: Record validated ShapesOS demo
+on:
+  push:
+    branches: [recording/demo-b5]
+permissions:
+  contents: read
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: marketr
+          POSTGRES_PASSWORD: marketr
+          POSTGRES_DB: marketr
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U marketr"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marketr:marketr@localhost:5433/marketr
+      APP_DATABASE_URL: postgresql://marketr_app:marketr_app_ci@localhost:5433/marketr
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b5b0822eb467ad9b7dd25115b41603596c72c0af
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Migrate a fresh database
+        run: sh scripts/db/migrate.sh
+
+      - name: Create least-privilege app role
+        run: >-
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=marketr_app
+          -v app_password=marketr_app_ci -f scripts/db/create-app-role.sql
+
+      - name: Swap for the production build
+        run: sh scripts/ci/add-swap.sh 16
+
+      - name: Production build
+        # Types are gated by the verify job; skip Next's duplicate pass.
+        env:
+          SKIP_BUILD_TYPECHECK: "1"
+        run: npm run build
+
+      - name: Enable focused recording harness (app source unchanged)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('playwright.config.ts')
+          s = p.read_text().replace('baseURL: BASE_URL,', 'baseURL: BASE_URL, video: { mode: "on", size: { width: 1280, height: 720 } }, launchOptions: { slowMo: 180 },')
+          p.write_text(s)
+          p = Path('scripts/e2e/run.sh')
+          p.write_text(p.read_text().replace('npx playwright test\n', 'npx playwright test mission-plan-gate.spec.ts mission-plan-compare.spec.ts store-bundles.spec.ts --project=e2e\n'))
+          for name in ['mission-plan-gate', 'mission-plan-compare', 'store-bundles']:
+              p = Path('tests/e2e/' + name + '.spec.ts')
+              p.write_text(p.read_text().replace('await page.screenshot(', 'await page.waitForTimeout(2500); await page.screenshot('))
+          PY
+
+      - name: Playwright E2E (next start, app role)
+        env:
+          CI: "true"
+          E2E_SKIP_BUILD: "1"
+          # NextAuth v5 behind `next start` on localhost.
+          AUTH_TRUST_HOST: "true"
+        # run.sh: migrate (no-op here), seed as the owner, start the server as
+        # E2E_APP_DATABASE_URL, wait for /login, then `npx playwright test`.
+        run: >-
+          E2E_DATABASE_URL="$DATABASE_URL" E2E_APP_DATABASE_URL="$APP_DATABASE_URL"
+          bash scripts/e2e/run.sh
+
+      - name: Server log (on failure)
+        if: failure()
+        run: tail -n 200 /tmp/marketr-e2e-server.log || true
+
+      - name: Upload Playwright report
+        # Always: the visual-gate spec's review screenshots land in
+        # test-results/visual-gate/ on green runs too.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            scripts/e2e/report
+            test-results
+          retention-days: 7
