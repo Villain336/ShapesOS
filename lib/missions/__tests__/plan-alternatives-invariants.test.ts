@@ -34,6 +34,9 @@ describe("drafts-only invariants (source-backed)", () => {
         // prose that leans on an approval/publish step carries the plain note instead
         if (/approv|gate|publish|send/i.test(t.plan.find((x) => x.key === s.key)!.description)) {
           assert.match(s.description, /no step sends or publishes/);
+          // ...and the original clause naming the gate is gone, not left beside the note
+          const body = s.description.replace(/ \(In this variant[^)]*\)/, "");
+          assert.ok(!/approv|gate|publish|send/i.test(body), `${t.id}/${s.key} still names a gate: ${body}`);
         }
       }
       assert.deepEqual(alt.steps.map((s) => s.order), alt.steps.map((_, i) => i + 1));
