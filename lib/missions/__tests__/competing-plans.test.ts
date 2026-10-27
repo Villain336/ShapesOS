@@ -3,7 +3,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { MockLlmProvider } from "@/lib/llm/mock";
-import { composeCandidates, CompetingPlansRefused, buildUserTurn, DEFAULT_LENSES, callCeilingMicroUsd } from "../competing-plans";
+import { composeCandidates, CompetingPlansRefused, buildUserTurn, DEFAULT_LENSES, callCeilingMicroUsd, WRAPPER_TOKEN_ALLOWANCE } from "../competing-plans";
 import { competingPlansGate } from "../competing-plans-gate";
 import { MODEL_PRICES } from "@/lib/llm/pricing";
 
@@ -56,18 +56,15 @@ describe("competing plans (mock provider)", () => {
     assert.equal(turn.split("</goal>").length, 2, "only the real closing tag exists outside the quoted string");
     assert.ok(turn.includes('\\"actor\\"') || turn.includes('\\"'), "quotes are escaped");
   });
-  it("the ceiling is cap-bound arithmetic from the listed price, and null when unpriced", () => {
+  it("the bound is bytes-based (multi-byte text costs more) and null when unpriced", () => {
     const p = MODEL_PRICES[MODEL];
-    assert.equal(callCeilingMicroUsd(MODEL, 1000, 800), Math.ceil(500 * p.input! + 800 * p.output!));
+    assert.equal(callCeilingMicroUsd(MODEL, 1000, 800), Math.ceil((1000 + WRAPPER_TOKEN_ALLOWANCE) * p.input! + 800 * p.output!));
     assert.equal(callCeilingMicroUsd("no-such-model", 10, 10), null);
   });
-  it("gate: off by default; on only with the flag AND a positive integer ceiling", () => {
-    assert.equal(competingPlansGate({}).enabled, false);
-    assert.equal(competingPlansGate({ COMPETING_PLANS_ENABLED: "1" }).enabled, false);
-    assert.equal(competingPlansGate({ COMPETING_PLANS_ENABLED: "1", COMPETING_PLANS_CAP_MICRO_USD: "0" }).enabled, false);
-    assert.equal(competingPlansGate({ COMPETING_PLANS_ENABLED: "1", COMPETING_PLANS_CAP_MICRO_USD: "1.5" }).enabled, false);
-    assert.equal(competingPlansGate({ COMPETING_PLANS_ENABLED: "true", COMPETING_PLANS_CAP_MICRO_USD: "100" }).enabled, false);
-    const on = competingPlansGate({ COMPETING_PLANS_ENABLED: "1", COMPETING_PLANS_CAP_MICRO_USD: "250000" });
-    assert.deepEqual([on.enabled, on.capMicroUsd], [true, 250000]);
+  it("gate: always off, no environment flag can turn it on, and it names what is missing", () => {
+    const g = competingPlansGate();
+    assert.equal(g.enabled, false);
+    assert.ok(g.missing.length >= 3);
+    assert.equal(competingPlansGate.length, 0, "takes no arguments, so no env or option reaches it");
   });
 });
