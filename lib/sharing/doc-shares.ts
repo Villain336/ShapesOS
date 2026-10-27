@@ -10,6 +10,7 @@
 // after runs under the link's own workspace scope. Unknown, expired and
 // revoked tokens all resolve to null (no oracle).
 
+import { assessSnapshot } from "@/lib/sharing/render-support";
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
@@ -96,8 +97,11 @@ export async function createDocShare(input: {
   const row = await withWorkspaceScope(input.workspaceId, async (tx) => {
     // The doc must belong to this workspace — never mint a link to something
     // the actor can't see.
-    const doc = await tx.univerDoc.findFirst({ where: { id: input.docId, workspaceId: input.workspaceId }, select: { id: true } });
+    const doc = await tx.univerDoc.findFirst({ where: { id: input.docId, workspaceId: input.workspaceId }, select: { id: true, kind: true, snapshot: true } });
     if (!doc) throw new Error("DOC_NOT_FOUND");
+    // Never mint a link whose viewer would drop content.
+    const fit = assessSnapshot(doc.kind, doc.snapshot);
+    if (!fit.ok) throw new Error(`UNSUPPORTED_CONTENT:${fit.reason}`);
     return tx.univerDocShare.create({
       data: {
         workspaceId: input.workspaceId,
