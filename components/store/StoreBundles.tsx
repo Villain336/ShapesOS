@@ -65,11 +65,11 @@ export function StoreBundles({ canInstall, onInstalled }: { canInstall: boolean;
     const ok = await confirmAction({
       title: `Install ${chosen.length} item${chosen.length === 1 ? "" : "s"} from "${b.name}"?`,
       description:
-        chosen.map((m) => `${m.name} (${KIND_LABEL[m.kind] ?? m.kind}): ${needsLine(m)}`).join("\n") +
+        chosen.map((m) => `${m.name} (${KIND_LABEL[m.kind] ?? m.kind}): ${needsLine(m)}.`).join(" ") +
         (connectors.length
-          ? `\n\nNot installed by this bundle: ${connectors.map((m) => m.name).join(", ")}. They need your own account or key, which you connect in Settings.`
+          ? ` Not installed by this bundle: ${connectors.map((m) => m.name).join(", ")}. They need your own account or key, which you connect in Settings.`
           : "") +
-        "\n\nEach item is installed with its own permission check, and anything that acts for you still asks for approval when it runs.",
+        " Each item is installed with its own permission check, and anything that acts for you still asks for approval when it runs.",
       confirmLabel: "Install selected",
       cancelLabel: "Cancel",
     });
