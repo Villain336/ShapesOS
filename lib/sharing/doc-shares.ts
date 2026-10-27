@@ -236,12 +236,12 @@ export async function resolveReportShareToken(token: string, now = new Date()): 
 /** Count an open of a shared doc/report page. Best effort. */
 export async function recordDocShareOpen(share: { id: string; workspaceId: string }): Promise<void> {
   await withWorkspaceScope(share.workspaceId, (tx) =>
-    tx.univerDocShare.update({ where: { id: share.id }, data: { openCount: { increment: 1 }, lastOpenedAt: new Date() } }),
+    tx.univerDocShare.update({ where: { id: share.id, workspaceId: share.workspaceId }, data: { openCount: { increment: 1 }, lastOpenedAt: new Date() } }),
   ).catch(() => undefined);
 }
 
 export async function recordReportShareOpen(share: { id: string; workspaceId: string }): Promise<void> {
   await withWorkspaceScope(share.workspaceId, (tx) =>
-    tx.reportShare.update({ where: { id: share.id }, data: { openCount: { increment: 1 }, lastOpenedAt: new Date() } }),
+    tx.reportShare.update({ where: { id: share.id, workspaceId: share.workspaceId }, data: { openCount: { increment: 1 }, lastOpenedAt: new Date() } }),
   ).catch(() => undefined);
 }
