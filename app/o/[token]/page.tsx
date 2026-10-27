@@ -7,7 +7,7 @@
 import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
 import { recordDocShareOpen, resolveDocShareToken } from "@/lib/sharing/doc-shares";
-import SharedDocEmbed from "@/components/office/SharedDocEmbed";
+import SharedDocView from "@/components/office/SharedDocView";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function SharedDocPage({ params }: { params: Promise<{ toke
           </p>
         </div>
       </header>
-      <SharedDocEmbed kind={doc.kind} snapshot={doc.snapshot} />
+      <SharedDocView kind={doc.kind} snapshot={doc.snapshot} />
       <footer className="text-center text-xs text-subtle">
         Shared via ShapesOS. This is a read-only link; it can be revoked at any time.
       </footer>
