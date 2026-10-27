@@ -81,7 +81,7 @@ describe("selectPlanAlternative", () => {
     const rev0 = planRevision(m.planSnapshot);
     const res = await Promise.allSettled([
       selectPlanAlternative(d, m.id, WS, USER, { alternativeId: "drafts-only", expectedRevision: rev0 }),
-      selectPlanAlternative(d, m.id, WS, USER, { alternativeId: "review-first", expectedRevision: rev0 }),
+      selectPlanAlternative(d, m.id, WS, USER, { alternativeId: "drafts-only", expectedRevision: rev0 }),
     ]);
     assert.equal(res.filter((r) => r.status === "fulfilled").length, 1);
     const events = (await d.store.listEvents(m.id, WS)).filter((e) => e.step === "mission.plan_alternative_selected");
