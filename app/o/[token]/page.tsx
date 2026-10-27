@@ -47,7 +47,7 @@ export default async function SharedDocPage({ params }: { params: Promise<{ toke
       </header>
       {(() => {
         const a = assessSnapshot(doc.kind, doc.snapshot);
-        return a.ok ? <SharedDocView kind={doc.kind} snapshot={doc.snapshot} /> : <UnsupportedShare reason={a.reason} />;
+        return a.ok ? <SharedDocView kind={doc.kind} snapshot={doc.snapshot} /> : <UnsupportedShare />;
       })()}
       <footer className="text-center text-xs text-subtle">
         Shared via ShapesOS. This is a read-only link; it can be revoked at any time.
