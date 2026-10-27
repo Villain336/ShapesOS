@@ -1,0 +1,721 @@
+{
+  "id": "doc_mvqgbue9_g0826lu",
+  "body": {
+    "tables": [
+      {
+        "tableId": "RP511U",
+        "endIndex": 86,
+        "startIndex": 18
+      }
+    ],
+    "textRuns": [
+      {
+        "ed": 86,
+        "st": 0,
+        "ts": {
+          "cl": {
+            "rgb": "#1B1C1F"
+          }
+        }
+      },
+      {
+        "ed": 88,
+        "st": 87,
+        "ts": {
+          "cl": {
+            "rgb": "#1B1C1F"
+          }
+        }
+      }
+    ],
+    "dataStream": "Editor table test\r\u001a\u001b\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u000e\u001b\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u000e\u001b\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u001c\r\n\u001d\u000e\u000f\r\r\n",
+    "paragraphs": [
+      {
+        "startIndex": 17,
+        "paragraphId": "para_Tx67U1Cy456l"
+      },
+      {
+        "startIndex": 21,
+        "paragraphId": "para_sRO8KKB2N_x6",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 25,
+        "paragraphId": "para_LXea0KKzm3PR",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 29,
+        "paragraphId": "para_nPrUqN3HoNeo",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 33,
+        "paragraphId": "para_epZzCKfDLhTB",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 37,
+        "paragraphId": "para_sxuO1Qp6Dy5r",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 43,
+        "paragraphId": "para_flJ0o5Qddlsr",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 47,
+        "paragraphId": "para_ZSggho0kWpxD",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 51,
+        "paragraphId": "para_8XTr8Z1BFM9m",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 55,
+        "paragraphId": "para_aA1QBpvTxt1x",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 59,
+        "paragraphId": "para_T9YoMnOvvRJh",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 65,
+        "paragraphId": "para_RCnxVG4pMPrD",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 69,
+        "paragraphId": "para_ui6rt_S0i-kt",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 73,
+        "paragraphId": "para_Tg8regWMaTBk",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 77,
+        "paragraphId": "para_2sGVQny0dGSR",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 81,
+        "paragraphId": "para_UjqiQtKNqITO",
+        "paragraphStyle": {
+          "spaceAbove": {
+            "v": 3
+          },
+          "spaceBelow": {
+            "v": 0
+          },
+          "lineSpacing": 2
+        }
+      },
+      {
+        "startIndex": 86,
+        "paragraphId": "para_GoqgxXQ01yDv"
+      },
+      {
+        "startIndex": 87,
+        "paragraphId": "p0"
+      }
+    ],
+    "customRanges": [],
+    "sectionBreaks": [
+      {
+        "sectionId": "section_ArWuutyGhId_",
+        "startIndex": 22
+      },
+      {
+        "sectionId": "section_qrdGACfL_RlA",
+        "startIndex": 26
+      },
+      {
+        "sectionId": "section_hIJ__N5yZ57e",
+        "startIndex": 30
+      },
+      {
+        "sectionId": "section_s0wh6taisYCO",
+        "startIndex": 34
+      },
+      {
+        "sectionId": "section_SiPJYe8W-Ety",
+        "startIndex": 38
+      },
+      {
+        "sectionId": "section_BZj2FiVT5zJL",
+        "startIndex": 44
+      },
+      {
+        "sectionId": "section_eTYlhpnawSwn",
+        "startIndex": 48
+      },
+      {
+        "sectionId": "section_-PKI8j9C9jts",
+        "startIndex": 52
+      },
+      {
+        "sectionId": "section_X9D7Pl941rw8",
+        "startIndex": 56
+      },
+      {
+        "sectionId": "section_Hbox8XVHrBzu",
+        "startIndex": 60
+      },
+      {
+        "sectionId": "section_2vIlzU_jKzZw",
+        "startIndex": 66
+      },
+      {
+        "sectionId": "section_-moeDO_6XwfH",
+        "startIndex": 70
+      },
+      {
+        "sectionId": "section_DQlp6cjB1mhZ",
+        "startIndex": 74
+      },
+      {
+        "sectionId": "section_5W_9uVnPlGHy",
+        "startIndex": 78
+      },
+      {
+        "sectionId": "section_Qno9WEF9VOku",
+        "startIndex": 82
+      }
+    ],
+    "customDecorations": []
+  },
+  "notes": {},
+  "title": "Editor table doc",
+  "locale": "enUS",
+  "footers": {},
+  "headers": {},
+  "drawings": {},
+  "settings": {},
+  "resources": [
+    {
+      "data": "[]",
+      "name": "DOC_OBJECT_PERMISSION_PLUGIN"
+    },
+    {
+      "data": "",
+      "name": "DOC_WORD_STYLES_PLUGIN"
+    },
+    {
+      "data": "",
+      "name": "DOC_NOTE_PLUGIN"
+    }
+  ],
+  "tableSource": {
+    "RP511U": {
+      "dist": {
+        "distB": 0,
+        "distL": 0,
+        "distR": 0,
+        "distT": 0
+      },
+      "size": {
+        "type": 0,
+        "width": {
+          "v": 826.6666666666667
+        }
+      },
+      "align": 0,
+      "indent": {
+        "v": 0
+      },
+      "tableId": "RP511U",
+      "position": {
+        "positionH": {
+          "posOffset": 0,
+          "relativeFrom": 0
+        },
+        "positionV": {
+          "posOffset": 0,
+          "relativeFrom": 0
+        }
+      },
+      "textWrap": 0,
+      "tableRows": [
+        {
+          "trHeight": {
+            "val": {
+              "v": 30
+            },
+            "hRule": 0
+          },
+          "tableCells": [
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "trHeight": {
+            "val": {
+              "v": 30
+            },
+            "hRule": 0
+          },
+          "tableCells": [
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "trHeight": {
+            "val": {
+              "v": 30
+            },
+            "hRule": 0
+          },
+          "tableCells": [
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            },
+            {
+              "margin": {
+                "end": {
+                  "v": 10
+                },
+                "top": {
+                  "v": 5
+                },
+                "start": {
+                  "v": 10
+                },
+                "bottom": {
+                  "v": 5
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "cellMargin": {
+        "end": {
+          "v": 10
+        },
+        "top": {
+          "v": 5
+        },
+        "start": {
+          "v": 10
+        },
+        "bottom": {
+          "v": 5
+        }
+      },
+      "tableColumns": [
+        {
+          "size": {
+            "type": 1,
+            "width": {
+              "v": 165.3333333333333
+            }
+          }
+        },
+        {
+          "size": {
+            "type": 1,
+            "width": {
+              "v": 165.3333333333333
+            }
+          }
+        },
+        {
+          "size": {
+            "type": 1,
+            "width": {
+              "v": 165.3333333333333
+            }
+          }
+        },
+        {
+          "size": {
+            "type": 1,
+            "width": {
+              "v": 165.3333333333333
+            }
+          }
+        },
+        {
+          "size": {
+            "type": 1,
+            "width": {
+              "v": 165.3333333333333
+            }
+          }
+        }
+      ]
+    }
+  },
+  "noteSettings": {},
+  "documentStyle": {
+    "pageSize": {
+      "width": 960,
+      "height": 1122.666666666667
+    },
+    "marginTop": 50,
+    "marginLeft": 50,
+    "marginRight": 50,
+    "marginBottom": 50,
+    "marginFooter": 30,
+    "marginHeader": 30,
+    "renderConfig": {
+      "background": {
+        "rgb": "#ccc"
+      },
+      "centerAngle": 0,
+      "vertexAngle": 0,
+      "zeroWidthParagraphBreak": 0
+    },
+    "documentFlavor": 2,
+    "autoHyphenation": 1,
+    "defaultFooterId": "",
+    "defaultHeaderId": "",
+    "evenPageFooterId": "",
+    "evenPageHeaderId": "",
+    "evenAndOddHeaders": 0,
+    "firstPageFooterId": "",
+    "firstPageHeaderId": "",
+    "doNotHyphenateCaps": 0,
+    "consecutiveHyphenLimit": 2,
+    "useFirstPageHeaderFooter": 0
+  },
+  "drawingsOrder": []
+}
