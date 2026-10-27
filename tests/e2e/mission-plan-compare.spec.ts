@@ -36,8 +36,12 @@ test("the plan variants can be compared step by step, labelled as variants", asy
     await expect(panel.getByTestId(`compare-row-${s.key}`)).toContainText("Not in this variant");
   }
   await expect(panel).toContainText("no time or cost estimate");
-  await panel.scrollIntoViewIfNeeded();
-  await panel.screenshot({ path: `${SHOTS}/compare-open.png` });
+  await expect(panel.getByTestId("compare-legend")).toContainText("CP = a checkpoint label");
+  // Put the whole panel above the fixed floating controls before capturing.
+  await panel.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  const pb = (await panel.boundingBox())!;
+  expect(pb.y + pb.height, "panel ends above the bottom-corner controls").toBeLessThanOrEqual(page.viewportSize()!.height - 90);
+  await page.screenshot({ path: `${SHOTS}/compare-open.png` });
 
   // Comparing changes nothing: the mission is still the unstarted draft.
   const detail = (await (await page.request.get(`/api/missions/${id}`)).json()) as { mission: { status: string } };
@@ -45,7 +49,6 @@ test("the plan variants can be compared step by step, labelled as variants", asy
 
   // Narrow viewport: the controls stay reachable and nothing in the table is clipped off-screen.
   await page.setViewportSize({ width: 390, height: 844 });
-  await panel.scrollIntoViewIfNeeded();
   await expect(table).toBeVisible();
   const box = await table.boundingBox();
   expect(box, "table has a box").not.toBeNull();
@@ -54,6 +57,12 @@ test("the plan variants can be compared step by step, labelled as variants", asy
   await expect(table).toBeHidden();
   await panel.getByText("Compare steps side by side").click();
   await expect(table).toBeVisible();
-  await panel.scrollIntoViewIfNeeded();
+  // Last rows and the summary can be scrolled fully above the fixed controls.
+  const last = panel.getByText("compared with Full plan").last();
+  await last.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const lb = (await last.boundingBox())!;
+  expect(lb.y + lb.height, "summary sits above the bottom-corner controls").toBeLessThanOrEqual(844 - 90);
   await page.screenshot({ path: `${SHOTS}/compare-narrow-viewport.png` });
+  await panel.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await page.screenshot({ path: `${SHOTS}/compare-narrow-top.png` });
 });
