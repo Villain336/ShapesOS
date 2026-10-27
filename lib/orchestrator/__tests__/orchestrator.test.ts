@@ -3,6 +3,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { DispatchError } from "../orchestrator";
 
 import {
   runMission,
@@ -61,6 +62,26 @@ function baseDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
 // ---------------------------------------------------------------------------
 
 describe("orchestrator routing state", () => {
+  it("failed work keeps its recorded cost and stops at the existing cost budget before the next dispatch", async () => {
+    const log = eventLog();
+    let calls = 0;
+    const result = await runMission({
+      missionId: MISSION, workspaceId: WS, costBudgetCents: 10,
+      initialTasks: [task("research", "first"), task("analyze", "second")],
+      deps: baseDeps({ appendEvent: log.append, dispatch: async () => {
+        calls++;
+        throw new DispatchError("model failed after usage", 12);
+      } }),
+    });
+    assert.equal(calls, 1);
+    assert.equal(result.reason, "cost_budget");
+    assert.equal(result.costCents, 12);
+    const failed = log.events.find((e) => e.step === "exec.1.error");
+    assert.equal(failed?.costCents, 12);
+    assert.equal(failed?.observation?.failure, true);
+    assert.ok(!log.events.some((e) => e.step === "exec.1"), "failed work is not a successful step");
+  });
+
   it("records { nextAgent, routingReason } on every delegation", async () => {
     const log = eventLog();
     const seen: Array<{ executor: string; kind: string }> = [];
