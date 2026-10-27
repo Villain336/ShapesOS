@@ -117,6 +117,8 @@ export interface MissionStore {
   /** Hash-chained append (GENESIS -> ...), same chain contract as M1's audit.appendMissionEvent. */
   appendEvent(missionId: string, workspaceId: string, input: AppendEventInput): Promise<StoredMissionEvent>;
   listEvents(missionId: string, workspaceId: string, limit?: number): Promise<StoredMissionEvent[]>;
+  /** One event by id within the mission and workspace (null otherwise). Not subject to the listEvents cap. */
+  getEvent(missionId: string, workspaceId: string, eventId: string): Promise<StoredMissionEvent | null>;
   createApproval(input: CreateApprovalInput): Promise<StoredMissionApproval>;
   getApproval(approvalId: string, workspaceId: string): Promise<StoredMissionApproval | null>;
   listApprovals(missionId: string, workspaceId: string): Promise<StoredMissionApproval[]>;
@@ -252,6 +254,11 @@ export function createMemoryMissionStore(): MissionStore {
       scopedMission(missionId, workspaceId);
       const list = events.get(missionId) ?? [];
       return list.slice(-limit);
+    },
+
+    async getEvent(missionId, workspaceId, eventId) {
+      scopedMission(missionId, workspaceId);
+      return (events.get(missionId) ?? []).find((e) => e.id === eventId) ?? null;
     },
 
     async createApproval(input) {

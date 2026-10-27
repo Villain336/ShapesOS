@@ -30,6 +30,7 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
   const [data, setData] = useState<Data | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cp, setCp] = useState<{ enabled: boolean; reason: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -38,6 +39,8 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
       if (!r.ok) throw new Error(j.error ?? `Request failed (${r.status})`);
       setData(j);
       setError(null);
+      const c = await fetch(`/api/missions/${missionId}/competing-plans`);
+      if (c.ok) setCp((await c.json()) as { enabled: boolean; reason: string });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load the plan alternatives.");
     }
@@ -110,6 +113,14 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
           );
         })}
       </ul>
+      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md bg-canvas p-3" data-testid="competing-plans-gate">
+        <button type="button" className={aosButton({ variant: "secondary", size: "sm" })} disabled>
+          Generate competing plans
+        </button>
+        <p className="text-xs text-muted">
+          Independent competing plans are not available. {cp ? cp.reason : "They would call a paid model."}
+        </p>
+      </div>
     </section>
   );
 }

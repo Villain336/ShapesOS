@@ -239,6 +239,13 @@ export function createPrismaMissionStore(): MissionStore {
       return rows.map((r) => toEvent(r as MissionEventRow));
     },
 
+    async getEvent(missionId, workspaceId, eventId) {
+      const r = await withWorkspaceScope(workspaceId, (tx) =>
+        tx.missionEvent.findFirst({ where: { id: eventId, missionId, workspaceId } }),
+      );
+      return r ? toEvent(r as MissionEventRow) : null;
+    },
+
     async createApproval(input: CreateApprovalInput) {
       const r = await withWorkspaceScope(input.workspaceId, (tx) =>
         tx.missionApproval.create({
