@@ -110,8 +110,9 @@ export async function loadStoredCandidate(deps: EngineDeps, missionId: string, w
   if (cut < 1) return null;
   const eventId = candidateId.slice(0, cut);
   const index = Number(candidateId.slice(cut + 1));
-  const events = await deps.store.listEvents(missionId, workspaceId);
-  const ev = events.find((e) => e.id === eventId && e.step === CANDIDATES_EVENT_STEP);
+  // Direct lookup by id: a stored batch never falls behind the listEvents cap on a busy mission.
+  const found = await deps.store.getEvent(missionId, workspaceId, eventId);
+  const ev = found && found.step === CANDIDATES_EVENT_STEP ? found : null;
   const obs = ev?.observation as { baseRevision?: unknown; candidates?: { index: number; candidate: unknown }[] } | undefined;
   const hit = obs?.candidates?.find((c) => c.index === index);
   if (!ev || !hit || typeof obs?.baseRevision !== "string") return null;
