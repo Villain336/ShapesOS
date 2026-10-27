@@ -28,6 +28,18 @@ import { runAnalyst } from "./executors/analyst";
 import { runScheduler } from "./executors/scheduler";
 import { runActor } from "./executors/actor";
 
+
+// A failed executor may already have used metered model tokens. Carry that cost through the error
+// so failure does not erase it from the mission budget. An ordinary Error supplies no cost evidence.
+export class DispatchError extends Error {
+  readonly costCents: number;
+  constructor(message: string, costCents: number) {
+    super(message);
+    this.name = "DispatchError";
+    this.costCents = Number.isFinite(costCents) ? Math.max(0, Math.ceil(costCents)) : 0;
+  }
+}
+
 /** Circuit breaker: hard cap on routing hops per run (research: ~15–25). */
 export const MAX_ROUTING_HOPS = 20;
 /** Default caps — deterministic termination, checked each hop. */
@@ -389,12 +401,16 @@ export async function runMission(opts: RunMissionOptions): Promise<RunMissionRes
       if (res.followUps && res.followUps.length > 0) queue.push(...res.followUps);
     } catch (err) {
       consecutiveFailures += 1;
+      // Only a typed failure carries evidence of usage. Do not invent a cost for ordinary throws.
+      const failureCostCents = err instanceof DispatchError ? err.costCents : 0;
+      spentCents += failureCostCents;
       const message = err instanceof Error ? err.message : String(err);
       await log({
         actor: routing.nextAgent,
         step: `exec.${hops}.error`,
         tool: routing.nextAgent,
-        observation: { error: message, consecutiveFailures },
+        observation: { error: message, consecutiveFailures, failure: true, costCents: failureCostCents },
+        costCents: failureCostCents,
       });
       if (consecutiveFailures >= maxFailures) {
         await escalate("consecutive_failures", `${maxFailures} consecutive executor failures (last: ${message.slice(0, 200)}).`);
