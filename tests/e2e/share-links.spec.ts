@@ -100,6 +100,11 @@ test.describe("share links beyond Studio", () => {
 
     // The public page: a fresh, signed-out context sees the read-only doc.
     const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } }); // explicitly signed out: the config storageState is otherwise inherited
+    // Positive control: the same authenticated-only endpoint answers 200 for the
+    // logged-in page and 401 for this context, so inherited auth state can never
+    // silently turn the public-route checks below into logged-in checks.
+    expect((await page.request.get(`/api/office/docs/${doc.id}/shares`)).status(), "control: logged-in context is authenticated").toBe(200);
+    expect((await anon.request.get(`/api/office/docs/${doc.id}/shares`)).status(), "control: fresh context is unauthenticated").toBe(401);
     const pub = await anon.newPage();
     const res = await pub.goto(`/o/${token}`, { waitUntil: "domcontentloaded" });
     expect(res!.status(), "public page 200").toBe(200);
@@ -164,6 +169,11 @@ test.describe("share links beyond Studio", () => {
     expect(token.startsWith("rsh_")).toBe(true);
 
     const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } }); // explicitly signed out: the config storageState is otherwise inherited
+    // Positive control: the same authenticated-only endpoint answers 200 for the
+    // logged-in page and 401 for this context, so inherited auth state can never
+    // silently turn the public-route checks below into logged-in checks.
+    expect((await page.request.get(`/api/reports/${reportId}/shares`)).status(), "control: logged-in context is authenticated").toBe(200);
+    expect((await anon.request.get(`/api/reports/${reportId}/shares`)).status(), "control: fresh context is unauthenticated").toBe(401);
     // Route contract: PDF bytes, inline disposition, noindex, exact length.
     const res = await anon.request.get(`/r/report/${token}/raw`);
     expect(res.status(), "public PDF bytes 200").toBe(200);
