@@ -70,3 +70,50 @@ export async function adoptCandidate(
   });
   return { mission: replaced, planRevision: next };
 }
+
+// ---------------------------------------------------------------------------
+// Persistence WITHOUT a new table: candidates are recorded as an event on the
+// mission's hash-chained, workspace-scoped (row-level-security) event log.
+// Append-only, so a stored candidate cannot be edited afterwards, and the chain
+// makes tampering visible. Tenant isolation is the existing mission_events policy.
+// Nothing calls recordCandidates yet: only a future, authorized and metered
+// generation path would. Role checks belong to that route, not to this module.
+// ---------------------------------------------------------------------------
+
+export const CANDIDATES_EVENT_STEP = "mission.plan_candidates_recorded";
+
+/** Records only candidates that pass the schema; returns the event id and per-index stored ids. */
+export async function recordCandidates(
+  deps: EngineDeps,
+  input: { missionId: string; workspaceId: string; userId: string; baseRevision: string; candidates: { lensId: string; candidate: unknown }[] },
+): Promise<{ eventId: string; stored: StoredCandidate[] }> {
+  const { missionId, workspaceId, userId, baseRevision } = input;
+  const mission = await deps.store.getMission(missionId, workspaceId);
+  if (!mission) throw new MissionError("Mission not found in workspace.", 404);
+  if (planRevision(mission.planSnapshot) !== baseRevision) throw new MissionError("The plan changed while candidates were composed; they were not recorded.", 409);
+  const valid = input.candidates.flatMap((c, index) => {
+    const parsed = CandidateSchema.safeParse(c.candidate);
+    return parsed.success ? [{ index, lensId: c.lensId, candidate: parsed.data }] : [];
+  });
+  if (valid.length === 0) throw new MissionError("No candidate passed validation; nothing was recorded.", 422);
+  const ev = await deps.store.appendEvent(missionId, workspaceId, {
+    actor: userId,
+    step: CANDIDATES_EVENT_STEP,
+    observation: { baseRevision, candidates: valid, note: "Proposals only. Nothing here changes the plan until a person adopts one." },
+  });
+  return { eventId: ev.id, stored: valid.map((v) => ({ id: `${ev.id}:${v.index}`, workspaceId, missionId, baseRevision, candidate: v.candidate })) };
+}
+
+/** Loads a recorded candidate by "<eventId>:<index>" within the mission and workspace, else null. */
+export async function loadStoredCandidate(deps: EngineDeps, missionId: string, workspaceId: string, candidateId: string): Promise<StoredCandidate | null> {
+  const cut = candidateId.lastIndexOf(":");
+  if (cut < 1) return null;
+  const eventId = candidateId.slice(0, cut);
+  const index = Number(candidateId.slice(cut + 1));
+  const events = await deps.store.listEvents(missionId, workspaceId);
+  const ev = events.find((e) => e.id === eventId && e.step === CANDIDATES_EVENT_STEP);
+  const obs = ev?.observation as { baseRevision?: unknown; candidates?: { index: number; candidate: unknown }[] } | undefined;
+  const hit = obs?.candidates?.find((c) => c.index === index);
+  if (!ev || !hit || typeof obs?.baseRevision !== "string") return null;
+  return { id: candidateId, workspaceId, missionId, baseRevision: obs.baseRevision, candidate: hit.candidate };
+}
