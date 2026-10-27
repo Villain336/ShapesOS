@@ -16,7 +16,7 @@ test.describe("share links beyond Studio", () => {
   test("an Office doc shares by token link; the public page is read-only, private-clean, and dies on revoke", async ({ page, browser }) => {
     loadIds();
     const create = await page.request.post("/api/office/docs", {
-      data: { kind: "doc", title: "Share-gate pixel doc", snapshot: { body: { textRuns: [{ st: 0, ed: 5, ts: {} }] } } },
+      data: { kind: "doc", title: "Share-gate pixel doc" }, // no snapshot: the route builds a valid blank one
     });
     expect(create.status(), "doc created").toBe(201);
     const { doc } = (await create.json()) as { doc: { id: string } };
