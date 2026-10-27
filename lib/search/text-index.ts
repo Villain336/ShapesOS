@@ -205,17 +205,20 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
   const text = extracted.text.slice(0, TEXT_INDEX_LIMITS.maxChars);
   const hash = sha256(`${extracted.status}\n${text}`);
   const key = target.fileId ? { fileId: target.fileId } : { univerDocId: target.univerDocId! };
-  const existing = await withWorkspaceScope(target.workspaceId, (tx) =>
-    tx.searchText.findFirst({ where: { workspaceId: target.workspaceId, ...key }, select: { id: true, contentSha256: true, embeddedCount: true, chunkCount: true } }),
-  );
-  if (existing && existing.contentSha256 === hash && !opts.force) {
-    const missingEmbeds = opts.embed !== false ? await embedPending(target.workspaceId, existing.id, opts.embedder) : 0;
-    return { status: "unchanged", chunks: existing.chunkCount, embedded: existing.embeddedCount + missingEmbeds };
-  }
   const chunks = extracted.status === "indexed" ? chunkText(text) : [];
   const id = await withWorkspaceScope(
     target.workspaceId,
     async (tx) => {
+      // Serialize writers for this source, including the initial insert. Reading `existing`
+      // outside this transaction let two background indexers both choose create and one lose
+      // to the source's unique key. Lock before rechecking freshness and reading the row.
+      const lockKey = `search-text:${target.workspaceId}:${target.source}:${target.fileId ?? target.univerDocId}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
+      const existing = await tx.searchText.findFirst({
+        where: { workspaceId: target.workspaceId, ...key },
+        select: { id: true },
+      });
       const data = {
         workspaceId: target.workspaceId,
         source: target.source,
@@ -230,7 +233,6 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
         error: extracted.error ?? null,
         indexedAt: new Date(),
       };
-      if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
       const row = existing
         ? await tx.searchText.update({ where: { id: existing.id, workspaceId: target.workspaceId }, data })
         : await tx.searchText.create({ data: { ...data, ...key } });
