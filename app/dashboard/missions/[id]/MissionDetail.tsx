@@ -660,7 +660,7 @@ export function MissionDetail({ missionId }: { missionId: string }) {
           {timeline && v ? (
             <RunTimeline
               title="Mission timeline"
-              subtitle={startedAt ? `Strategist started this mission at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Strategist leads this mission"}
+              subtitle={startedAt && m.status === "planned" ? `Strategist drafted this plan at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Not started yet.` : startedAt ? `Strategist started this mission at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Strategist leads this mission"}
               status={v.status}
               steps={timeline.steps}
               completed={timeline.completed}
