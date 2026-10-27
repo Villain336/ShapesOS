@@ -1,4 +1,4 @@
-// Drafts-only / review-first invariants, read from the REAL executor allow-lists
+// Drafts-only invariants, read from the REAL executor allow-lists
 // (imports the executors, so it needs the app dependencies; runs in CI).
 // Run: npx tsx --test lib/missions/__tests__/plan-alternatives-invariants.test.ts
 import { describe, it } from "node:test";
@@ -40,17 +40,10 @@ describe("drafts-only invariants (source-backed)", () => {
       assert.deepEqual(alt.omitted.sort(), removed.map((r) => r.title).sort());
     }
   });
-  it("review-first changes only checkpointAfter: executors, kinds, tiers, approval steps all identical", () => {
+  it("no variant is offered whose only difference is the checkpointAfter label", () => {
     for (const t of MISSION_TEMPLATES) {
-      const alt = buildPlanAlternatives(t).find((a) => a.id === "review-first");
-      if (!alt) continue;
-      assert.equal(alt.steps.length, t.plan.length);
-      alt.steps.forEach((s, i) => {
-        const { checkpointAfter: _a, ...rest } = s;
-        const { checkpointAfter: _b, ...orig } = t.plan[i];
-        assert.deepEqual(rest, orig);
-        assert.equal(s.checkpointAfter, true);
-      });
+      const ids = buildPlanAlternatives(t).map((a) => a.id);
+      assert.ok(!(ids as string[]).includes("review-first"));
     }
   });
 });
