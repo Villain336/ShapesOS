@@ -300,7 +300,7 @@ SSO_DEFAULT_ROLE=
 
 Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (shapesos-db-app), `CRON_SECRET` (shapesos-web), `REMINDERS_CRON_SECRET` (shapesos-web), `AUTH_SECRET` (shapesos-shared), `MARKETR_CREDENTIALS_KEY` (shapesos-shared), `MARKETR_APPROVAL_SECRET` (shapesos-shared), `AUTHORITY_APPROVAL_SECRET` (shapesos-shared), `MESSAGING_UNSUBSCRIBE_SECRET` (shapesos-shared), `MESSAGING_INBOUND_EMAIL_SECRET` (shapesos-shared), `PAYLOAD_SECRET` (shapesos-shared), `PIXEL_SIGNING_SECRET` (shapesos-shared), `SRA_SIGNING_SECRET` (shapesos-shared), `ACTION_OAUTH_STATE_SECRET` (shapesos-shared), `CALLRAIL_WEBHOOK_SECRET` (shapesos-web).
 
-<details><summary>Not set on Render, on purpose (260 keys)</summary>
+<details><summary>Not set on Render, on purpose (264 keys)</summary>
 
 | Why | Keys |
 |---|---|
@@ -379,6 +379,9 @@ Render generates these once, on the first Blueprint apply: `APP_DB_PASSWORD` (sh
 | prototype flag, off | `MARKETR_LDE_PROTOTYPE` |
 | default https://zernio.com/api | `ZERNIO_BASE_URL` |
 | default e2b.app | `E2B_DOMAIN` |
+| dev-preview browser flag stays off until the owner enables it | `SHAPES_DEV_PREVIEW` |
+| spend gate stays unset - dev sandboxes fail closed without owner approval | `SHAPES_DEV_PREVIEW_SPEND` |
+| bounded test window only; never set on hosted | `SHAPES_DEV_PREVIEW_TEST`, `SHAPES_DEV_PREVIEW_TEST_UNTIL` |
 | default base | `E2B_TEMPLATE` |
 | E2B is the hosted sandbox provider | `DAYTONA_API_KEY`, `DAYTONA_API_URL`, `DAYTONA_SNAPSHOT` |
 | no Docker socket on Render; sandboxes run on E2B | `DOCKER_HOST` |
