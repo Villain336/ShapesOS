@@ -43,6 +43,9 @@ test.describe("store bundles", () => {
     await seo.getByRole("button", { name: /Install selected \(1\)/ }).click();
     await expect(page.getByText(/Install 1 item from "SEO growth kit"\?/)).toBeVisible();
     await expect(page.getByText(/Not installed by this bundle: .*Google Search Console/)).toBeVisible();
+    // The dialog fades in: wait for its animations to finish so the pixel shows it fully painted.
+    await expect(page.getByRole("button", { name: "Install selected", exact: true })).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     await page.screenshot({ path: `${SHOTS}/bundle-confirm.png`, fullPage: false });
     await page.getByRole("button", { name: "Install selected", exact: true }).click();
     await expect(seo.getByText("Already installed")).toBeVisible();
