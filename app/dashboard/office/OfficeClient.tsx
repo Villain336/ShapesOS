@@ -14,8 +14,10 @@ import {
   Loader2,
   ArrowLeft,
   Download,
+  Share2,
 } from "lucide-react";
 import { confirmAction } from "@/lib/ui/feedback";
+import ShareLinksPanel from "@/components/sharing/ShareLinksPanel";
 
 const UniverEmbed = dynamic(() => import("@/components/office/UniverEmbed"), {
   ssr: false,
@@ -72,6 +74,7 @@ function fmtDate(iso: string): string {
 export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[]; openId?: string }) {
   const [docs, setDocs] = useState<DocSummary[]>(initialDocs);
   const [openDoc, setOpenDoc] = useState<FullDoc | null>(null);
+  const [showShare, setShowShare] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -219,12 +222,29 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
                 </a>
               </>
             ) : null}
+            <button
+              type="button"
+              onClick={() => setShowShare((v) => !v)}
+              className={btnSecondary}
+              title="Share a read-only link to this doc"
+            >
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
             <span className={kindBadge}>
               <meta.icon className="h-3 w-3" /> {meta.label} · v{openDoc.version}
             </span>
           </div>
         </div>
         <h2 className="aos-subheading">{openDoc.title}</h2>
+        {showShare ? (
+          <ShareLinksPanel
+            endpoint={`/api/office/docs/${openDoc.id}/shares`}
+            subjectLabel="document"
+            publicPath={(token) => `/o/${token}`}
+            limitsNote="The shared view shows plain text, headings, bold/italic/underline, bullets, sheet cell values and slide text. Plain tables and web (http, https, mailto) links are shown too. Documents with images, drawings, merged cells, nested tables, internal links or other link types can't be shared yet, and the link is refused rather than shown incomplete. If a shared document later gains such content, its link shows as unavailable."
+          />
+        ) : null}
         {editable ? (
           <UniverEmbed
             key={openDoc.id}
