@@ -242,6 +242,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
             endpoint={`/api/office/docs/${openDoc.id}/shares`}
             subjectLabel="document"
             publicPath={(token) => `/o/${token}`}
+            limitsNote="The shared view shows plain text, headings, bold/italic/underline, bullets, sheet cell values and slide text. Documents with tables, images, links, merged cells or shapes can't be shared yet, and the link is refused rather than shown incomplete. If a shared document later gains such content, its link shows as unavailable."
           />
         ) : null}
         {editable ? (
