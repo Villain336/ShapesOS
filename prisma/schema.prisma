@@ -572,6 +572,7 @@ enum SiteSourceType {
 }
 
 model Workspace {
+  instructionRevisions WorkspaceInstructionRevision[]
   attributionBundles AttributionBundle[]
   id                 String              @id @default(cuid())
   name               String
@@ -18231,4 +18232,24 @@ model AgentRunFolder {
   @@unique([runId, folderPath])
   @@index([workspaceId, runId])
   @@map("agent_run_folders")
+}
+
+// ============================================================
+// Phase 25: shared workspace instructions (admin-written guidance that is
+// included in agent context). Append-only; current = highest revision.
+// Guidance, not enforcement: it never replaces approval, spend or security
+// gates.
+// ============================================================
+model WorkspaceInstructionRevision {
+  id             String   @id @default(cuid()) @map("id")
+  workspaceId    String   @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  revision       Int      @map("revision")
+  body           String   @map("body") @db.Text
+  createdBy      String   @map("created_by")
+  createdByLabel String?  @map("created_by_label")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, revision])
+  @@map("workspace_instruction_revisions")
 }
