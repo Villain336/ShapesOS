@@ -106,3 +106,20 @@ describe("workspaceContextBlock + withContextBlock", () => {
     assert.deepEqual(withContextBlock([{ role: "user", content: "q" }], ""), [{ role: "user", content: "q" }], "no block → untouched");
   });
 });
+
+describe("workspaceContextBlock shared instructions (Phase 25)", () => {
+  it("places shared instructions after company intelligence and before the project context", () => {
+    const block = workspaceContextBlock({
+      projectContext: "Project: x",
+      intelligence: "## HARD CONSTRAINTS - STYLE RULES\n- never say cheap",
+      sharedInstructions: "## SHARED WORKSPACE INSTRUCTIONS\nAlways cite sources.",
+    });
+    const a = block.indexOf("HARD CONSTRAINTS");
+    const b = block.indexOf("SHARED WORKSPACE INSTRUCTIONS");
+    const c = block.indexOf("## PROJECT CONTEXT");
+    assert.ok(a >= 0 && a < b && b < c);
+  });
+  it("omits the section when none is set", () => {
+    assert.equal(workspaceContextBlock({ projectContext: "Project: x" }).includes("SHARED WORKSPACE"), false);
+  });
+});

@@ -1,18 +1,18 @@
-// ShapesOS — the agent home, as a desktop (Phase 18.1, WS=desk).
+// ShapesOS — Home is the Feed (approved flat-feed redesign, WS=desk).
 //
-// Top to bottom: the workspace headline, status banners when something needs
-// the member (approvals waiting → yellow "Review all"; work that stopped →
-// red "Reconnect" / "Open"), then the member's desktop: a grid of widgets
-// they arrange (components/desktop/Desktop.tsx). The widgets are the cards the
-// Overview always had — the lead agent with its sub-agents (DESIGN.md "one
-// lead, many sub-agents"), live activity, missions and schedules, the
-// attention queue, projects, "win this week" — plus Needs you, running
-// agents, today's calendar, the inbox, the pipeline, cash, twin KPIs and the
-// agent-written Today briefing. Only the placed widgets load (in parallel,
-// lib/desktop/loaders.server.ts); a widget whose source fails shows its own
-// error and the rest of Home still renders. Layout per member per workspace,
-// default per role (lib/desktop/layout.ts).
+// Top to bottom: the greeting, status banners when something needs the
+// member, then one flat column — hairline-divided rows, not boxed widgets:
+// "Needs you" (pending approvals, each with the queue's own decision path:
+// inline Approve / Deny when the queue's API takes a plain POST and the
+// viewer's role may decide, Review on the queue's screen otherwise),
+// "Running now" (the lead agent and its sub-agents, live), "Earlier" (what
+// finished or stopped, newest first), and the agent-written Today briefing.
+// The widget desktop lives on at /dashboard/desktop; layouts are per member
+// per workspace and route-independent (lib/desktop/store.server.ts), so no
+// arrangement is lost. Every loader is best-effort: a source that fails
+// leaves its section out, never a broken Home.
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Clock } from "lucide-react";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
@@ -23,35 +23,91 @@ import { ValuePill } from "@/components/vault/atoms/ValuePill";
 import { safeAgentActivity } from "@/lib/aos/activity.server";
 import { deriveBanners, failedWorkFromTree, type FailedWork } from "@/lib/aos/home";
 import { loadInbox, resolveInboxViewer } from "@/lib/approvals/inbox";
-import { Banner } from "@/components/aos";
+import type { InboxResult, InboxSourceKey } from "@/lib/approvals/types";
+import { Banner, StatusShape } from "@/components/aos";
 import { NewTaskButton } from "@/components/command-bar/NewTaskButton";
-import { getDesk } from "@/lib/desktop/store.server";
 import { getUserPreferences } from "@/lib/desktop/prefs";
-import { loadWidgets, timeAgo } from "@/lib/desktop/loaders.server";
-import { renderWidget } from "@/components/desktop/widgets/views";
-import { Desktop } from "@/components/desktop/Desktop";
-import type { WidgetId } from "@/lib/desktop/widgets";
+import { loadWidgets, timeAgo, type BriefingData } from "@/lib/desktop/loaders.server";
 import { DEFAULT_TIME_ZONE } from "@/lib/time/zoned";
 import { prisma } from "@/lib/prisma";
-// Phase 18.1 (integration): Home in the person's language (lib/i18n).
 import { getI18n } from "@/lib/i18n/server";
-import type { InboxSourceKey } from "@/lib/approvals/types";
+import type { AgentNode, AgentTree } from "@/lib/aos/agents";
+import type { AosStatus } from "@/lib/aos/status";
+import { FeedNeedsYou } from "@/components/home/FeedNeedsYou";
 
 export const dynamic = "force-dynamic";
 
-/** Approvals waiting on this member, grouped by queue (best effort), queue names translated. */
-async function approvalsSummary(userId: string, workspaceId: string, sourceLabel: (source: InboxSourceKey, fallback: string) => string) {
+/** Pending requests for this member, best effort (null when unreadable). */
+async function feedInbox(userId: string, workspaceId: string): Promise<InboxResult | null> {
   try {
     const viewer = await resolveInboxViewer(userId, workspaceId);
-    if (!viewer) return { actionable: 0, sources: [] as string[] };
-    const inbox = await loadInbox(viewer, { limitPerSource: 25 });
-    return {
-      actionable: inbox.actionable,
-      sources: inbox.sources.filter((s) => s.actionable > 0).map((s) => sourceLabel(s.source, s.label)),
-    };
+    if (!viewer) return null;
+    return await loadInbox(viewer, { limitPerSource: 8 });
   } catch {
-    return { actionable: 0, sources: [] as string[] };
+    return null;
   }
+}
+
+/** The lead agent, its sub-agents and their delegated runs, flattened. */
+function flattenTree(tree: AgentTree | null): AgentNode[] {
+  if (!tree) return [];
+  const out: AgentNode[] = [];
+  const walk = (n: AgentNode) => {
+    out.push(n);
+    for (const c of n.children ?? []) walk(c);
+  };
+  walk(tree.lead);
+  for (const b of tree.branches) walk(b);
+  return out;
+}
+
+/** One flat feed row: status shape, title + one line of context, time. */
+function FeedRow({
+  status,
+  title,
+  line,
+  href,
+  when,
+  source,
+  progress,
+  timeLabel,
+}: {
+  status: AosStatus;
+  title: string;
+  line: string | null;
+  href: string | null;
+  when: string;
+  source: string;
+  progress: { done: number; total: number } | null;
+  timeLabel: string;
+}) {
+  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null;
+  return (
+    <li className="flex gap-3 border-t border-line py-4 first:border-t-0 first:pt-1">
+      <StatusShape status={status} size={12} className="mt-1" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-medium text-ink">
+          {href ? (
+            <Link href={href} className="transition-colors hover:text-focus">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+        </div>
+        {line ? <p className="mt-0.5 text-sm text-muted">{line}</p> : null}
+        {pct !== null ? (
+          <div className="mt-2 h-1 w-40 overflow-hidden rounded-full bg-line" aria-hidden>
+            <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+          </div>
+        ) : null}
+        <div className="mt-1.5 text-xs text-muted">{source}</div>
+      </div>
+      <span className="shrink-0 text-xs text-muted" title={when}>
+        {timeLabel}
+      </span>
+    </li>
+  );
 }
 
 export default async function DashboardPage() {
@@ -64,56 +120,73 @@ export default async function DashboardPage() {
   if (needsOnboarding(workspace, me?.role)) redirect("/dashboard/welcome");
   const role = me?.role ?? "viewer";
   const now = new Date();
-  const { t, locale } = await getI18n();
+  const { t, locale, format } = await getI18n();
   const sourceLabel = (source: InboxSourceKey, fallback: string) => {
     const label = t(`approvals.sources.${source}`);
     return label === `approvals.sources.${source}` ? fallback : label;
   };
 
-  const [desk, prefs, activity, approvals] = await Promise.all([
-    getDesk(workspace.id, user.id, role),
+  const [prefs, activity, inbox, lastRun] = await Promise.all([
     getUserPreferences(user.id).catch(() => ({ timeZone: null })),
     safeAgentActivity(workspace.id),
-    approvalsSummary(user.id, workspace.id, sourceLabel),
-  ]);
-  const placed = desk.layout.widgets.map((w) => w.widget);
-  const [results, lastRun] = await Promise.all([
-    loadWidgets(
-      { workspaceId: workspace.id, userId: user.id, role, now, timeZone: prefs.timeZone ?? DEFAULT_TIME_ZONE, workspaceName: workspace.name, t, locale },
-      placed,
-    ),
+    feedInbox(user.id, workspace.id),
     prisma.workflowRun.findFirst({
       where: { workflow: { project: { workspaceId: workspace.id } } },
       orderBy: { startedAt: "desc" },
       select: { startedAt: true, workflow: { select: { name: true } } },
     }).catch(() => null),
   ]);
-  const contents: Partial<Record<WidgetId, React.ReactNode>> = {};
-  for (const id of placed) contents[id] = renderWidget(id, results[id] as never, { t, locale });
+  const timeZone = prefs.timeZone ?? DEFAULT_TIME_ZONE;
+  const briefingResult = await loadWidgets(
+    { workspaceId: workspace.id, userId: user.id, role, now, timeZone, workspaceName: workspace.name, t, locale },
+    ["briefing"],
+  );
+  const briefingLoad = briefingResult.briefing;
+  const briefing: BriefingData | null = briefingLoad && briefingLoad.ok ? briefingLoad.data : null;
 
   // ── banners: only when something needs the member ──────────
   const tree = activity?.tree ?? null;
   const failedSchedules: FailedWork[] = (activity?.schedules ?? [])
     .filter((s) => s.status === "failed")
     .map((s) => ({ key: `schedule:${s.id}`, name: s.name, detail: s.error ?? t("home.banners.scheduleFailed"), href: s.href }));
-  const banners = deriveBanners({ approvals, failed: [...failedWorkFromTree(tree), ...failedSchedules] }, t);
+  const approvalsSummary = {
+    actionable: inbox?.actionable ?? 0,
+    sources: (inbox?.sources ?? []).filter((s) => s.actionable > 0).map((s) => sourceLabel(s.source, s.label)),
+  };
+  const banners = deriveBanners({ approvals: approvalsSummary, failed: [...failedWorkFromTree(tree), ...failedSchedules] }, t);
   const provider = providerStatus();
 
+  // ── feed sections ──────────────────────────────────────────
+  const nodes = flattenTree(tree);
+  const running = nodes.filter((n) => n.status === "running");
+  const earlier = nodes
+    .filter((n) => n.status === "done" || n.status === "failed")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 6);
+
+  // Greeting in the member's timezone (home.greeting.* in lib/i18n).
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone }).format(now),
+  );
+  const daypart = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  const firstName = (user.name ?? "").trim().split(/\s+/)[0] || workspace.name;
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Page headline */}
+    <div className="mx-auto flex w-full max-w-[660px] flex-col gap-6">
+      {/* Greeting */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="aos-heading">{workspace.name}</h1>
+          <p className="text-sm text-muted">{format.date(now, "date")}</p>
+          <h1 className="aos-heading">{t(`home.greeting.${daypart}`, { name: firstName })}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
             <span>{t("home.plan")}</span>
             <ValuePill>{workspace.plan}</ValuePill>
-            <span aria-hidden className="text-subtle">·</span>
+            <span aria-hidden className="text-muted">·</span>
             <span>{t("home.data")}</span>
             <ValuePill>{provider.isLive ? t("home.dataLive") : t("home.dataMock")}</ValuePill>
             {lastRun ? (
               <>
-                <span aria-hidden className="text-subtle">·</span>
+                <span aria-hidden className="text-muted">·</span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="size-3.5" aria-hidden />
                   {t("home.lastAutomation", { name: lastRun.workflow.name, ago: timeAgo(lastRun.startedAt, now, locale) })}
@@ -140,7 +213,85 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <Desktop initialLayout={desk.layout} customized={desk.customized} role={role} contents={contents} />
+      {/* Needs you: pending requests as flat rows with inline decisions. */}
+      {inbox && inbox.items.length ? (
+        <section aria-label={t("home.feed.needsYou")}>
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("home.feed.needsYou")}
+          </h2>
+          <FeedNeedsYou items={inbox.items} />
+        </section>
+      ) : null}
+
+      {/* Running now: the lead agent and its sub-agents, live. */}
+      {running.length ? (
+        <section aria-label={t("home.feed.runningNow")}>
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("home.feed.runningNow")}
+          </h2>
+          <ul>
+            {running.map((n) => (
+              <FeedRow
+                key={n.key}
+                status="running"
+                title={n.name}
+                line={n.line}
+                href={n.href}
+                when={n.updatedAt}
+                source={n.missionName ?? t("home.feed.agent")}
+                progress={n.progress}
+                timeLabel={timeAgo(new Date(n.updatedAt), now, locale)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Earlier: what finished or stopped, newest first. */}
+      {earlier.length ? (
+        <section aria-label={t("home.feed.earlierToday")}>
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("home.feed.earlierToday")}
+          </h2>
+          <ul>
+            {earlier.map((n) => (
+              <FeedRow
+                key={n.key}
+                status={n.status}
+                title={n.name}
+                line={n.line}
+                href={n.href}
+                when={n.updatedAt}
+                source={n.missionName ?? t("home.feed.agent")}
+                progress={null}
+                timeLabel={timeAgo(new Date(n.updatedAt), now, locale)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Today, from the lead agent. */}
+      {briefing && briefing.status === "ready" && briefing.body ? (
+        <section aria-label={t("home.feed.briefing")} className="rounded-lg border border-line bg-surface p-4">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("home.feed.briefing")}
+          </h2>
+          <p className="text-sm leading-relaxed text-ink">{briefing.body}</p>
+          {briefing.writtenAt ? (
+            <p className="mt-2 text-xs text-muted">
+              {t("home.feed.writtenAgo", { ago: timeAgo(new Date(briefing.writtenAt), now, locale) })}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* The widget desktop is still here, one tap away. */}
+      <p className="text-sm">
+        <Link href="/dashboard/desktop" className="text-ink underline underline-offset-2 hover:text-focus">
+          {t("home.feed.openDesktop")}
+        </Link>
+      </p>
     </div>
   );
 }

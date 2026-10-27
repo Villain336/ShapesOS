@@ -104,6 +104,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     pages: [
       { href: "/dashboard/settings/workspace", label: "General", description: "Name, plan, setup, and creating or deleting workspaces.", icon: Building2 },
       { href: "/dashboard/settings/defaults", label: "Defaults", description: "The baseline every project inherits: model, locale, tone.", icon: SlidersHorizontal },
+      { href: "/dashboard/settings/instructions", label: "Shared instructions", description: "Guidance from your admins that agents are asked to follow. Guidance only: approvals and limits still apply.", icon: Bot },
       { href: "/dashboard/settings/automation", label: "Automation", description: "What agents may do on their own, what asks first, and what never runs.", icon: Bot },
       { href: "/dashboard/settings/governance", label: "Governance", description: "Retention and sharing defaults, inherited by every project.", icon: Scale },
       { href: "/dashboard/settings/notifications", label: "Notifications", description: "Workspace-wide notification defaults.", icon: Bell },

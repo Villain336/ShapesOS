@@ -100,6 +100,8 @@ export const en = {
     },
     items: {
       "/dashboard": { label: "Overview", description: "Home: what needs attention" },
+      "/dashboard/desktop": { label: "Desktop", description: "Home as an arrangeable widget desktop" },
+      "/dashboard/browser": { label: "Browser", description: "Dev previews: your projects' dev servers in tabs" },
       "/dashboard/crm": { label: "CRM", description: "Leads, contacts, deals, pipeline" },
       "/dashboard/crm/inbox": { label: "Inbox", description: "Lead conversations: texts and email" },
       // Phase 18.2 (WS=comms)
@@ -437,6 +439,7 @@ export const en = {
       "/dashboard/settings/you/notifications": { label: "Notifications", description: "Which notifications reach you, and where." },
       "/dashboard/settings/workspace": { label: "General", description: "Name, plan, setup, and creating or deleting workspaces." },
       "/dashboard/settings/defaults": { label: "Defaults", description: "The baseline every project inherits: model, locale, tone." },
+      "/dashboard/settings/instructions": { label: "Shared instructions", description: "Guidance from your admins that agents are asked to follow. Guidance only: approvals and limits still apply." },
       "/dashboard/settings/automation": { label: "Automation", description: "What agents may do on their own, what asks first, and what never runs." },
       "/dashboard/settings/governance": { label: "Governance", description: "Retention and sharing defaults, inherited by every project." },
       "/dashboard/settings/notifications": { label: "Notifications", description: "Workspace-wide notification defaults." },
@@ -592,6 +595,40 @@ export const en = {
       listMore: "{list} and {count} more",
       scheduleFailed: "The last scheduled run failed",
     },
+    // The Feed (approved flat-feed redesign): section labels and links.
+    feed: {
+      needsYou: "Needs you",
+      runningNow: "Running now",
+      earlierToday: "Earlier",
+      briefing: "Today, from your lead agent",
+      writtenAgo: "written {ago}",
+      agent: "Agent",
+      openDesktop: "Open desktop",
+    },
+  },
+
+  // In-product browser "Dev preview" v1: tab strip and per-tab controls.
+  browser: {
+    title: "Browser",
+    newTab: "New tab",
+    closeTab: "Close tab",
+    project: "Project",
+    pickProject: "Pick a project",
+    port: "Port",
+    openTab: "Open",
+    start: "Start preview",
+    starting: "Starting…",
+    resume: "Resume",
+    resuming: "Resuming…",
+    pause: "Pause",
+    paused: "This preview is paused. Resume it to keep working - nothing runs while paused.",
+    none: "No dev preview yet. Start one to run this project's dev server here.",
+    failed: "The preview couldn't start: {reason}",
+    empty: "No tabs open. Open one to see a project's dev server.",
+    stopsItself: "Running previews use paid compute. Pause a preview to stop its compute charges.",
+    sessionExpired: "This preview's session expired. Reloading loses any unsaved state in the previewed app.",
+    reloadPreview: "Reload preview",
+    tokenError: "Couldn't renew the preview session. Reload to try again.",
   },
 
   // Phase 18.1 (integration): words inside the shared Agentic OS kit

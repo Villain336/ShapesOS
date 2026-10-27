@@ -28,6 +28,9 @@
 // (flushCheckpoint) — so every command starts from a restorable point.
 
 import { registerExtraTool, type ToolContext, type ToolDef, type ToolResult } from "@/lib/chat/tools";
+// Dev preview v1: share_preview lives in its own module (the persistent dev
+// sandbox lifecycle) and fails closed without the spend gate.
+import { share_preview } from "./share-preview";
 import type { Sandbox } from "./types";
 import { liveSandboxForRun, sandboxForRun, SandboxUnavailableError, sandboxAvailability } from "./index";
 import { addExposedPort } from "./store";
@@ -677,6 +680,7 @@ export function registerCodeTools(): void {
   if (registered) return;
   registered = true;
   for (const t of CODE_TOOLS) registerExtraTool(t);
+  registerExtraTool(share_preview);
 }
 
 /** Why the code tools can't run right now (null = they can). */

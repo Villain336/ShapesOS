@@ -10,7 +10,9 @@
 // (injected, mirroring the M1 executor dep pattern). PURE of prisma and
 // @/ imports — safe for tsx-run tests.
 
+import { createHash } from "node:crypto";
 import { getTemplate } from "./templates";
+import { buildPlanAlternatives } from "./plan-alternatives";
 import {
   buildStalenessReport,
   checkTermination,
@@ -231,7 +233,9 @@ export async function startMission(deps: EngineDeps, input: StartMissionInput): 
     createdBy: input.userId,
   });
 
-  // Genesis event FIRST (durable before any human wait), then planned -> active.
+  // Genesis event FIRST (durable before any human wait). The mission then
+  // HOLDS at "planned": nothing executes — and no launch may be queued —
+  // until a person approves the whole drafted plan (approveMissionPlan).
   await deps.store.appendEvent(mission.id, input.workspaceId, {
     actor: "mission-engine",
     step: "mission.genesis",
@@ -241,16 +245,156 @@ export async function startMission(deps: EngineDeps, input: StartMissionInput): 
       note: "Tier 0: starting a mission drafts plans and executes nothing.",
     },
   });
-  await deps.store.updateMission(mission.id, input.workspaceId, { status: "active" });
-  await deps.store.appendEvent(mission.id, input.workspaceId, {
-    actor: "mission-engine",
-    step: "mission.activated",
-    observation: { planSteps: plan.length, deadlineAt },
-  });
 
   const reloaded = await deps.store.getMission(mission.id, input.workspaceId);
   if (!reloaded) throw new MissionError("Mission not found in workspace.", 404);
   return reloaded;
+}
+
+// ---------------------------------------------------------------------------
+// approveMissionPlan — the whole-plan gate: planned -> active.
+// ---------------------------------------------------------------------------
+
+/** Deterministic stringify (object keys sorted) for a stable plan fingerprint. */
+function stableStringify(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`;
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v) ?? "null";
+}
+
+/**
+ * planRevision — a stable fingerprint of the drafted plan. It binds approval
+ * to the exact plan the person reviewed: if the snapshot changes after the
+ * review, the reviewed revision no longer matches and the approval is
+ * refused (409), so a plan can never be silently swapped under an approval.
+ */
+export function planRevision(planSnapshot: unknown): string {
+  return createHash("sha256").update(stableStringify(planSnapshot ?? null)).digest("hex").slice(0, 16);
+}
+
+/**
+ * approveMissionPlan — a person reviewed the drafted plan and approved it.
+ * Only then does the mission activate and its launch may be queued. Per-step
+ * approvals (money, outside sends, publishing) still ask during execution —
+ * this gate adds one up-front review; it never replaces the per-step gates.
+ * Idempotent: approving an already-active mission is a no-op reporting
+ * transitioned=false, so a double-click never double-queues the launch.
+ */
+export async function approveMissionPlan(
+  deps: EngineDeps,
+  missionId: string,
+  workspaceId: string,
+  userId: string,
+  opts: { expectedRevision?: string } = {},
+): Promise<{ mission: StoredMission; transitioned: boolean }> {
+  await assertNotFrozen(deps, workspaceId);
+
+  // Retry/active path: an approved mission may (re-)launch only while the plan
+  // is still the one that was approved - never a changed plan under an old
+  // approval. Missions activated before this gate existed carry no
+  // plan_approved event; nothing today rewrites planSnapshot, so an absent
+  // record skips the check.
+  const assertApprovedRevisionCurrent = async (m: StoredMission) => {
+    const events = await deps.store.listEvents(missionId, workspaceId);
+    const approvedEvent = [...events].reverse().find((e) => e.step === "mission.plan_approved");
+    const approved = (approvedEvent?.observation as { planRevision?: string } | null | undefined)?.planRevision;
+    if (approved && approved !== planRevision(m.planSnapshot)) {
+      throw new MissionError("The plan changed after it was approved - it needs a fresh review before this mission can start.", 409);
+    }
+  };
+
+  const mission = await deps.store.getMission(missionId, workspaceId);
+  if (!mission) throw new MissionError("Mission not found in workspace.", 404);
+  if (mission.status === "active") {
+    await assertApprovedRevisionCurrent(mission);
+    return { mission, transitioned: false };
+  }
+  if (mission.status !== "planned") {
+    throw new MissionError(`Cannot approve the plan of a mission in status "${mission.status}".`);
+  }
+  const revision = planRevision(mission.planSnapshot);
+  if (opts.expectedRevision !== undefined && opts.expectedRevision !== revision) {
+    throw new MissionError("The plan changed since you reviewed it - review the latest plan, then approve.", 409);
+  }
+  // Atomic claim: exactly one concurrent approval wins planned -> active at
+  // the row; the loser takes the already-active path (revision check
+  // included) instead of double-activating or double-logging.
+  const claimed = await deps.store.claimMissionActivation(missionId, workspaceId);
+  if (!claimed) {
+    const reread = await deps.store.getMission(missionId, workspaceId);
+    if (reread?.status === "active") {
+      await assertApprovedRevisionCurrent(reread);
+      return { mission: reread, transitioned: false };
+    }
+    throw new MissionError(`Cannot approve the plan of a mission in status "${reread?.status ?? "unknown"}".`);
+  }
+  // The plan is bound to the approval at read time AND again after the claim:
+  // a plan that changed mid-approval is refused and the claim rolled back, so
+  // an approval can never activate a plan that was swapped underneath it.
+  if (planRevision(claimed.planSnapshot) !== revision) {
+    await deps.store.updateMission(missionId, workspaceId, { status: "planned" });
+    throw new MissionError("The plan changed during approval - review the latest plan, then approve.", 409);
+  }
+  const steps = (claimed.planSnapshot as { steps?: unknown } | null)?.steps;
+  const planSteps = Array.isArray(steps) ? steps.length : 0;
+  await deps.store.appendEvent(missionId, workspaceId, {
+    actor: userId,
+    step: "mission.plan_approved",
+    observation: { planSteps, approvedBy: userId, planRevision: revision },
+  });
+  await deps.store.appendEvent(missionId, workspaceId, {
+    actor: "mission-engine",
+    step: "mission.activated",
+    observation: { planSteps },
+  });
+  return { mission: claimed, transitioned: true };
+}
+
+// ---------------------------------------------------------------------------
+// selectPlanAlternative - swap the DRAFTED plan for another declared
+// alternative. It never activates the mission and never approves anything:
+// the mission stays "planned" and the next approval must name the new
+// revision. Compare-and-set at the row, so a concurrent approve/select loses
+// with 409 instead of swapping a plan under a review.
+// ---------------------------------------------------------------------------
+
+export async function selectPlanAlternative(
+  deps: EngineDeps,
+  missionId: string,
+  workspaceId: string,
+  userId: string,
+  opts: { alternativeId: string; expectedRevision: string },
+): Promise<{ mission: StoredMission; changed: boolean; planRevision: string }> {
+  await assertNotFrozen(deps, workspaceId);
+  const mission = await deps.store.getMission(missionId, workspaceId);
+  if (!mission) throw new MissionError("Mission not found in workspace.", 404);
+  if (mission.status !== "planned") {
+    throw new MissionError(`The plan can only be changed before it is approved (status "${mission.status}").`, 409);
+  }
+  const current = planRevision(mission.planSnapshot);
+  if (opts.expectedRevision !== current) {
+    throw new MissionError("The plan changed since you reviewed it - review the latest plan, then choose.", 409);
+  }
+  const alt = buildPlanAlternatives(getTemplate(mission.template)).find((a) => a.id === opts.alternativeId);
+  if (!alt) throw new MissionError("Unknown plan alternative for this mission.", 400);
+  const next = planRevision(alt.snapshot);
+  if (next === current) return { mission, changed: false, planRevision: current };
+  const replaced = await deps.store.replacePlanIfCurrent(missionId, workspaceId, mission.updatedAt, alt.snapshot);
+  if (!replaced) {
+    throw new MissionError("The mission changed while you were choosing - review the latest plan, then choose.", 409);
+  }
+  await deps.store.appendEvent(missionId, workspaceId, {
+    actor: userId,
+    step: "mission.plan_alternative_selected",
+    observation: { alternativeId: alt.id, fromRevision: current, toRevision: next, selectedBy: userId, note: "Plan swapped before approval. The mission stays planned until this revision is approved." },
+  });
+  return { mission: replaced, changed: true, planRevision: next };
 }
 
 // ---------------------------------------------------------------------------
@@ -425,6 +569,12 @@ export async function pauseMission(
   if (mission.status === "paused") return mission;
   if (mission.status === "complete" || mission.status === "archived") {
     throw new MissionError(`Cannot pause mission in status "${mission.status}".`);
+  }
+  if (mission.status === "planned") {
+    // A planned mission is not running — it waits on whole-plan approval.
+    // Pausing would also open a planned -> paused -> resume -> active bypass
+    // around that gate.
+    throw new MissionError('Cannot pause mission in status "planned" — approve the plan first, or archive it.');
   }
   const updated = await deps.store.updateMission(missionId, workspaceId, { status: "paused" });
   await deps.store.appendEvent(missionId, workspaceId, {

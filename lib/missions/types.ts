@@ -129,6 +129,8 @@ export function checkTermination(input: TerminationInput): { done: boolean; reas
 /** Event steps that are engine bookkeeping — never counted toward maxSteps. */
 export const META_STEPS: ReadonlySet<string> = new Set([
   "mission.genesis",
+  "mission.plan_approved",
+  "mission.plan_alternative_selected",
   "mission.activated",
   "mission.completed",
   "mission.terminated",
