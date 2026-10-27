@@ -118,8 +118,7 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
           Generate competing plans
         </button>
         <p className="text-xs text-muted">
-          Independent competing plans are {cp?.enabled ? "enabled on the server, but candidates cannot be adopted into this mission yet." : "not available."}{" "}
-          {cp && !cp.enabled ? cp.reason : "They would call a paid model; the button stays off in the app."}
+          Independent competing plans are not available. {cp ? cp.reason : "They would call a paid model."}
         </p>
       </div>
     </section>
