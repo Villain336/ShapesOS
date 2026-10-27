@@ -3,7 +3,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createMemoryMissionStore } from "../store";
-import { approveMissionPlan, planRevision, selectPlanAlternative, startMission, MissionError, type EngineDeps } from "../engine";
+import { approveMissionPlan, loadMission, planRevision, selectPlanAlternative, startMission, MissionError, type EngineDeps } from "../engine";
 import { buildPlanAlternatives } from "../plan-alternatives";
 import { getTemplate, MISSION_TEMPLATES } from "../templates";
 
@@ -50,6 +50,14 @@ describe("selectPlanAlternative", () => {
     assert.equal(ok.transitioned, true);
     const events = await d.store.listEvents(m.id, WS);
     assert.ok(events.some((e) => e.step === "mission.plan_alternative_selected"));
+  });
+  it("choosing is bookkeeping: it adds no counted step and no progress", async () => {
+    const d = deps();
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: TPL, goal: GOAL });
+    await selectPlanAlternative(d, m.id, WS, USER, { alternativeId: "drafts-only", expectedRevision: planRevision(m.planSnapshot) });
+    const l = await loadMission(d, m.id, WS);
+    assert.equal(l.stepCount, 0);
+    assert.equal(l.progress, 0);
   });
   it("is a no-op for the current plan and refuses a stale revision or unknown id", async () => {
     const d = deps();
