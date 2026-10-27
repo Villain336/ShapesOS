@@ -18,6 +18,7 @@
 // Re-running after a crash skips steps already done (progress is saved on
 // the mission run) and resumes a step's half-finished sub-agent run.
 
+import { loadInstructionsBlock } from "@/lib/instructions/workspace-instructions";
 import { prisma } from "@/lib/prisma";
 import { workloadForAgent } from "@/lib/llm/router";
 import {
@@ -232,6 +233,7 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
       return null;
     };
     const p = task.payload as { title?: unknown; description?: unknown } | undefined;
+    const sharedInstructions = await loadInstructionsBlock(opts.workspaceId);
     const system = [
       subAgentSystemPrompt(executor),
       "",
@@ -239,6 +241,7 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
       "Do this step only, with your tools. Drafts stay drafts: anything that sends, publishes or spends waits for a person's approval.",
       `This step may only use these tool groups: ${grant.groups.join(", ")}.`,
       "Finish with a short report: what you did, what you found, and what the next step needs to know.",
+      ...(sharedInstructions ? ["", sharedInstructions] : []),
     ].join("\n");
     const userText = [`Step ${stepId}: ${String(p?.title ?? task.label)}`, String(p?.description ?? "")].filter(Boolean).join("\n\n");
 
