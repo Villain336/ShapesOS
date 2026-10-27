@@ -65,7 +65,7 @@ describe("plan variant selection (Postgres)", () => {
     const rev = planRevision(m.planSnapshot);
     const res = await Promise.allSettled([
       selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "drafts-only", expectedRevision: rev }),
-      selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "review-first", expectedRevision: rev }),
+      selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "drafts-only", expectedRevision: rev }),
     ]);
     const won = res.filter((r) => r.status === "fulfilled");
     assert.equal(won.length, 1, JSON.stringify(res.map((r) => r.status)));
@@ -108,7 +108,7 @@ describe("plan variant selection (Postgres)", () => {
     const m = await draft();
     const rev = planRevision(m.planSnapshot);
     await selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "drafts-only", expectedRevision: rev });
-    await assert.rejects(selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "review-first", expectedRevision: rev }), (e: { status?: number }) => e.status === 409);
+    await assert.rejects(selectPlanAlternative(d, m.id, WS, OWNER, { alternativeId: "as-templated", expectedRevision: rev }), (e: { status?: number }) => e.status === 409);
   });
 });
 
