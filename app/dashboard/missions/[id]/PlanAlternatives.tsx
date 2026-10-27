@@ -33,11 +33,11 @@ function PlanComparison({ alternatives, currentRevision }: { alternatives: Alt[]
   const result = comparePlans(alternatives.map((a) => ({ id: a.id, label: a.label, steps: a.steps })));
   const cols = `minmax(0,1.4fr) repeat(${alternatives.length}, minmax(0,1fr))`;
   return (
-    <details className="mt-3 rounded-md bg-canvas p-3" data-testid="plan-compare">
+    <details className="mt-3 scroll-mt-20 rounded-md bg-canvas p-3" data-testid="plan-compare">
       <summary className="cursor-pointer text-sm font-semibold text-ink">Compare steps side by side</summary>
       <p className="mt-2 text-xs text-muted">
         These are variants of one template plan, not independent runs, laid next to each other step by step. Nothing was run to produce this, and there is no time or cost estimate.
-        Tier and checkpoint are labels on each step. Differences are shown against the first variant.
+        Differences are shown against the first variant.
       </p>
       <div role="table" aria-label="Plan variants compared" className="mt-2 text-xs">
         <div role="row" className="grid gap-2 border-b border-hairline pb-1 font-semibold text-ink" style={{ gridTemplateColumns: cols }}>
@@ -54,13 +54,26 @@ function PlanComparison({ alternatives, currentRevision }: { alternatives: Alt[]
             <span role="rowheader" className="text-ink">{r.title}</span>
             {r.cells.map((c, i) => (
               <span role="cell" key={alternatives[i].id} data-diff={r.diff[i]} className={r.diff[i] === "missing" ? "text-muted" : r.diff[i] === "changed" ? "font-semibold text-ink" : "text-ink"}>
-                {c === null ? "Not in this variant" : `${c.executor}, ${c.tier > 0 ? `marked tier ${c.tier} (acts outside)` : "marked tier 0 (no outside action)"}${c.checkpointAfter ? ", checkpoint label" : ""}`}
+                {c === null ? (
+                  "Not in this variant"
+                ) : (
+                  <>
+                    <span className="block">{c.executor}</span>
+                    <span className="block text-muted">
+                      {c.tier > 0 ? `T${c.tier}, outside` : "T0"}
+                      {c.checkpointAfter ? ", CP" : ""}
+                    </span>
+                  </>
+                )}
               </span>
             ))}
           </div>
         ))}
       </div>
-      <ul className="mt-2 text-xs text-muted">
+      <p data-testid="compare-legend" className="mt-2 text-xs text-muted">
+        Key: T0 = step marked as making no outside action. T1 or T2 = marked as acting outside the workspace. CP = a checkpoint label after the step. These are labels on each step as written, not a forecast.
+      </p>
+      <ul className="mt-2 scroll-mb-28 text-xs text-muted">
         {result.summary.slice(1).map((s) => (
           <li key={s.id}>
             {s.label}: {s.missingFromBaseline} step{s.missingFromBaseline === 1 ? "" : "s"} left out, {s.changed} changed, {s.notInBaseline} added, compared with {alternatives[0].label}.
