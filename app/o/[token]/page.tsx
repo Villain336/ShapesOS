@@ -5,13 +5,13 @@
 // time. Never: workspace name, members, or anything else in the workspace.
 
 import { notFound } from "next/navigation";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { recordDocShareOpen, resolveDocShareToken } from "@/lib/sharing/doc-shares";
 
 export const dynamic = "force-dynamic";
 
-const SharedDocEmbed = dynamic(() => import("@/components/office/SharedDocEmbed"), {
+const SharedDocEmbed = nextDynamic(() => import("@/components/office/SharedDocEmbed"), {
   ssr: false,
   loading: () => (
     <div className="flex h-[560px] items-center justify-center rounded-lg bg-paper shadow-hairline">
