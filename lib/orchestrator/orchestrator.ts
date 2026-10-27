@@ -187,6 +187,11 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
       return { summary: r.attribution, costCents: r.costCents };
     }
     case "scheduler": {
+      // The scheduler schedules a plan's checkpoints. planToTasks hands it the validated plan;
+      // a task without one fails with a plain reason rather than a TypeError deep inside.
+      if (!p.plan || typeof p.plan !== "object") {
+        throw new Error("scheduler: this task carries no mission plan to schedule checkpoints for.");
+      }
       const r = await runScheduler({
         ...base,
         plan: p.plan as MissionPlan,
@@ -207,13 +212,18 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
   }
 }
 
-function planToTasks(plan: MissionPlan, parent: MissionTask): MissionTask[] {
+export function planToTasks(plan: MissionPlan, parent: MissionTask): MissionTask[] {
   return plan.steps.map((s) => ({
     kind: EXECUTOR_TO_KIND[s.executor as ExecutorName] ?? "plan",
     label: `${s.id}: ${s.task}`,
     workspaceId: parent.workspaceId,
     missionId: parent.missionId ?? null,
-    payload: { ...(s.inputs as Record<string, unknown>), stepId: s.id },
+    // The scheduler step proposes checkpoints for the plan it belongs to, so it carries that plan.
+    payload: {
+      ...(s.inputs as Record<string, unknown>),
+      ...(s.executor === "scheduler" ? { plan } : {}),
+      stepId: s.id,
+    },
   }));
 }
 
