@@ -20,6 +20,23 @@ test.describe("share links beyond Studio", () => {
     });
     expect(create.status(), "doc created").toBe(201);
     const { doc } = (await create.json()) as { doc: { id: string } };
+    // Put real content in it so the public render pixel is meaningful.
+    const patch = await page.request.patch(`/api/office/docs/${doc.id}`, {
+      data: {
+        snapshot: {
+          id: "e2e-shared-doc",
+          title: "Share-gate pixel doc",
+          locale: "enUS",
+          documentStyle: {},
+          body: {
+            dataStream: "This shared doc renders for anyone with the link.\r\n",
+            paragraphs: [{ startIndex: 0, paragraphId: "p0" }],
+            textRuns: [],
+          },
+        },
+      },
+    });
+    expect(patch.status(), "doc content saved").toBe(200);
 
     // Workspace boundary / no-oracle at the route level: unknown doc ids
     // are plain 404s, never a distinction between "exists elsewhere" and
@@ -48,6 +65,11 @@ test.describe("share links beyond Studio", () => {
     expect(res!.status(), "public page 200").toBe(200);
     await expect(pub.getByRole("heading", { name: "Share-gate pixel doc" })).toBeVisible();
     await expect(pub.getByText(/shared read-only/)).toBeVisible();
+    // The Univer embed mounts and paints (no save affordance in read-only).
+    await expect(pub.getByText(/edits stay local until you save/)).toBeVisible({ timeout: 30000 });
+    await expect(pub.locator("canvas").first()).toBeVisible({ timeout: 30000 });
+    await expect(pub.getByText(/editor failed to load/)).toHaveCount(0);
+    await pub.waitForTimeout(800); // let the canvas finish its first paint
     // No private metadata or edit affordances leak onto the public page.
     const bodyText = (await pub.locator("body").innerText()) || "";
     expect(bodyText).not.toContain("E2E Workspace");
@@ -109,7 +131,9 @@ test.describe("share links beyond Studio", () => {
     expect(pres!.status(), "viewer page 200").toBe(200);
     await expect(pub.getByRole("heading", { name: "E2E Shared Report" })).toBeVisible();
     await expect(pub.getByText(/2026-10 · shared read-only/)).toBeVisible();
-    await expect(pub.locator("canvas").first()).toBeVisible({ timeout: 20000 });
+    await expect(pub.getByText("Page 1 of 1")).toBeVisible({ timeout: 30000 });
+    await expect(pub.locator(".textLayer span").first()).toBeAttached({ timeout: 30000 });
+    await pub.waitForTimeout(500); // canvas paint settle
     const rbody = (await pub.locator("body").innerText()) || "";
     expect(rbody).not.toContain("E2E Workspace");
     expect(rbody).not.toContain("e2e-admin@example.com");
