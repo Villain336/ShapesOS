@@ -9,7 +9,7 @@
 import type { MissionTemplate, PlanStepDef } from "./templates";
 
 export interface PlanAlternative {
-  id: "as-templated" | "drafts-only" | "review-first";
+  id: "as-templated" | "drafts-only";
   label: string;
   /** The declared strategy, in words. Not a prediction about speed or cost. */
   strategy: string;
@@ -19,6 +19,10 @@ export interface PlanAlternative {
   /** The plan snapshot stored on the mission when this alternative is chosen. */
   snapshot: Record<string, unknown>;
 }
+
+// A "checkpoint after every step" variant is deliberately absent: checkpointAfter
+// is only a label today (the engine uses it for the "next checkpoint" text), so
+// offering it as a review option would claim behaviour that does not exist.
 
 // Executors a "drafts only" variant may keep. Source-backed: none of these
 // allow-lists contains `actions.invoke` (the only connected-app action tool,
@@ -64,16 +68,5 @@ export function buildPlanAlternatives(template: MissionTemplate): PlanAlternativ
     });
   }
 
-  if (base.some((s) => !s.checkpointAfter)) {
-    const steps = base.map((s) => ({ ...s, checkpointAfter: true }));
-    out.push({
-      id: "review-first",
-      label: "Checkpoint after every step",
-      strategy: "The same steps in the same order, each marked with a checkpoint after it. Executors, approval steps and tiers are unchanged, so no approval gate is added, removed or weakened.",
-      steps,
-      omitted: [],
-      snapshot: { templateId: template.id, alternativeId: "review-first", steps },
-    });
-  }
   return out;
 }
