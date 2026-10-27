@@ -50,5 +50,34 @@ test.describe("mission plan gate", () => {
     await approve.click();
     await expect(bannerTitle).toBeHidden({ timeout: 15000 });
     await page.screenshot({ path: `${SHOTS}/approved-mission.png`, fullPage: true });
+
+    // The approved run executes on the deterministic (mock-mode) executors. It must reach its
+    // expected terminal state: every executor step runs (the planner's follow-up scheduler step
+    // included), none records an error, and it stops at the human approval step. A step error is
+    // a failure here, not something to screenshot around.
+    type Ev = { step: string | null; tool: string | null; observation: Record<string, unknown> };
+    let events: Ev[] = [];
+    await expect
+      .poll(
+        async () => {
+          const r = await page.request.get(`/api/missions/${mission.id}`);
+          events = ((await r.json()) as { events: Ev[] }).events ?? [];
+          return events.some((e) => e.step === "mission.awaiting_human");
+        },
+        { message: "approved mission reaches its human approval step", timeout: 30000, intervals: [500, 1000] },
+      )
+      .toBe(true);
+    const errored = events.filter((e) => /\.error$/.test(e.step ?? "")).map((e) => `${e.step}: ${JSON.stringify(e.observation)}`);
+    expect(errored, "no executor step errored").toEqual([]);
+    const ran = events.filter((e) => /^exec\.\d+$/.test(e.step ?? "")).map((e) => e.tool);
+    for (const executor of ["researcher", "planner", "drafter", "analyst", "scheduler"]) {
+      expect(ran, `the ${executor} step ran`).toContain(executor);
+    }
+
+    // Settled viewport capture: reload so no toast is on screen, then wait for the page to idle.
+    await gotoClean(page, `/dashboard/missions/${mission.id}`);
+    await expect(page.getByText("Mission timeline")).toBeVisible();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${SHOTS}/approved-mission-settled.png` });
   });
 });
