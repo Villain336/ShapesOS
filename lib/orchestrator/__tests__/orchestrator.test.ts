@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 
 import {
   runMission,
+  planToTasks,
   ROUTING_TABLE,
   MAX_ROUTING_HOPS,
   type MissionTask,
@@ -437,6 +438,24 @@ describe("executor safety", () => {
       assert.ok(rem.message.includes("proposed, not sent"));
     }
     assert.ok(r.summary.includes("nothing was armed, sent, or fired"));
+  });
+
+  it("the planner's scheduler step carries its plan, so the scheduler runs instead of throwing a TypeError", async () => {
+    const plan = await runPlanner({ workspaceId: WS, goal: "fill slow season" }).then((r) => r.plan);
+    const tasks = planToTasks(plan, task("plan", "root"));
+    const sched = tasks.find((t) => t.kind === "schedule");
+    assert.ok(sched, "the default plan has a scheduler step");
+    const carried = (sched.payload as { plan?: typeof plan }).plan;
+    assert.ok(carried, "scheduler task payload carries the plan");
+    const r = await runScheduler(
+      { workspaceId: WS, missionId: MISSION, plan: carried },
+      { readTimeline: async () => [] },
+    );
+    assert.equal(r.checkpoints.length, plan.checkpoints.length);
+    // Only the scheduler step carries the plan; other steps keep their own inputs.
+    for (const t of tasks.filter((x) => x.kind !== "schedule")) {
+      assert.equal((t.payload as Record<string, unknown>).plan, undefined);
+    }
   });
 });
 
