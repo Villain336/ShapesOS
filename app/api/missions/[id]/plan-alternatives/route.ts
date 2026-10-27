@@ -35,6 +35,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         outsideActionSteps: a.steps.filter((s) => s.tier > 0).length,
         checkpointCount: a.steps.filter((s) => s.checkpointAfter).length,
         omitted: a.omitted,
+        steps: a.steps.map((x) => ({ key: x.key, title: x.title, kind: x.kind, executor: x.executor, tier: x.tier, checkpointAfter: x.checkpointAfter })),
       })),
     });
   } catch (err) {
