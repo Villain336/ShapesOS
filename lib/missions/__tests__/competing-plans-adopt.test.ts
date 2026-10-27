@@ -115,4 +115,11 @@ describe("recordCandidates / loadStoredCandidate", () => {
     assert.equal(await loadStoredCandidate(d, m.id, WS, `${rec.eventId}:9`), null);
     assert.equal(await loadStoredCandidate(d, m.id, WS, "garbage"), null);
   });
+  it("loads a recorded candidate even after more than 500 later events (memory store)", async () => {
+    const d = deps();
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: TPL, goal: GOAL });
+    const rec = await recordCandidates(d, { missionId: m.id, workspaceId: WS, userId: USER, baseRevision: planRevision(m.planSnapshot), candidates: [{ lensId: "y", candidate: cand }] });
+    for (let i = 0; i < 505; i++) await d.store.appendEvent(m.id, WS, { actor: USER, step: "test.filler" });
+    assert.ok(await loadStoredCandidate(d, m.id, WS, rec.stored[0].id));
+  });
 });
