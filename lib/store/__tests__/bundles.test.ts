@@ -25,13 +25,15 @@ const item = (over: Partial<StoreItem> & Pick<StoreItem, "kind" | "key">): Store
 describe("bundle registry", () => {
   it("every member points at a real registry entry", async () => {
     // The connector registry pulls the full dependency tree (resend, ...);
-    // CI has it. A sandbox without it still checks skills + templates.
+    // an installed checkout has it. A sandbox without it still checks skills + templates.
     let connectorKeys: string[] | null = null;
     try {
       const { listBuiltinConnectors } = await import("@/lib/connectors/m21/registry");
       connectorKeys = listBuiltinConnectors().map((c) => c.key);
     } catch (e) {
-      if (process.env.CI) throw e;
+      // Only a missing dependency may skip the connector check; any other
+      // failure of the registry import is a real failure.
+      if (!/Cannot find module/.test(String((e as Error)?.message))) throw e;
     }
     for (const b of BUNDLES) {
       for (const m of b.members) {
