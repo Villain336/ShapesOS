@@ -94,8 +94,8 @@ test.describe("share links beyond Studio", () => {
 
     const anon = await browser.newContext();
     // Route contract: PDF bytes, inline disposition, noindex, exact length.
-    const res = await anon.request.get(`/r/report/${token}`);
-    expect(res.status(), "public PDF 200").toBe(200);
+    const res = await anon.request.get(`/r/report/${token}/raw`);
+    expect(res.status(), "public PDF bytes 200").toBe(200);
     expect(res.headers()["content-type"]).toContain("application/pdf");
     expect(res.headers()["content-disposition"]).toMatch(/^inline;/);
     expect(res.headers()["x-robots-tag"]).toContain("noindex");
@@ -103,15 +103,20 @@ test.describe("share links beyond Studio", () => {
     expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(Number(res.headers()["content-length"])).toBe(body.length);
 
-    // Rendered result: the browser's PDF viewer shows the fixture page.
+    // Rendered result: the house pdf.js viewer shows the fixture page.
     const pub = await anon.newPage();
-    await pub.goto(`/r/report/${token}`, { waitUntil: "domcontentloaded" });
-    await pub.waitForTimeout(2000); // PDF viewer paint
-    await expect(pub).toHaveTitle(/\.pdf/i);
+    const pres = await pub.goto(`/r/report/${token}`, { waitUntil: "domcontentloaded" });
+    expect(pres!.status(), "viewer page 200").toBe(200);
+    await expect(pub.getByRole("heading", { name: "E2E Shared Report" })).toBeVisible();
+    await expect(pub.getByText(/2026-10 · shared read-only/)).toBeVisible();
+    await expect(pub.locator("canvas").first()).toBeVisible({ timeout: 20000 });
+    const rbody = (await pub.locator("body").innerText()) || "";
+    expect(rbody).not.toContain("E2E Workspace");
+    expect(rbody).not.toContain("e2e-admin@example.com");
     await pub.screenshot({ path: `${SHOTS}/public-report.png`, fullPage: false });
 
     // Unknown report token: identical 404.
-    const nope = await anon.request.get(`/r/report/rsh_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`);
+    const nope = await anon.request.get(`/r/report/rsh_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/raw`);
     expect(nope.status(), "unknown report token 404").toBe(404);
 
     // Revoke: the PDF stops streaming immediately.
@@ -119,8 +124,10 @@ test.describe("share links beyond Studio", () => {
     const shareId = ((await shares.json()) as { shares: { id: string }[] }).shares[0]!.id;
     const del = await page.request.delete(`/api/reports/${reportId}/shares/${shareId}`);
     expect(del.status()).toBe(200);
-    const gone = await anon.request.get(`/r/report/${token}`);
-    expect(gone.status(), "revoked report link 404s").toBe(404);
+    const gone = await anon.request.get(`/r/report/${token}/raw`);
+    expect(gone.status(), "revoked report bytes 404").toBe(404);
+    const gonePage = await pub.goto(`/r/report/${token}`, { waitUntil: "domcontentloaded" });
+    expect(gonePage!.status(), "revoked report page 404s").toBe(404);
     await anon.close();
   });
 });
