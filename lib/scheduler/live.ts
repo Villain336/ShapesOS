@@ -16,6 +16,7 @@
 //     (stopping it interrupts its in-flight model call).
 // In mock mode (no live model) the runner keeps its mock subagents.
 
+import { loadInstructionsBlock } from "@/lib/instructions/workspace-instructions";
 import type { Skill } from "@prisma/client";
 import { getLlmProviderFor, workloadForAgent } from "@/lib/llm/router";
 import { getTool, toolGroup } from "@/lib/chat/tools";
@@ -105,6 +106,7 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
   // run above it — interrupts its in-flight model call), tied to the caller's.
   const own = registerRunAbort(run.id);
   const signal = input.signal ? AbortSignal.any([own, input.signal]) : own;
+  const sharedInstructions = await loadInstructionsBlock(input.workspaceId);
   const system = [
     GLOBAL_HARD_RULES,
     "",
@@ -115,6 +117,7 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
     "",
     "## Skill",
     input.skill.skillMd.slice(0, 20_000),
+    ...(sharedInstructions ? ["", sharedInstructions] : []),
   ].join("\n");
   try {
     const loop = await runAgentLoop({

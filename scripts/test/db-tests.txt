@@ -282,3 +282,5 @@ lib/drive/__tests__/base-version-db.test.ts
 
 # Phase 21B (drive): a person id that is not a plain slug (the self-host "admin:<email>" login) still gets a private home - reversible folder name, owned file, invisible to others in listing and journal.
 lib/drive/__tests__/home-ids-db.test.ts
+lib/instructions/__tests__/workspace-instructions-db.test.ts
+lib/instructions/__tests__/instructions-route-db.test.ts
