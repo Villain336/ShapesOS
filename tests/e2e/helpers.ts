@@ -13,6 +13,9 @@ import { join } from "node:path";
 export interface E2EIds {
   workspaceId: string;
   projectId: string;
+  /** Phase 23 share-link fixtures (seed.mts). */
+  reportId?: string;
+  expiredDocToken?: string;
 }
 
 export function loadIds(): E2EIds {
