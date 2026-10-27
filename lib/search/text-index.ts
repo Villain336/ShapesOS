@@ -177,6 +177,8 @@ export interface IndexOptions {
   embed?: boolean;
   /** Test seam: the embedder (default the local MiniLM). */
   embedder?: Embed;
+  /** Test seam: pause after extraction, before the version check and locked write. */
+  beforeWrite?: () => Promise<void>;
 }
 
 export interface IndexResult {
@@ -309,6 +311,7 @@ export async function indexFileText(workspaceId: string, fileId: string, opts: I
     extracted = bytes ? await extractFileText(row.filename, row.mimeType, bytes) : { status: "failed", text: "", extractor: null, error: "file bytes not found in storage" };
   }
   const storageKey = row.storageKey;
+  await opts.beforeWrite?.();
   return writeIndex(
     {
       workspaceId,
