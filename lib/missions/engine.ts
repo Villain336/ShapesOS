@@ -12,6 +12,7 @@
 
 import { createHash } from "node:crypto";
 import { getTemplate } from "./templates";
+import { buildPlanAlternatives } from "./plan-alternatives";
 import {
   buildStalenessReport,
   checkTermination,
@@ -353,6 +354,47 @@ export async function approveMissionPlan(
     observation: { planSteps },
   });
   return { mission: claimed, transitioned: true };
+}
+
+// ---------------------------------------------------------------------------
+// selectPlanAlternative - swap the DRAFTED plan for another declared
+// alternative. It never activates the mission and never approves anything:
+// the mission stays "planned" and the next approval must name the new
+// revision. Compare-and-set at the row, so a concurrent approve/select loses
+// with 409 instead of swapping a plan under a review.
+// ---------------------------------------------------------------------------
+
+export async function selectPlanAlternative(
+  deps: EngineDeps,
+  missionId: string,
+  workspaceId: string,
+  userId: string,
+  opts: { alternativeId: string; expectedRevision: string },
+): Promise<{ mission: StoredMission; changed: boolean; planRevision: string }> {
+  await assertNotFrozen(deps, workspaceId);
+  const mission = await deps.store.getMission(missionId, workspaceId);
+  if (!mission) throw new MissionError("Mission not found in workspace.", 404);
+  if (mission.status !== "planned") {
+    throw new MissionError(`The plan can only be changed before it is approved (status "${mission.status}").`, 409);
+  }
+  const current = planRevision(mission.planSnapshot);
+  if (opts.expectedRevision !== current) {
+    throw new MissionError("The plan changed since you reviewed it - review the latest plan, then choose.", 409);
+  }
+  const alt = buildPlanAlternatives(getTemplate(mission.template)).find((a) => a.id === opts.alternativeId);
+  if (!alt) throw new MissionError("Unknown plan alternative for this mission.", 400);
+  const next = planRevision(alt.snapshot);
+  if (next === current) return { mission, changed: false, planRevision: current };
+  const replaced = await deps.store.replacePlanIfCurrent(missionId, workspaceId, mission.updatedAt, alt.snapshot);
+  if (!replaced) {
+    throw new MissionError("The mission changed while you were choosing - review the latest plan, then choose.", 409);
+  }
+  await deps.store.appendEvent(missionId, workspaceId, {
+    actor: userId,
+    step: "mission.plan_alternative_selected",
+    observation: { alternativeId: alt.id, fromRevision: current, toRevision: next, selectedBy: userId, note: "Plan swapped before approval. The mission stays planned until this revision is approved." },
+  });
+  return { mission: replaced, changed: true, planRevision: next };
 }
 
 // ---------------------------------------------------------------------------

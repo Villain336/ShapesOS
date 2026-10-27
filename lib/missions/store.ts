@@ -106,6 +106,13 @@ export interface MissionStore {
    * mission was not planned). The durable half of the whole-plan gate.
    */
   claimMissionActivation(missionId: string, workspaceId: string): Promise<StoredMission | null>;
+  /**
+   * Compare-and-set the drafted plan: replaces planSnapshot only while the
+   * mission is still "planned" AND its updatedAt is the value the caller read.
+   * Returns null when either no longer holds (someone approved, paused or
+   * changed it first). Used by plan-alternative selection.
+   */
+  replacePlanIfCurrent(missionId: string, workspaceId: string, expectedUpdatedAt: Date, planSnapshot: Record<string, unknown>): Promise<StoredMission | null>;
   listMissions(workspaceId: string): Promise<StoredMission[]>;
   /** Hash-chained append (GENESIS -> ...), same chain contract as M1's audit.appendMissionEvent. */
   appendEvent(missionId: string, workspaceId: string, input: AppendEventInput): Promise<StoredMissionEvent>;
@@ -188,6 +195,16 @@ export function createMemoryMissionStore(): MissionStore {
       const m = missions.get(missionId);
       if (!m || m.workspaceId !== workspaceId || m.status !== "planned") return null;
       const next: StoredMission = { ...m, status: "active", updatedAt: new Date() };
+      missions.set(missionId, next);
+      return next;
+    },
+
+    async replacePlanIfCurrent(missionId, workspaceId, expectedUpdatedAt, planSnapshot) {
+      const m = missions.get(missionId);
+      if (!m || m.workspaceId !== workspaceId || m.status !== "planned") return null;
+      if (m.updatedAt.getTime() !== expectedUpdatedAt.getTime()) return null;
+      // updatedAt must strictly advance so a second racer's token goes stale.
+      const next: StoredMission = { ...m, planSnapshot, updatedAt: new Date(Math.max(Date.now(), m.updatedAt.getTime() + 1)) };
       missions.set(missionId, next);
       return next;
     },

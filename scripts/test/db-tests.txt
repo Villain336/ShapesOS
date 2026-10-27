@@ -282,3 +282,6 @@ lib/drive/__tests__/base-version-db.test.ts
 
 # Phase 21B (drive): a person id that is not a plain slug (the self-host "admin:<email>" login) still gets a private home - reversible folder name, owned file, invisible to others in listing and journal.
 lib/drive/__tests__/home-ids-db.test.ts
+
+# Phase 26 (missions): plan variants - parallel selects (one wins), selection vs approval x20 never leaves an active mission on an unapproved plan, route: viewer/non-member 403, editor 200, refused calls change nothing.
+lib/missions/__tests__/plan-alternatives-db.test.ts

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { closeOnEscape } from "@/lib/ui/keyboard";
 import { toast, toastError } from "@/lib/ui/feedback";
+import { PlanAlternatives } from "./PlanAlternatives";
 import { AgentTree, ApprovalCard, Banner, NeutralBadge, RunTimeline, StatusBadge, aosButton } from "@/components/aos";
 import { needsReconnect } from "@/lib/aos/home";
 import type { MissionView } from "@/lib/aos/agents";
@@ -659,7 +660,7 @@ export function MissionDetail({ missionId }: { missionId: string }) {
           {timeline && v ? (
             <RunTimeline
               title="Mission timeline"
-              subtitle={startedAt ? `Strategist started this mission at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Strategist leads this mission"}
+              subtitle={startedAt && m.status === "planned" ? `Strategist drafted this plan at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Not started yet.` : startedAt ? `Strategist started this mission at ${clockTime(startedAt)} on ${startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Strategist leads this mission"}
               status={v.status}
               steps={timeline.steps}
               completed={timeline.completed}
@@ -764,7 +765,12 @@ export function MissionDetail({ missionId }: { missionId: string }) {
 
         {tab === "log" && <EventLogTab events={data.events} />}
         {tab === "decided" && <DecidedTab approvals={decided} />}
-        {tab === "plan" && <PlanTab steps={steps} />}
+        {tab === "plan" && (
+          <>
+            <PlanAlternatives missionId={missionId} status={m.status} onChanged={load} />
+            <PlanTab steps={steps} />
+          </>
+        )}
         {tab === "tasks" && <TasksTab />}
       </div>
 
