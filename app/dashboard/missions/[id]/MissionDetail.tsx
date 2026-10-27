@@ -36,6 +36,7 @@ import { missionLeadNode } from "@/lib/aos/missions";
 import { clockTime, missionTimeline, type PlanStepInput } from "@/lib/aos/runs";
 import { factLines, humanize } from "@/lib/approvals/format";
 import { cn } from "@/lib/utils";
+import { costSummary, formatCents } from "@/lib/missions/display";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
@@ -127,8 +128,12 @@ interface MissionDetailData {
   events: DetailEvent[];
   approvals: DetailApproval[];
   stepCount: number;
+  /** Steps of the plan that are done; not the number of events or runs. */
+  completedSteps: number;
   planStepCount: number;
   totalCostCents: number;
+  /** Part of totalCostCents that is the cost model's estimate, not metered or billed. */
+  estimatedCostCents: number;
   /** Fingerprint of the drafted plan this page loaded; sent back with the plan approval. */
   planRevision: string;
   progress: number;
@@ -153,7 +158,7 @@ function summarizeObservation(obs: Record<string, unknown>): string {
 }
 
 function fmtCost(cents: number): string {
-  return cents === 0 ? "—" : `$${(cents / 100).toFixed(2)}`;
+  return formatCents(cents);
 }
 
 // ── Sub-tab panels ───────────────────────────────────────────────────────────
@@ -621,8 +626,8 @@ export function MissionDetail({ missionId }: { missionId: string }) {
             <span className="font-semibold text-ink">{m.businessTypeLabel}</span> · {goalLine}
           </p>
           <p className="mt-1 text-sm text-muted tabular-nums">
-            {Math.round(data.progress * 100)}% of goal · {data.stepCount}/{data.planStepCount} steps
-            {data.totalCostCents > 0 ? ` · ${fmtCost(data.totalCostCents)} spent` : ""}
+            {Math.round(data.progress * 100)}% of plan · {data.completedSteps}/{data.planStepCount} steps
+            {costSummary(data.totalCostCents, data.estimatedCostCents)}
             {data.nextCheckpoint ? ` · Next checkpoint: ${data.nextCheckpoint}` : ""}
           </p>
         </div>
