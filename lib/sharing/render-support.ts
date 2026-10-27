@@ -51,12 +51,30 @@ function assessDocBody(doc: unknown, depth = 0, allowTables = true): Assessment 
   if (!isRec(body)) return no("document has no readable body");
   if (typeof body.dataStream !== "string") return no("document has no text stream");
   if (nonEmpty(body.customBlocks)) return no("contains embedded blocks");
-  if (nonEmpty(body.sectionBreaks)) return no("contains section breaks");
   for (const [k, v] of Object.entries(body)) {
     if (!BODY_KEYS_HANDLED.has(k) && k !== "sectionBreaks" && k !== "customBlocks" && nonEmpty(v)) return no(`contains unsupported content (${k})`);
   }
   const stream = body.dataStream;
   if (UNRENDERED_TOKENS.test(stream) || OLD_TOKENS.test(stream)) return no("contains tables or embedded objects");
+
+  // Section breaks. The real editor writes one inside every table cell (the
+  // paragraph "\r" is followed by a "\n" listed in body.sectionBreaks); that is
+  // structure, not a page/section split. Any section break anywhere else is a
+  // real layout split we do not draw, so it refuses.
+  if (Array.isArray(body.sectionBreaks)) {
+    let inCell = false;
+    const cellBreaks = new Set<number>();
+    for (let i = 0; i < stream.length; i++) {
+      if (stream[i] === T_CELL_START) inCell = true;
+      else if (stream[i] === T_CELL_END) inCell = false;
+      else if (inCell && stream[i] === "\n" && stream[i - 1] === "\r") cellBreaks.add(i);
+    }
+    for (const sb of body.sectionBreaks) {
+      if (!isRec(sb) || !Number.isInteger(sb.startIndex) || !cellBreaks.has(sb.startIndex as number)) return no("contains section breaks");
+    }
+  } else if (nonEmpty(body.sectionBreaks)) {
+    return no("contains section breaks");
+  }
 
   // Links: every custom range must be a hyperlink with a safe absolute URL and
   // must line up exactly with a start/end token pair in the stream.
