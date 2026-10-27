@@ -26,6 +26,7 @@ export default function ShareLinksPanel({
   endpoint,
   subjectLabel,
   publicPath,
+  limitsNote,
 }: {
   /** Management endpoint, e.g. /api/office/docs/<id>/shares */
   endpoint: string;
@@ -33,6 +34,8 @@ export default function ShareLinksPanel({
   subjectLabel: string;
   /** Public path builder for a freshly minted token. */
   publicPath: (token: string) => string;
+  /** Shown before a link can be created: what the shared view can and cannot show. */
+  limitsNote?: string;
 }) {
   const [links, setLinks] = useState<ShareLink[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,8 @@ export default function ShareLinksPanel({
         body: JSON.stringify({ label: label || undefined, expiresInDays: days }),
       });
       if (!res.ok) {
-        setError((await res.json().catch(() => ({})))?.error ?? "Couldn't create the link");
+        const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
+        setError(`${body.error ?? "Couldn't create the link"}${body.reason ? ` (${body.reason})` : ""}`);
         return;
       }
       const { token } = await res.json();
@@ -122,6 +126,10 @@ export default function ShareLinksPanel({
             </button>
           </div>
         </div>
+      )}
+
+      {showForm && limitsNote && (
+        <p className="rounded-md bg-canvas p-3 text-xs text-muted" role="note">{limitsNote}</p>
       )}
 
       {showForm && (
