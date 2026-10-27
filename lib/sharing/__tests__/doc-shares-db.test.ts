@@ -48,7 +48,7 @@ before(async () => {
   }
   const doc = await withWorkspaceScope(WS_A, (tx) =>
     tx.univerDoc.create({
-      data: { workspaceId: WS_A, kind: "doc", title: "Shared plan", snapshot: { body: { textRuns: [{ st: 0, ed: 5, ts: {} }] } } },
+      data: { workspaceId: WS_A, kind: "doc", title: "Shared plan", snapshot: { body: { dataStream: "Shared plan body\r\n", paragraphs: [{ startIndex: 0 }], textRuns: [{ st: 0, ed: 5, ts: { bl: 1 } }] } } },
     }),
   );
   docId = doc.id;
@@ -78,6 +78,13 @@ describe("doc + report share links (DB)", () => {
 
   it("a link cannot be minted for a doc outside the workspace", async () => {
     await assert.rejects(createDocShare({ workspaceId: WS_B, docId, userId: USER }), /DOC_NOT_FOUND/);
+    // Unsupported content (a table) is refused at creation, never published partially.
+    const tdoc = await withWorkspaceScope(WS_A, (tx) =>
+      tx.univerDoc.create({
+        data: { workspaceId: WS_A, kind: "doc", title: "Has table", snapshot: { body: { dataStream: "x\r\n", tables: [{ tableId: "t" }] } } },
+      }),
+    );
+    await assert.rejects(createDocShare({ workspaceId: WS_A, docId: tdoc.id, userId: USER }), /UNSUPPORTED_CONTENT:contains tables/);
   });
 
   it("list is newest-first with no token material; revoke is immediate", async () => {
