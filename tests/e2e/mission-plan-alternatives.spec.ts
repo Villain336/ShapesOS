@@ -36,16 +36,26 @@ test("choosing a plan alternative changes the draft but never starts the mission
   const card = page.getByTestId("alt-drafts-only");
   await expect(card).toBeVisible();
   await expect(page.getByTestId("alt-as-templated")).toContainText("Current plan");
-  await page.screenshot({ path: `${SHOTS}/alternatives-before.png`, fullPage: true });
+  await page.getByRole("heading", { name: "Booked-job growth" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}/header-before.png` });
+  await page.getByRole("region", { name: "Plan variants" }).screenshot({ path: `${SHOTS}/variants-before.png` });
 
   await card.getByRole("button", { name: "Use this plan" }).click();
   await expect(card).toContainText("Current plan");
   await expect(page.locator("table tbody tr")).toHaveCount(drafts.stepCount);
   await expect(page.getByText("Review the plan before anything runs")).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/alternatives-after.png`, fullPage: true });
+  await page.getByRole("heading", { name: "Booked-job growth" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${SHOTS}/header-after.png` });
+  await page.getByRole("region", { name: "Plan variants" }).screenshot({ path: `${SHOTS}/variants-after.png` });
+  await page.locator("table").first().screenshot({ path: `${SHOTS}/plan-table-after.png` });
+  await expect(page.getByText("Not started yet.")).toBeVisible();
+  await expect(page.getByText("started this mission")).toHaveCount(0);
 
-  const detail = (await (await page.request.get(`/api/missions/${id}`)).json()) as { mission: { status: string } };
+  const detail = (await (await page.request.get(`/api/missions/${id}`)).json()) as { mission: { status: string }; stepCount: number; progress: number };
   expect(detail.mission.status, "choosing does not start the mission").toBe("planned");
+  expect(detail.stepCount, "choosing is not an executed step").toBe(0);
+  expect(detail.progress, "choosing is not progress").toBe(0);
+  await expect(page.getByText("0% of goal")).toBeVisible();
 
   // The revision reviewed before the switch can no longer be approved.
   const stale = await page.request.post(`/api/missions/${id}/approve-plan`, { data: { planRevision: before.currentRevision } });
