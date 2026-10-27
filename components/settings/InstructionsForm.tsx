@@ -93,6 +93,15 @@ export default function InstructionsForm() {
           {cur.revision === 0 ? "No instructions set." : `Revision ${cur.revision}, saved ${cur.updatedAt ? new Date(cur.updatedAt).toLocaleString() : ""} by ${cur.updatedBy ?? "an admin"}.`}
         </p>
       </section>
+      <section className={cardCls} data-testid="instructions-scope">
+        <h2 className="text-md font-semibold text-ink">Where this applies</h2>
+        <p className="mt-1 text-sm text-muted">
+          Included in: chat turns, delegated sub-agents, mission steps and scheduled skill runs. A run already in progress keeps the text it started with.
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Not included: one-off generation features such as site audits, review replies, content repurposing, the mail and meeting assistants and other single-request tools. Rules written here are not checked or enforced.
+        </p>
+      </section>
       {revs.length > 0 ? (
         <section className={cardCls}>
           <h2 className="text-md font-semibold text-ink">History</h2>
