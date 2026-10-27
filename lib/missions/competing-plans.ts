@@ -13,8 +13,9 @@
 //  - A candidate may only use draft-safe executors, tier 0, no approval step: the
 //    same limits as the "Drafts and analysis only" variant. A model cannot propose
 //    a step that acts outside the workspace.
-//  - The cost figure is a WORST-CASE BOUND under stated assumptions, not a forecast and
-//    not a charge. No budget is reserved or debited from it; real spend is whatever
+//  - The cost figure is an UNVERIFIED BUDGETING ESTIMATE: tokenizer and wrapper overhead
+//    are NOT validated against the real model, so it is not a guarantee, forecast or
+//    charge. No budget is reserved or debited from it; real spend is whatever
 //    the provider reports per call (costMicroUsd, null when a price is unknown), and
 //    that metering must be wired through the budget gates before any live use.
 //
@@ -103,7 +104,7 @@ export function buildUserTurn(goal: string, lens: CandidateLens): string {
 export const WRAPPER_TOKEN_ALLOWANCE = 256;
 
 /**
- * Worst-case bound for one call, at the model's listed price: input tokens are
+ * Unverified budgeting estimate for one call (tokenizer/wrapper overhead not validated), at the model's listed price: input tokens are
  * bounded by UTF-8 BYTES (a token covers at least one byte, so this holds for any
  * language or code) plus a fixed wrapper allowance covering the system prompt, the
  * user turn and the output schema text that are all inside promptBytes; output at
@@ -146,7 +147,7 @@ export async function composeCandidates(input: ComposeInput): Promise<{ ceilingM
   const lenses = input.lenses ?? DEFAULT_LENSES;
   if (lenses.length < 2 || lenses.length > 4) throw new CompetingPlansRefused("bad_input", "Competing plans need 2 to 4 lenses.");
 
-  // Refuse BEFORE any call: the whole run's worst-case bound (all N calls) must fit the limit.
+  // Refuse BEFORE any call: the whole run's unverified estimate (all N calls) must fit the limit.
   let ceiling = 0;
   for (const l of lenses) {
     const c = callCeilingMicroUsd(input.model, bytes(MISSION_PLANNER_SYSTEM_PROMPT) + bytes(buildUserTurn(goal, l)), input.maxTokensPerCall);
@@ -154,7 +155,7 @@ export async function composeCandidates(input: ComposeInput): Promise<{ ceilingM
     ceiling += c;
   }
   if (ceiling > input.capMicroUsd) {
-    throw new CompetingPlansRefused("over_ceiling", `Worst-case bound ${ceiling} micro-USD exceeds the limit ${input.capMicroUsd}; nothing was called.`);
+    throw new CompetingPlansRefused("over_ceiling", `Unverified estimate ${ceiling} micro-USD exceeds the limit ${input.capMicroUsd}; nothing was called.`);
   }
 
   // Independent calls: one failing never affects another.
