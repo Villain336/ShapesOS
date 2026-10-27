@@ -12,6 +12,6 @@ export function costSummary(totalCents: number, estimatedCents: number): string 
   const recorded = Math.max(0, totalCents - estimatedCents);
   const parts: string[] = [];
   if (recorded > 0) parts.push(`${formatCents(recorded)} recorded cost`);
-  if (estimatedCents > 0) parts.push(`~${formatCents(estimatedCents)} model estimate, not metered`);
+  if (estimatedCents > 0) parts.push(`~${formatCents(estimatedCents)} execution estimate, not metered`);
   return parts.length ? ` · ${parts.join(" · ")}` : "";
 }
