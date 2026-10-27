@@ -189,6 +189,19 @@ export function createPrismaMissionStore(): MissionStore {
       });
     },
 
+    async replacePlanIfCurrent(missionId, workspaceId, expectedUpdatedAt, planSnapshot) {
+      return withWorkspaceScope(workspaceId, async (tx) => {
+        // Conditional update: only while still planned and untouched since the read.
+        const res = await tx.mission.updateMany({
+          where: { id: missionId, workspaceId, status: "planned", updatedAt: expectedUpdatedAt },
+          data: { planSnapshot: planSnapshot as never },
+        });
+        if (res.count === 0) return null;
+        const row = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
+        return row ? toMission(row as MissionRow) : null;
+      });
+    },
+
     async listMissions(workspaceId) {
       const rows = await withWorkspaceScope(workspaceId, (tx) =>
         tx.mission.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } }),
