@@ -80,7 +80,10 @@ test.describe("share links with real editor output", () => {
     await page.screenshot({ path: `${OUT}/04-table-in-editor.png` });
     // Type into the first two cells (the caret lands in the first cell after insert).
     await page.keyboard.type("Plan");
-    await page.keyboard.press("Tab");
+    await page.waitForTimeout(300);
+    // Tab does not move between cells in this editor (the first run replaced the text), so click
+    // the second cell instead; coordinates come from the viewport capture 04b of the previous run.
+    await page.mouse.click(687, 422);
     await page.keyboard.type("Owner");
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${OUT}/04b-cells-typed.png` });
