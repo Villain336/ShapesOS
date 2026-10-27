@@ -432,6 +432,7 @@ export const es: Catalogue = {
       "/dashboard/settings/you/notifications": { label: "Notificaciones", description: "Qué notificaciones te llegan y dónde." },
       "/dashboard/settings/workspace": { label: "General", description: "Nombre, plan, configuración y creación o eliminación de espacios de trabajo." },
       "/dashboard/settings/defaults": { label: "Valores por defecto", description: "La base que hereda cada proyecto: modelo, idioma, tono." },
+      "/dashboard/settings/instructions": { label: "Instrucciones compartidas", description: "Pautas de tus administradores que se pide a los agentes seguir. Solo son pautas: las aprobaciones y los límites siguen vigentes." },
       "/dashboard/settings/automation": { label: "Automatización", description: "Qué pueden hacer los agentes solos, qué preguntan antes y qué nunca se ejecuta." },
       "/dashboard/settings/governance": { label: "Gobernanza", description: "Retención y uso compartido por defecto, heredados por cada proyecto." },
       "/dashboard/settings/notifications": { label: "Notificaciones", description: "Notificaciones por defecto de todo el espacio de trabajo." },
