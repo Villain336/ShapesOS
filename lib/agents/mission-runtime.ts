@@ -20,6 +20,7 @@
 
 import { loadInstructionsBlock } from "@/lib/instructions/workspace-instructions";
 import { prisma } from "@/lib/prisma";
+import { DispatchError } from "@/lib/orchestrator/orchestrator";
 import { workloadForAgent } from "@/lib/llm/router";
 import {
   appendAgentRunEvent,
@@ -254,8 +255,8 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
     if (loop.status === "handoff") throw new LeaseLostError();
     const status = loop.status === "cancelled" ? "cancelled" : loop.status === "error" ? "failed" : "succeeded";
     await finishAgentRun(opts.workspaceId, runId, status).catch(() => undefined);
-    if (loop.status === "error") throw new Error(loop.finalText);
     const costCents = Math.ceil(loop.state.costMicroUsd / 10_000);
+    if (loop.status === "error") throw new DispatchError(loop.finalText, costCents);
     const waiting = loop.status === "awaiting_confirmation" ? ` (waiting for approval: ${loop.proposal?.tool ?? "an action"})` : "";
     return { summary: `${name}: ${loop.finalText || "done"}${waiting}`.slice(0, 2000), costCents };
   };
