@@ -78,6 +78,12 @@ test.describe("share links with real editor output", () => {
     if (await ok.isVisible().catch(() => false)) await ok.click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/04-table-in-editor.png` });
+    // Type into the first two cells (the caret lands in the first cell after insert).
+    await page.keyboard.type("Plan");
+    await page.keyboard.press("Tab");
+    await page.keyboard.type("Owner");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/04b-cells-typed.png` });
 
     await save.click();
     await expect(save).toBeEnabled({ timeout: 30_000 });
@@ -98,6 +104,9 @@ test.describe("share links with real editor output", () => {
     const pub = await anon.newPage();
     expect((await pub.goto(`/o/${token}`, { waitUntil: "domcontentloaded" }))!.status()).toBe(200);
     await expect(pub.locator("article [data-shared-table]")).toHaveCount(1);
+    const cells = (await pub.locator("article [data-shared-table] td").allInnerTexts()).map((c) => c.trim());
+    expect(cells.length, "3 rows x 5 columns").toBe(15);
+    expect(cells.slice(0, 2), "typed cell text reached the public page").toEqual(["Plan", "Owner"]);
     await pub.locator("article").screenshot({ path: `${OUT}/05-public-editor-table.png` });
     await anon.close();
   });
