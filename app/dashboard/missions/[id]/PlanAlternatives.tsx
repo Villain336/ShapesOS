@@ -93,7 +93,7 @@ export function PlanAlternatives({ missionId, status, onChanged }: { missionId: 
               </div>
               <p className="text-xs text-muted">{a.strategy}</p>
               <p className="text-xs text-ink">
-                {a.stepCount} steps, {a.outsideActionSteps} that act outside the workspace, {a.checkpointCount} checkpoints
+                {a.stepCount} steps, {a.outsideActionSteps} marked as acting outside the workspace
               </p>
               {a.omitted.length > 0 ? <p className="text-xs text-muted">Leaves out: {a.omitted.join(", ")}</p> : null}
               <div className="mt-auto pt-1">
