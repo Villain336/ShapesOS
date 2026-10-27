@@ -129,6 +129,8 @@ export function checkTermination(input: TerminationInput): { done: boolean; reas
 /** Event steps that are engine bookkeeping — never counted toward maxSteps. */
 export const META_STEPS: ReadonlySet<string> = new Set([
   "mission.genesis",
+  "mission.plan_approved",
+  "mission.plan_alternative_selected",
   "mission.activated",
   "mission.completed",
   "mission.terminated",
@@ -140,8 +142,46 @@ export const META_STEPS: ReadonlySet<string> = new Set([
   "approval.decided",
 ]);
 
+// stepCount (every non-meta event) is unchanged on purpose: it feeds the maxSteps termination check.
+// What the header shows as "steps done" is completedPlanStepKeys below, a separate count.
 export function isCountedStep(step: string | null | undefined): boolean {
   return !!step && !META_STEPS.has(step);
+}
+
+/**
+ * Which of the plan's own steps are done. A step is done when either
+ *  - an event named by its key exists (the engine's own step events), or
+ *  - the orchestrator ran a task labelled "<key>: ..." and the run succeeded (`route.N` carries
+ *    the label, `exec.N` is the success; `exec.N.error` is a failed attempt and does not count).
+ * Executions the planner adds on its own (its generic research/analyze/draft/schedule follow-ups) and
+ * unrelated events are real work, but they are not steps of this plan, so they do not move progress.
+ */
+export function completedPlanStepKeys(
+  events: ReadonlyArray<{ step: string | null; args?: Record<string, unknown> | null; observation?: Record<string, unknown> | null }>,
+  planKeys: readonly string[],
+): Set<string> {
+  const keys = new Set(planKeys.filter((k) => k.length > 0));
+  const done = new Set<string>();
+  const routedKey = new Map<string, string>();
+  for (const e of events) {
+    const step = e.step ?? "";
+    if (keys.has(step) && e.observation?.failure !== true) {
+      done.add(step);
+      continue;
+    }
+    const route = /^route\.(\d+)$/.exec(step);
+    if (route) {
+      const label = e.args?.taskLabel;
+      if (typeof label === "string") routedKey.set(route[1], label.split(":")[0].trim());
+      continue;
+    }
+    const exec = /^exec\.(\d+)$/.exec(step);
+    if (exec) {
+      const key = routedKey.get(exec[1]);
+      if (key && keys.has(key)) done.add(key);
+    }
+  }
+  return done;
 }
 
 /** Progress ∈ [0,1] over the template plan skeleton. */

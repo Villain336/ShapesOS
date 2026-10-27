@@ -34,6 +34,7 @@ import { resolveSandboxPath } from "./paths";
 import { listFilesViaExec, restoreViaExec, SandboxCommandError, snapshotViaExec } from "./exec-fs";
 import { isValidPreviewPort, previewPath, type PreviewCapable, type PreviewUpstream } from "./preview";
 import type { SecretCarrier } from "./secrets";
+import type { PauseCapable, PersistentSandboxOptions } from "./persistence";
 
 export const E2B_ENVD_PORT = 49983;
 export const E2B_USER = "user";
@@ -98,7 +99,7 @@ interface Access {
   domain: string;
 }
 
-export class E2BSandbox implements Sandbox, PreviewCapable, SecretCarrier {
+export class E2BSandbox implements Sandbox, PreviewCapable, SecretCarrier, PauseCapable {
   readonly provider = "e2b" as const;
   readonly workdir = E2B_WORKDIR;
 
@@ -114,6 +115,16 @@ export class E2BSandbox implements Sandbox, PreviewCapable, SecretCarrier {
 
   persistSecret(): string | null {
     return this.access.trafficAccessToken ? JSON.stringify({ traffic: this.access.trafficAccessToken }) : null;
+  }
+
+  /** Pause: filesystem + memory preserved, per-second billing stops (docs-backed). */
+  pause(): Promise<void> {
+    return this.provider_.pauseSandbox(this.access.sandboxId);
+  }
+
+  /** Wake via the v2 connect endpoint (resumes if paused; extends TTL only). */
+  async resume(opts: { timeoutSeconds?: number } = {}): Promise<void> {
+    await this.provider_.connectSandbox(this.access.sandboxId, opts.timeoutSeconds);
   }
 
   private envdUrl(path: string): string {
@@ -285,6 +296,33 @@ export class E2BSandboxProvider implements SandboxProvider {
     return { "X-API-Key": this.cfg.e2b.apiKey ?? "", ...extra };
   }
 
+  /** POST /sandboxes/{id}/pause - 204 on success. */
+  async pauseSandbox(sandboxId: string): Promise<void> {
+    const res = await this.fetch(this.api(`/sandboxes/${encodeURIComponent(sandboxId)}/pause`), {
+      method: "POST",
+      headers: this.headers(),
+    });
+    if (res.status === 204) return;
+    if (res.status === 404) throw new E2BError(res.status, `E2B sandbox ${sandboxId} is gone.`);
+    throw new E2BError(res.status, `E2B pause failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+
+  /**
+   * POST /v2/sandboxes/{id}/connect - resumes a paused sandbox and extends
+   * its TTL (never shortens it). This is the ONLY wake path: autoResume on
+   * inbound traffic stays off, so outside traffic cannot start spend.
+   */
+  async connectSandbox(sandboxId: string, timeoutSeconds?: number): Promise<void> {
+    const res = await this.fetch(this.api(`/v2/sandboxes/${encodeURIComponent(sandboxId)}/connect`), {
+      method: "POST",
+      headers: this.headers({ "content-type": "application/json" }),
+      body: JSON.stringify(timeoutSeconds ? { timeout: timeoutSeconds } : {}),
+    });
+    if (res.ok) return;
+    if (res.status === 404) throw new E2BError(res.status, `E2B sandbox ${sandboxId} is gone.`);
+    throw new E2BError(res.status, `E2B connect failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+
   async available(): Promise<{ ok: true } | { ok: false; reason: string }> {
     if (!this.cfg.e2b.apiKey) return { ok: false, reason: "SANDBOX_PROVIDER=e2b needs E2B_API_KEY." };
     try {
@@ -298,14 +336,29 @@ export class E2BSandboxProvider implements SandboxProvider {
   }
 
   async create(opts: SandboxCreateOptions): Promise<Sandbox> {
+    return this.createWithLifecycle(opts, null);
+  }
+
+  /**
+   * Persistent variant: provider-side auto-pause at the running TTL with a
+   * full memory snapshot (warm resume). The TTL is refreshed by activity,
+   * so it bounds a QUIET sandbox's spend, not a busy one's - the app
+   * enforces absolute ceilings separately.
+   */
+  async createPersistent(opts: SandboxCreateOptions, persist: PersistentSandboxOptions): Promise<Sandbox & PauseCapable> {
+    const sb = await this.createWithLifecycle(opts, persist);
+    return sb as Sandbox & PauseCapable;
+  }
+
+  private async createWithLifecycle(opts: SandboxCreateOptions, persist: PersistentSandboxOptions | null): Promise<Sandbox> {
     if (!this.cfg.e2b.apiKey) throw new SandboxCommandError("E2B_API_KEY is not set.");
     const res = await this.fetch(this.api("/v2/sandboxes"), {
       method: "POST",
       headers: this.headers({ "content-type": "application/json" }),
       body: JSON.stringify({
         templateID: opts.image ?? this.cfg.e2b.template,
-        timeout: this.cfg.idleSeconds,
-        autoPause: false,
+        timeout: persist ? persist.timeoutSeconds : this.cfg.idleSeconds,
+        autoPause: persist ? persist.autoPause : false,
         allow_internet_access: true,
         metadata: { app: "shapesos", workspaceId: opts.workspaceId, runId: opts.runId },
         network: {
@@ -340,6 +393,46 @@ export class E2BSandboxProvider implements SandboxProvider {
 
   get(id: string): Promise<Sandbox | null> {
     return this.getWithSecret(id, null);
+  }
+
+  /**
+   * Raw lifecycle state for reconciliation ("running" | anything else |
+   * "gone"): get() hides paused sandboxes by design (a non-running sandbox
+   * can't serve), but a persistent dev sandbox MUST tell "paused, resumable"
+   * apart from "gone" - the row's resume path depends on it.
+   */
+  async sandboxState(id: string): Promise<"running" | "paused" | "gone"> {
+    if (!/^[a-z0-9-]{4,64}$/i.test(id) || !this.cfg.e2b.apiKey) return "gone";
+    const res = await this.fetch(this.api(`/sandboxes/${encodeURIComponent(id)}`), { headers: this.headers() });
+    if (res.status === 404) return "gone";
+    if (!res.ok) throw new E2BError(res.status, `E2B lookup failed (${res.status})`);
+    const d = (await res.json()) as { state?: string };
+    return d.state === "running" ? "running" : "paused";
+  }
+
+  /**
+   * Attach to a PAUSED sandbox for an explicit resume (the only wake path):
+   * same handle construction as getWithSecret but without the running-state
+   * gate. Callers must have already established the sandbox is paused via
+   * sandboxState() - attaching to a dead sandbox fails at resume().
+   */
+  async attachPaused(id: string, secret: string | null): Promise<E2BSandbox | null> {
+    if (!/^[a-z0-9-]{4,64}$/i.test(id) || !this.cfg.e2b.apiKey) return null;
+    const res = await this.fetch(this.api(`/sandboxes/${encodeURIComponent(id)}`), { headers: this.headers() });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new E2BError(res.status, `E2B lookup failed (${res.status})`);
+    const d = (await res.json()) as { sandboxID: string; envdAccessToken?: string; domain?: string | null; metadata?: Record<string, string> };
+    let traffic: string | null = null;
+    try {
+      traffic = secret ? ((JSON.parse(secret) as { traffic?: string }).traffic ?? null) : null;
+    } catch {
+      traffic = null;
+    }
+    return new E2BSandbox(
+      this,
+      { sandboxId: d.sandboxID, envdAccessToken: d.envdAccessToken ?? null, trafficAccessToken: traffic, domain: d.domain || this.cfg.e2b.domain },
+      d.metadata?.runId ?? "",
+    );
   }
 
   async getWithSecret(id: string, secret: string | null): Promise<Sandbox | null> {

@@ -176,6 +176,32 @@ export function createPrismaMissionStore(): MissionStore {
       return toMission(r as MissionRow);
     },
 
+    async claimMissionActivation(missionId, workspaceId) {
+      return withWorkspaceScope(workspaceId, async (tx) => {
+        // Conditional update: exactly one concurrent claimant wins the row.
+        const claimed = await tx.mission.updateMany({
+          where: { id: missionId, workspaceId, status: "planned" },
+          data: { status: "active" },
+        });
+        if (claimed.count === 0) return null;
+        const row = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
+        return row ? toMission(row as MissionRow) : null;
+      });
+    },
+
+    async replacePlanIfCurrent(missionId, workspaceId, expectedUpdatedAt, planSnapshot) {
+      return withWorkspaceScope(workspaceId, async (tx) => {
+        // Conditional update: only while still planned and untouched since the read.
+        const res = await tx.mission.updateMany({
+          where: { id: missionId, workspaceId, status: "planned", updatedAt: expectedUpdatedAt },
+          data: { planSnapshot: planSnapshot as never },
+        });
+        if (res.count === 0) return null;
+        const row = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
+        return row ? toMission(row as MissionRow) : null;
+      });
+    },
+
     async listMissions(workspaceId) {
       const rows = await withWorkspaceScope(workspaceId, (tx) =>
         tx.mission.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } }),
@@ -211,6 +237,13 @@ export function createPrismaMissionStore(): MissionStore {
         }),
       );
       return rows.map((r) => toEvent(r as MissionEventRow));
+    },
+
+    async getEvent(missionId, workspaceId, eventId) {
+      const r = await withWorkspaceScope(workspaceId, (tx) =>
+        tx.missionEvent.findFirst({ where: { id: eventId, missionId, workspaceId } }),
+      );
+      return r ? toEvent(r as MissionEventRow) : null;
     },
 
     async createApproval(input: CreateApprovalInput) {

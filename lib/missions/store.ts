@@ -100,10 +100,25 @@ export interface MissionStore {
   createMission(input: CreateMissionInput): Promise<StoredMission>;
   getMission(missionId: string, workspaceId: string): Promise<StoredMission | null>;
   updateMission(missionId: string, workspaceId: string, patch: UpdateMissionPatch): Promise<StoredMission>;
+  /**
+   * Atomically claim the planned -> active transition: exactly one concurrent
+   * caller receives the activated mission; everyone else gets null (the
+   * mission was not planned). The durable half of the whole-plan gate.
+   */
+  claimMissionActivation(missionId: string, workspaceId: string): Promise<StoredMission | null>;
+  /**
+   * Compare-and-set the drafted plan: replaces planSnapshot only while the
+   * mission is still "planned" AND its updatedAt is the value the caller read.
+   * Returns null when either no longer holds (someone approved, paused or
+   * changed it first). Used by plan-alternative selection.
+   */
+  replacePlanIfCurrent(missionId: string, workspaceId: string, expectedUpdatedAt: Date, planSnapshot: Record<string, unknown>): Promise<StoredMission | null>;
   listMissions(workspaceId: string): Promise<StoredMission[]>;
   /** Hash-chained append (GENESIS -> ...), same chain contract as M1's audit.appendMissionEvent. */
   appendEvent(missionId: string, workspaceId: string, input: AppendEventInput): Promise<StoredMissionEvent>;
   listEvents(missionId: string, workspaceId: string, limit?: number): Promise<StoredMissionEvent[]>;
+  /** One event by id within the mission and workspace (null otherwise). Not subject to the listEvents cap. */
+  getEvent(missionId: string, workspaceId: string, eventId: string): Promise<StoredMissionEvent | null>;
   createApproval(input: CreateApprovalInput): Promise<StoredMissionApproval>;
   getApproval(approvalId: string, workspaceId: string): Promise<StoredMissionApproval | null>;
   listApprovals(missionId: string, workspaceId: string): Promise<StoredMissionApproval[]>;
@@ -177,6 +192,25 @@ export function createMemoryMissionStore(): MissionStore {
       return next;
     },
 
+    async claimMissionActivation(missionId, workspaceId) {
+      // Single-threaded: the check-and-set cannot interleave.
+      const m = missions.get(missionId);
+      if (!m || m.workspaceId !== workspaceId || m.status !== "planned") return null;
+      const next: StoredMission = { ...m, status: "active", updatedAt: new Date() };
+      missions.set(missionId, next);
+      return next;
+    },
+
+    async replacePlanIfCurrent(missionId, workspaceId, expectedUpdatedAt, planSnapshot) {
+      const m = missions.get(missionId);
+      if (!m || m.workspaceId !== workspaceId || m.status !== "planned") return null;
+      if (m.updatedAt.getTime() !== expectedUpdatedAt.getTime()) return null;
+      // updatedAt must strictly advance so a second racer's token goes stale.
+      const next: StoredMission = { ...m, planSnapshot, updatedAt: new Date(Math.max(Date.now(), m.updatedAt.getTime() + 1)) };
+      missions.set(missionId, next);
+      return next;
+    },
+
     async listMissions(workspaceId) {
       return [...missions.values()]
         .filter((m) => m.workspaceId === workspaceId)
@@ -220,6 +254,11 @@ export function createMemoryMissionStore(): MissionStore {
       scopedMission(missionId, workspaceId);
       const list = events.get(missionId) ?? [];
       return list.slice(-limit);
+    },
+
+    async getEvent(missionId, workspaceId, eventId) {
+      scopedMission(missionId, workspaceId);
+      return (events.get(missionId) ?? []).find((e) => e.id === eventId) ?? null;
     },
 
     async createApproval(input) {

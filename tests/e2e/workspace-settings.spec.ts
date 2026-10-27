@@ -19,6 +19,14 @@ const PAGES = [
 ];
 
 test.describe("workspace settings", () => {
+  // The serial suite reuses one admin across many independent tests, each with a new browser
+  // context (client-side visit pacing/backoff is therefore reset for every test). Earlier specs
+  // spend the same user's 60/min write bucket on saves plus visits. Begin this independent settings
+  // smoke group after a full production write window, without changing limits or hiding 429s.
+  test.beforeAll(async () => {
+    test.setTimeout(75000);
+    await new Promise((resolve) => setTimeout(resolve, 61000));
+  });
   for (const p of PAGES) {
     test(`renders /dashboard/settings/${p.path}`, async ({ page }) => {
       await gotoClean(page, `/dashboard/settings/${p.path}`);

@@ -22,6 +22,7 @@ import { aosButton, FilterPill, NeutralBadge } from "@/components/aos";
 import { Segmented } from "@/components/aos/Controls";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { confirmAction, toast, toastError } from "@/lib/ui/feedback";
+import { StoreBundles } from "@/components/store/StoreBundles";
 import { filterCatalogue, maxTier, PUBLISHABLE_KINDS, STORE_KINDS, type StoreItem, type StoreKind } from "@/lib/store/catalogue";
 import type { ClientWorkspace, PublicationOut, StoreCatalogue } from "@/lib/store/service";
 import type { MessageKey } from "@/lib/i18n";
@@ -181,6 +182,8 @@ export function StoreApp({ initial, initialPublications, clients, role, canInsta
         <h1 className="aos-heading">{t("storeApp.title")}</h1>
         <p className="mt-1 max-w-[72ch] text-md text-muted">{t("storeApp.subtitle")}</p>
       </div>
+
+      <StoreBundles canInstall={(ROLE_RANK[role] ?? 0) >= 1} onInstalled={refresh} />
 
       {admin && pendingIncoming.length > 0 ? (
         <section aria-labelledby="store-offers" className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline">

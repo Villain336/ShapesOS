@@ -11,11 +11,13 @@ import { checkTermination, validateGoal, missionProgress } from "../types";
 import { createMemoryMissionStore } from "../store";
 import {
   appendStepEvent,
+  approveMissionPlan,
   checkpoint,
   createStalenessVerifier,
   decideApproval,
   loadMission,
   pauseMission,
+  planRevision,
   resumeMission,
   startMission,
   type EngineDeps,
@@ -35,8 +37,13 @@ function deps(overrides: Partial<EngineDeps> = {}): EngineDeps {
 
 const GOOD_GOAL = { metric: "booked_jobs", targetValue: 40, unit: "jobs", timeframeDays: 90, baseline: 22 };
 
+// Start + approve the plan: most tests exercise an ACTIVE mission. The
+// whole-plan gate itself is covered in the startMission / approveMissionPlan
+// blocks below.
 async function started(d: EngineDeps, goal: unknown = GOOD_GOAL, templateId = "home-services.booked-job-growth") {
-  return startMission(d, { workspaceId: WS, userId: USER, templateId, goal });
+  const m = await startMission(d, { workspaceId: WS, userId: USER, templateId, goal });
+  const { mission } = await approveMissionPlan(d, m.id, WS, USER);
+  return mission;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,20 +137,28 @@ describe("startMission", () => {
     d = deps();
   });
 
-  it("creates planned->active mission with plan snapshot + genesis event; executes nothing", async () => {
-    const m = await started(d);
-    assert.equal(m.status, "active");
+  it("creates a PLANNED mission with plan snapshot + genesis event; executes nothing until a person approves the plan", async () => {
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    assert.equal(m.status, "planned");
     assert.equal(m.template, "home-services.booked-job-growth");
     const snap = m.planSnapshot as { steps: unknown[] };
     assert.ok(Array.isArray(snap.steps) && snap.steps.length > 0, "plan snapshot written");
     const events = await d.store.listEvents(m.id, WS);
+    assert.equal(events.length, 1, "genesis only — no activation before plan approval");
     assert.equal(events[0].step, "mission.genesis");
     assert.equal(events[0].prevHash, "GENESIS");
-    assert.equal(events[1].step, "mission.activated");
-    // hash chain links
-    assert.equal(events[1].prevHash, events[0].eventHash);
     // Tier 0: no executor/tool events — only engine bookkeeping
     assert.ok(events.every((e) => e.tool === null), "no tool calls on start");
+
+    // The whole-plan gate: a person's approval activates the mission.
+    const { mission: activated, transitioned } = await approveMissionPlan(d, m.id, WS, USER);
+    assert.equal(transitioned, true);
+    assert.equal(activated.status, "active");
+    const after = await d.store.listEvents(m.id, WS);
+    assert.equal(after[1].step, "mission.plan_approved");
+    assert.equal(after[1].prevHash, after[0].eventHash, "hash chain links");
+    assert.equal(after[2].step, "mission.activated");
+    assert.equal(after[2].prevHash, after[1].eventHash, "hash chain links");
   });
 
   it("stores the user-supplied name as the goal label", async () => {
@@ -166,6 +181,97 @@ describe("startMission", () => {
     await assert.rejects(started(frozen, GOOD_GOAL, "nope.x"), /frozen/i);
     // nothing was created
     assert.equal((await frozen.store.listMissions(WS)).length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// approveMissionPlan (the whole-plan gate)
+// ---------------------------------------------------------------------------
+
+describe("approveMissionPlan", () => {
+  let d: EngineDeps;
+  beforeEach(() => {
+    d = deps();
+  });
+
+  it("is idempotent on an already-active mission — a repeat approval activates nothing twice", async () => {
+    const m = await started(d);
+    const before = await d.store.listEvents(m.id, WS);
+    const again = await approveMissionPlan(d, m.id, WS, USER);
+    assert.equal(again.transitioned, false);
+    assert.equal(again.mission.status, "active");
+    const after = await d.store.listEvents(m.id, WS);
+    assert.equal(after.length, before.length, "no duplicate plan_approved/activated events");
+  });
+
+  it("rejects approving the plan of a mission that is not planned", async () => {
+    const m = await started(d);
+    await pauseMission(d, m.id, WS);
+    await assert.rejects(approveMissionPlan(d, m.id, WS, USER), /status "paused"/);
+  });
+
+  it("404s on an unknown mission", async () => {
+    await assert.rejects(approveMissionPlan(d, "nope", WS, USER), /not found/i);
+  });
+
+  it("checks the workspace freeze FIRST", async () => {
+    const frozen = deps({ isWorkspaceFrozen: async () => true });
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    await assert.rejects(approveMissionPlan(frozen, m.id, WS, USER), /frozen/i);
+  });
+
+  it("binds the approval to the reviewed plan revision — a changed plan is refused (409)", async () => {
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    const reviewed = planRevision(m.planSnapshot);
+    await assert.rejects(
+      approveMissionPlan(d, m.id, WS, USER, { expectedRevision: "stale-revision" }),
+      (e: Error) => /changed since you reviewed/.test(e.message) && (e as { status?: number }).status === 409,
+    );
+    assert.equal((await d.store.getMission(m.id, WS))!.status, "planned", "still gated after a refused approval");
+    const { transitioned } = await approveMissionPlan(d, m.id, WS, USER, { expectedRevision: reviewed });
+    assert.equal(transitioned, true);
+  });
+
+  it("planRevision is stable for the same plan and changes with the plan", async () => {
+    const a = planRevision({ steps: [{ order: 1, title: "A" }] });
+    const same = planRevision({ steps: [{ title: "A", order: 1 }] });
+    const different = planRevision({ steps: [{ order: 1, title: "B" }] });
+    assert.equal(a, same, "key order does not change the revision");
+    assert.notEqual(a, different, "content changes the revision");
+  });
+
+  it("records the approved plan revision on the timeline", async () => {
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    const reviewed = planRevision(m.planSnapshot);
+    await approveMissionPlan(d, m.id, WS, USER, { expectedRevision: reviewed });
+    const events = await d.store.listEvents(m.id, WS);
+    const approved = events.find((e) => e.step === "mission.plan_approved")!;
+    assert.equal((approved.observation as { planRevision?: string }).planRevision, reviewed);
+  });
+
+  it("concurrent approvals converge: one transition, one plan_approved event", async () => {
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    const [a, b] = await Promise.all([
+      approveMissionPlan(d, m.id, WS, USER),
+      approveMissionPlan(d, m.id, WS, USER),
+    ]);
+    assert.equal([a.transitioned, b.transitioned].filter(Boolean).length, 1, "exactly one approval transitions");
+    assert.equal((await d.store.getMission(m.id, WS))!.status, "active");
+    const events = await d.store.listEvents(m.id, WS);
+    assert.equal(events.filter((e) => e.step === "mission.plan_approved").length, 1, "no duplicate approval events");
+    assert.equal(events.filter((e) => e.step === "mission.activated").length, 1, "no duplicate activation events");
+  });
+
+  it("an approved mission whose plan changed afterwards cannot (re-)launch under the old approval", async () => {
+    const m = await started(d);
+    await d.store.updateMission(m.id, WS, { planSnapshot: { templateId: "home-services.booked-job-growth", steps: [{ order: 1, title: "Swapped step" }] } });
+    await assert.rejects(approveMissionPlan(d, m.id, WS, USER), /changed after it was approved/);
+  });
+
+  it("pauseMission refuses a planned mission — no planned->paused->resume bypass of the plan gate", async () => {
+    const m = await startMission(d, { workspaceId: WS, userId: USER, templateId: "home-services.booked-job-growth", goal: GOOD_GOAL });
+    await assert.rejects(pauseMission(d, m.id, WS), /planned/);
+    assert.equal((await d.store.getMission(m.id, WS))!.status, "planned");
   });
 });
 

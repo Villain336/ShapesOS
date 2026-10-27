@@ -42,8 +42,30 @@ export E2E_MOCK_OAUTH_CLIENT_SECRET="${E2E_MOCK_OAUTH_CLIENT_SECRET:-e2e-mock-se
 # axe pass alone loads ~10 pages in ~25 s), which outruns the default
 # 120 reads/min a person gets. Raise only the read tier for the suite.
 export RATE_LIMIT_READ_PER_MIN="${RATE_LIMIT_READ_PER_MIN:-600}"
-export LLM_API_KEY="${LLM_API_KEY:-e2e-no-llm}"
-export LLM_MODEL="${LLM_MODEL:-e2e-no-model}"
+# Provider-network isolation. The suite starts missions, so the agent loop runs
+# and asks the router for a model. A placeholder LLM_API_KEY is NOT inert: the
+# router counts it as an OpenAI key, runs the agent workloads live on OpenAI's
+# default base URL and sends a real request with a fake key. So instead every
+# provider credential, model override, base URL and self-host switch is forced
+# empty here (never inherited from the caller's shell), the router then falls
+# back to its deterministic, labelled mock provider (no network, never
+# metered), and both base URLs point at a closed local port as a second wall.
+# lib/llm/__tests__/e2e-provider-isolation.test.ts reads these exports and
+# asserts every workload resolves to the mock provider.
+export LLM_API_KEY=""
+export OPENAI_API_KEY=""
+export ANTHROPIC_API_KEY=""
+export LLM_MODEL=""
+export LLM_MODEL_COPY=""
+export LLM_MODEL_BULK=""
+export LLM_MODEL_BACKGROUND=""
+export LLM_MODEL_LEAD=""
+export LLM_MODEL_SUBAGENT=""
+export LLM_MODEL_CODE=""
+export LLM_MODEL_CODE_MAX=""
+export LLM_SELF_HOST=""
+export LLM_BASE_URL="http://127.0.0.1:9"
+export OPENAI_BASE_URL="http://127.0.0.1:9"
 
 echo "==> [e2e] migrate (scripts/db/migrate.sh)"
 sh scripts/db/migrate.sh

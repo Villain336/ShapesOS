@@ -77,6 +77,17 @@ test.describe("visual gate: workspace UX", () => {
     const groupHeading = page.getByRole("button", { name: /^Collapse / }).first();
     await expect(groupHeading).toBeVisible();
 
+    // One route, one active row: pinned rows own /dashboard and
+    // /dashboard/assistant; the matching group items stay in nav config
+    // (hotkeys/⌘K/activeNavHref) but render only as the pinned row.
+    // The e2e seed stamps onboardingCompletedAt, so /dashboard renders Home
+    // instead of the wizard; both routes carry the check - /dashboard is the
+    // original duplicate Feed+Overview regression case.
+    await page.goto("/dashboard/assistant", { waitUntil: "networkidle" });
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+
     // Expected initial state is light (e2e member default + CI prefers light).
     expect(await htmlClass(page)).not.toMatch(/\bdark\b/);
     await page.screenshot({ path: `${SHOTS}/01-light-dashboard.png`, fullPage: true });
@@ -265,5 +276,92 @@ test.describe("visual gate: workspace UX", () => {
     await page.screenshot({ path: `${SHOTS}/06-mobile-dashboard.png`, fullPage: true });
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
     expect(fits).toBeTruthy();
+  });
+
+  test("home feed renders greeting, needs-you rows and the desktop link", async ({ page }) => {
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+
+    // Greeting (home.greeting.*): the feed headline, member's first name.
+    await expect(page.getByRole("heading", { name: /^Good (morning|afternoon|evening),/ })).toBeVisible();
+
+    // Populated needs-you: the seeded approvals render as flat rows.
+    const needsYou = page.getByRole("region", { name: "Needs you" });
+    await expect(needsYou).toBeVisible();
+    await expect(needsYou.locator("li", { hasText: "Send estimate" })).toBeVisible();
+    await expect(needsYou.locator("li", { hasText: "Reply to Dana K." })).toBeVisible();
+
+    // The widget desktop moved to /dashboard/desktop, one tap away.
+    await expect(page.getByRole("link", { name: "Open desktop" })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/09-feed-home.png`, fullPage: true });
+
+    // Narrow view: flat rows and inline actions stay readable.
+    await page.setViewportSize({ width: 900, height: 844 });
+    await page.screenshot({ path: `${SHOTS}/09b-feed-narrow.png` });
+
+    // Beside chat — the approved layout's core ("open other panels without
+    // it feeling crammed"): the dock pushes the feed column and the flat
+    // rows + inline actions stay visible and readable next to it.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole("button", { name: "Open chat" }).click();
+    const dock = page.getByRole("complementary", { name: "Chat" });
+    await expect(dock).toBeVisible();
+    const main = page.locator("[data-shell-main]");
+    await expect
+      .poll(() => main.evaluate((el) => parseFloat(getComputedStyle(el).marginRight)), {
+        message: "push margin settles at dock width",
+      })
+      .toBeGreaterThan(0);
+    await expect(needsYou.locator("li", { hasText: "Send estimate" })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/09c-feed-beside-chat.png` });
+    await page.getByRole("button", { name: "Close chat" }).click();
+
+    // One route, one active row: the new Desktop group item must not
+    // duplicate the pinned Feed row on /dashboard.
+    const nav = page.locator("nav[data-shell-nav]");
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+
+    // The desktop itself still renders at its new route, layouts intact.
+    await page.goto("/dashboard/desktop", { waitUntil: "networkidle" });
+    await expect(nav.locator("[aria-current='page']")).toHaveCount(1);
+    await page.screenshot({ path: `${SHOTS}/10-desktop-route.png`, fullPage: true });
+  });
+
+  test("feed needs-you rows keep the queue's decision semantics", async ({ page }) => {
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+    const needsYou = page.getByRole("region", { name: "Needs you" });
+    await expect(needsYou).toBeVisible();
+    const initial = await needsYou.locator("li").count();
+
+    // Blocked row: the admin already approved it and a second approver is
+    // needed — Review only, no inline Approve, and the reason is shown.
+    const blocked = needsYou.locator("li", { hasText: "Reply to Dana K." });
+    await expect(blocked).toBeVisible();
+    await expect(blocked.getByRole("button", { name: /Approve/ })).toHaveCount(0);
+    await expect(blocked.getByRole("link", { name: "Review" })).toBeVisible();
+    await expect(blocked.getByText(/second approver is needed/)).toBeVisible();
+
+    // Failure rollback: when the queue refuses, the row stays and the error
+    // surfaces (nothing is optimistically removed).
+    await page.route("**/api/automation/decide", (route) =>
+      route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "Not allowed." }) }),
+    );
+    const approveRow = needsYou.locator("li", { hasText: "Send estimate" });
+    await approveRow.getByRole("button", { name: /^Approve/ }).click();
+    await expect(page.getByText("Couldn't approve")).toBeVisible();
+    await expect(approveRow).toBeVisible();
+    await page.unroute("**/api/automation/decide");
+
+    // Real decide (synthetic rows in the disposable e2e database): approve
+    // removes one row, deny removes the other, and the queue state persists
+    // across a reload (the decisions really reached the queue APIs).
+    await approveRow.getByRole("button", { name: /^Approve/ }).click();
+    await expect(approveRow).toHaveCount(0);
+    const denyRow = needsYou.locator("li", { hasText: "Pause campaign" });
+    await denyRow.getByRole("button", { name: "Deny" }).click();
+    await expect(denyRow).toHaveCount(0);
+    await page.reload({ waitUntil: "networkidle" });
+    const after = page.getByRole("region", { name: "Needs you" });
+    expect(await after.locator("li").count()).toBe(initial - 2);
+    await page.screenshot({ path: `${SHOTS}/11-feed-sparse.png`, fullPage: true });
   });
 });

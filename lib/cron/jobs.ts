@@ -45,6 +45,10 @@ const LONG = 30 * MIN;
 export const CRON_JOBS: readonly CronJob[] = [
   // --- Every minute -------------------------------------------------------
   { key: "webhooks", path: "/api/cron/webhooks", cron: "* * * * *", source: "deploy", timeoutMs: SHORT },
+  // Dev preview (in-product browser v1): flip provider-auto-paused rows,
+  // destroy gone/ceiling-past sandboxes. 5 minutes keeps DB↔provider drift
+  // and absolute-ceiling overrun small; the provider TTL is the real stop.
+  { key: "dev-sandbox-reconcile", path: "/api/cron/dev-sandbox-reconcile", cron: "*/5 * * * *", source: "deploy", timeoutMs: SHORT },
   {
     key: "workflows",
     path: "/api/cron/workflows",

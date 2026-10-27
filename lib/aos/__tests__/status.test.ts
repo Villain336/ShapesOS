@@ -74,7 +74,7 @@ describe("record → status", () => {
   });
 
   it("maps missions; a pending approval raises a live mission to needs you", () => {
-    assert.equal(fromMissionStatus("planned"), "queued");
+    assert.equal(fromMissionStatus("planned"), "needs");
     assert.equal(fromMissionStatus("active"), "running");
     assert.equal(fromMissionStatus("paused"), "paused");
     assert.equal(fromMissionStatus("complete"), "done");

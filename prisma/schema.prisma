@@ -1,3 +1,49 @@
+// Read-only preview capability for the in-product browser (v2, replaces the
+
+// ambient capability cookie): an unguessable bearer URL per
+
+// (user, project, port, sandbox generation). tokenHash verifies requests;
+
+// tokenEnc (secrets envelope) lets the status endpoint re-serve the SAME raw
+
+// token to its owning session so a live pane never reloads for renewal.
+
+model ProjectDevPreviewToken {
+
+  id            String    @id @default(cuid()) @map("id")
+
+  workspaceId   String    @map("workspace_id")  
+
+projectId     String    @map("project_id")
+
+  port          Int       @map("port")
+
+  sandboxId     String    @map("sandbox_id")
+
+  userId        String    @map("user_id")
+
+  tokenHash     String    @unique @map("token_hash")
+
+  tokenEnc      String    @map("token_enc")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  expiresAt     DateTime  @map("expires_at")  
+
+lastRenewedAt DateTime? @map("last_renewed_at")
+
+  revokedAt     DateTime? @map("revoked_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+
+
+  @@index([workspaceId, projectId, port])
+
+  @@map("project_dev_preview_tokens")
+
+}
+
 // Marketr — Prisma data model (spec §6).
 // Source of truth: docs/specs/SPEC.md. Milestone 1: schema only, no business logic yet.
 
@@ -572,7 +618,10 @@ enum SiteSourceType {
 }
 
 model Workspace {
+  instructionRevisions WorkspaceInstructionRevision[]
   attributionBundles AttributionBundle[]
+
+  projectDevPreviewTokens ProjectDevPreviewToken[]
   id                 String              @id @default(cuid())
   name               String
   // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
@@ -798,6 +847,8 @@ model Workspace {
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
   workspaceActionBudget       WorkspaceActionBudget?
   univerDocs                  UniverDoc[]
+  univerDocShares             UniverDocShare[]
+  reportShares                ReportShare[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources                 DataSource[]
   serpVendorConfigs           SerpVendorConfig[]
@@ -1097,6 +1148,7 @@ model Workspace {
   agentRunEvents              AgentRunEvent[]
   agentRunRecordings          AgentRunRecording[]
   agentRunSandboxes           AgentRunSandbox[] // Phase 8: one code sandbox per agent run
+  projectDevSandboxes         ProjectDevSandbox[] // in-product browser Dev preview: one persistent sandbox per project
   authorityApprovalEvents     AuthorityApprovalEvent[]
   billingSetupIdempotency     BillingSetupIdempotency[]
   breakerEvents               BreakerEvent[]
@@ -1278,6 +1330,7 @@ model Project {
   deployments             Deployment[]
   siteAudits              SiteAudit[]
   siteIssues              SiteIssue[]
+  projectDevSandbox       ProjectDevSandbox?
   // Milestone 12: report templates and generated reports scoped to this project.
   reportTemplates         ReportTemplate[]
   reports                 Report[]
@@ -1525,6 +1578,7 @@ model Report {
   sentAt  DateTime?    @map("sent_at")
 
   createdAt DateTime @default(now()) @map("created_at")
+  shares    ReportShare[]
 
   @@map("reports")
 }
@@ -1536,6 +1590,29 @@ enum ReportStatus {
   ready
   failed
   sent
+}
+
+// Phase 23: tokenized external share links for generated reports (the PDF is
+// what the link exposes — never the workspace, template internals or client).
+model ReportShare {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reportId     String    @map("report_id")
+  report       Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @map("token_hash")
+  tokenHint    String    @map("token_hint") @db.VarChar(8)
+  label        String?
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  openCount    Int       @default(0) @map("open_count")
+  lastOpenedAt DateTime? @map("last_opened_at")
+
+  @@index([workspaceId, reportId])
+  @@map("report_shares")
 }
 
 // Marketr — white-label brand kit (milestone 12). Workspace-scoped; optionally
@@ -9524,9 +9601,37 @@ model UniverDoc {
   noteLinks   NoteLink[]
   versions    UniverDocVersion[]
   collabState UniverDocCollabState?
+  shares      UniverDocShare[]
 
   @@index([workspaceId, kind, updatedAt])
   @@map("univer_docs")
+}
+
+// Phase 23: tokenized external share links for Office docs — the CAD/Studio
+// share pattern extended to the Office surface. Only the SHA-256 of the
+// token is stored; the raw token is returned once at creation. RLS mirrors
+// workspace_file_shares: tenant isolation + one SELECT-only public-lookup
+// policy gated on app.doc_report_share_route (lib/sharing/doc-shares.ts).
+model UniverDocShare {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  docId        String    @map("doc_id")
+  doc          UniverDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @map("token_hash")
+  // Last 4 characters of the token, to tell links apart in the list.
+  tokenHint    String    @map("token_hint") @db.VarChar(8)
+  label        String?
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  openCount    Int       @default(0) @map("open_count")
+  lastOpenedAt DateTime? @map("last_opened_at")
+
+  @@index([workspaceId, docId])
+  @@map("univer_doc_shares")
 }
 
 // ============================================================
@@ -9649,6 +9754,49 @@ model AgentRunSandbox {
 
   @@index([workspaceId, status])
   @@map("agent_run_sandboxes")
+}
+
+// Persistent per-project dev sandbox (in-product browser "Dev preview" v1):
+// ONE sandbox per project, surviving between work sessions. Unlike
+// AgentRunSandbox (dies with the agent run), this row outlives runs; the
+// provider pauses it at the running TTL (a paused sandbox bills nothing,
+// docs-backed claim, not a contractual SLA; the TTL is refreshed by
+// activity, so absolute ceilings are enforced app-side) and
+// ShapesOS wakes it only via an explicit resume. autoResume on inbound
+// traffic stays OFF by owner constraint (2026-10-25).
+model ProjectDevSandbox {
+  id           String    @id @default(cuid()) @map("id")
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId    String    @unique @map("project_id")
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider     String    @map("provider")
+  sandboxId    String    @map("sandbox_id")
+  // "creating" | "running" | "paused" | "destroyed"
+  status       String    @default("creating") @map("status")
+  // The bounds this sandbox was created under: "production" | "test".
+  // Reconcile applies the matching created-at ceiling per row, so a
+  // test-bounded sandbox never inherits the looser production ceiling.
+  mode         String    @default("production") @map("mode")
+  // Monotonic creations under this row: 1 at insert, +1 on every
+  // revive-after-destroy. The test aggregate bound sums THIS, so a
+  // destroy/recreate loop on the same project can't dodge the cap by
+  // reusing the row.
+  createCount  Int       @default(1) @map("create_count")
+  // Provider running TTL in seconds (auto-pause at expiry; refreshed by
+  // activity, so NOT a user-idle detector and not an absolute spend bound).
+  ttlSeconds Int @default(900) @map("ttl_seconds")
+  exposedPorts Int[]     @default([]) @map("exposed_ports")
+  // Provider access material needed to reattach (E2B traffic token), as a
+  // secrets() envelope. Never sent out.
+  secretEnc    String?   @map("secret_enc")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastResumedAt DateTime? @map("last_resumed_at")
+  pausedAt     DateTime? @map("paused_at")
+  destroyedAt  DateTime? @map("destroyed_at")
+
+  @@index([workspaceId, status])
+  @@map("project_dev_sandboxes")
 }
 
 model AgentRunRecording {
@@ -18231,4 +18379,24 @@ model AgentRunFolder {
   @@unique([runId, folderPath])
   @@index([workspaceId, runId])
   @@map("agent_run_folders")
+}
+
+// ============================================================
+// Phase 25: shared workspace instructions (admin-written guidance that is
+// included in agent context). Append-only; current = highest revision.
+// Guidance, not enforcement: it never replaces approval, spend or security
+// gates.
+// ============================================================
+model WorkspaceInstructionRevision {
+  id             String   @id @default(cuid()) @map("id")
+  workspaceId    String   @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  revision       Int      @map("revision")
+  body           String   @map("body") @db.Text
+  createdBy      String   @map("created_by")
+  createdByLabel String?  @map("created_by_label")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, revision])
+  @@map("workspace_instruction_revisions")
 }

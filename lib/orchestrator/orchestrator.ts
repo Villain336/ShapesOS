@@ -28,6 +28,18 @@ import { runAnalyst } from "./executors/analyst";
 import { runScheduler } from "./executors/scheduler";
 import { runActor } from "./executors/actor";
 
+
+// A failed executor may already have used metered model tokens. Carry that cost through the error
+// so failure does not erase it from the mission budget. An ordinary Error supplies no cost evidence.
+export class DispatchError extends Error {
+  readonly costCents: number;
+  constructor(message: string, costCents: number) {
+    super(message);
+    this.name = "DispatchError";
+    this.costCents = Number.isFinite(costCents) ? Math.max(0, Math.ceil(costCents)) : 0;
+  }
+}
+
 /** Circuit breaker: hard cap on routing hops per run (research: ~15–25). */
 export const MAX_ROUTING_HOPS = 20;
 /** Default caps — deterministic termination, checked each hop. */
@@ -98,6 +110,11 @@ export interface RoutingRecord {
 export interface DispatchResult {
   summary: string;
   costCents: number;
+  /**
+   * True when costCents comes from the deterministic cost model (the no-model executors), not from
+   * metered model usage. It is recorded on the event so the UI never presents it as money spent.
+   */
+  costEstimated?: boolean;
   followUps?: MissionTask[];
 }
 
@@ -159,11 +176,11 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
         query: String(p.query ?? task.label),
         topK: typeof p.topK === "number" ? p.topK : undefined,
       });
-      return { summary: r.summary, costCents: r.costCents };
+      return { summary: r.summary, costCents: r.costCents, costEstimated: true };
     }
     case "planner": {
       const r = await runPlanner({ ...base, goal: String(p.goal ?? task.label) });
-      return { summary: r.summary, costCents: r.costCents, followUps: planToTasks(r.plan, task) };
+      return { summary: r.summary, costCents: r.costCents, costEstimated: true, followUps: planToTasks(r.plan, task) };
     }
     case "drafter": {
       const r = await runDrafter({
@@ -173,7 +190,7 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
         channel: typeof p.channel === "string" ? p.channel : undefined,
         audience: typeof p.audience === "string" ? p.audience : undefined,
       });
-      return { summary: r.summary, costCents: r.costCents };
+      return { summary: r.summary, costCents: r.costCents, costEstimated: true };
     }
     case "analyst": {
       const r = await runAnalyst({
@@ -184,15 +201,20 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
         metricDelta: (p.metricDelta as Record<string, unknown> | undefined) ?? {},
         contextRefs: (p.contextRefs as Record<string, unknown> | undefined) ?? {},
       });
-      return { summary: r.attribution, costCents: r.costCents };
+      return { summary: r.attribution, costCents: r.costCents, costEstimated: true };
     }
     case "scheduler": {
+      // The scheduler schedules a plan's checkpoints. planToTasks hands it the validated plan;
+      // a task without one fails with a plain reason rather than a TypeError deep inside.
+      if (!p.plan || typeof p.plan !== "object") {
+        throw new Error("scheduler: this task carries no mission plan to schedule checkpoints for.");
+      }
       const r = await runScheduler({
         ...base,
         plan: p.plan as MissionPlan,
         startAt: typeof p.startAt === "string" ? p.startAt : undefined,
       });
-      return { summary: r.summary, costCents: r.costCents };
+      return { summary: r.summary, costCents: r.costCents, costEstimated: true };
     }
     case "actor": {
       const r = await runActor({
@@ -202,18 +224,23 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
         args: (p.args as Record<string, unknown> | undefined) ?? {},
         invokedBy: `chief-strategy-agent${base.missionId ? `:${base.missionId}` : ""}`,
       });
-      return { summary: r.summary, costCents: r.costCents };
+      return { summary: r.summary, costCents: r.costCents, costEstimated: true };
     }
   }
 }
 
-function planToTasks(plan: MissionPlan, parent: MissionTask): MissionTask[] {
+export function planToTasks(plan: MissionPlan, parent: MissionTask): MissionTask[] {
   return plan.steps.map((s) => ({
     kind: EXECUTOR_TO_KIND[s.executor as ExecutorName] ?? "plan",
     label: `${s.id}: ${s.task}`,
     workspaceId: parent.workspaceId,
     missionId: parent.missionId ?? null,
-    payload: { ...(s.inputs as Record<string, unknown>), stepId: s.id },
+    // The scheduler step proposes checkpoints for the plan it belongs to, so it carries that plan.
+    payload: {
+      ...(s.inputs as Record<string, unknown>),
+      ...(s.executor === "scheduler" ? { plan } : {}),
+      stepId: s.id,
+    },
   }));
 }
 
@@ -364,18 +391,26 @@ export async function runMission(opts: RunMissionOptions): Promise<RunMissionRes
         actor: routing.nextAgent,
         step: `exec.${hops}`,
         tool: routing.nextAgent,
-        observation: { summary: res.summary.slice(0, 2000), costCents: res.costCents },
+        observation: {
+          summary: res.summary.slice(0, 2000),
+          costCents: res.costCents,
+          ...(res.costEstimated ? { costEstimated: true } : {}),
+        },
         costCents: Math.max(0, Math.round(res.costCents)),
       });
       if (res.followUps && res.followUps.length > 0) queue.push(...res.followUps);
     } catch (err) {
       consecutiveFailures += 1;
+      // Only a typed failure carries evidence of usage. Do not invent a cost for ordinary throws.
+      const failureCostCents = err instanceof DispatchError ? err.costCents : 0;
+      spentCents += failureCostCents;
       const message = err instanceof Error ? err.message : String(err);
       await log({
         actor: routing.nextAgent,
         step: `exec.${hops}.error`,
         tool: routing.nextAgent,
-        observation: { error: message, consecutiveFailures },
+        observation: { error: message, consecutiveFailures, failure: true, costCents: failureCostCents },
+        costCents: failureCostCents,
       });
       if (consecutiveFailures >= maxFailures) {
         await escalate("consecutive_failures", `${maxFailures} consecutive executor failures (last: ${message.slice(0, 200)}).`);

@@ -37,6 +37,7 @@ import { listFileAccess, requireFileAction, setFileAccess, type FileActor } from
 import { createShareLink, listShareLinks, revokeShareLink } from "../shares";
 import { createAnnotation, exportAnnotations, listAnnotations, removeAnnotation } from "../annotations";
 import { spotlight } from "@/lib/search/records";
+import { indexFileText } from "@/lib/search/text-index";
 import { GET as rawGET, POST as rawPOST } from "@/app/r/file/[token]/raw/route";
 
 const RUN = randomUUID().slice(0, 8);
@@ -91,6 +92,12 @@ describe("Files (DB)", () => {
   it("an overwrite keeps the previous bytes as a version; quota counts both; Spotlight re-indexes", async () => {
     const res = await overwriteFile({ workspaceId: WS, fileId, bytes: V2, mimeType: "application/pdf", userId: BEN });
     assert.equal(res.version, 2);
+    // Two writers for the current version must both settle without a unique-key race.
+    const indexed = await Promise.all([
+      indexFileText(WS, fileId, { embed: false }),
+      indexFileText(WS, fileId, { embed: false }),
+    ]);
+    assert.ok(indexed.every((r) => r.status === "indexed" || r.status === "unchanged"));
     const versions = await listFileVersions(WS, fileId);
     assert.deepEqual(versions!.map((v) => [v.version, v.current]), [[2, true], [1, false]]);
     assert.equal(versions![0]!.createdBy, BEN, "the current version is Ben's");
@@ -108,6 +115,38 @@ describe("Files (DB)", () => {
     }
     assert.ok(found, "re-indexed after the new version");
     assert.ok(!(await spotlight(WS, "viewer", "vellichor", { userId: ANA })).hits.some((h) => h.id === fileId));
+  });
+
+  it("a paused old-version index cannot replace newer text, and a different tenant cannot index it", async () => {
+    const separate = await writeFile({ workspaceId: WS, logicalPath: "/files/index-race.pdf", kind: "file", bytes: V2, mimeType: "application/pdf", createdBy: ANA });
+    const raceId = separate.id;
+    let extracted!: () => void;
+    const ready = new Promise<void>((resolve) => { extracted = resolve; });
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => { release = resolve; });
+    const oldRun = indexFileText(WS, raceId, {
+      embed: false,
+      beforeWrite: async () => { extracted(); await wait; },
+    });
+    await ready;
+    try {
+      // Overwrite this separate file with different bytes while its extraction
+      // is paused; the stale extraction must be refused even if its hash matches an existing row.
+      await overwriteFile({ workspaceId: WS, fileId: raceId, bytes: V1, mimeType: "application/pdf", userId: BEN });
+      const current = await indexFileText(WS, raceId, { embed: false });
+      assert.ok(current.status === "indexed" || current.status === "unchanged");
+      release();
+      assert.equal((await oldRun).status, "superseded");
+      const row = await withWorkspaceScope(WS, (tx) => tx.searchText.findFirst({ where: { workspaceId: WS, fileId: raceId } }));
+      assert.ok(row?.content?.includes("vellichor"), "newest version remains indexed");
+      assert.ok(!row?.content?.includes("pyrrhic"));
+      assert.equal((await indexFileText(`${WS}-other`, raceId, { embed: false })).status, "missing");
+    } finally {
+      release();
+      await oldRun;
+      await trashFile({ workspaceId: WS, fileId: raceId });
+      await deleteFile({ workspaceId: WS, fileId: raceId });
+    }
   });
 
   it("restore makes the old bytes a NEW version; history only grows", async () => {

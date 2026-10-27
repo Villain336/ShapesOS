@@ -2,7 +2,7 @@
 // Full mission detail: mission, event timeline, approvals, derived state.
 
 import { missionsGuard, safetyError, serializeMission, serializeApproval, serializeEvent, missionDeps } from "../_lib";
-import { loadMission } from "@/lib/missions/engine";
+import { loadMission, planRevision } from "@/lib/missions/engine";
 import { missionAgentView } from "@/lib/aos/missions";
 import { safeMissionRuns } from "@/lib/aos/missions.server";
 
@@ -20,9 +20,15 @@ export async function GET(
     const runs = await safeMissionRuns(gate.workspaceId, [loaded.mission.id]);
     return Response.json({
       mission: serializeMission(loaded.mission),
+      // The drafted plan's revision fingerprint: the client sends it back
+      // with the plan approval, which is refused (409) if the plan changed
+      // since the review.
+      planRevision: planRevision(loaded.mission.planSnapshot),
       events: loaded.events.map(serializeEvent),
       approvals: loaded.approvals.map(serializeApproval),
       stepCount: loaded.stepCount,
+      completedSteps: loaded.completedSteps,
+      estimatedCostCents: loaded.estimatedCostCents,
       planStepCount: loaded.planStepCount,
       totalCostCents: loaded.totalCostCents,
       consecutiveFailures: loaded.consecutiveFailures,

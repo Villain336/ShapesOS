@@ -40,6 +40,7 @@ import {
   type StoreActor,
 } from "../service";
 import { removedMissionTemplates } from "../state";
+import { installBundle, listBundlePlans } from "../bundles-service";
 import { list_store_items } from "../tools";
 
 const RUN = randomUUID().slice(0, 8);
@@ -158,6 +159,46 @@ describe("Store (DB)", () => {
     await assert.rejects(installStoreItem(adm, "rocket", "x"), /kind must be one of/);
     const gmail = await item(vic, "connector", "gmail");
     assert.equal(gmail?.install.mode, "link");
+  });
+
+  it("bundles: a shortcut, not a bypass - each member keeps its own gate, connectors never install, unselected members stay untouched", async () => {
+    const all = ["mission_template:local-services.gbp-visibility", "mission_template:home-services.review-velocity", "skill:rank-report", "connector:google-business-profile"];
+    // Mission templates are built in (installed unless removed): hide this one first so the bundle has something to add.
+    await removeStoreItem(adm, "mission_template", "local-services.gbp-visibility");
+    await removeStoreItem({ ...adm, workspaceId: OTHER }, "mission_template", "local-services.gbp-visibility");
+    // Editor without the grant: every installable member is refused by ITS OWN check; nothing installs.
+    const edRes = await installBundle(ed, "local-visibility", all);
+    const by = (r: typeof edRes, id: string) => r.results.find((x) => x.id === id)!;
+    assert.equal(by(edRes, "mission_template:local-services.gbp-visibility").outcome, "failed");
+    assert.match(by(edRes, "mission_template:local-services.gbp-visibility").reason ?? "", /admin role/);
+    assert.equal(by(edRes, "mission_template:home-services.review-velocity").outcome, "skipped", "built-in template still installed: nothing to add");
+    assert.equal(by(edRes, "skill:rank-report").outcome, "failed");
+    assert.match(by(edRes, "skill:rank-report").reason ?? "", /skills\.install/);
+    assert.equal(by(edRes, "connector:google-business-profile").outcome, "skipped");
+    assert.equal((await item(ed, "skill", "rank-report"))?.installed, false);
+    // The plan an editor sees says the same thing up front.
+    const plans = await listBundlePlans(ed);
+    const lv = plans.find((b) => b.key === "local-visibility")!;
+    assert.equal(lv.members.find((m) => m.key === "rank-report")!.action, "blocked");
+    assert.equal(lv.members.find((m) => m.key === "google-business-profile")!.action, "connect_separately");
+    // Admin in another workspace: only the SELECTED members install; the connector is skipped.
+    const admRes = await installBundle({ ...adm, workspaceId: OTHER }, "local-visibility", ["mission_template:local-services.gbp-visibility", "skill:rank-report", "connector:google-business-profile"]);
+    assert.equal(by(admRes, "mission_template:local-services.gbp-visibility").outcome, "installed");
+    assert.equal(by(admRes, "skill:rank-report").outcome, "installed");
+    assert.equal(by(admRes, "connector:google-business-profile").outcome, "skipped");
+    assert.equal(admRes.results.some((r) => r.id === "mission_template:home-services.review-velocity"), false, "unselected member untouched");
+    // Re-running is a no-op for what is installed, never a duplicate.
+    const again = await installBundle({ ...adm, workspaceId: OTHER }, "local-visibility", ["skill:rank-report"]);
+    assert.equal(by(again, "skill:rank-report").outcome, "skipped");
+    // Bad input: unknown bundle, nothing selected, a member outside the bundle.
+    await assert.rejects(installBundle(adm, "nope", ["skill:rank-report"]), /No bundle/);
+    await assert.rejects(installBundle(adm, "local-visibility", []), /at least one/);
+    await assert.rejects(installBundle(adm, "local-visibility", ["skill:seo-audit"]), /not part of this bundle/);
+    // Per-workspace: the first workspace is still untouched by the other's install.
+    assert.equal((await item(adm, "skill", "rank-report"))?.installed, false);
+    // Leave OTHER as the later skill assertions expect.
+    await removeStoreItem({ ...adm, workspaceId: OTHER }, "skill", "rank-report");
+    await installStoreItem(adm, "mission_template", "local-services.gbp-visibility");
   });
 
   it("agency publishing: only to its own clients; client admin accepts or declines; installed through the same paths", async () => {

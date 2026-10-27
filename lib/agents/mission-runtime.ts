@@ -18,7 +18,9 @@
 // Re-running after a crash skips steps already done (progress is saved on
 // the mission run) and resumes a step's half-finished sub-agent run.
 
+import { loadInstructionsBlock } from "@/lib/instructions/workspace-instructions";
 import { prisma } from "@/lib/prisma";
+import { DispatchError } from "@/lib/orchestrator/orchestrator";
 import { workloadForAgent } from "@/lib/llm/router";
 import {
   appendAgentRunEvent,
@@ -99,19 +101,53 @@ export function missionInitialTasks(
   return { tasks, waitingOn: null };
 }
 
-/** Launch: the mission's run + the queued job (POST /api/missions calls this). */
+/** Launch: the mission's run + the queued job (POST /api/missions/:id/approve-plan calls this). */
 export async function enqueueMissionLaunch(input: MissionJobPayload): Promise<{ runId: string; jobId: string }> {
-  const run = await createAgentRun({
-    workspaceId: input.workspaceId,
-    kind: "mission",
-    startedBy: input.userId,
-    missionId: input.missionId,
-    agentKey: "lead",
-    agentState: { missionId: input.missionId },
+  return withWorkspaceScope(input.workspaceId, async (tx) => {
+    // Durable serialization, not UI discipline: the mission row is locked FOR
+    // UPDATE for the whole check+create, so true-parallel launches (API
+    // retries, a second tab, a worker race) cannot both pass the existing-run
+    // check - the second waits on the lock, then adopts the first's run.
+    await tx.$queryRaw`SELECT id FROM missions WHERE id = ${input.missionId} AND workspace_id = ${input.workspaceId} FOR UPDATE`;
+    // Whole-plan gate, structural: a mission still at "planned" has not had
+    // its drafted plan approved by a person, so it must not launch.
+    const mission = await tx.mission.findFirst({
+      where: { id: input.missionId, workspaceId: input.workspaceId },
+      select: { status: true },
+    });
+    if (!mission) throw new Error(`Mission ${input.missionId} not found in this workspace.`);
+    if (mission.status === "planned") {
+      throw new Error("This mission's plan is still awaiting a person's approval - approve the plan before starting it.");
+    }
+    // Idempotent + retry-safe: one launch run per mission. If a previous
+    // attempt created the run but failed before or after queueing the job, a
+    // retry resumes from exactly where it stopped instead of double-starting.
+    const existing = await tx.agentRun.findFirst({
+      where: { workspaceId: input.workspaceId, missionId: input.missionId, kind: "mission", parentRunId: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (existing) {
+      const job = await tx.agentJob.findFirst({
+        where: { workspaceId: input.workspaceId, runId: existing.id, kind: "mission" },
+        select: { id: true },
+      });
+      if (job) return { runId: existing.id, jobId: job.id };
+      const queued = await enqueueAgentJob({ workspaceId: input.workspaceId, kind: "mission", runId: existing.id, payload: input });
+      return { runId: existing.id, jobId: queued.id };
+    }
+    const run = await createAgentRun({
+      workspaceId: input.workspaceId,
+      kind: "mission",
+      startedBy: input.userId,
+      missionId: input.missionId,
+      agentKey: "lead",
+      agentState: { missionId: input.missionId },
+    });
+    const job = await enqueueAgentJob({ workspaceId: input.workspaceId, kind: "mission", runId: run.id, payload: input });
+    await appendAgentRunEvent(input.workspaceId, run.id, { type: "note", summary: "Mission queued for the agent worker" }).catch(() => undefined);
+    return { runId: run.id, jobId: job.id };
   });
-  const job = await enqueueAgentJob({ workspaceId: input.workspaceId, kind: "mission", runId: run.id, payload: input });
-  await appendAgentRunEvent(input.workspaceId, run.id, { type: "note", summary: "Mission queued for the agent worker" }).catch(() => undefined);
-  return { runId: run.id, jobId: job.id };
 }
 
 interface MissionProgress {
@@ -198,6 +234,7 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
       return null;
     };
     const p = task.payload as { title?: unknown; description?: unknown } | undefined;
+    const sharedInstructions = await loadInstructionsBlock(opts.workspaceId);
     const system = [
       subAgentSystemPrompt(executor),
       "",
@@ -205,6 +242,7 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
       "Do this step only, with your tools. Drafts stay drafts: anything that sends, publishes or spends waits for a person's approval.",
       `This step may only use these tool groups: ${grant.groups.join(", ")}.`,
       "Finish with a short report: what you did, what you found, and what the next step needs to know.",
+      ...(sharedInstructions ? ["", sharedInstructions] : []),
     ].join("\n");
     const userText = [`Step ${stepId}: ${String(p?.title ?? task.label)}`, String(p?.description ?? "")].filter(Boolean).join("\n\n");
 
@@ -217,8 +255,8 @@ export function subAgentDispatch(opts: SubAgentDispatchOptions) {
     if (loop.status === "handoff") throw new LeaseLostError();
     const status = loop.status === "cancelled" ? "cancelled" : loop.status === "error" ? "failed" : "succeeded";
     await finishAgentRun(opts.workspaceId, runId, status).catch(() => undefined);
-    if (loop.status === "error") throw new Error(loop.finalText);
     const costCents = Math.ceil(loop.state.costMicroUsd / 10_000);
+    if (loop.status === "error") throw new DispatchError(loop.finalText, costCents);
     const waiting = loop.status === "awaiting_confirmation" ? ` (waiting for approval: ${loop.proposal?.tool ?? "an action"})` : "";
     return { summary: `${name}: ${loop.finalText || "done"}${waiting}`.slice(0, 2000), costCents };
   };

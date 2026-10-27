@@ -146,6 +146,7 @@ export function toListItem(loaded: LoadedMission) {
     progress: loaded.progress,
     nextCheckpoint: loaded.nextCheckpoint,
     totalCostCents: loaded.totalCostCents,
+    estimatedCostCents: loaded.estimatedCostCents,
     createdAt: m.createdAt,
   };
 }

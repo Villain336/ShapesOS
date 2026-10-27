@@ -177,6 +177,8 @@ export interface IndexOptions {
   embed?: boolean;
   /** Test seam: the embedder (default the local MiniLM). */
   embedder?: Embed;
+  /** Test seam: pause after extraction, before the version check and locked write. */
+  beforeWrite?: () => Promise<void>;
 }
 
 export interface IndexResult {
@@ -205,17 +207,25 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
   const text = extracted.text.slice(0, TEXT_INDEX_LIMITS.maxChars);
   const hash = sha256(`${extracted.status}\n${text}`);
   const key = target.fileId ? { fileId: target.fileId } : { univerDocId: target.univerDocId! };
-  const existing = await withWorkspaceScope(target.workspaceId, (tx) =>
-    tx.searchText.findFirst({ where: { workspaceId: target.workspaceId, ...key }, select: { id: true, contentSha256: true, embeddedCount: true, chunkCount: true } }),
-  );
-  if (existing && existing.contentSha256 === hash && !opts.force) {
-    const missingEmbeds = opts.embed !== false ? await embedPending(target.workspaceId, existing.id, opts.embedder) : 0;
-    return { status: "unchanged", chunks: existing.chunkCount, embedded: existing.embeddedCount + missingEmbeds };
-  }
   const chunks = extracted.status === "indexed" ? chunkText(text) : [];
+  let unchanged: { chunkCount: number; embeddedCount: number } | null = null;
   const id = await withWorkspaceScope(
     target.workspaceId,
     async (tx) => {
+      // Serialize writers for this source, including the initial insert. Reading `existing`
+      // outside this transaction let two background indexers both choose create and one lose
+      // to the source's unique key. Lock before rechecking freshness and reading the row.
+      const lockKey = `search-text:${target.workspaceId}:${target.source}:${target.fileId ?? target.univerDocId}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
+      const existing = await tx.searchText.findFirst({
+        where: { workspaceId: target.workspaceId, ...key },
+        select: { id: true, contentSha256: true, chunkCount: true, embeddedCount: true },
+      });
+      if (existing && existing.contentSha256 === hash && !opts.force) {
+        unchanged = { chunkCount: existing.chunkCount, embeddedCount: existing.embeddedCount };
+        return existing.id;
+      }
       const data = {
         workspaceId: target.workspaceId,
         source: target.source,
@@ -230,7 +240,6 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
         error: extracted.error ?? null,
         indexedAt: new Date(),
       };
-      if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
       const row = existing
         ? await tx.searchText.update({ where: { id: existing.id, workspaceId: target.workspaceId }, data })
         : await tx.searchText.create({ data: { ...data, ...key } });
@@ -246,6 +255,9 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
   );
   if (id === null) return { status: "superseded", chunks: 0, embedded: 0 };
   const embedded = opts.embed !== false && chunks.length ? await embedPending(target.workspaceId, id, opts.embedder) : 0;
+  // Assignments inside the transaction callback are not tracked by TypeScript's flow analysis.
+  const prior = unchanged as { chunkCount: number; embeddedCount: number } | null;
+  if (prior) return { status: "unchanged", chunks: prior.chunkCount, embedded: prior.embeddedCount + embedded };
   return { status: extracted.status, chunks: chunks.length, embedded };
 }
 
@@ -299,6 +311,7 @@ export async function indexFileText(workspaceId: string, fileId: string, opts: I
     extracted = bytes ? await extractFileText(row.filename, row.mimeType, bytes) : { status: "failed", text: "", extractor: null, error: "file bytes not found in storage" };
   }
   const storageKey = row.storageKey;
+  await opts.beforeWrite?.();
   return writeIndex(
     {
       workspaceId,
