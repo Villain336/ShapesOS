@@ -43,6 +43,7 @@
 // saved after every step); build-mode turns go to the worker straight away.
 // The request answers `queued` and the run keeps streaming its events.
 
+import { loadInstructionsBlock } from "@/lib/instructions/workspace-instructions";
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRole } from "@prisma/client";
 import { getLlmProviderFor } from "@/lib/llm";
@@ -375,6 +376,8 @@ export interface WorkspaceContextParts {
   nudge?: string | null;
   /** Phase 17 (A3): the thread's "facts so far" summary (labelled; never replaces the transcript). */
   factsSummary?: string | null;
+  /** Phase 25: admin-written shared workspace instructions (guidance, lower priority; "" when unset). */
+  sharedInstructions?: string;
   /** Phase 22 (chat): how the thread's mode shapes this turn (Plan mode guidance). */
   modeNote?: string | null;
 }
@@ -391,6 +394,8 @@ export function workspaceContextBlock(parts: WorkspaceContextParts): string {
     "",
     parts.intelligence ?? "",
     parts.intelligence ? "" : null,
+    parts.sharedInstructions ?? "",
+    parts.sharedInstructions ? "" : null,
     "## PROJECT CONTEXT",
     parts.projectContext,
     parts.supplements ? `\n${parts.supplements}` : "",
@@ -908,10 +913,11 @@ export async function delegatedChildSystemPrompt(
   agentKey: AgentKey,
   grant: readonly ToolGroup[],
 ): Promise<{ system: string; context: string }> {
-  const [projectContext, supplements, deleg] = await Promise.all([
+  const [projectContext, supplements, deleg, sharedInstructions] = await Promise.all([
     buildProjectContext(projectId, workspaceId),
     buildAgentSupplements(projectId),
     loadDelegationSettings(workspaceId).catch(() => null),
+    loadInstructionsBlock(workspaceId),
   ]);
   const system = staticSystemPrompt({
     agentKey,
@@ -919,7 +925,7 @@ export async function delegatedChildSystemPrompt(
     delegation: { autoDelegation: deleg?.autoDelegation ?? true, canDelegate: grant.includes("delegate") },
     deliverable: true,
   });
-  return { system, context: workspaceContextBlock({ projectContext, supplements }) };
+  return { system, context: workspaceContextBlock({ projectContext, supplements, sharedInstructions }) };
 }
 
 /** The system prompt + opening messages of a fresh live turn. */
@@ -932,7 +938,7 @@ async function freshTurnPrompt(
 ): Promise<{ system: string; messages: ChatMessage[] }> {
   const agentKey = input.agentKey ?? "lead";
   const grant = input.grant ?? null;
-  const [projectContext, supplements, attachmentSection, intelligenceSection, history, factsSummary] = await Promise.all([
+  const [projectContext, supplements, attachmentSection, intelligenceSection, history, factsSummary, sharedInstructions] = await Promise.all([
     buildProjectContext(input.projectId, input.workspaceId),
     buildAgentSupplements(input.projectId),
     buildAttachmentSection(input.projectId, input.threadId, input.attachmentIds),
@@ -942,6 +948,8 @@ async function freshTurnPrompt(
     threadHistory(input.threadId, trimmed),
     // Phase 17 (A3): the thread's "facts so far" summary (lib/chat/facts.ts).
     loadThreadFacts(input.threadId).catch(() => null),
+    // Phase 25: admin-written shared instructions (guidance only).
+    loadInstructionsBlock(input.workspaceId),
   ]);
   // Phase 16: delegation guidance in the static prefix; the cheap pre-check's
   // nudge for this request goes with the dynamic context (the model decides;
@@ -956,6 +964,7 @@ async function freshTurnPrompt(
   const context = workspaceContextBlock({
     projectContext,
     intelligence: intelligenceSection,
+    sharedInstructions,
     supplements: [supplements, attachmentSection].filter(Boolean).join("\n\n"),
     nudge: autoDelegation && grantCanDelegate(grant) ? delegationNudge(trimmed) : null,
     factsSummary,
