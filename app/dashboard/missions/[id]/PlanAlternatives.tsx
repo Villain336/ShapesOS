@@ -37,7 +37,7 @@ function PlanComparison({ alternatives, currentRevision }: { alternatives: Alt[]
       <summary className="cursor-pointer text-sm font-semibold text-ink">Compare steps side by side</summary>
       <p className="mt-2 text-xs text-muted">
         These are variants of one template plan, not independent runs, laid next to each other step by step. Nothing was run to produce this, and there is no time or cost estimate.
-        Differences are shown against the first variant.
+        Tier and checkpoint are labels on each step. Differences are shown against the first variant.
       </p>
       <div role="table" aria-label="Plan variants compared" className="mt-2 text-xs">
         <div role="row" className="grid gap-2 border-b border-hairline pb-1 font-semibold text-ink" style={{ gridTemplateColumns: cols }}>
@@ -54,7 +54,7 @@ function PlanComparison({ alternatives, currentRevision }: { alternatives: Alt[]
             <span role="rowheader" className="text-ink">{r.title}</span>
             {r.cells.map((c, i) => (
               <span role="cell" key={alternatives[i].id} data-diff={r.diff[i]} className={r.diff[i] === "missing" ? "text-muted" : r.diff[i] === "changed" ? "font-semibold text-ink" : "text-ink"}>
-                {c === null ? "Not in this variant" : `${c.executor}${c.tier > 0 ? `, acts outside (tier ${c.tier})` : ", drafts only"}${c.checkpointAfter ? ", checkpoint after" : ""}`}
+                {c === null ? "Not in this variant" : `${c.executor}, ${c.tier > 0 ? `marked tier ${c.tier} (acts outside)` : "marked tier 0 (no outside action)"}${c.checkpointAfter ? ", checkpoint label" : ""}`}
               </span>
             ))}
           </div>
