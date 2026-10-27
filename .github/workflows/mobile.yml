@@ -1,0 +1,56 @@
+# ShapesOS mobile - validation only (typecheck, unit tests, react-native-web
+# render of the Docs screen). No deploy, no publish, no secrets, no paid
+# services. Runs only when mobile/ or this file changes.
+
+name: mobile
+
+on:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile.yml"
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile.yml"
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Render the Docs screen with react-native-web
+        # Not a phone: the real React Native screen laid out by
+        # react-native-web in Chrome at 390x844, against an in-page fake of
+        # the Office docs routes. Dev-only packages, nothing is saved to the
+        # lockfile.
+        run: |
+          npm install --no-save react-native-web@0.21.4 react-dom@19.3.0 esbuild playwright-core
+          CHROME_PATH="$(command -v google-chrome || command -v chromium)" node web-harness/run.mjs
+
+      - name: Upload Docs screen renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-docs-renders
+          path: mobile/web-harness/out/*.png
+          if-no-files-found: warn
