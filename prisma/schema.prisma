@@ -798,6 +798,8 @@ model Workspace {
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
   workspaceActionBudget       WorkspaceActionBudget?
   univerDocs                  UniverDoc[]
+  univerDocShares             UniverDocShare[]
+  reportShares                ReportShare[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources                 DataSource[]
   serpVendorConfigs           SerpVendorConfig[]
@@ -1525,6 +1527,7 @@ model Report {
   sentAt  DateTime?    @map("sent_at")
 
   createdAt DateTime @default(now()) @map("created_at")
+  shares    ReportShare[]
 
   @@map("reports")
 }
@@ -1536,6 +1539,29 @@ enum ReportStatus {
   ready
   failed
   sent
+}
+
+// Phase 23: tokenized external share links for generated reports (the PDF is
+// what the link exposes — never the workspace, template internals or client).
+model ReportShare {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reportId     String    @map("report_id")
+  report       Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @map("token_hash")
+  tokenHint    String    @map("token_hint") @db.VarChar(8)
+  label        String?
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  openCount    Int       @default(0) @map("open_count")
+  lastOpenedAt DateTime? @map("last_opened_at")
+
+  @@index([workspaceId, reportId])
+  @@map("report_shares")
 }
 
 // Marketr — white-label brand kit (milestone 12). Workspace-scoped; optionally
@@ -9524,9 +9550,37 @@ model UniverDoc {
   noteLinks   NoteLink[]
   versions    UniverDocVersion[]
   collabState UniverDocCollabState?
+  shares      UniverDocShare[]
 
   @@index([workspaceId, kind, updatedAt])
   @@map("univer_docs")
+}
+
+// Phase 23: tokenized external share links for Office docs — the CAD/Studio
+// share pattern extended to the Office surface. Only the SHA-256 of the
+// token is stored; the raw token is returned once at creation. RLS mirrors
+// workspace_file_shares: tenant isolation + one SELECT-only public-lookup
+// policy gated on app.doc_report_share_route (lib/sharing/doc-shares.ts).
+model UniverDocShare {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  docId        String    @map("doc_id")
+  doc          UniverDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @map("token_hash")
+  // Last 4 characters of the token, to tell links apart in the list.
+  tokenHint    String    @map("token_hint") @db.VarChar(8)
+  label        String?
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  openCount    Int       @default(0) @map("open_count")
+  lastOpenedAt DateTime? @map("last_opened_at")
+
+  @@index([workspaceId, docId])
+  @@map("univer_doc_shares")
 }
 
 // ============================================================
