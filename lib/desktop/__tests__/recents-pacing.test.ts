@@ -34,7 +34,7 @@ describe("recentsPostDelay", () => {
     let posts = 0;
     for (let i = 0; i < 60; i++) {
       now += 1000; // one navigation a second
-      const due = now + recentsPostDelay({ now, lastSentAt: last, pausedUntil: null });
+      const due: number = now + recentsPostDelay({ now, lastSentAt: last, pausedUntil: null });
       // the next navigation (1s later) cancels a pending report; only a report that fires counts
       if (due <= now + 1000) {
         last = due;
