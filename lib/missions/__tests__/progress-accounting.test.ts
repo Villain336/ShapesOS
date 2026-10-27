@@ -71,16 +71,16 @@ describe("completedPlanStepKeys", () => {
 
 describe("costSummary", () => {
   it("words the cost model's estimate as an estimate, never as spend or as a billing claim", () => {
-    assert.equal(costSummary(14, 14), " · ~$0.14 model estimate, not metered");
+    assert.equal(costSummary(14, 14), " · ~$0.14 execution estimate, not metered");
     assert.ok(!/spent|billed/.test(costSummary(14, 14)));
   });
   it("keeps metered spend and the estimate apart", () => {
-    assert.equal(costSummary(114, 14), " · $1.00 recorded cost · ~$0.14 model estimate, not metered");
+    assert.equal(costSummary(114, 14), " · $1.00 recorded cost · ~$0.14 execution estimate, not metered");
     assert.equal(costSummary(250, 0), " · $2.50 recorded cost");
   });
   it("discloses a mixed total as both parts, never dropping the estimate", () => {
     const t = costSummary(300, 100);
-    assert.ok(t.includes("$2.00 recorded cost") && t.includes("~$1.00 model estimate, not metered"));
+    assert.ok(t.includes("$2.00 recorded cost") && t.includes("~$1.00 execution estimate, not metered"));
   });
   it("says nothing when there is no cost", () => {
     assert.equal(costSummary(0, 0), "");
