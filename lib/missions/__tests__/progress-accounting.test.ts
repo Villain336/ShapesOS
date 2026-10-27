@@ -2,7 +2,7 @@
 // Run: npx tsx --test lib/missions/__tests__/progress-accounting.test.ts
 //
 // Regression: a mission that had just run its first three steps read "100% of goal, 16/8 steps,
-// $0.14 spent". Every orchestrator hop was counted twice (its route record and its run), the
+// $0.14 spent". Progress divided every event (two per orchestrator hop) by the plan size, the
 // planner's own follow-up runs counted as plan steps, progress was labelled as the business goal, and
 // the cost model's estimate was worded as money spent.
 
@@ -19,17 +19,6 @@ function hop(n: number, label: string, ok = true) {
     { step: ok ? `exec.${n}` : `exec.${n}.error`, args: {} },
   ];
 }
-
-describe("isCountedStep", () => {
-  it("does not count routing records or run-loop bookkeeping", () => {
-    for (const s of ["route.1", "route.12", "complete", "escalate", "terminate", "mission.awaiting_human"]) {
-      assert.equal(isCountedStep(s), false, s);
-    }
-    for (const s of ["exec.1", "exec.2.error", "audit-local-presence", "automation.flow_run"]) {
-      assert.equal(isCountedStep(s), true, s);
-    }
-  });
-});
 
 describe("completedPlanStepKeys", () => {
   it("counts a plan step once its orchestrator run succeeded", () => {
@@ -49,6 +38,11 @@ describe("completedPlanStepKeys", () => {
     assert.deepEqual([...completedPlanStepKeys(events, KEYS)], ["quarter-plan"]);
   });
 
+  it("failed plan work consumes the original step budget but does not complete a plan step", () => {
+    const events = [{ step: "draft-offer", observation: { failure: true } }];
+    assert.equal(completedPlanStepKeys(events, KEYS).size, 0);
+    assert.equal(events.filter((e) => isCountedStep(e.step)).length, 1);
+  });
   it("still counts the engine's own step events by key, once each", () => {
     const events = [{ step: "audit-local-presence" }, { step: "audit-local-presence" }, { step: "automation.flow_run" }];
     assert.deepEqual([...completedPlanStepKeys(events, KEYS)], ["audit-local-presence"]);
@@ -70,19 +64,23 @@ describe("completedPlanStepKeys", () => {
     const done = completedPlanStepKeys(events, KEYS).size;
     assert.equal(done, 3);
     assert.equal(missionProgress(KEYS.length, done, "active"), 3 / 8);
-    const counted = events.filter((e) => isCountedStep(e.step)).length;
-    assert.equal(counted, 8, "eight runs, not sixteen events");
+    // The event count that feeds the maxSteps check keeps its meaning (every non-meta event).
+    assert.equal(events.filter((e) => isCountedStep(e.step)).length, 18);
   });
 });
 
 describe("costSummary", () => {
-  it("words the cost model's estimate as an estimate, never as spend", () => {
-    assert.equal(costSummary(14, 14), " · ~$0.14 estimated, nothing billed");
-    assert.ok(!/spent/.test(costSummary(14, 14)));
+  it("words the cost model's estimate as an estimate, never as spend or as a billing claim", () => {
+    assert.equal(costSummary(14, 14), " · ~$0.14 model estimate, not metered");
+    assert.ok(!/spent|billed/.test(costSummary(14, 14)));
   });
   it("keeps metered spend and the estimate apart", () => {
-    assert.equal(costSummary(114, 14), " · $1.00 spent · ~$0.14 estimated, nothing billed");
-    assert.equal(costSummary(250, 0), " · $2.50 spent");
+    assert.equal(costSummary(114, 14), " · $1.00 recorded cost · ~$0.14 model estimate, not metered");
+    assert.equal(costSummary(250, 0), " · $2.50 recorded cost");
+  });
+  it("discloses a mixed total as both parts, never dropping the estimate", () => {
+    const t = costSummary(300, 100);
+    assert.ok(t.includes("$2.00 recorded cost") && t.includes("~$1.00 model estimate, not metered"));
   });
   it("says nothing when there is no cost", () => {
     assert.equal(costSummary(0, 0), "");
