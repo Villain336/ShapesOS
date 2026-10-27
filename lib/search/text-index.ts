@@ -206,6 +206,7 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
   const hash = sha256(`${extracted.status}\n${text}`);
   const key = target.fileId ? { fileId: target.fileId } : { univerDocId: target.univerDocId! };
   const chunks = extracted.status === "indexed" ? chunkText(text) : [];
+  let unchanged: { chunkCount: number; embeddedCount: number } | null = null;
   const id = await withWorkspaceScope(
     target.workspaceId,
     async (tx) => {
@@ -217,8 +218,12 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
       if (target.stillCurrent && !(await target.stillCurrent(tx))) return null;
       const existing = await tx.searchText.findFirst({
         where: { workspaceId: target.workspaceId, ...key },
-        select: { id: true },
+        select: { id: true, contentSha256: true, chunkCount: true, embeddedCount: true },
       });
+      if (existing && existing.contentSha256 === hash && !opts.force) {
+        unchanged = { chunkCount: existing.chunkCount, embeddedCount: existing.embeddedCount };
+        return existing.id;
+      }
       const data = {
         workspaceId: target.workspaceId,
         source: target.source,
@@ -248,6 +253,9 @@ async function writeIndex(target: Target, extracted: Extracted, opts: IndexOptio
   );
   if (id === null) return { status: "superseded", chunks: 0, embedded: 0 };
   const embedded = opts.embed !== false && chunks.length ? await embedPending(target.workspaceId, id, opts.embedder) : 0;
+  // Assignments inside the transaction callback are not tracked by TypeScript's flow analysis.
+  const prior = unchanged as { chunkCount: number; embeddedCount: number } | null;
+  if (prior) return { status: "unchanged", chunks: prior.chunkCount, embedded: prior.embeddedCount + embedded };
   return { status: extracted.status, chunks: chunks.length, embedded };
 }
 
